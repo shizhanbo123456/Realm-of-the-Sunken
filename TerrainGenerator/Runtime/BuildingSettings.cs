@@ -66,6 +66,8 @@ namespace TerrainGen
         [Min(0)] public int cellsPerProp = 80;
         [Tooltip("建筑物/装饰/灌木/摆件之间的额外间距（世界单位），叠加在各自包围盒半径之上")]
         [Min(0f)] public float propGapPadding = 0.5f;
+        [Tooltip("勾选：装饰/摆件/灌木在格内随机落点，同一格可放多件；取消：每格居中只放一件")]
+        public bool randomPropPosition = true;
         [Tooltip("每条临空外墙边贴藤蔓的概率")]
         [Range(0f, 1f)] public float vineChance = 0.25f;
     }

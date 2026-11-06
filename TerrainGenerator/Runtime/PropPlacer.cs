@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace TerrainGen
 {
-    // 建筑物 / 装饰 / 灌木 / 摆件按面积密度散落（后放的避让先放的），藤蔓贴在地块临空外墙
+    // 建筑物 / 装饰 / 摆件 / 灌木按面积密度散落（后放的避让先放的），藤蔓贴在地块临空外墙
     public static class PropPlacer
     {
         public const string PropsName = "Props";
@@ -41,15 +41,15 @@ namespace TerrainGen
 
             int count = 0;
             count += Scatter(f, s, kit, propsParent, kit.buildings, "Building_", s.cellsPerBuilding, false, false, ox, oz, rng, spots, cache);
-            count += Scatter(f, s, kit, propsParent, kit.decorations, "Decor_", s.cellsPerDecoration, false, true, ox, oz, rng, spots, cache);
-            count += Scatter(f, s, kit, propsParent, kit.bushes, "Bush_", s.cellsPerBush, true, true, ox, oz, rng, spots, cache);
-            count += Scatter(f, s, kit, propsParent, kit.props, "Prop_", s.cellsPerProp, false, true, ox, oz, rng, spots, cache);
+            count += Scatter(f, s, kit, propsParent, kit.decorations, "Decor_", s.cellsPerDecoration, false, s.randomPropPosition, ox, oz, rng, spots, cache);
+            count += Scatter(f, s, kit, propsParent, kit.props, "Prop_", s.cellsPerProp, false, s.randomPropPosition, ox, oz, rng, spots, cache);
+            count += Scatter(f, s, kit, propsParent, kit.bushes, "Bush_", s.cellsPerBush, true, s.randomPropPosition, ox, oz, rng, spots, cache);
             count += PlaceVines(f, s, kit, parent, ox, oz, rng);
             return count;
         }
 
         static int Scatter(BuildingField f, BuildingSettings s, BuildingKitSet kit, Transform parent,
-            List<GameObject> list, string prefix, int cellsPer, bool freeYaw, bool jitter,
+            List<GameObject> list, string prefix, int cellsPer, bool freeYaw, bool randomSpot,
             float ox, float oz, System.Random rng, List<Spot> spots, Dictionary<GameObject, Bounds> cache)
         {
             if (parent == null || list == null || list.Count == 0 || cellsPer <= 0) return 0;
@@ -59,26 +59,32 @@ namespace TerrainGen
             for (int x = 0; x < f.SizeX; x++)
                 for (int z = 0; z < f.SizeZ; z++)
                     if (f.Layer[x, z] >= 0) cells.Add(new Vector2Int(x, z));
+            if (cells.Count == 0) return 0;
 
-            for (int i = cells.Count - 1; i > 0; i--)
+            if (!randomSpot)
             {
-                int j = rng.Next(i + 1);
-                Vector2Int tmp = cells[i];
-                cells[i] = cells[j];
-                cells[j] = tmp;
+                for (int i = cells.Count - 1; i > 0; i--)
+                {
+                    int j = rng.Next(i + 1);
+                    Vector2Int tmp = cells[i];
+                    cells[i] = cells[j];
+                    cells[j] = tmp;
+                }
             }
 
+            // 随机落点模式：每次在随机地板格里取随机点，同一格可以放多件，靠间距约束防重叠
+            int maxTries = randomSpot ? target * 40 + 200 : cells.Count;
             int made = 0;
-            for (int i = 0; i < cells.Count && made < target; i++)
+            for (int i = 0; i < maxTries && made < target; i++)
             {
-                Vector2Int cell = cells[i];
+                Vector2Int cell = randomSpot ? cells[rng.Next(cells.Count)] : cells[i];
                 int group = f.RegionGroup(cell.x, cell.y);
                 GameObject prefab = kit.PickFrom(list, group);
                 if (prefab == null) continue;
                 if (!PrefabBounds.TryGet(prefab, cache, out Bounds b)) continue;
 
                 float radius = Mathf.Max(b.extents.x, b.extents.z);
-                float spread = jitter ? Mathf.Max(0f, s.cellSize * 0.5f - radius) : 0f;
+                float spread = randomSpot ? Mathf.Max(0f, s.cellSize * 0.5f - radius) : 0f;
                 float jx = spread > 0f ? (float)(rng.NextDouble() * 2.0 - 1.0) * spread : 0f;
                 float jz = spread > 0f ? (float)(rng.NextDouble() * 2.0 - 1.0) * spread : 0f;
                 var pos = new Vector3(cell.x * s.cellSize - ox + jx, s.groundHeight - b.min.y, cell.y * s.cellSize - oz + jz);
