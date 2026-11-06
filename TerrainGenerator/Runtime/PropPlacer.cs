@@ -70,13 +70,13 @@ namespace TerrainGen
             for (int i = 0; i < cells.Count && made < target; i++)
             {
                 Vector2Int cell = cells[i];
-                int group = f.RegionGroup(cell.x, cell.z);
+                int group = f.RegionGroup(cell.x, cell.y);
                 GameObject prefab = kit.PickFrom(list, group);
                 if (prefab == null) continue;
                 if (!PrefabBounds.TryGet(prefab, cache, out Bounds b)) continue;
 
                 float radius = Mathf.Max(b.extents.x, b.extents.z);
-                var pos = new Vector3(cell.x * s.cellSize - ox, s.groundHeight - b.min.y, cell.z * s.cellSize - oz);
+                var pos = new Vector3(cell.x * s.cellSize - ox, s.groundHeight - b.min.y, cell.y * s.cellSize - oz);
                 if (Blocked(pos, radius, s.propGapPadding, spots)) continue;
 
                 var go = (GameObject)Object.Instantiate(prefab, parent);
