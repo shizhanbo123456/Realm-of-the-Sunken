@@ -6,7 +6,7 @@ namespace TerrainGen.EditorTools
 {
     public class ModularTerrainWindow : EditorWindow
     {
-        const string ConfigFolder = "Assets/TerrainGenerator/Config";
+        const string ConfigFolder = "Assets/Scripts/TerrainGenerator/Config";
 
         BuildingSettings settings;
         BuildingKitSet kit;

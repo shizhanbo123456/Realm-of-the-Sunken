@@ -34,6 +34,12 @@ namespace TerrainGen
             return true;
         }
 
+        // 只按 Mesh 算（不看 BoxCollider），供编辑器预处理工具用
+        public static bool TryGetMeshBounds(GameObject prefab, out Bounds bounds)
+        {
+            return FromMesh(prefab, out bounds);
+        }
+
         static bool FromMesh(GameObject prefab, out Bounds bounds)
         {
             bounds = default;
