@@ -142,7 +142,8 @@ namespace TerrainGen
                             case 2: pos = new Vector3((x0 + x1) * 0.5f, 0f, z0); break;
                             default: pos = new Vector3(x0, 0f, (z0 + z1) * 0.5f); break;
                         }
-                        pos.y = (float)rng.NextDouble() * s.groundHeight;
+                        // 只在地块上半部分高度贴
+                        pos.y = s.groundHeight * (0.5f + 0.5f * (float)rng.NextDouble());
 
                         var go = (GameObject)Object.Instantiate(prefab, container.transform);
                         go.name = "Vine_" + prefab.name;
