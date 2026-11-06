@@ -15,6 +15,8 @@ namespace TerrainGen
 
         [Header("房间划分")]
         public int seed = 20261105;
+        [Tooltip("生成数据版本号：改过生成逻辑或素材表后 +1，运行时会按 种子 + 版本号 找缓存文件")]
+        [Min(1)] public int version = 1;
         [Tooltip("房间最大边长（格），地图越大房间自动越多")]
         [Min(4)] public int maxRoomCells = 12;
         [Tooltip("单个房间最少几格")]

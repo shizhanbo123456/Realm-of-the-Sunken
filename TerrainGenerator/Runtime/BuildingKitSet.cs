@@ -75,6 +75,42 @@ namespace TerrainGen
         // 同一区域固定用高/矮其中一种，避免一格一根高、一格一根矮
         public bool UseTallPost(int group) => ((group * 733 ^ variantSeed * 29) & 1) == 1;
 
+        // 摆放数据只存"类别 + 列表下标"，运行时按这两个信息还原预制体
+        public List<GameObject> GetList(TerrainItemKind kind)
+        {
+            switch (kind)
+            {
+                case TerrainItemKind.Ground: return ground;
+                case TerrainItemKind.Fence: return fences;
+                case TerrainItemKind.PostShort: return shortPosts;
+                case TerrainItemKind.PostTall: return tallPosts;
+                case TerrainItemKind.Support: return supports;
+                case TerrainItemKind.Building: return buildings;
+                case TerrainItemKind.Decoration: return decorations;
+                case TerrainItemKind.Prop: return props;
+                case TerrainItemKind.Bush: return bushes;
+                case TerrainItemKind.Vine: return vines;
+                case TerrainItemKind.Obstacle: return obstacles;
+                case TerrainItemKind.ObstacleDecor: return obstacleDecorations;
+                case TerrainItemKind.Floating: return floatingDecorations;
+                case TerrainItemKind.Fish: return fishSchools;
+                default: return null;
+            }
+        }
+
+        public int IndexOf(TerrainItemKind kind, GameObject prefab)
+        {
+            List<GameObject> list = GetList(kind);
+            return list == null ? -1 : list.IndexOf(prefab);
+        }
+
+        public GameObject GetPrefab(TerrainItemKind kind, int index)
+        {
+            List<GameObject> list = GetList(kind);
+            if (list == null || index < 0 || index >= list.Count) return null;
+            return list[index];
+        }
+
         GameObject Pick(List<GameObject> list, int group)
         {
             if (list == null || list.Count == 0) return null;

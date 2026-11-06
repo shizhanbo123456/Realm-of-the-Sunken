@@ -5,38 +5,32 @@ namespace TerrainGen
     public class ModularTerrainGenerator : MonoBehaviour
     {
         public BuildingSettings settings;
-        [Tooltip("地面/围栏/石柱/支撑/植被摆件素材表，留空则场景中没有任何装饰预制体")]
+        [Tooltip("地面/围栏/石柱/支撑/植被摆件素材表")]
         public BuildingKitSet kit;
-        [Tooltip("每次生成换一个随机种子")]
-        public bool randomSeed;
-        public int seed = 20261105;
         [Tooltip("生成到哪个节点下，留空则生成到自身")]
         public Transform container;
         public bool generateOnStart;
 
-        BuildingField field;
+        TerrainPropCuller culler;
 
         void Start()
         {
             if (generateOnStart) Generate();
         }
 
-        public GameObject Generate()
+        // 编辑器非播放态：只把数据烘焙到 StreamingAssets/TerrainGenerator 并返回 null
+        // 播放态：优先读缓存数据，缺失则运行期生成，返回挂好数据的 Culler
+        public TerrainPropCuller Generate()
         {
-            if (settings == null) { Debug.LogError("[地形] 未指定生成参数 BuildingSettings", this); return null; }
-            Clear();
-            int useSeed = randomSeed ? System.Environment.TickCount : seed;
-            field = new BuildingField();
-            field.Generate(settings, useSeed);
-
-            Transform parent = container != null ? container : transform;
-            TerrainBuildResult result = TerrainAssembler.Build(field, settings, kit, parent);
-            if (!result.Success)
+            if (settings == null)
             {
-                Debug.LogError("[地形] " + result.error, this);
+                Debug.LogError("[地形] 未指定生成参数 BuildingSettings", this);
                 return null;
             }
-            return result.root;
+
+            Clear();
+            culler = TerrainGenerator.Generate(settings, kit, container != null ? container : transform);
+            return culler;
         }
 
         public void Clear()
@@ -45,12 +39,13 @@ namespace TerrainGen
             for (int i = parent.childCount - 1; i >= 0; i--)
             {
                 Transform child = parent.GetChild(i);
-                if (child.name != TerrainAssembler.RootName) continue;
+                if (child.GetComponent<TerrainPropCuller>() == null) continue;
                 if (Application.isPlaying) Destroy(child.gameObject);
                 else DestroyImmediate(child.gameObject);
             }
+            culler = null;
         }
 
-        public BuildingField Field => field;
+        public TerrainPropCuller Culler => culler;
     }
 }

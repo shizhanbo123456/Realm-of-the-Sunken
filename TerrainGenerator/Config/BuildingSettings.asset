@@ -35,3 +35,18 @@ MonoBehaviour:
   towerMinDistance: 2
   towerMaxDistance: 6
   towerSpacing: 3
+  cellsPerBuilding: 50
+  cellsPerDecoration: 4
+  cellsPerBush: 6
+  cellsPerProp: 1
+  propGapPadding: 0.5
+  randomPropPosition: 1
+  vineChance: 0.25
+  cellsPerObstacle: 20
+  obstacleBaseMinY: -4
+  obstacleBaseMaxY: 6
+  cellsPerObstacleDecoration: 5
+  propScaleRange: 0.2
+  cellsPerFloatingDecoration: 20
+  cellsPerFishSchool: 120
+  floatingExtraHeight: 6

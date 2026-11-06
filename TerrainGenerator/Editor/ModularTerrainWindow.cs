@@ -61,7 +61,7 @@ namespace TerrainGen.EditorTools
             using (new EditorGUILayout.HorizontalScope())
             {
                 if (GUILayout.Button("预览布局", GUILayout.Height(24))) Rebuild();
-                if (GUILayout.Button("生成到场景", GUILayout.Height(24))) GenerateIntoScene();
+                if (GUILayout.Button("烘焙数据", GUILayout.Height(24))) GenerateIntoScene();
                 if (GUILayout.Button("清空场景", GUILayout.Height(24))) ClearScene();
                 if (GUILayout.Button("随机种子", GUILayout.Height(24), GUILayout.Width(72))) SetRandomSeed();
             }
@@ -203,21 +203,18 @@ namespace TerrainGen.EditorTools
             report.Clear();
             if (field == null || dirty || field.SizeX != settings.mapCellsX || field.SizeZ != settings.mapCellsZ) Rebuild();
 
-            GameObject existing = GameObject.Find(TerrainAssembler.RootName);
-            if (existing != null) Undo.DestroyObjectImmediate(existing);
-
-            TerrainBuildResult result = TerrainAssembler.Build(field, settings, kit, null);
-            if (!result.Success)
+            TerrainPlanData data = TerrainGenerator.Bake(settings, kit);
+            if (data == null)
             {
-                summary = "生成失败：" + result.error;
+                summary = "烘焙失败：无法构建摆放数据，检查生成参数与素材表";
                 summaryIsError = true;
-                Log(result.error);
+                Log(summary);
                 return;
             }
 
-            Undo.RegisterCreatedObjectUndo(result.root, "生成建筑");
-            Selection.activeGameObject = result.root;
-            summary = $"生成完成：{field.Rooms.Count} 个房间，{result.decor} 个预制体，{result.points} 个点位。";
+            summary = $"已烘焙 {data.items.Count} 个物件、{data.points.Count} 个点位（{field.Rooms.Count} 个房间）→ "
+                      + TerrainPlanData.PathFor(settings.seed, settings.version)
+                      + "；进播放模式后由 Culler 按区块动态生成";
             summaryIsError = false;
             Log(summary);
         }
@@ -225,15 +222,15 @@ namespace TerrainGen.EditorTools
         void ClearScene()
         {
             report.Clear();
-            GameObject root = GameObject.Find(TerrainAssembler.RootName);
-            if (root == null)
+            TerrainPropCuller[] cullers = Object.FindObjectsOfType<TerrainPropCuller>();
+            if (cullers.Length == 0)
             {
-                summary = "场景里没有 TerrainRoot。";
+                summary = "场景里没有地形节点。";
                 summaryIsError = false;
                 return;
             }
-            Undo.DestroyObjectImmediate(root);
-            summary = "已清空 TerrainRoot。";
+            foreach (TerrainPropCuller c in cullers) Undo.DestroyObjectImmediate(c.gameObject);
+            summary = $"已删除 {cullers.Length} 个地形节点。";
             summaryIsError = false;
         }
 

@@ -3,17 +3,12 @@ using UnityEngine;
 
 namespace TerrainGen
 {
-    // 只按约定摆预制体：地面 6×6×4、原点在底面中心；围墙 6 米长、默认沿 Z 延伸
+    // 只按约定产出摆放数据：地面 6×6×4、原点在底面中心；围墙 6 米长、默认沿 Z 延伸
     public static class BuildingDecorator
     {
-        public const string Name = "Decor";
-
-        public static int Build(BuildingField f, BuildingSettings s, BuildingKitSet kit, Transform parent)
+        public static int BuildPlan(BuildingField f, BuildingSettings s, BuildingKitSet kit, List<TerrainItemData> items)
         {
             if (kit == null) return 0;
-
-            var container = new GameObject(Name);
-            container.transform.SetParent(parent, false);
 
             float c = s.cellSize;
             float ox = (f.SizeX - 1) * 0.5f * c;
@@ -27,19 +22,13 @@ namespace TerrainGen
                 for (int z = 0; z < f.SizeZ; z++)
                 {
                     if (f.Layer[x, z] < 0) continue;
-                    GameObject prefab = kit.PickGround(f.RegionGroup(x, z));
-                    if (prefab == null) continue;
-
-                    var go = (GameObject)Object.Instantiate(prefab, container.transform);
-                    go.name = "Ground_" + prefab.name;
-                    go.transform.localRotation = Quaternion.identity;
-                    go.transform.localPosition = new Vector3(x * c - ox, 0f, z * c - oz);
-                    count++;
+                    count += Add(kit, items, TerrainItemKind.Ground, f.RegionGroup(x, z),
+                        new Vector3(x * c - ox, 0f, z * c - oz), 0f);
                 }
             }
 
             // 围墙：沿边界边铺设；素材默认沿 Z 延伸，所以东西向的边转 90 度
-            // 同时收集每段栏杆的两个端点，保证相邻栏杆之间必有石桩
+            // 同时收集每段栏杆的两个端点，保证相邻栏杆之间必有石柱
             var verts = new List<Vector2Int>();
             var vertGroups = new List<int>();
             var seenVert = new HashSet<long>();
@@ -50,7 +39,6 @@ namespace TerrainGen
                 {
                     if (f.Layer[x, z] < 0) continue;
 
-                    // x*c-ox 是格子中心，格子最小角要再减半格
                     float x0 = x * c - ox - c * 0.5f;
                     float x1 = x0 + c;
                     float z0 = z * c - oz - c * 0.5f;
@@ -61,7 +49,6 @@ namespace TerrainGen
                     {
                         if (!f.NeedWallAt(x, z, d)) continue;
 
-                        // 该段栏杆的两个端点
                         switch (d)
                         {
                             case 0:
@@ -82,9 +69,6 @@ namespace TerrainGen
                                 break;
                         }
 
-                        GameObject prefab = kit.PickFence(group);
-                        if (prefab == null) continue;
-
                         int yaw = (d % 2 == 0 ? 90 : 0) + kit.fenceYawOffset;
                         Vector3 mid;
                         switch (d)
@@ -95,45 +79,35 @@ namespace TerrainGen
                             default: mid = new Vector3(x0, surface, (z0 + z1) * 0.5f); break;
                         }
 
-                        var go = (GameObject)Object.Instantiate(prefab, container.transform);
-                        go.name = "Fence_" + prefab.name;
-                        go.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
-                        go.transform.localPosition = mid;
-                        count++;
+                        count += Add(kit, items, TerrainItemKind.Fence, group, mid, yaw);
                     }
                 }
             }
 
-            // 石桩：每段栏杆的两端各一个，重合的格角只放一个
-            // 支撑：只放在已生成石桩的格角，一律从地块下表面往下（原点为支撑顶部中心）
+            // 石柱：每段栏杆的两端各一个，重合的格角只放一个
+            // 支撑：只生成在高石柱下方，从地块下表面往下
             for (int i = 0; i < verts.Count; i++)
             {
                 Vector2Int v = verts[i];
                 int group = vertGroups[i];
                 var pos = new Vector3(v.x * c - ox - c * 0.5f, surface, v.y * c - oz - c * 0.5f);
 
-                // 同一区域固定用高石柱或矮石柱；对应的列表为空时退回另一类，保证相邻栏杆之间仍有石桩
                 GameObject tallPrefab = kit.UseTallPost(group) ? kit.PickTallPost(group) : null;
-                GameObject postPrefab = tallPrefab != null ? tallPrefab : kit.PickShortPost(group);
-                if (postPrefab == null) continue;
+                GameObject shortPrefab = kit.PickShortPost(group);
 
-                var post = (GameObject)Object.Instantiate(postPrefab, container.transform);
-                post.name = (tallPrefab != null ? "Post_Tall_" : "Post_Short_") + postPrefab.name;
-                post.transform.localRotation = Quaternion.identity;
-                post.transform.localPosition = pos;
-                count++;
+                if (tallPrefab != null)
+                {
+                    count += AddPrefab(kit, items, TerrainItemKind.PostTall, tallPrefab, pos, 0f);
 
-                // 支撑只生成在高石柱下方
-                if (tallPrefab == null) continue;
-
-                GameObject supportPrefab = kit.PickSupport(group);
-                if (supportPrefab == null) continue;
-
-                var support = (GameObject)Object.Instantiate(supportPrefab, container.transform);
-                support.name = "Support_" + supportPrefab.name;
-                support.transform.localRotation = Quaternion.identity;
-                support.transform.localPosition = new Vector3(pos.x, 0f, pos.z);
-                count++;
+                    GameObject supportPrefab = kit.PickSupport(group);
+                    if (supportPrefab != null)
+                        count += AddPrefab(kit, items, TerrainItemKind.Support, supportPrefab,
+                            new Vector3(pos.x, 0f, pos.z), 0f);
+                }
+                else
+                {
+                    count += AddPrefab(kit, items, TerrainItemKind.PostShort, shortPrefab, pos, 0f);
+                }
             }
 
             return count;
@@ -144,6 +118,30 @@ namespace TerrainGen
             if (!seen.Add(((long)cx << 32) | (uint)cz)) return;
             verts.Add(new Vector2Int(cx, cz));
             groups.Add(group);
+        }
+
+        static int Add(BuildingKitSet kit, List<TerrainItemData> items, TerrainItemKind kind, int group, Vector3 pos, float yaw)
+        {
+            return AddPrefab(kit, items, kind, kit.PickFrom(kit.GetList(kind), group), pos, yaw);
+        }
+
+        static int AddPrefab(BuildingKitSet kit, List<TerrainItemData> items, TerrainItemKind kind, GameObject prefab,
+            Vector3 pos, float yaw, float scale = 1f)
+        {
+            if (prefab == null) return 0;
+
+            int index = kit.IndexOf(kind, prefab);
+            if (index < 0) return 0;
+
+            items.Add(new TerrainItemData
+            {
+                kind = kind,
+                prefabIndex = index,
+                position = pos,
+                yaw = yaw,
+                scale = scale,
+            });
+            return 1;
         }
     }
 }
