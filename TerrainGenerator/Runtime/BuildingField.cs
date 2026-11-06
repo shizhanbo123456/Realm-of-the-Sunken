@@ -814,6 +814,15 @@ namespace TerrainGen
             return false;
         }
 
+        // 该边朝外是虚空（地块外轮廓），藤蔓只贴这种面
+        public bool IsOuterEdge(int x, int z, int d)
+        {
+            if (!InBounds(x, z) || Layer[x, z] < 0) return false;
+            int nx = x + DirDelta[d].x;
+            int nz = z + DirDelta[d].y;
+            return !InBounds(nx, nz) || Layer[nx, nz] < 0;
+        }
+
         // 同一区域用同一套素材：房间按房间号分组，走廊按 8 格街区
         public int RegionGroup(int x, int z)
         {

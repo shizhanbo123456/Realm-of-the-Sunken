@@ -21,8 +21,23 @@ namespace TerrainGen
         [Header("支撑（放在高石柱下方，原点为支撑顶部中心）")]
         public List<GameObject> supports = new List<GameObject>();
 
+        [Header("树木（按面积密度随机摆放，底面对齐地面）")]
+        public List<GameObject> trees = new List<GameObject>();
+
+        [Header("装饰（同上，避让树木）")]
+        public List<GameObject> decorations = new List<GameObject>();
+
+        [Header("摆件（同上，避让树木和装饰）")]
+        public List<GameObject> props = new List<GameObject>();
+
+        [Header("藤蔓（贴在地块临空外墙侧面，高度随机）")]
+        public List<GameObject> vines = new List<GameObject>();
+
         [Tooltip("围栏素材长轴不是本地 X 轴时，用这个角度补正")]
         public int fenceYawOffset;
+
+        [Tooltip("藤蔓素材贴面朝向不对时，用这个角度补正")]
+        public int vineYawOffset;
 
         [Tooltip("同一区域挑中同一素材的偏移，换个数字可以整体换一套搭配")]
         public int variantSeed;
@@ -37,6 +52,10 @@ namespace TerrainGen
         public GameObject PickTallPost(int group) => Pick(tallPosts, group);
 
         public GameObject PickSupport(int group) => Pick(supports, group);
+
+        public GameObject PickVine(int group) => Pick(vines, group);
+
+        public GameObject PickFrom(List<GameObject> list, int group) => Pick(list, group);
 
         // 同一区域固定用高/矮其中一种，避免一格一根高、一格一根矮
         public bool UseTallPost(int group) => ((group * 733 ^ variantSeed * 29) & 1) == 1;

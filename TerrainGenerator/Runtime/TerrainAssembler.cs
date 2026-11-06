@@ -34,6 +34,7 @@ namespace TerrainGen
             root.transform.SetParent(parent, false);
 
             int decor = BuildingDecorator.Build(field, s, kit, root.transform);
+            decor += PropPlacer.Place(field, s, kit, root.transform);
             int points = CreatePoints(field, s, root.transform);
             return new TerrainBuildResult(root, points, decor, null);
         }
