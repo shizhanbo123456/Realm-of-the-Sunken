@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace TerrainGen
 {
-    // 装饰 / 灌木 / 摆件按面积密度散落（后放的避让先放的），藤蔓贴在地块临空外墙
+    // 建筑物 / 装饰 / 灌木 / 摆件按面积密度散落（后放的避让先放的），藤蔓贴在地块临空外墙
     public static class PropPlacer
     {
         public const string PropsName = "Props";
@@ -19,7 +19,8 @@ namespace TerrainGen
         {
             if (kit == null) return 0;
 
-            bool wantProps = (kit.decorations.Count > 0 && s.cellsPerDecoration > 0)
+            bool wantProps = (kit.buildings.Count > 0 && s.cellsPerBuilding > 0)
+                             || (kit.decorations.Count > 0 && s.cellsPerDecoration > 0)
                              || (kit.bushes.Count > 0 && s.cellsPerBush > 0)
                              || (kit.props.Count > 0 && s.cellsPerProp > 0);
 
@@ -39,6 +40,7 @@ namespace TerrainGen
             float oz = (f.SizeZ - 1) * 0.5f * s.cellSize;
 
             int count = 0;
+            count += Scatter(f, s, kit, propsParent, kit.buildings, "Building_", s.cellsPerBuilding, false, ox, oz, rng, spots, cache);
             count += Scatter(f, s, kit, propsParent, kit.decorations, "Decor_", s.cellsPerDecoration, false, ox, oz, rng, spots, cache);
             count += Scatter(f, s, kit, propsParent, kit.bushes, "Bush_", s.cellsPerBush, true, ox, oz, rng, spots, cache);
             count += Scatter(f, s, kit, propsParent, kit.props, "Prop_", s.cellsPerProp, false, ox, oz, rng, spots, cache);
