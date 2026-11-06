@@ -56,13 +56,13 @@ namespace TerrainGen
         [Min(1)] public int towerSpacing = 3;
 
         [Header("植被与摆件")]
-        [Tooltip("平均多少格放一棵树，0 = 不生成")]
-        [Min(0)] public int cellsPerTree = 40;
         [Tooltip("平均多少格放一个装饰，0 = 不生成")]
         [Min(0)] public int cellsPerDecoration = 60;
+        [Tooltip("平均多少格放一丛灌木，0 = 不生成")]
+        [Min(0)] public int cellsPerBush = 40;
         [Tooltip("平均多少格放一个摆件，0 = 不生成")]
         [Min(0)] public int cellsPerProp = 80;
-        [Tooltip("树木/装饰/摆件之间的额外间距（世界单位），叠加在各自包围盒半径之上")]
+        [Tooltip("装饰/灌木/摆件之间的额外间距（世界单位），叠加在各自包围盒半径之上")]
         [Min(0f)] public float propGapPadding = 0.5f;
         [Tooltip("每条临空外墙边贴藤蔓的概率")]
         [Range(0f, 1f)] public float vineChance = 0.25f;

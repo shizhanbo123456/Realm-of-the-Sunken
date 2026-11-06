@@ -21,13 +21,13 @@ namespace TerrainGen
         [Header("支撑（放在高石柱下方，原点为支撑顶部中心）")]
         public List<GameObject> supports = new List<GameObject>();
 
-        [Header("树木（按面积密度随机摆放，底面对齐地面）")]
-        public List<GameObject> trees = new List<GameObject>();
-
-        [Header("装饰（同上，避让树木）")]
+        [Header("装饰（按面积密度随机摆放，底面对齐地面）")]
         public List<GameObject> decorations = new List<GameObject>();
 
-        [Header("摆件（同上，避让树木和装饰）")]
+        [Header("灌木（同上，避让装饰）")]
+        public List<GameObject> bushes = new List<GameObject>();
+
+        [Header("摆件（同上，避让装饰和灌木）")]
         public List<GameObject> props = new List<GameObject>();
 
         [Header("藤蔓（贴在地块临空外墙侧面，高度随机）")]
