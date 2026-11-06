@@ -205,11 +205,14 @@ namespace TerrainGen.EditorTools
                     var box = root.GetComponent<BoxCollider>();
                     if (box == null) box = root.AddComponent<BoxCollider>();
                     box.center = bounds.center;
-                    box.size = bounds.size;
-                    box.enabled = mode == Mode.BoxEnabled;
 
-                    if (box.size.x < 0.001f || box.size.y < 0.001f || box.size.z < 0.001f)
-                        Debug.LogWarning($"[地形] {path} 计算出的包围盒有零尺寸轴 {box.size}，请检查该预制体");
+                    // 零厚度轴（贴片类素材）给个极小厚度，避免出现无效碰撞体
+                    Vector3 size = bounds.size;
+                    if (size.x <= 0f) size.x = 0.01f;
+                    if (size.y <= 0f) size.y = 0.01f;
+                    if (size.z <= 0f) size.z = 0.01f;
+                    box.size = size;
+                    box.enabled = mode == Mode.BoxEnabled;
                 }
 
                 if (PrefabUtility.SaveAsPrefabAsset(root, path) == null)
