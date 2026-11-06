@@ -40,16 +40,16 @@ namespace TerrainGen
             float oz = (f.SizeZ - 1) * 0.5f * s.cellSize;
 
             int count = 0;
-            count += Scatter(f, s, kit, propsParent, kit.buildings, "Building_", s.cellsPerBuilding, false, ox, oz, rng, spots, cache);
-            count += Scatter(f, s, kit, propsParent, kit.decorations, "Decor_", s.cellsPerDecoration, false, ox, oz, rng, spots, cache);
-            count += Scatter(f, s, kit, propsParent, kit.bushes, "Bush_", s.cellsPerBush, true, ox, oz, rng, spots, cache);
-            count += Scatter(f, s, kit, propsParent, kit.props, "Prop_", s.cellsPerProp, false, ox, oz, rng, spots, cache);
+            count += Scatter(f, s, kit, propsParent, kit.buildings, "Building_", s.cellsPerBuilding, false, false, ox, oz, rng, spots, cache);
+            count += Scatter(f, s, kit, propsParent, kit.decorations, "Decor_", s.cellsPerDecoration, false, true, ox, oz, rng, spots, cache);
+            count += Scatter(f, s, kit, propsParent, kit.bushes, "Bush_", s.cellsPerBush, true, true, ox, oz, rng, spots, cache);
+            count += Scatter(f, s, kit, propsParent, kit.props, "Prop_", s.cellsPerProp, false, true, ox, oz, rng, spots, cache);
             count += PlaceVines(f, s, kit, parent, ox, oz, rng);
             return count;
         }
 
         static int Scatter(BuildingField f, BuildingSettings s, BuildingKitSet kit, Transform parent,
-            List<GameObject> list, string prefix, int cellsPer, bool freeYaw,
+            List<GameObject> list, string prefix, int cellsPer, bool freeYaw, bool jitter,
             float ox, float oz, System.Random rng, List<Spot> spots, Dictionary<GameObject, Bounds> cache)
         {
             if (parent == null || list == null || list.Count == 0 || cellsPer <= 0) return 0;
@@ -78,7 +78,10 @@ namespace TerrainGen
                 if (!PrefabBounds.TryGet(prefab, cache, out Bounds b)) continue;
 
                 float radius = Mathf.Max(b.extents.x, b.extents.z);
-                var pos = new Vector3(cell.x * s.cellSize - ox, s.groundHeight - b.min.y, cell.y * s.cellSize - oz);
+                float spread = jitter ? Mathf.Max(0f, s.cellSize * 0.5f - radius) : 0f;
+                float jx = spread > 0f ? (float)(rng.NextDouble() * 2.0 - 1.0) * spread : 0f;
+                float jz = spread > 0f ? (float)(rng.NextDouble() * 2.0 - 1.0) * spread : 0f;
+                var pos = new Vector3(cell.x * s.cellSize - ox + jx, s.groundHeight - b.min.y, cell.y * s.cellSize - oz + jz);
                 if (Blocked(pos, radius, s.propGapPadding, spots)) continue;
 
                 var go = (GameObject)Object.Instantiate(prefab, parent);
