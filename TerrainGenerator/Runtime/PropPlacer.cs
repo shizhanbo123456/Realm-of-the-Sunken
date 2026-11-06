@@ -54,7 +54,7 @@ namespace TerrainGen
             count += PlaceObstacles(f, s, kit, parent, ox, oz, rng, obstacles, reserved, cache);
             count += PlaceObstacleDecor(f, s, kit, parent, ox, oz, rng, cache);
             count += PlaceFloating(f, s, kit, parent, ox, oz, rng, reserved, cache);
-            count += PlaceFish(f, s, kit, parent, ox, oz, rng, reserved, cache);
+            count += PlaceFish(f, s, kit, parent, ox, oz, rng, reserved);
             return count;
         }
 
@@ -314,8 +314,9 @@ namespace TerrainGen
         }
 
         // 鱼群：与漂浮装饰同规则（任意位置、地面之上、避开障碍与建筑物的生成点）
+        // 不读包围盒，预制体没有 Mesh/碰撞体也能生成，直接按采样点摆放
         static int PlaceFish(BuildingField f, BuildingSettings s, BuildingKitSet kit, Transform parent,
-            float ox, float oz, System.Random rng, HashSet<long> reserved, Dictionary<GameObject, Bounds> cache)
+            float ox, float oz, System.Random rng, HashSet<long> reserved)
         {
             if (kit.fishSchools.Count == 0 || s.cellsPerFishSchool <= 0) return 0;
 
@@ -337,13 +338,12 @@ namespace TerrainGen
 
                 GameObject prefab = kit.PickFrom(kit.fishSchools, f.RegionGroup(gx, gz));
                 if (prefab == null) continue;
-                if (!PrefabBounds.TryGet(prefab, cache, out Bounds b)) continue;
 
-                float bottom = s.groundHeight + (float)rng.NextDouble() * s.floatingExtraHeight;
+                float y = s.groundHeight + (float)rng.NextDouble() * s.floatingExtraHeight;
                 var go = (GameObject)Object.Instantiate(prefab, container.transform);
                 go.name = "Fish_" + prefab.name;
-                go.transform.localRotation = Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f);
-                go.transform.localPosition = new Vector3(cx, bottom - b.min.y, cz);
+                go.transform.localRotation = Quaternion.identity;
+                go.transform.localPosition = new Vector3(cx, y, cz);
                 made++;
             }
             return made;
