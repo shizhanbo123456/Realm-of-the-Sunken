@@ -39,6 +39,11 @@ namespace TerrainGen
             }
 
             // 围墙：沿边界边铺设；素材默认沿 Z 延伸，所以东西向的边转 90 度
+            // 同时收集每段栏杆的两个端点，保证相邻栏杆之间必有石桩
+            var verts = new List<Vector2Int>();
+            var vertGroups = new List<int>();
+            var seenVert = new HashSet<long>();
+
             for (int x = 0; x < f.SizeX; x++)
             {
                 for (int z = 0; z < f.SizeZ; z++)
@@ -55,6 +60,28 @@ namespace TerrainGen
                     for (int d = 0; d < 4; d++)
                     {
                         if (!f.NeedWallAt(x, z, d)) continue;
+
+                        // 该段栏杆的两个端点
+                        switch (d)
+                        {
+                            case 0:
+                                AddVert(verts, vertGroups, seenVert, x, z + 1, group);
+                                AddVert(verts, vertGroups, seenVert, x + 1, z + 1, group);
+                                break;
+                            case 1:
+                                AddVert(verts, vertGroups, seenVert, x + 1, z, group);
+                                AddVert(verts, vertGroups, seenVert, x + 1, z + 1, group);
+                                break;
+                            case 2:
+                                AddVert(verts, vertGroups, seenVert, x, z, group);
+                                AddVert(verts, vertGroups, seenVert, x + 1, z, group);
+                                break;
+                            default:
+                                AddVert(verts, vertGroups, seenVert, x, z, group);
+                                AddVert(verts, vertGroups, seenVert, x, z + 1, group);
+                                break;
+                        }
+
                         GameObject prefab = kit.PickFence(group);
                         if (prefab == null) continue;
 
@@ -77,43 +104,42 @@ namespace TerrainGen
                 }
             }
 
-            // 石桩：只放在两条边界边交汇的格角，重叠的角只放一个
-            var corners = new HashSet<long>();
-            for (int x = 0; x < f.SizeX; x++)
+            // 石桩：每段栏杆的两端各一个，重合的格角只放一个
+            // 支撑：只放在已生成石桩的格角，竖直位置随机取地块上表面或下表面（原点为支撑顶部中心）
+            var rng = new System.Random(s.seed ^ 0x2F6E2B1);
+            for (int i = 0; i < verts.Count; i++)
             {
-                for (int z = 0; z < f.SizeZ; z++)
-                {
-                    if (f.Layer[x, z] < 0) continue;
-                    int group = f.RegionGroup(x, z);
-                    bool w = f.NeedWallAt(x, z, 3);
-                    bool e = f.NeedWallAt(x, z, 1);
-                    bool sEdge = f.NeedWallAt(x, z, 2);
-                    bool n = f.NeedWallAt(x, z, 0);
+                Vector2Int v = verts[i];
+                int group = vertGroups[i];
+                var pos = new Vector3(v.x * c - ox - c * 0.5f, surface, v.y * c - oz - c * 0.5f);
 
-                    count += TryPost(x, z, w && sEdge, group, kit, ox, oz, c, surface, container.transform, corners);
-                    count += TryPost(x + 1, z, e && sEdge, group, kit, ox, oz, c, surface, container.transform, corners);
-                    count += TryPost(x + 1, z + 1, e && n, group, kit, ox, oz, c, surface, container.transform, corners);
-                    count += TryPost(x, z + 1, w && n, group, kit, ox, oz, c, surface, container.transform, corners);
-                }
+                GameObject postPrefab = kit.PickPost(group);
+                if (postPrefab == null) continue;
+
+                var post = (GameObject)Object.Instantiate(postPrefab, container.transform);
+                post.name = "Post_" + postPrefab.name;
+                post.transform.localRotation = Quaternion.identity;
+                post.transform.localPosition = pos;
+                count++;
+
+                GameObject supportPrefab = kit.PickSupport(group);
+                if (supportPrefab == null) continue;
+
+                var support = (GameObject)Object.Instantiate(supportPrefab, container.transform);
+                support.name = "Support_" + supportPrefab.name;
+                support.transform.localRotation = Quaternion.identity;
+                support.transform.localPosition = new Vector3(pos.x, rng.Next(2) == 0 ? 0f : surface, pos.z);
+                count++;
             }
 
             return count;
         }
 
-        static int TryPost(int cx, int cz, bool atCorner, int group, BuildingKitSet kit,
-            float ox, float oz, float cell, float surface, Transform parent, HashSet<long> seen)
+        static void AddVert(List<Vector2Int> verts, List<int> groups, HashSet<long> seen, int cx, int cz, int group)
         {
-            if (!atCorner) return 0;
-            if (!seen.Add(((long)cx << 32) | (uint)cz)) return 0;
-
-            GameObject prefab = kit.PickPost(group);
-            if (prefab == null) return 0;
-
-            var go = (GameObject)Object.Instantiate(prefab, parent);
-            go.name = "Post_" + prefab.name;
-            go.transform.localRotation = Quaternion.identity;
-            go.transform.localPosition = new Vector3(cx * cell - ox - cell * 0.5f, surface, cz * cell - oz - cell * 0.5f);
-            return 1;
+            if (!seen.Add(((long)cx << 32) | (uint)cz)) return;
+            verts.Add(new Vector2Int(cx, cz));
+            groups.Add(group);
         }
     }
 }

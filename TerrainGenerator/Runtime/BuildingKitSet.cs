@@ -12,8 +12,11 @@ namespace TerrainGen
         [Header("围栏（沿边界边铺设）")]
         public List<GameObject> fences = new List<GameObject>();
 
-        [Header("石桩（放在边界拐角）")]
+        [Header("石桩（放在每段栏杆两端的格角）")]
         public List<GameObject> posts = new List<GameObject>();
+
+        [Header("支撑（放在有石桩的格角，原点为支撑顶部中心）")]
+        public List<GameObject> supports = new List<GameObject>();
 
         [Tooltip("围栏素材长轴不是本地 X 轴时，用这个角度补正")]
         public int fenceYawOffset;
@@ -27,6 +30,8 @@ namespace TerrainGen
         public GameObject PickFence(int group) => Pick(fences, group);
 
         public GameObject PickPost(int group) => Pick(posts, group);
+
+        public GameObject PickSupport(int group) => Pick(supports, group);
 
         GameObject Pick(List<GameObject> list, int group)
         {
