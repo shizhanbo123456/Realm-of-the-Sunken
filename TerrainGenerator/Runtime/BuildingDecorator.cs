@@ -105,8 +105,7 @@ namespace TerrainGen
             }
 
             // 石桩：每段栏杆的两端各一个，重合的格角只放一个
-            // 支撑：只放在已生成石桩的格角，竖直位置随机取地块上表面或下表面（原点为支撑顶部中心）
-            var rng = new System.Random(s.seed ^ 0x2F6E2B1);
+            // 支撑：只放在已生成石桩的格角，一律从地块下表面往下（原点为支撑顶部中心）
             for (int i = 0; i < verts.Count; i++)
             {
                 Vector2Int v = verts[i];
@@ -128,7 +127,7 @@ namespace TerrainGen
                 var support = (GameObject)Object.Instantiate(supportPrefab, container.transform);
                 support.name = "Support_" + supportPrefab.name;
                 support.transform.localRotation = Quaternion.identity;
-                support.transform.localPosition = new Vector3(pos.x, rng.Next(2) == 0 ? 0f : surface, pos.z);
+                support.transform.localPosition = new Vector3(pos.x, 0f, pos.z);
                 count++;
             }
 
