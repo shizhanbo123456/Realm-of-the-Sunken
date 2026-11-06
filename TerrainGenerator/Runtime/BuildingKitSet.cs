@@ -36,6 +36,15 @@ namespace TerrainGen
         [Header("藤蔓（贴在地块临空外墙侧面，高度随机）")]
         public List<GameObject> vines = new List<GameObject>();
 
+        [Header("障碍（放在无地面格，允许压地面但不能整块落在地面上）")]
+        public List<GameObject> obstacles = new List<GameObject>();
+
+        [Header("障碍装饰（放在无地面格，高度在下表面与上表面之间）")]
+        public List<GameObject> obstacleDecorations = new List<GameObject>();
+
+        [Header("漂浮装饰（任意位置，不压障碍和建筑物，高度在地面之上）")]
+        public List<GameObject> floatingDecorations = new List<GameObject>();
+
         [Tooltip("围栏素材长轴不是本地 X 轴时，用这个角度补正")]
         public int fenceYawOffset;
 

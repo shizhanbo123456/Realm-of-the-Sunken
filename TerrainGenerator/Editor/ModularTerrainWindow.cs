@@ -257,7 +257,7 @@ namespace TerrainGen.EditorTools
             kit = CreateInstance<BuildingKitSet>();
             AssetDatabase.CreateAsset(kit, path);
             AssetDatabase.SaveAssets();
-            summary = "已新建空素材表，请把地面 / 围墙 / 矮石柱 / 高石柱 / 支撑 / 建筑物 / 装饰 / 灌木 / 摆件 / 藤蔓预制体拖进十个列表。";
+            summary = "已新建空素材表，请把地面 / 围墙 / 矮石柱 / 高石柱 / 支撑 / 建筑物 / 装饰 / 灌木 / 摆件 / 藤蔓 / 障碍 / 障碍装饰 / 漂浮装饰预制体拖进十三个列表。";
             summaryIsError = false;
         }
 

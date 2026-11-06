@@ -40,6 +40,15 @@ namespace TerrainGen.EditorTools
         [MenuItem("Tools/模块化地形/碰撞体预处理/藤蔓")]
         static void ProcessVines() => Run(k => k.vines, "藤蔓");
 
+        [MenuItem("Tools/模块化地形/碰撞体预处理/障碍")]
+        static void ProcessObstacles() => Run(k => k.obstacles, "障碍");
+
+        [MenuItem("Tools/模块化地形/碰撞体预处理/障碍装饰")]
+        static void ProcessObstacleDecorations() => Run(k => k.obstacleDecorations, "障碍装饰");
+
+        [MenuItem("Tools/模块化地形/碰撞体预处理/漂浮装饰")]
+        static void ProcessFloatingDecorations() => Run(k => k.floatingDecorations, "漂浮装饰");
+
         static void Run(Func<BuildingKitSet, List<GameObject>> select, string category)
         {
             var kit = AssetDatabase.LoadAssetAtPath<BuildingKitSet>(KitPath);

@@ -70,5 +70,21 @@ namespace TerrainGen
         public bool randomPropPosition = true;
         [Tooltip("每条临空外墙边贴藤蔓的概率")]
         [Range(0f, 1f)] public float vineChance = 0.25f;
+
+        [Header("障碍")]
+        [Tooltip("平均多少格虚空放一个障碍，0 = 不生成")]
+        [Min(0)] public int cellsPerObstacle = 60;
+        [Tooltip("障碍底面的竖直随机范围下限（世界 Y）")]
+        public float obstacleBaseMinY = 0f;
+        [Tooltip("障碍底面的竖直随机范围上限（世界 Y）")]
+        public float obstacleBaseMaxY = 4f;
+        [Tooltip("平均多少格虚空放一个障碍装饰，0 = 不生成")]
+        [Min(0)] public int cellsPerObstacleDecoration = 80;
+
+        [Header("漂浮装饰")]
+        [Tooltip("平均多少格放一个漂浮装饰，0 = 不生成")]
+        [Min(0)] public int cellsPerFloatingDecoration = 150;
+        [Tooltip("漂浮装饰底面在地面之上再抬高的随机上限")]
+        [Min(0f)] public float floatingExtraHeight = 6f;
     }
 }
