@@ -112,14 +112,19 @@ namespace TerrainGen
                 int group = vertGroups[i];
                 var pos = new Vector3(v.x * c - ox - c * 0.5f, surface, v.y * c - oz - c * 0.5f);
 
-                GameObject postPrefab = kit.PickPost(group);
+                // 同一区域固定用高石柱或矮石柱；对应的列表为空时退回另一类，保证相邻栏杆之间仍有石桩
+                GameObject tallPrefab = kit.UseTallPost(group) ? kit.PickTallPost(group) : null;
+                GameObject postPrefab = tallPrefab != null ? tallPrefab : kit.PickShortPost(group);
                 if (postPrefab == null) continue;
 
                 var post = (GameObject)Object.Instantiate(postPrefab, container.transform);
-                post.name = "Post_" + postPrefab.name;
+                post.name = (tallPrefab != null ? "Post_Tall_" : "Post_Short_") + postPrefab.name;
                 post.transform.localRotation = Quaternion.identity;
                 post.transform.localPosition = pos;
                 count++;
+
+                // 支撑只生成在高石柱下方
+                if (tallPrefab == null) continue;
 
                 GameObject supportPrefab = kit.PickSupport(group);
                 if (supportPrefab == null) continue;

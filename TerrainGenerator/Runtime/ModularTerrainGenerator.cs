@@ -5,7 +5,7 @@ namespace TerrainGen
     public class ModularTerrainGenerator : MonoBehaviour
     {
         public BuildingSettings settings;
-        [Tooltip("地面/围栏/石桩素材表，留空则只生成素地面和墙")]
+        [Tooltip("地面/围栏/石柱/支撑素材表，留空则场景中没有任何装饰预制体")]
         public BuildingKitSet kit;
         [Tooltip("每次生成换一个随机种子")]
         public bool randomSeed;

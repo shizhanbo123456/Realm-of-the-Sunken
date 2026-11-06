@@ -12,10 +12,13 @@ namespace TerrainGen
         [Header("围栏（沿边界边铺设）")]
         public List<GameObject> fences = new List<GameObject>();
 
-        [Header("石桩（放在每段栏杆两端的格角）")]
-        public List<GameObject> posts = new List<GameObject>();
+        [Header("矮石柱（放在每段栏杆两端的格角）")]
+        public List<GameObject> shortPosts = new List<GameObject>();
 
-        [Header("支撑（放在有石桩的格角，原点为支撑顶部中心）")]
+        [Header("高石柱（同上，且下方会生成支撑）")]
+        public List<GameObject> tallPosts = new List<GameObject>();
+
+        [Header("支撑（放在高石柱下方，原点为支撑顶部中心）")]
         public List<GameObject> supports = new List<GameObject>();
 
         [Tooltip("围栏素材长轴不是本地 X 轴时，用这个角度补正")]
@@ -29,9 +32,14 @@ namespace TerrainGen
 
         public GameObject PickFence(int group) => Pick(fences, group);
 
-        public GameObject PickPost(int group) => Pick(posts, group);
+        public GameObject PickShortPost(int group) => Pick(shortPosts, group);
+
+        public GameObject PickTallPost(int group) => Pick(tallPosts, group);
 
         public GameObject PickSupport(int group) => Pick(supports, group);
+
+        // 同一区域固定用高/矮其中一种，避免一格一根高、一格一根矮
+        public bool UseTallPost(int group) => ((group * 733 ^ variantSeed * 29) & 1) == 1;
 
         GameObject Pick(List<GameObject> list, int group)
         {
