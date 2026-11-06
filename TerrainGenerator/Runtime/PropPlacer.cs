@@ -42,23 +42,24 @@ namespace TerrainGen
             float oz = (f.SizeZ - 1) * 0.5f * s.cellSize;
 
             int count = 0;
-            count += Scatter(f, s, kit, propsParent, kit.buildings, "Building_", s.cellsPerBuilding, false, false, ox, oz, rng, spots, cache);
-            int buildingCount = spots.Count;
-            count += Scatter(f, s, kit, propsParent, kit.decorations, "Decor_", s.cellsPerDecoration, false, s.randomPropPosition, ox, oz, rng, spots, cache);
-            count += Scatter(f, s, kit, propsParent, kit.props, "Prop_", s.cellsPerProp, false, s.randomPropPosition, ox, oz, rng, spots, cache);
-            count += Scatter(f, s, kit, propsParent, kit.bushes, "Bush_", s.cellsPerBush, true, s.randomPropPosition, ox, oz, rng, spots, cache);
+            var reserved = new HashSet<long>();
+            count += Scatter(f, s, kit, propsParent, kit.buildings, "Building_", s.cellsPerBuilding, false, false, ox, oz, rng, spots, cache, reserved);
+            count += Scatter(f, s, kit, propsParent, kit.decorations, "Decor_", s.cellsPerDecoration, false, s.randomPropPosition, ox, oz, rng, spots, cache, null);
+            count += Scatter(f, s, kit, propsParent, kit.props, "Prop_", s.cellsPerProp, false, s.randomPropPosition, ox, oz, rng, spots, cache, null);
+            count += Scatter(f, s, kit, propsParent, kit.bushes, "Bush_", s.cellsPerBush, true, s.randomPropPosition, ox, oz, rng, spots, cache, null);
             count += PlaceVines(f, s, kit, parent, ox, oz, rng);
 
             var obstacles = new List<Spot>();
-            count += PlaceObstacles(f, s, kit, parent, ox, oz, rng, obstacles, cache);
+            count += PlaceObstacles(f, s, kit, parent, ox, oz, rng, obstacles, reserved, cache);
             count += PlaceObstacleDecor(f, s, kit, parent, ox, oz, rng, cache);
-            count += PlaceFloating(f, s, kit, parent, ox, oz, rng, spots, buildingCount, obstacles, cache);
+            count += PlaceFloating(f, s, kit, parent, ox, oz, rng, reserved, cache);
             return count;
         }
 
         static int Scatter(BuildingField f, BuildingSettings s, BuildingKitSet kit, Transform parent,
             List<GameObject> list, string prefix, int cellsPer, bool freeYaw, bool randomSpot,
-            float ox, float oz, System.Random rng, List<Spot> spots, Dictionary<GameObject, Bounds> cache)
+            float ox, float oz, System.Random rng, List<Spot> spots, Dictionary<GameObject, Bounds> cache,
+            HashSet<long> reserved = null)
         {
             if (parent == null || list == null || list.Count == 0 || cellsPer <= 0) return 0;
 
@@ -105,6 +106,7 @@ namespace TerrainGen
                 go.transform.localPosition = pos;
 
                 spots.Add(new Spot { pos = new Vector2(pos.x, pos.z), radius = radius });
+                reserved?.Add(CellKey(cell.x, cell.y));
                 made++;
             }
             return made;
@@ -177,7 +179,7 @@ namespace TerrainGen
 
         // 障碍：锚在虚空格上，允许压到地面，但不能整块都落在地面上；彼此允许重叠但不超过一半
         static int PlaceObstacles(BuildingField f, BuildingSettings s, BuildingKitSet kit, Transform parent,
-            float ox, float oz, System.Random rng, List<Spot> placed, Dictionary<GameObject, Bounds> cache)
+            float ox, float oz, System.Random rng, List<Spot> placed, HashSet<long> reserved, Dictionary<GameObject, Bounds> cache)
         {
             if (kit.obstacles.Count == 0 || s.cellsPerObstacle <= 0) return 0;
 
@@ -224,6 +226,7 @@ namespace TerrainGen
                 go.transform.localPosition = new Vector3(cx, baseY - b.min.y, cz);
 
                 placed.Add(new Spot { pos = flat, radius = radius });
+                reserved.Add(CellKey(cell.x, cell.y));
                 made++;
             }
             return made;
@@ -265,10 +268,10 @@ namespace TerrainGen
             return made;
         }
 
-        // 漂浮装饰：整张图任意位置，高度在地面之上抬 [0, floatingExtraHeight]，不压障碍和建筑物
+        // 漂浮装饰：整张图任意位置，高度在地面之上抬 [0, floatingExtraHeight]
+        // 只避免生成点与障碍/建筑物落在同一格，不做模型层面的重叠检测
         static int PlaceFloating(BuildingField f, BuildingSettings s, BuildingKitSet kit, Transform parent,
-            float ox, float oz, System.Random rng, List<Spot> props, int buildingCount, List<Spot> obstacles,
-            Dictionary<GameObject, Bounds> cache)
+            float ox, float oz, System.Random rng, HashSet<long> reserved, Dictionary<GameObject, Bounds> cache)
         {
             if (kit.floatingDecorations.Count == 0 || s.cellsPerFloatingDecoration <= 0) return 0;
 
@@ -286,14 +289,11 @@ namespace TerrainGen
 
                 int gx = Mathf.Clamp(Mathf.RoundToInt((cx + ox) / s.cellSize), 0, f.SizeX - 1);
                 int gz = Mathf.Clamp(Mathf.RoundToInt((cz + oz) / s.cellSize), 0, f.SizeZ - 1);
+                if (reserved.Contains(CellKey(gx, gz))) continue;
+
                 GameObject prefab = kit.PickFrom(kit.floatingDecorations, f.RegionGroup(gx, gz));
                 if (prefab == null) continue;
                 if (!PrefabBounds.TryGet(prefab, cache, out Bounds b)) continue;
-
-                float radius = Mathf.Max(b.extents.x, b.extents.z);
-                var flat = new Vector2(cx, cz);
-                if (OverlapsAny(flat, radius, obstacles)) continue;
-                if (OverlapsAny(flat, radius, props, buildingCount)) continue;
 
                 float bottom = s.groundHeight + (float)rng.NextDouble() * s.floatingExtraHeight;
                 var go = (GameObject)Object.Instantiate(prefab, container.transform);
@@ -304,6 +304,8 @@ namespace TerrainGen
             }
             return made;
         }
+
+        static long CellKey(int x, int z) => ((long)x << 32) | (uint)z;
 
         static List<Vector2Int> CollectVoidCells(BuildingField f)
         {
@@ -328,14 +330,6 @@ namespace TerrainGen
                     if (x < 0 || z < 0 || x >= f.SizeX || z >= f.SizeZ) return true;
                     if (f.Layer[x, z] < 0) return true;
                 }
-            return false;
-        }
-
-        static bool OverlapsAny(Vector2 pos, float radius, List<Spot> others, int count = -1)
-        {
-            int n = count < 0 ? others.Count : Mathf.Min(count, others.Count);
-            for (int i = 0; i < n; i++)
-                if (OverlapArea(pos, radius, others[i].pos, others[i].radius) > 0f) return true;
             return false;
         }
 
