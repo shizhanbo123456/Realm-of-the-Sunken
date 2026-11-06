@@ -45,6 +45,9 @@ namespace TerrainGen
         [Header("漂浮装饰（任意位置，不压障碍和建筑物，高度在地面之上）")]
         public List<GameObject> floatingDecorations = new List<GameObject>();
 
+        [Header("鱼群（同漂浮装饰规则，最后生成）")]
+        public List<GameObject> fishSchools = new List<GameObject>();
+
         [Tooltip("围栏素材长轴不是本地 X 轴时，用这个角度补正")]
         public int fenceYawOffset;
 

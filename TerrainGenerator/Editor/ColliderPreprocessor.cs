@@ -46,6 +46,7 @@ namespace TerrainGen.EditorTools
             new Entry("障碍", k => k.obstacles, Mode.BoxEnabled),
             new Entry("障碍装饰", k => k.obstacleDecorations, Mode.RemoveOnly),
             new Entry("漂浮装饰", k => k.floatingDecorations, Mode.RemoveOnly),
+            new Entry("鱼群", k => k.fishSchools, Mode.RemoveOnly),
         };
 
         [MenuItem("Tools/模块化地形/碰撞体预处理/全部处理")]
@@ -112,6 +113,9 @@ namespace TerrainGen.EditorTools
 
         [MenuItem("Tools/模块化地形/碰撞体预处理/漂浮装饰")]
         static void ProcessFloatingDecorations() => RunOne("漂浮装饰");
+
+        [MenuItem("Tools/模块化地形/碰撞体预处理/鱼群")]
+        static void ProcessFishSchools() => RunOne("鱼群");
 
         static void RunOne(string name)
         {

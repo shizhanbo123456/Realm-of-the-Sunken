@@ -80,11 +80,15 @@ namespace TerrainGen
         public float obstacleBaseMaxY = 4f;
         [Tooltip("平均多少格虚空放一个障碍装饰，0 = 不生成")]
         [Min(0)] public int cellsPerObstacleDecoration = 80;
+        [Tooltip("障碍/障碍装饰/漂浮装饰的随机缩放幅度：0.5 表示在 0.5~1.5 倍之间随机")]
+        [Range(0f, 0.9f)] public float propScaleRange = 0.5f;
 
-        [Header("漂浮装饰")]
+        [Header("漂浮装饰 / 鱼群")]
         [Tooltip("平均多少格放一个漂浮装饰，0 = 不生成")]
         [Min(0)] public int cellsPerFloatingDecoration = 150;
-        [Tooltip("漂浮装饰底面在地面之上再抬高的随机上限")]
+        [Tooltip("平均多少格放一群鱼，0 = 不生成")]
+        [Min(0)] public int cellsPerFishSchool = 150;
+        [Tooltip("漂浮装饰和鱼群的底面在地面之上再抬高的随机上限")]
         [Min(0f)] public float floatingExtraHeight = 6f;
     }
 }

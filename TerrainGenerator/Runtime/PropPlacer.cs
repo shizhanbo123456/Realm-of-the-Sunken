@@ -10,6 +10,7 @@ namespace TerrainGen
         public const string VinesName = "Vines";
         public const string ObstaclesName = "Obstacles";
         public const string FloatingName = "Floating";
+        public const string FishName = "Fish";
 
         struct Spot
         {
@@ -53,6 +54,7 @@ namespace TerrainGen
             count += PlaceObstacles(f, s, kit, parent, ox, oz, rng, obstacles, reserved, cache);
             count += PlaceObstacleDecor(f, s, kit, parent, ox, oz, rng, cache);
             count += PlaceFloating(f, s, kit, parent, ox, oz, rng, reserved, cache);
+            count += PlaceFish(f, s, kit, parent, ox, oz, rng, reserved, cache);
             return count;
         }
 
@@ -203,7 +205,8 @@ namespace TerrainGen
                 if (prefab == null) continue;
                 if (!PrefabBounds.TryGet(prefab, cache, out Bounds b)) continue;
 
-                float radius = Mathf.Max(b.extents.x, b.extents.z);
+                float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * s.propScaleRange;
+                float radius = Mathf.Max(b.extents.x, b.extents.z) * scale;
                 float cx = cell.x * s.cellSize - ox + (float)(rng.NextDouble() * 2.0 - 1.0) * half;
                 float cz = cell.y * s.cellSize - oz + (float)(rng.NextDouble() * 2.0 - 1.0) * half;
                 var flat = new Vector2(cx, cz);
@@ -222,8 +225,9 @@ namespace TerrainGen
                 float baseY = Mathf.Lerp(s.obstacleBaseMinY, s.obstacleBaseMaxY, (float)rng.NextDouble());
                 var go = (GameObject)Object.Instantiate(prefab, container.transform);
                 go.name = "Obstacle_" + prefab.name;
-                go.transform.localRotation = Quaternion.Euler(0f, rng.Next(4) * 90f, 0f);
-                go.transform.localPosition = new Vector3(cx, baseY - b.min.y, cz);
+                go.transform.localScale = Vector3.one * scale;
+                go.transform.localRotation = Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f);
+                go.transform.localPosition = new Vector3(cx, baseY - b.min.y * scale, cz);
 
                 placed.Add(new Spot { pos = flat, radius = radius });
                 reserved.Add(CellKey(cell.x, cell.y));
@@ -253,7 +257,8 @@ namespace TerrainGen
                 if (prefab == null) continue;
                 if (!PrefabBounds.TryGet(prefab, cache, out Bounds b)) continue;
 
-                float radius = Mathf.Max(b.extents.x, b.extents.z);
+                float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * s.propScaleRange;
+                float radius = Mathf.Max(b.extents.x, b.extents.z) * scale;
                 float spread = Mathf.Max(0f, s.cellSize * 0.5f - radius);
                 float cx = cell.x * s.cellSize - ox + (float)(rng.NextDouble() * 2.0 - 1.0) * spread;
                 float cz = cell.y * s.cellSize - oz + (float)(rng.NextDouble() * 2.0 - 1.0) * spread;
@@ -261,6 +266,7 @@ namespace TerrainGen
 
                 var go = (GameObject)Object.Instantiate(prefab, container.transform);
                 go.name = "ObstacleDecor_" + prefab.name;
+                go.transform.localScale = Vector3.one * scale;
                 go.transform.localRotation = Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f);
                 go.transform.localPosition = new Vector3(cx, y, cz);
                 made++;
@@ -295,9 +301,47 @@ namespace TerrainGen
                 if (prefab == null) continue;
                 if (!PrefabBounds.TryGet(prefab, cache, out Bounds b)) continue;
 
+                float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * s.propScaleRange;
                 float bottom = s.groundHeight + (float)rng.NextDouble() * s.floatingExtraHeight;
                 var go = (GameObject)Object.Instantiate(prefab, container.transform);
                 go.name = "Floating_" + prefab.name;
+                go.transform.localScale = Vector3.one * scale;
+                go.transform.localRotation = Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f);
+                go.transform.localPosition = new Vector3(cx, bottom - b.min.y * scale, cz);
+                made++;
+            }
+            return made;
+        }
+
+        // 鱼群：与漂浮装饰同规则（任意位置、地面之上、避开障碍与建筑物的生成点）
+        static int PlaceFish(BuildingField f, BuildingSettings s, BuildingKitSet kit, Transform parent,
+            float ox, float oz, System.Random rng, HashSet<long> reserved, Dictionary<GameObject, Bounds> cache)
+        {
+            if (kit.fishSchools.Count == 0 || s.cellsPerFishSchool <= 0) return 0;
+
+            var container = new GameObject(FishName);
+            container.transform.SetParent(parent, false);
+            int target = Mathf.Max(1, Mathf.RoundToInt(f.SizeX * f.SizeZ / (float)s.cellsPerFishSchool));
+            float halfW = f.SizeX * s.cellSize * 0.5f;
+            float halfD = f.SizeZ * s.cellSize * 0.5f;
+            int made = 0;
+
+            for (int i = 0; i < target * 40 + 200 && made < target; i++)
+            {
+                float cx = (float)(rng.NextDouble() * 2.0 - 1.0) * halfW;
+                float cz = (float)(rng.NextDouble() * 2.0 - 1.0) * halfD;
+
+                int gx = Mathf.Clamp(Mathf.RoundToInt((cx + ox) / s.cellSize), 0, f.SizeX - 1);
+                int gz = Mathf.Clamp(Mathf.RoundToInt((cz + oz) / s.cellSize), 0, f.SizeZ - 1);
+                if (reserved.Contains(CellKey(gx, gz))) continue;
+
+                GameObject prefab = kit.PickFrom(kit.fishSchools, f.RegionGroup(gx, gz));
+                if (prefab == null) continue;
+                if (!PrefabBounds.TryGet(prefab, cache, out Bounds b)) continue;
+
+                float bottom = s.groundHeight + (float)rng.NextDouble() * s.floatingExtraHeight;
+                var go = (GameObject)Object.Instantiate(prefab, container.transform);
+                go.name = "Fish_" + prefab.name;
                 go.transform.localRotation = Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f);
                 go.transform.localPosition = new Vector3(cx, bottom - b.min.y, cz);
                 made++;
