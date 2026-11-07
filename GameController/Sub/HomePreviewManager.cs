@@ -6,26 +6,31 @@ public class HomePreviewManager : ClientSubManager
 {
     private readonly List<GameObject> views = new();
 
+    // 预览模型未做 EntityAnim.Init（无 EntityData），UpCenter 会走非骨骼分支 = 模型高度的 0.75
+    private EntityModelInfo attackerModel;
+    private EntityModelInfo defenserModel;
+
     // 首页：只摆当前选中的攻/守各一个（机位与朝向由 ResetHomeView / LookAtHome 控制）
     public void RefreshHome(int attackIndex, int defenseIndex)
     {
         ClearViews();
         var arranger = HomeArranger();
         if (arranger == null) return;
-        AddView(EntityType.Attack(attackIndex), arranger.AttackerAnchor);
-        AddView(EntityType.Defense(defenseIndex), arranger.DefenserAnchor);
+        attackerModel = AddView(EntityType.Attack(attackIndex), arranger.AttackerAnchor);
+        defenserModel = AddView(EntityType.Defense(defenseIndex), arranger.DefenserAnchor);
     }
 
-    // 首页选角：相机留在 CameraPos，原地转向该阵营角色
+    // 首页选角：相机留在 CameraPos，原地转向该阵营角色的胸口锚点
     public void LookAtHome(PlayerCampType camp)
     {
         var arranger = HomeArranger();
         var cam = Tool.CameraController;
         if (arranger == null || cam == null) return;
-        var target = camp == PlayerCampType.Defense ? arranger.DefenserAnchor : arranger.AttackerAnchor;
-        if (target == null) return;
+        var model = camp == PlayerCampType.Defense ? defenserModel : attackerModel;
+        if (model == null) return; // 模型缺失已由 AddView 报错
+        Vector3 focus = EntityAnchor.UpCenter.GetTransform(model, null).position;
         cam.transform.position = arranger.CameraPos.position;
-        cam.transform.rotation = Quaternion.LookRotation(target.position - arranger.CameraPos.position);
+        cam.transform.rotation = Quaternion.LookRotation(focus - arranger.CameraPos.position);
     }
 
     public void ResetHomeView()
@@ -78,15 +83,19 @@ public class HomePreviewManager : ClientSubManager
             AddView(attack ? EntityType.Attack(indices[i]) : EntityType.Defense(indices[i]), anchors[i]);
     }
 
-    private void AddView(EntityType type, Transform anchor)
+    private EntityModelInfo AddView(EntityType type, Transform anchor)
     {
-        if (anchor == null) return;
+        if (anchor == null) return null;
         if (Tool.AssetsManager == null || !Tool.AssetsManager.TryGetGraphic(type, out var prefab) || prefab == null)
         {
             Debug.LogError($"[展示] 缺少角色图形：{type}");
-            return;
+            return null;
         }
-        views.Add(UnityEngine.Object.Instantiate(prefab, anchor.position, anchor.rotation));
+        var go = UnityEngine.Object.Instantiate(prefab, anchor.position, anchor.rotation);
+        views.Add(go);
+        var model = go.GetComponentInChildren<EntityModelInfo>();
+        if (model == null) Debug.LogError($"[展示] 角色模型缺少 EntityModelInfo，无法算胸口锚点：{type}");
+        return model;
     }
 
     // 首页/大厅没有跟随目标，相机只按机位摆一次；清掉跟随点防止战斗遗留的目标继续拽相机
@@ -105,6 +114,8 @@ public class HomePreviewManager : ClientSubManager
             if (views[i] != null) UnityEngine.Object.Destroy(views[i]);
         }
         views.Clear();
+        attackerModel = null;
+        defenserModel = null;
     }
     #endregion
 }
