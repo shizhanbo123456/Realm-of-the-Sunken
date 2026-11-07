@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -22,12 +21,9 @@ namespace TerrainGen
         Transform contentRoot;
         Transform outOfMapRoot;
         bool warnedOutOfMap;
+        float timer;
         Vector3 lastCheckPos;
         float lastRadius = float.NaN;
-
-        Coroutine loop;
-        WaitForSecondsRealtime wait;
-        float waitInterval = -1f;
 
         public int InstanceCount { get; private set; }
 
@@ -86,52 +82,24 @@ namespace TerrainGen
             lastCheckPos = transform.position;
             lastRadius = visibleDistance;
             SyncVisibility(transform.position);
-
-            if (isActiveAndEnabled && loop == null) loop = StartCoroutine(CheckLoop());
         }
 
-        void OnEnable()
+        // 按间隔判定；未到间隔、或位置没动且半径没变时直接 return，不做任何计算
+        void LateUpdate()
         {
-            if (contentRoot != null && loop == null) loop = StartCoroutine(CheckLoop());
-        }
+            if (chunks.Count == 0) return;
 
-        void OnDisable()
-        {
-            if (loop != null)
-            {
-                StopCoroutine(loop);
-                loop = null;
-            }
-        }
+            timer += Time.unscaledDeltaTime;
+            if (timer < checkInterval) return;
+            timer = 0f;
 
-        // 按间隔轮询：静止时直接跳过（静默），不占用 Update
-        IEnumerator CheckLoop()
-        {
-            while (true)
-            {
-                if (checkInterval > 0f)
-                {
-                    if (wait == null || !Mathf.Approximately(waitInterval, checkInterval))
-                    {
-                        wait = new WaitForSecondsRealtime(checkInterval);
-                        waitInterval = checkInterval;
-                    }
-                    yield return wait;
-                }
-                else
-                {
-                    yield return null;
-                }
+            Vector3 pos = transform.position;
+            if ((pos - lastCheckPos).sqrMagnitude < quietDistance * quietDistance
+                && Mathf.Approximately(visibleDistance, lastRadius)) return;
 
-                Vector3 pos = transform.position;
-                bool moved = (pos - lastCheckPos).sqrMagnitude >= quietDistance * quietDistance;
-                bool radiusChanged = !Mathf.Approximately(visibleDistance, lastRadius);
-                if (!moved && !radiusChanged) continue;
-
-                lastCheckPos = pos;
-                lastRadius = visibleDistance;
-                SyncVisibility(pos);
-            }
+            lastCheckPos = pos;
+            lastRadius = visibleDistance;
+            SyncVisibility(pos);
         }
 
         // 逐块比对目标状态，不做增量记录，避免状态不同步导致"只开不关"
