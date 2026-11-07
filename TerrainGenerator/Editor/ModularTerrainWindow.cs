@@ -319,7 +319,7 @@ namespace TerrainGen.EditorTools
             }
 
             // 项目设置里的 minRegionArea 在 Navigation 面板上没暴露，这里按 m² 换算成体素² 覆盖
-            int minRegion = build.minRegionArea;
+            float minRegion = build.minRegionArea;
             if (minRegionAreaM2 > 0f)
             {
                 float voxelArea = build.voxelSize * build.voxelSize;
@@ -328,7 +328,7 @@ namespace TerrainGen.EditorTools
                     message = "烘焙失败：agent 的 voxelSize 读不到（0），无法把 m² 换算成体素²";
                     return false;
                 }
-                minRegion = Mathf.Max(1, Mathf.RoundToInt(minRegionAreaM2 / voxelArea));
+                minRegion = Mathf.Max(1f, Mathf.Round(minRegionAreaM2 / voxelArea));
                 build.minRegionArea = minRegion;
             }
 
@@ -381,7 +381,7 @@ namespace TerrainGen.EditorTools
 
             string path = SaveNavMeshAsset(data);
             message = $"NavMesh 已烘焙：{sources.Count} 个网格、范围 X {bounds.min.x:0}~{bounds.max.x:0} / Z {bounds.min.z:0}~{bounds.max.z:0}、"
-                      + $"minRegionArea {minRegion} 体素²（≈{minRegion * build.voxelSize * build.voxelSize:0.#} m²）→ {path}";
+                      + $"minRegionArea {minRegion:0} 体素²（≈{minRegion * build.voxelSize * build.voxelSize:0.#} m²）→ {path}";
             return true;
         }
 
