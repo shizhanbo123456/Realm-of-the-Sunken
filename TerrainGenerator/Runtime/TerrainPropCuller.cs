@@ -9,6 +9,9 @@ namespace TerrainGen
         [Tooltip("可见半径（米），以本物体为中心；建议比相机可视范围略大")]
         public float visibleDistance = 250f;
 
+        [Tooltip("显隐中心跟随目标（相机/玩家）；留空则由外部直接移动本物体")]
+        public Transform followTarget;
+
         readonly Dictionary<Vector2Int, Transform> chunkRoots = new Dictionary<Vector2Int, Transform>();
         readonly HashSet<int> activeIds = new HashSet<int>();
         readonly HashSet<int> nextIds = new HashSet<int>();
@@ -22,7 +25,7 @@ namespace TerrainGen
 
         public int InstanceCount { get; private set; }
 
-        // 地形实例的挂载点（TerrainRoot），与本物体是兄弟节点，移动本物体不会带走地形
+        // 地形实例的挂载点（TerrainRoot），与本物体无父子关系，移动本物体不会带走地形
         public Transform ContentRoot => contentRoot;
 
         public void Initialize(TerrainPlanData data, BuildingKitSet kit, Transform content)
@@ -79,6 +82,7 @@ namespace TerrainGen
         void LateUpdate()
         {
             if (index == null) return;
+            if (followTarget != null) transform.position = followTarget.position;
             if (!dirty && (transform.position - lastPosition).sqrMagnitude < 0.0001f) return;
             SyncVisibility();
         }

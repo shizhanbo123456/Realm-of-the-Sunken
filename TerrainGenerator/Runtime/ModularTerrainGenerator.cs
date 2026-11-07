@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace TerrainGen
@@ -36,27 +35,23 @@ namespace TerrainGen
 
         public void Clear()
         {
-            Transform parent = container != null ? container : transform;
-            var doomed = new List<GameObject>();
-
-            // Culler 与内容根是同级的两个节点，两边都要清
-            for (int i = 0; i < parent.childCount; i++)
+            // Culler 在场景根上、内容根挂在 container 下，两处都要清；靠 Culler 上记录的 ContentRoot 找到内容
+            TerrainPropCuller[] found = FindObjectsOfType<TerrainPropCuller>();
+            for (int i = 0; i < found.Length; i++)
             {
-                Transform child = parent.GetChild(i);
-                var found = child.GetComponent<TerrainPropCuller>();
-                if (found == null) continue;
-                if (found.ContentRoot != null && found.ContentRoot.parent == parent)
-                    doomed.Add(found.ContentRoot.gameObject);
-                doomed.Add(child.gameObject);
-            }
-
-            for (int i = 0; i < doomed.Count; i++)
-            {
-                if (doomed[i] == null) continue;
-                if (Application.isPlaying) Destroy(doomed[i]);
-                else DestroyImmediate(doomed[i]);
+                TerrainPropCuller item = found[i];
+                if (item == null) continue;
+                Transform content = item.ContentRoot;
+                DestroyNode(item.gameObject);
+                if (content != null) DestroyNode(content.gameObject);
             }
             culler = null;
+        }
+
+        void DestroyNode(GameObject go)
+        {
+            if (Application.isPlaying) Destroy(go);
+            else DestroyImmediate(go);
         }
 
         public TerrainPropCuller Culler => culler;
