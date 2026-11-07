@@ -45,8 +45,9 @@ namespace TerrainGen
             return data;
         }
 
-        // 服务器一次性铺设：只铺有启用碰撞体的类别，除地面外只留根物体与根碰撞体（碰撞体统一在根上，见 ColliderPreprocessor）
-        public static void SpawnColliderOnly(TerrainPlanData data, BuildingKitSet kit, Transform root)
+        // 服务器一次性铺设：只铺有启用碰撞体的类别；stripMeshes 时除地面外只留根物体与根碰撞体
+        // 烘焙导航时传 stripMeshes = false：类别过滤不变，但保留完整网格，NavMesh 才按真实几何生成
+        public static void SpawnColliderOnly(TerrainPlanData data, BuildingKitSet kit, Transform root, bool stripMeshes = true)
         {
             int placed = 0;
             int stripped = 0;
@@ -63,7 +64,7 @@ namespace TerrainGen
                 go.transform.rotation = Quaternion.Euler(0f, item.yaw, 0f);
                 go.transform.localScale = Vector3.one * item.scale;
 
-                if (item.kind != TerrainItemKind.Ground)
+                if (stripMeshes && item.kind != TerrainItemKind.Ground)
                 {
                     StripToCollider(go);
                     stripped++;
@@ -71,6 +72,11 @@ namespace TerrainGen
                 placed++;
             }
 
+            if (!stripMeshes)
+            {
+                Debug.Log($"[地形] 铺设完成（保留网格，供烘焙导航）：{placed} 个物件");
+                return;
+            }
             Debug.Log($"[地形] 服务器铺设完成：{placed} 个物件（其中 {stripped} 个只保留根碰撞体，其余为地面模型）");
         }
 

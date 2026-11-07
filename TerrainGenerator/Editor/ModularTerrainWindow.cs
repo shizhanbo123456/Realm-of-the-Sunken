@@ -73,7 +73,7 @@ namespace TerrainGen.EditorTools
                 EditorGUILayout.HelpBox(summary, summaryIsError ? MessageType.Error : MessageType.Info);
 
             EditorGUILayout.Space(4);
-            if (GUILayout.Button("烘焙 NavMesh（要求空场景，烘完自动清空临时地形）", GUILayout.Height(24))) BakeNavMesh();
+            if (GUILayout.Button("烘焙 NavMesh（要求空场景，按真实网格生成）", GUILayout.Height(24))) BakeNavMesh();
 
             scroll = EditorGUILayout.BeginScrollView(scroll, GUILayout.ExpandHeight(true));
 
@@ -301,7 +301,7 @@ namespace TerrainGen.EditorTools
             var root = new GameObject(BakeRootName);
             root.transform.position = Vector3.zero;
 
-            TerrainAssembler.SpawnColliderOnly(data, kit, root.transform);
+            TerrainAssembler.SpawnColliderOnly(data, kit, root.transform, stripMeshes: false);
             bool ok = TryBakeNavMesh(root.transform, data.groundHeight, out string message);
 
             // 临时排查用：烘完保留地形，确认完改回 DestroyImmediate(root) 并删掉 ClearBakeRoots 调用
@@ -321,43 +321,40 @@ namespace TerrainGen.EditorTools
                 return false;
             }
 
-            // 不能走 NavMeshBuilder.CollectSources：编辑器态刚 Instantiate 的碰撞体还没同步进物理场景，
-            // 收集到的全在预制体本地位置（原点附近），烘出来只有一小片。这里直接按生成物自己的 BoxCollider 造 source。
+            // 按真实网格烘：取生成物下所有 MeshFilter，门洞、柱隙、栏杆镂空都能保真。
+            // 不用 CollectSources(PhysicsColliders)：编辑器态刚生成的碰撞体还没同步进物理场景，会收错；
+            // 也不用 BoxCollider 包围盒：每个物件糊成一个实心块，通道全没了。
             var sources = new List<NavMeshBuildSource>();
             Bounds bounds = default;
             bool hasBounds = false;
-            int missingBox = 0;
 
-            foreach (Transform item in root)
+            foreach (MeshFilter filter in root.GetComponentsInChildren<MeshFilter>(true))
             {
-                var box = item.GetComponent<BoxCollider>();
-                if (box == null) { missingBox++; continue; }
-
-                float scale = item.localScale.x; // 摆放只做等比缩放
-                Vector3 center = item.position + item.rotation * (box.center * scale);
-                Vector3 size = box.size * scale;
+                Mesh mesh = filter.sharedMesh;
+                if (mesh == null) continue;
 
                 sources.Add(new NavMeshBuildSource
                 {
-                    shape = NavMeshBuildSourceShape.Box,
-                    size = size,
+                    shape = NavMeshBuildSourceShape.Mesh,
+                    mesh = mesh,
                     area = 0,
-                    transform = Matrix4x4.TRS(center, item.rotation, Vector3.one),
+                    transform = filter.transform.localToWorldMatrix,
                 });
 
-                var itemBounds = new Bounds(center, size);
-                if (!hasBounds) { bounds = itemBounds; hasBounds = true; }
-                else bounds.Encapsulate(itemBounds);
+                var renderer = filter.GetComponent<MeshRenderer>();
+                if (renderer == null) continue;
+                if (!hasBounds) { bounds = renderer.bounds; hasBounds = true; }
+                else bounds.Encapsulate(renderer.bounds);
             }
 
-            if (sources.Count == 0)
+            if (sources.Count == 0 || !hasBounds)
             {
-                message = "烘焙失败：没有任何带 BoxCollider 的生成物，检查素材表里的地面预制体";
+                message = "烘焙失败：生成物里没有可用的网格，检查素材表与碰撞体预处理";
                 return false;
             }
 
             bounds.Expand(2f); // 留出 agent 半径余量
-            // Y 只留地面附近：高处/低空的摆件不参与寻路，带着会把体素量拉爆
+            // Y 只留地面附近：高空摆件不参与地面寻路，带着会把体素量拉爆
             Vector3 min = bounds.min;
             Vector3 max = bounds.max;
             min.y = groundY - 6f;
@@ -372,8 +369,7 @@ namespace TerrainGen.EditorTools
             }
 
             string path = SaveNavMeshAsset(data);
-            message = $"NavMesh 已烘焙：{sources.Count} 个 Box 几何、范围 X {bounds.min.x:0}~{bounds.max.x:0} / Z {bounds.min.z:0}~{bounds.max.z:0} → {path}"
-                      + (missingBox > 0 ? $"；另有 {missingBox} 个生成物没有 BoxCollider，未参与烘焙" : string.Empty);
+            message = $"NavMesh 已烘焙：{sources.Count} 个网格、范围 X {bounds.min.x:0}~{bounds.max.x:0} / Z {bounds.min.z:0}~{bounds.max.z:0} → {path}";
             return true;
         }
 
