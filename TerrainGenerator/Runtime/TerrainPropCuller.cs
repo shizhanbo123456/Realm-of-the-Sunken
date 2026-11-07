@@ -7,7 +7,7 @@ namespace TerrainGen
     public class TerrainPropCuller : MonoBehaviour
     {
         [Tooltip("可见半径（米），以本物体为中心；建议比相机可视范围略大")]
-        public float visibleDistance = 250f;
+        public float visibleDistance = 50f;
 
         [Tooltip("检测间隔（秒）：隔这么久才判定一次，0 = 每帧判定")]
         public float checkInterval = 0.25f;
