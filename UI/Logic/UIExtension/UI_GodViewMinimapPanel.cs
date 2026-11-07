@@ -302,14 +302,14 @@ namespace Ros.UI.Main
         #endregion
 
         #region 区域与底图
-        private float Edge => Landscape.MapSize / ConfigManager.GlobalVariableConfig.godView_scale[scaleIndex];
+        private float Edge => ConfigManager.GlobalVariableConfig.terrain_size / ConfigManager.GlobalVariableConfig.godView_scale[scaleIndex];
 
         private float PixelsPerMeter => Edge > 0f ? m_largeMinimapContainer.width / Edge : 0f;
 
         private Vector2 ClampCenter(Vector2 value)
         {
             float edge = Edge;
-            float size = Landscape.MapSize;
+            float size = ConfigManager.GlobalVariableConfig.terrain_size;
             if (edge >= size) return new Vector2(size * 0.5f, size * 0.5f); // 区域不比地图小：居中
             float half = edge * 0.5f;
             return new Vector2(Mathf.Clamp(value.x, half, size - half), Mathf.Clamp(value.y, half, size - half));
@@ -322,12 +322,13 @@ namespace Ros.UI.Main
             EnsureMapImage();
             float ppm = PixelsPerMeter;
             if (ppm <= 0f) return;
-            float size = Landscape.MapSize * ppm;
+            float mapSize = ConfigManager.GlobalVariableConfig.terrain_size;
+            float size = mapSize * ppm;
             var loader = m_largeMinimapContainer.m_loader;
             if (loader != null)
             {
                 loader.SetSize(size, size);
-                loader.SetXY((center.x - Edge * 0.5f) * -ppm, (center.y + Edge * 0.5f - Landscape.MapSize) * ppm);
+                loader.SetXY((center.x - Edge * 0.5f) * -ppm, (center.y + Edge * 0.5f - mapSize) * ppm);
             }
             PlaceMarkers();
         }

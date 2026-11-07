@@ -32,6 +32,8 @@ namespace TerrainGen
 
         public void Clear()
         {
+            TerrainSpawns.Reset();
+
             // Culler 与内容根都是场景根物体，两处都要清；靠 Culler 上记录的 ContentRoot 找到内容
             TerrainPropCuller[] found = FindObjectsOfType<TerrainPropCuller>();
             for (int i = 0; i < found.Length; i++)

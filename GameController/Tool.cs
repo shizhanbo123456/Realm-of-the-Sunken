@@ -57,20 +57,6 @@ public class Tool : MonoBehaviour
     public static TransitionManager TransitionManager;
     public static LuaManager LuaManager;
     public static TerrainGen.ModularTerrainGenerator ModularTerrainGenerator;
-
-    public static LandscapeSpawns LandscapeSpawns
-    {
-        get
-        {
-            if (s_landscapeSpawns == null)
-            {
-                Debug.LogError("[Tool] LandscapeSpawns 未注册：地形预制体（挂 LandscapeSpawns 组件）必须先随场景加载。");
-            }
-            return s_landscapeSpawns;
-        }
-        set => s_landscapeSpawns = value;
-    }
-    private static LandscapeSpawns s_landscapeSpawns;
     #endregion
 
     #region 通用工具
@@ -125,7 +111,6 @@ public class Tool : MonoBehaviour
         errors += CheckObject(nameof(BattleManager), BattleManager);
         errors += CheckObject(nameof(InfoManager), InfoManager);
         errors += CheckObject(nameof(EnvironmentManager), EnvironmentManager);
-        errors += CheckObject("地形 LandscapeSpawns（固定点位来源）", s_landscapeSpawns);
         errors += CheckObject(nameof(AssetsManager), AssetsManager);
         if (!isServer)
         {
@@ -176,19 +161,17 @@ public class Tool : MonoBehaviour
 
     private static int CheckGuardStatueSpawns()
     {
-        var spawns = s_landscapeSpawns;
-        if (spawns == null) return 0;
+        if (!TerrainGen.TerrainSpawns.Built)
+        {
+            Debug.LogWarning("[启动自检] 地形尚未生成（TerrainSpawns 未构建）：跳过守护点自检");
+            return 0;
+        }
 
         int e = 0;
-        int subCount = spawns.subGuardStatueSpawnPositions.Count;
-        if (subCount > Config.sage_statue_count)
+        int subCount = TerrainGen.TerrainSpawns.SubGuards.Count;
+        if (subCount != Config.sage_statue_count)
         {
-            Debug.LogError($"[启动自检] LandscapeSpawns.subGuardStatueSpawnPositions 有 {subCount} 个，超过贤者雕像上限 {Config.sage_statue_count}：多出的点会拿到国王雕像的 value");
-            e++;
-        }
-        if (spawns.mainGuardStatueSpawnPosition == null)
-        {
-            Debug.LogError("[启动自检] LandscapeSpawns.mainGuardStatueSpawnPosition 未赋值：开局不会生成国王雕像");
+            Debug.LogError($"[启动自检] 地形烘焙数据里有 {subCount} 个副守护点，与贤者雕像数量 {Config.sage_statue_count} 不一致：雕像会多出或缺失");
             e++;
         }
         return e;

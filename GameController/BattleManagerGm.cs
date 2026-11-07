@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Ros.Gm;
 using Ros.Transport;
+using TerrainGen;
 using UnityEngine;
 
 // GM 指令的服务器执行体：NetworkManager.ServerReceiveGmLocal → ExecuteGm，只处理"联网项"
@@ -250,7 +251,7 @@ public partial class BattleManager
                 // 中立单位（中立雕像）场上最多 1 个，已有就不再刷
                 foreach (var e in EntityContainer.Entities)
                     if (e != null && e.Alive && e.type.category == EntityCategory.NeutralStatue) return;
-                SpawnEntity(EntityType.AngelStatue, 1, LandscapeSpawns.RandomOf(Tool.LandscapeSpawns.neutralStatueSpawnPositions), EntityCamp.Neutral);
+                SpawnEntity(EntityType.AngelStatue, 1, TerrainSpawns.RandomOf(TerrainSpawns.NeutralStatues), EntityCamp.Neutral);
                 break;
         }
     }
@@ -261,7 +262,7 @@ public partial class BattleManager
         var owner = GetGmPlayerEntity(clientId);
         if (owner == null) return;
         Vector3 p = owner.transform.position;
-        if (!Tool.LandscapeSpawns.TryGetGroundPos(p.x, p.z, humanoid, out Vector3 pos)) return;
+        if (!TerrainSpawns.TryGetGroundPos(p.x, p.z, humanoid, out Vector3 pos)) return;
         SpawnEntity(type, level, pos, camp);
     }
 
@@ -291,7 +292,7 @@ public partial class BattleManager
     {
         gmTargetScratch.Clear();
         var source = GetGmPlayerEntity(clientId);
-        Vector3 origin = source != null ? source.transform.position : Landscape.MapCenter;
+        Vector3 origin = source != null ? source.transform.position : TerrainSpawns.MapCenter;
         foreach (var e in EntityContainer.Entities)
         {
             if (e == null || !e.Alive) continue;

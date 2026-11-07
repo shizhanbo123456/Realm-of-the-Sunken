@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Ros.Transport;
+using TerrainGen;
 using UnityEngine;
 
 public partial class BattleManager
@@ -304,11 +305,8 @@ public partial class BattleManager
         EntityType characterType = isAttack ? info.attackCharacter : info.defenseCharacter;
         int level = isAttack ? info.attackLevel : info.defenseLevel;
 
-        var spawns = Tool.LandscapeSpawns;
-        // 复活点：与开局出生共用同一个「出生/复活位置列表」，随机取点（不去重）
-        Vector3 pos = isAttack
-            ? LandscapeSpawns.RandomOf(spawns.attackPositions)
-            : LandscapeSpawns.RandomOf(spawns.defensePositions);
+        // 复活点：与开局出生共用同一个出生点（不去重）
+        Vector3 pos = isAttack ? TerrainSpawns.AttackSpawn : TerrainSpawns.DefenseSpawn;
 
         EntityCamp entityCamp = isAttack ? EntityCamp.Attack : EntityCamp.Defense;
         ushort entityId = SpawnEntity(characterType, level, pos, entityCamp);

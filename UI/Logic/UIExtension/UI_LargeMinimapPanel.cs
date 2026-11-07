@@ -58,10 +58,11 @@ namespace Ros.UI.Main
         private void Place(UI_MinimapItem item, in UI_Minimap.Point point)
         {
             if (m_loader == null) return;
-            float ppmX = m_loader.width / Landscape.MapSize;
-            float ppmY = m_loader.height / Landscape.MapSize;
+            float mapSize = ConfigManager.GlobalVariableConfig.terrain_size;
+            float ppmX = m_loader.width / mapSize;
+            float ppmY = m_loader.height / mapSize;
             item.SetXY(m_loader.x + point.world.x * ppmX - item.width * 0.5f,
-                m_loader.y + (Landscape.MapSize - point.world.y) * ppmY - item.height * 0.5f);
+                m_loader.y + (mapSize - point.world.y) * ppmY - item.height * 0.5f);
         }
 
         private UI_MinimapItem EnsureItem(in UI_Minimap.Point point)

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Ros.Transport;
+using TerrainGen;
 using UnityEngine;
 
 public partial class BattleManager
@@ -13,30 +14,24 @@ public partial class BattleManager
 
     private void SpawnBattleWorld()
     {
-        var spawns = Tool.LandscapeSpawns;
-
-        // 副守护点：index 即 value 0~2（贤者雕像；锚点未赋值的槽位跳过）
-        var sagePositions = spawns.subGuardStatueSpawnPositions;
-        for (int i = 0; i < sagePositions.Count; i++)
+        if (!TerrainSpawns.Built)
         {
-            var sageAnchor = sagePositions[i];
-            if (sageAnchor == null) continue;
-            SpawnEntity(EntityType.GuardStatue(i), 1, sageAnchor.position, EntityCamp.Defense);
+            Debug.LogError("[地形] TerrainSpawns 未构建：地形还没生成就进入战斗世界初始化，雕像与出生点无法定位");
+            return;
         }
 
-        // 主守护点：国王雕像（未赋值则不生成，启动自检会报）
-        var kingAnchor = spawns.mainGuardStatueSpawnPosition;
-        if (kingAnchor != null) SpawnEntity(EntityType.KingStatue, 1, kingAnchor.position, EntityCamp.Defense);
+        // 副守护点：index 即 value 0~2（贤者雕像）
+        for (int i = 0; i < TerrainSpawns.SubGuards.Count; i++)
+            SpawnEntity(EntityType.GuardStatue(i), 1, TerrainSpawns.SubGuards[i], EntityCamp.Defense);
 
-        // 珊瑚：开局不生成，按玩家邻近采样 MapSpace 合法位置动态生成（见 TickCoralSpawn）
+        // 主守护点：国王雕像
+        SpawnEntity(EntityType.KingStatue, 1, TerrainSpawns.MainGuard, EntityCamp.Defense);
 
-        // 水晶雕像（瘟疫孢子，不复活；锚点未赋值的槽位跳过）
-        for (int i = 0; i < spawns.crystalStatueSpawnPositions.Count; i++)
-        {
-            var crystalStatueAnchor = spawns.crystalStatueSpawnPositions[i];
-            if (crystalStatueAnchor == null) continue;
-            SpawnEntity(EntityType.CrystalStatue(i), 1, crystalStatueAnchor.position, EntityCamp.Defense);
-        }
+        // 珊瑚：开局不生成，按玩家邻近采样合法位置动态生成（见 TickCoralSpawn）
+
+        // 防御塔（水晶雕像）：烘焙数据里每个守护点 3 个塔位
+        for (int i = 0; i < TerrainSpawns.Towers.Count; i++)
+            SpawnEntity(EntityType.CrystalStatue(i), 1, TerrainSpawns.Towers[i], EntityCamp.Defense);
 
         // 中立雕像（中立争抢单位）：开局不刷，开战后按延迟计时刷新；之后由被打死的时机重排
         neutralStatueRespawnTime = Time.time + Config.neutral_statue_first_spawn_delay;
@@ -83,7 +78,7 @@ public partial class BattleManager
     private bool TrySampleRingPoint(Vector3 center, float minDist, float maxDist, bool humanoid, out Vector3 pos)
     {
         pos = default;
-        if (!Tool.LandscapeSpawns.TrySampleSpawnPointInRing(center, minDist, maxDist, humanoid, out pos)) return false;
+        if (!TerrainSpawns.TrySampleSpawnPointInRing(center, minDist, maxDist, humanoid, out pos)) return false;
         return !IsAnyPlayerWithin(pos, minDist);
     }
 
@@ -91,7 +86,7 @@ public partial class BattleManager
     private bool TrySampleZombieSpawnPoint(out Vector3 pos)
     {
         CollectAlivePlayerPositions();
-        if (s_playerPosScratch.Count == 0) return Tool.LandscapeSpawns.TrySampleSpawnPoint(out pos);
+        if (s_playerPosScratch.Count == 0) return TerrainSpawns.TrySampleSpawnPoint(out pos);
 
         float minDist = ConfigManager.GlobalVariableConfig.zombie_spawn_range_min;
         float maxDist = ConfigManager.GlobalVariableConfig.zombie_spawn_range_max;
@@ -108,11 +103,11 @@ public partial class BattleManager
 
     private void SpawnNeutralStatue()
     {
-        var list = Tool.LandscapeSpawns.neutralStatueSpawnPositions;
-        if (list == null || list.Count == 0) return; // 未配置候选点则不刷新
+        var list = TerrainSpawns.NeutralStatues;
+        if (list.Count == 0) return; // 没有中立刷新点则不刷
         // 白天刷天使雕像、夜晚刷恶魔雕像（两者行为一致，只有外观与 value 不同）
         EntityType statue = EnvironmentManager.IsDay ? EntityType.AngelStatue : EntityType.DemonStatue;
-        SpawnEntity(statue, 1, LandscapeSpawns.RandomOf(list), EntityCamp.Neutral);
+        SpawnEntity(statue, 1, TerrainSpawns.RandomOf(list), EntityCamp.Neutral);
 
         // 中立雕像刷新播报（首次出生与重生都算刷新）
         Tool.NetworkManager.SendBattleEvent(new SCBattleEvent()
@@ -170,7 +165,7 @@ public partial class BattleManager
 
         for (int attempt = 0; attempt < RingSampleAttempts; attempt++)
         {
-            // 采样：所选玩家的环带内 + 离所有存活玩家不小于内径 + MapSpace 合法区
+            // 采样：所选玩家的环带内 + 离所有存活玩家不小于内径 + 向下射线命中地形上表面
             if (!TrySampleRingPoint(center, minDist, maxDist, humanoid: false, out Vector3 pos)) continue;
             if (IsAnyCoralWithin(pos, spacing)) continue;               // 与已有珊瑚的最小间距
             if (CoralDensityAt(pos) >= maxDensity) continue;            // 所在区块珊瑚密度已达上限
@@ -185,7 +180,8 @@ public partial class BattleManager
     private static float CoralDensityAt(Vector3 pos)
     {
         int count = EntityContainer.Corals.GetChunkCount(ChunkSearcher<EntityData>.GetChunkIndex(pos));
-        return count / (Landscape.chunkSize * Landscape.chunkSize);
+        float chunkSize = ConfigManager.GlobalVariableConfig.terrain_chunk_size;
+        return count / (chunkSize * chunkSize);
     }
 
     private static bool IsAnyPlayerWithin(Vector3 pos, float radius)
@@ -233,15 +229,12 @@ public partial class BattleManager
     {
         if (!fallCheckTicker) return;
 
-        var spawns = Tool.LandscapeSpawns;
-        if (spawns == null) return;
-
         foreach (var entity in EntityContainer.Entities)
         {
             if (entity == null || entity.rb == null || !entity.Alive) continue; // 无刚体的雕像/珊瑚不会掉落
             Vector3 pos = entity.transform.position;
             if (pos.y >= 0f) continue;
-            if (!spawns.TrySampleTerrainHeight(pos.x, pos.z, out float groundY)) continue;
+            if (!TerrainSpawns.TrySampleGroundY(pos.x, pos.z, out float groundY)) continue;
 
             pos.y = groundY + Config.entity_fall_recover_height;
             entity.transform.position = pos;

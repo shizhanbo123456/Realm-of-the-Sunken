@@ -15,7 +15,7 @@ public partial class BattleManager
 
         // 包围盒必须是有限值且有面积；超出地图的部分按地形口径夹回边界
         if (!IsFinite(request.min) || !IsFinite(request.max)) return;
-        float size = Landscape.MapSize;
+        float size = ConfigManager.GlobalVariableConfig.terrain_size;
         float minX = Mathf.Clamp(Mathf.Min(request.min.x, request.max.x), 0f, size);
         float minZ = Mathf.Clamp(Mathf.Min(request.min.y, request.max.y), 0f, size);
         float maxX = Mathf.Clamp(Mathf.Max(request.min.x, request.max.x), 0f, size);

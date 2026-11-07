@@ -677,33 +677,28 @@ public class GmPanel
         return faces;
     }
 
+    // 新地形只有一套区块剔除（TerrainPropCuller.visibleDistance），地形与物件共用同一个半径
     private static void SetTerrainRadius(float radius)
     {
-        var culler = UnityEngine.Object.FindObjectOfType<TerrainChunkCuller>();
-        if (culler == null) { Debug.LogWarning("[GM] 场景内没有 TerrainChunkCuller，显示半径不生效"); return; }
+        var culler = Tool.ModularTerrainGenerator != null ? Tool.ModularTerrainGenerator.Culler : null;
+        if (culler == null) { Debug.LogWarning("[GM] 地形尚未生成，显示半径不生效"); return; }
         culler.visibleDistance = Mathf.Max(0f, radius);
     }
 
     private static void SetObjectRadius(float radius)
     {
-        var culler = UnityEngine.Object.FindObjectOfType<TerrainChunkCuller>();
-        if (culler == null) { Debug.LogWarning("[GM] 场景内没有 TerrainChunkCuller，物体显示半径不生效"); return; }
-        culler.objectVisibleDistance = Mathf.Max(0f, radius);
+        SetTerrainRadius(radius);
     }
 
-    // 显隐地形：全部可见↔全部隐藏；隐藏时先停掉分块剔除，否则它本帧的 LateUpdate 会把块又打开
+    // 显隐地形：隐藏时先停掉剔除，否则它本帧的 LateUpdate 会把区块又打开
     private static void ToggleTerrain()
     {
-        var spawns = Tool.LandscapeSpawns;
-        if (spawns == null) return;
-        bool hide = false;
-        foreach (var go in spawns.terrainChunks)
-            if (go != null && go.activeSelf) { hide = true; break; }
+        var culler = Tool.ModularTerrainGenerator != null ? Tool.ModularTerrainGenerator.Culler : null;
+        if (culler == null || culler.ContentRoot == null) { Debug.LogWarning("[GM] 地形尚未生成，显隐开关不生效"); return; }
 
-        var culler = UnityEngine.Object.FindObjectOfType<TerrainChunkCuller>();
-        if (culler != null) culler.enabled = !hide;
-        foreach (var go in spawns.terrainChunks)
-            if (go != null) go.SetActive(!hide);
+        bool hide = culler.ContentRoot.gameObject.activeSelf;
+        culler.enabled = !hide;
+        culler.ContentRoot.gameObject.SetActive(hide);
     }
 
     private static void ToggleFog()

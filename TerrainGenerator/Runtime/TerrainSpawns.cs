@@ -1,0 +1,204 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace TerrainGen
+{
+    // 地形点位与地形查询的唯一入口：点位来自烘焙数据，高度与刷新合法性一律走向下射线
+    public static class TerrainSpawns
+    {
+        #region 地图范围（直接取配表，不缓存）
+        public static float MapMin => ConfigManager.GlobalVariableConfig.terrain_size_min;
+        public static float MapSize => ConfigManager.GlobalVariableConfig.terrain_size;
+        public static float MapMax => MapMin + MapSize;
+        public static float ChunkSize => ConfigManager.GlobalVariableConfig.terrain_chunk_size;
+        public static int ChunkCount => ConfigManager.GlobalVariableConfig.terrain_chunk_size_count;
+        public static Vector3 MapCenter => new Vector3(MapMin + MapSize * 0.5f, 0f, MapMin + MapSize * 0.5f);
+        public static float SurfaceY => ConfigManager.TerrainGenerationConfig.ground_height;
+        #endregion
+
+        #region 点位
+        public static bool Built { get; private set; }
+        public static Vector3 MainGuard { get; private set; }
+        public static readonly List<Vector3> SubGuards = new List<Vector3>();
+        public static readonly List<Vector3> Towers = new List<Vector3>();
+        public static readonly List<Vector3> NeutralStatues = new List<Vector3>();
+        public static Vector3 DefenseSpawn { get; private set; }
+        public static Vector3 AttackSpawn { get; private set; }
+
+        public static void Build(TerrainPlanData data)
+        {
+            if (data == null)
+            {
+                Debug.LogError("[地形] TerrainSpawns 构建失败：数据为空");
+                return;
+            }
+
+            Reset();
+
+            float cell = data.cellSize;
+            var extras = new List<Vector3>();
+            int mainGuardCount = 0;
+
+            for (int i = 0; i < data.points.Count; i++)
+            {
+                MapPoint p = data.points[i];
+                var world = new Vector3(MapMin + (p.Cell.x + 0.5f) * cell, SurfaceY, MapMin + (p.Cell.y + 0.5f) * cell);
+                switch (p.Kind)
+                {
+                    case PointKind.MainGuard:
+                        MainGuard = world;
+                        mainGuardCount++;
+                        break;
+                    case PointKind.SubGuard:
+                        SubGuards.Add(world);
+                        break;
+                    case PointKind.Tower:
+                        Towers.Add(world);
+                        break;
+                    default:
+                        extras.Add(world);
+                        break;
+                }
+            }
+
+            if (mainGuardCount != 1)
+                Debug.LogError($"[地形] 烘焙数据里有 {mainGuardCount} 个主守护点，应当恰好 1 个：国王雕像与攻守出生点无法定位");
+            if (SubGuards.Count == 0)
+                Debug.LogError("[地形] 烘焙数据里没有副守护点：贤者雕像无法定位");
+
+            BuildSpawnsFromExtras(extras);
+            Built = true;
+        }
+
+        // 普通点位按离主守护点的距离分出攻守出生点，其余作为中立雕像候选
+        private static void BuildSpawnsFromExtras(List<Vector3> extras)
+        {
+            if (extras.Count < 2)
+            {
+                Debug.LogError($"[地形] 烘焙数据里只有 {extras.Count} 个普通点位：至少需要 2 个才能分出进攻/防守出生点");
+                return;
+            }
+
+            extras.Sort((a, b) => SqrDistanceXZ(a, MainGuard).CompareTo(SqrDistanceXZ(b, MainGuard)));
+            DefenseSpawn = extras[0];
+            AttackSpawn = extras[extras.Count - 1];
+            for (int i = 1; i < extras.Count - 1; i++) NeutralStatues.Add(extras[i]);
+
+            if (NeutralStatues.Count == 0)
+                Debug.LogWarning("[地形] 普通点位不足 3 个：没有中立雕像刷新点，中立雕像不会生成");
+        }
+
+        public static void Reset()
+        {
+            Built = false;
+            MainGuard = Vector3.zero;
+            DefenseSpawn = Vector3.zero;
+            AttackSpawn = Vector3.zero;
+            SubGuards.Clear();
+            Towers.Clear();
+            NeutralStatues.Clear();
+        }
+
+        private static float SqrDistanceXZ(Vector3 a, Vector3 b)
+        {
+            float dx = a.x - b.x;
+            float dz = a.z - b.z;
+            return dx * dx + dz * dz;
+        }
+        #endregion
+
+        #region 地面射线（GroundLayer，命中高度贴合上表面 ±0.5 才算合法）
+        private const float SurfaceTolerance = 0.5f;
+        private const float HumanoidOffset = 1f;
+        private const float PropOffset = 0f;
+        private const int MaxSampleAttempts = 32;
+
+        private static bool warnedNoLayer;
+
+        public static bool TrySampleGroundY(float x, float z, out float y)
+        {
+            y = 0f;
+
+            int layer = Tool.InfoManager != null ? Tool.InfoManager.ground_layer : 0;
+            if (layer == 0)
+            {
+                if (!warnedNoLayer)
+                {
+                    Debug.LogError("[地形] InfoManager.ground_layer 未配置（0）：地面射线无法进行，刷新点与贴地全部失效");
+                    warnedNoLayer = true;
+                }
+                return false;
+            }
+
+            float top = SurfaceY + ConfigManager.GlobalVariableConfig.terrain_height;
+            var origin = new Vector3(x, top, z);
+            if (!Physics.Raycast(origin, Vector3.down, out RaycastHit hit, top + 1f, 1 << layer, QueryTriggerInteraction.Ignore))
+                return false;
+
+            y = hit.point.y;
+            return true;
+        }
+
+        public static bool TryGetGroundPos(float x, float z, bool humanoid, out Vector3 pos)
+        {
+            pos = default;
+            if (!TrySampleGroundY(x, z, out float y)) return false;
+            pos = new Vector3(x, y + (humanoid ? HumanoidOffset : PropOffset), z);
+            return true;
+        }
+
+        public static bool IsLegalSpawnXZ(float x, float z)
+        {
+            return TrySampleLegalPoint(x, z, out _);
+        }
+
+        // 一次射线同时给出合法性与命中高度，避免采样时重复投射
+        private static bool TrySampleLegalPoint(float x, float z, out float y)
+        {
+            y = 0f;
+            if (x < MapMin || x >= MapMax || z < MapMin || z >= MapMax) return false;
+            if (!TrySampleGroundY(x, z, out y)) return false;
+            return Mathf.Abs(y - SurfaceY) <= SurfaceTolerance;
+        }
+
+        public static bool TrySampleSpawnPoint(out Vector3 pos)
+        {
+            pos = default;
+            for (int i = 0; i < MaxSampleAttempts; i++)
+            {
+                float x = MapMin + Random.value * MapSize;
+                float z = MapMin + Random.value * MapSize;
+                if (!TrySampleLegalPoint(x, z, out float y)) continue;
+                pos = new Vector3(x, y + HumanoidOffset, z);
+                return true;
+            }
+            return false;
+        }
+
+        public static bool TrySampleSpawnPointInRing(Vector3 center, float minRadius, float maxRadius, bool humanoid, out Vector3 pos)
+        {
+            pos = default;
+            float minSq = minRadius * minRadius;
+            float maxSq = maxRadius * maxRadius;
+
+            for (int i = 0; i < MaxSampleAttempts; i++)
+            {
+                // 半径按面积均匀（sqrt 修正），否则会明显堆在环带内侧
+                float angle = Random.value * (Mathf.PI * 2f);
+                float radius = Mathf.Sqrt(Mathf.Lerp(minSq, maxSq, Random.value));
+                float x = center.x + Mathf.Cos(angle) * radius;
+                float z = center.z + Mathf.Sin(angle) * radius;
+                if (!TrySampleLegalPoint(x, z, out float y)) continue;
+                pos = new Vector3(x, y + (humanoid ? HumanoidOffset : PropOffset), z);
+                return true;
+            }
+            return false;
+        }
+
+        public static Vector3 RandomOf(List<Vector3> list)
+        {
+            return list == null || list.Count == 0 ? MapCenter : list[Random.Range(0, list.Count)];
+        }
+        #endregion
+    }
+}

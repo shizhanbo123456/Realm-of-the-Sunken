@@ -29,6 +29,8 @@ namespace TerrainGen
             }
             if (data == null) return null;
 
+            TerrainSpawns.Build(data);
+
             // 数据本身即地图坐标（最小角落在 MapMin），内容根不再做平移
             Vector3 origin = Vector3.zero;
 

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Ros.Transport;
+using TerrainGen;
 using UnityEngine;
 using UnityEngine.Profiling;
 
@@ -890,12 +891,12 @@ public partial class BattleManager : EnsBehaviour
 
     private Vector3 GetAttackSpawnPos()
     {
-        return LandscapeSpawns.RandomOf(Tool.LandscapeSpawns.attackPositions);
+        return TerrainSpawns.AttackSpawn;
     }
 
     private Vector3 GetDefenseSpawnPos()
     {
-        return LandscapeSpawns.RandomOf(Tool.LandscapeSpawns.defensePositions);
+        return TerrainSpawns.DefenseSpawn;
     }
 
     private void UpdateAI()
@@ -1091,7 +1092,7 @@ public partial class BattleManager : EnsBehaviour
             Debug.Log($"{(RobotClients.Contains(clientId) ? "AI" : "玩家")} {clientId} 出战：{characterType} camp={camp} id={entityId}");
         }
 
-        // 对局世界：雕像×4 / 珊瑚 / 水晶雕像 / 中立雕像（位置来自地形组件 LandscapeSpawns）
+        // 对局世界：雕像×4 / 珊瑚 / 防御塔 / 中立雕像（位置来自地形点位 TerrainSpawns）
         SpawnBattleWorld();
         UpdateKingStatueReduce(); // 初始分层减伤 = 存活外围数 × 25%
 

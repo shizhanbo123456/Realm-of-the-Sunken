@@ -1,5 +1,6 @@
 ﻿using Ros.Skill.Utils;
 using Ros.Transport;
+using TerrainGen;
 using UnityEngine;
 
 namespace Ros.Skill
@@ -184,8 +185,7 @@ namespace Ros.Skill
                 ? target.transform.position
                 : entity.transform.position + entity.transform.forward * CastRange;
             float groundY = at.y;
-            var spawns = Tool.LandscapeSpawns; // 未注册时 Tool 已报错
-            if (spawns != null) spawns.TrySampleTerrainHeight(at.x, at.z, out groundY);
+            if (TerrainSpawns.TrySampleGroundY(at.x, at.z, out float sampled)) groundY = sampled;
             return new Vector3(at.x, groundY + FormationSurfaceOffset, at.z);
         }
 

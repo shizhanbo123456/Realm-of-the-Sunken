@@ -220,12 +220,13 @@ namespace Ros.UI.Main
             if (mapLoader == null || mapLoader.isDisposed || mapBase == null) return;
 
             float ppm = mapBase.width * 0.5f / viewRadius; // 像素/米
-            float size = Landscape.MapSize * ppm;
+            float mapSize = ConfigManager.GlobalVariableConfig.terrain_size;
+            float size = mapSize * ppm;
             float maskX = m_mask != null ? m_mask.x : 0f; // Loader 挂在遮罩里，需换算成遮罩局部
             float maskY = m_mask != null ? m_mask.y : 0f;
             mapLoader.SetXY(
                 mapBase.x + mapBase.width * 0.5f - center.x * ppm - maskX,
-                mapBase.y + mapBase.height * 0.5f - (Landscape.MapSize - center.z) * ppm - maskY);
+                mapBase.y + mapBase.height * 0.5f - (mapSize - center.z) * ppm - maskY);
             mapLoader.SetSize(size, size);
         }
 

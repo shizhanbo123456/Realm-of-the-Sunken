@@ -23,8 +23,9 @@ namespace TerrainGen
             var spots = new List<Spot>();
 
             // 0 号格中心的地图坐标；摆放数据直接存地图坐标，不以地形中心为原点
-            float ox = Landscape.MapMin + Gen.cell_size * 0.5f;
-            float oz = Landscape.MapMin + Gen.cell_size * 0.5f;
+            float mapMin = ConfigManager.GlobalVariableConfig.terrain_size_min;
+            float ox = mapMin + Gen.cell_size * 0.5f;
+            float oz = mapMin + Gen.cell_size * 0.5f;
 
             int count = 0;
             var reserved = new HashSet<long>();

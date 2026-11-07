@@ -135,10 +135,11 @@ public class ChunkSearcher<T> : IEnumerable<T>
         Vector3 minPoint = center - new Vector3(radius, 0, radius);
         Vector3 maxPoint = center + new Vector3(radius, 0, radius);
 
-        int minChunkX = Mathf.Max(0, Mathf.FloorToInt((minPoint.x - Landscape.MapMin) / Landscape.chunkSize));
-        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt((minPoint.z - Landscape.MapMin) / Landscape.chunkSize));
-        int maxChunkX = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt((maxPoint.x - Landscape.MapMin) / Landscape.chunkSize));
-        int maxChunkZ = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt((maxPoint.z - Landscape.MapMin) / Landscape.chunkSize));
+        var cfg = ConfigManager.GlobalVariableConfig;
+        int minChunkX = Mathf.Max(0, Mathf.FloorToInt((minPoint.x - cfg.terrain_size_min) / cfg.terrain_chunk_size));
+        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt((minPoint.z - cfg.terrain_size_min) / cfg.terrain_chunk_size));
+        int maxChunkX = Mathf.Min(cfg.terrain_chunk_size_count - 1, Mathf.FloorToInt((maxPoint.x - cfg.terrain_size_min) / cfg.terrain_chunk_size));
+        int maxChunkZ = Mathf.Min(cfg.terrain_chunk_size_count - 1, Mathf.FloorToInt((maxPoint.z - cfg.terrain_size_min) / cfg.terrain_chunk_size));
 
         for (int x = minChunkX; x <= maxChunkX; x++)
         {
@@ -172,10 +173,11 @@ public class ChunkSearcher<T> : IEnumerable<T>
         Vector3 minPoint = center - new Vector3(radius, 0, radius);
         Vector3 maxPoint = center + new Vector3(radius, 0, radius);
 
-        int minChunkX = Mathf.Max(0, Mathf.FloorToInt((minPoint.x - Landscape.MapMin) / Landscape.chunkSize));
-        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt((minPoint.z - Landscape.MapMin) / Landscape.chunkSize));
-        int maxChunkX = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt((maxPoint.x - Landscape.MapMin) / Landscape.chunkSize));
-        int maxChunkZ = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt((maxPoint.z - Landscape.MapMin) / Landscape.chunkSize));
+        var cfg = ConfigManager.GlobalVariableConfig;
+        int minChunkX = Mathf.Max(0, Mathf.FloorToInt((minPoint.x - cfg.terrain_size_min) / cfg.terrain_chunk_size));
+        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt((minPoint.z - cfg.terrain_size_min) / cfg.terrain_chunk_size));
+        int maxChunkX = Mathf.Min(cfg.terrain_chunk_size_count - 1, Mathf.FloorToInt((maxPoint.x - cfg.terrain_size_min) / cfg.terrain_chunk_size));
+        int maxChunkZ = Mathf.Min(cfg.terrain_chunk_size_count - 1, Mathf.FloorToInt((maxPoint.z - cfg.terrain_size_min) / cfg.terrain_chunk_size));
 
         for (int x = minChunkX; x <= maxChunkX; x++)
         {
@@ -200,10 +202,11 @@ public class ChunkSearcher<T> : IEnumerable<T>
         Vector3 minPoint = center - new Vector3(radius, 0, radius);
         Vector3 maxPoint = center + new Vector3(radius, 0, radius);
 
-        int minChunkX = Mathf.Max(0, Mathf.FloorToInt((minPoint.x - Landscape.MapMin) / Landscape.chunkSize));
-        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt((minPoint.z - Landscape.MapMin) / Landscape.chunkSize));
-        int maxChunkX = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt((maxPoint.x - Landscape.MapMin) / Landscape.chunkSize));
-        int maxChunkZ = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt((maxPoint.z - Landscape.MapMin) / Landscape.chunkSize));
+        var cfg = ConfigManager.GlobalVariableConfig;
+        int minChunkX = Mathf.Max(0, Mathf.FloorToInt((minPoint.x - cfg.terrain_size_min) / cfg.terrain_chunk_size));
+        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt((minPoint.z - cfg.terrain_size_min) / cfg.terrain_chunk_size));
+        int maxChunkX = Mathf.Min(cfg.terrain_chunk_size_count - 1, Mathf.FloorToInt((maxPoint.x - cfg.terrain_size_min) / cfg.terrain_chunk_size));
+        int maxChunkZ = Mathf.Min(cfg.terrain_chunk_size_count - 1, Mathf.FloorToInt((maxPoint.z - cfg.terrain_size_min) / cfg.terrain_chunk_size));
 
         for (int x = minChunkX; x <= maxChunkX; x++)
         {
@@ -252,14 +255,17 @@ public class ChunkSearcher<T> : IEnumerable<T>
     #region 边界检查工具方法
     public bool IsValidChunk(Vector2Int chunkIndex)
     {
-        return chunkIndex.x >= 0 && chunkIndex.x < Landscape.chunkCount &&
-               chunkIndex.y >= 0 && chunkIndex.y < Landscape.chunkCount;
+        int count = ConfigManager.GlobalVariableConfig.terrain_chunk_size_count;
+        return chunkIndex.x >= 0 && chunkIndex.x < count &&
+               chunkIndex.y >= 0 && chunkIndex.y < count;
     }
 
     public bool IsPositionInMap(Vector3 worldPos)
     {
-        return worldPos.x >= Landscape.MapMin && worldPos.x < Landscape.MapMax &&
-               worldPos.z >= Landscape.MapMin && worldPos.z < Landscape.MapMax;
+        float min = ConfigManager.GlobalVariableConfig.terrain_size_min;
+        float max = min + ConfigManager.GlobalVariableConfig.terrain_size;
+        return worldPos.x >= min && worldPos.x < max &&
+               worldPos.z >= min && worldPos.z < max;
     }
 
     private void ValidateChunkIndex(Vector2Int chunkIndex)
@@ -272,9 +278,10 @@ public class ChunkSearcher<T> : IEnumerable<T>
         bool valid = IsValidChunk(chunkIndex);
         if (!valid)
         {
+            int count = ConfigManager.GlobalVariableConfig.terrain_chunk_size_count;
             throw new ArgumentOutOfRangeException(
                 nameof(chunkIndex),
-                $"区块索引越界！Chunk:{chunkIndex}，地图区块总数:{Landscape.chunkCount}，合法范围 [0, {Landscape.chunkCount - 1}]"
+                $"区块索引越界！Chunk:{chunkIndex}，地图区块总数:{count}，合法范围 [0, {count - 1}]"
             );
         }
 #endif
@@ -282,13 +289,16 @@ public class ChunkSearcher<T> : IEnumerable<T>
 
     public static Vector2Int GetChunkIndex(Vector3 worldPos)
     {
-        if (worldPos.x < Landscape.MapMin || worldPos.x >= Landscape.MapMax ||
-            worldPos.z < Landscape.MapMin || worldPos.z >= Landscape.MapMax)
+        var cfg = ConfigManager.GlobalVariableConfig;
+        float min = cfg.terrain_size_min;
+        float max = min + cfg.terrain_size;
+        if (worldPos.x < min || worldPos.x >= max ||
+            worldPos.z < min || worldPos.z >= max)
         {
             return OutOfMapChunk;
         }
-        int x = Mathf.FloorToInt((worldPos.x - Landscape.MapMin) / Landscape.chunkSize);
-        int z = Mathf.FloorToInt((worldPos.z - Landscape.MapMin) / Landscape.chunkSize);
+        int x = Mathf.FloorToInt((worldPos.x - min) / cfg.terrain_chunk_size);
+        int z = Mathf.FloorToInt((worldPos.z - min) / cfg.terrain_chunk_size);
         return new Vector2Int(x, z);
     }
     #endregion

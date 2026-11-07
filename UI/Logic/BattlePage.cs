@@ -677,7 +677,7 @@ public class BattlePage : PageBase
     private Vector2 ResolveGodViewCenter()
     {
         if (TryGetMinimapCenter(out var center)) return new Vector2(center.x, center.z);
-        float half = Landscape.MapSize * 0.5f;
+        float half = ConfigManager.GlobalVariableConfig.terrain_size * 0.5f;
         return new Vector2(half, half);
     }
 
@@ -729,8 +729,9 @@ public class BattlePage : PageBase
             mapAreaTexture = Tool.AssetsManager.MapArea as Texture2D;
         if (mapAreaTexture == null) return;
 
-        float u = Mathf.Clamp01(myPos.x / Landscape.MapSize);
-        float v = Mathf.Clamp01(myPos.z / Landscape.MapSize);
+        float mapSize = ConfigManager.GlobalVariableConfig.terrain_size;
+        float u = Mathf.Clamp01(myPos.x / mapSize);
+        float v = Mathf.Clamp01(myPos.z / mapSize);
         Color c = mapAreaTexture.GetPixelBilinear(u, v);
         int area = c.a * 255f < 128f ? BannerWild
             : c.g >= c.r && c.g >= c.b ? BannerCity

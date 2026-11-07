@@ -25,7 +25,7 @@ AI 实时操控交互（命令行 + Lua）
   复用项目基础设施：BehaviorArbiter / IBehaviorHost / Behavior、EntitySkillController、Timer、EventManager
 
 坐标与时间口径：
-  位置只给 XZ（地形是平的），单位米，地图范围 Landscape.MapMin ~ MapMax（取配表 terrain_size 的「最小;最大」，当前 0 ~ 384）
+  位置只给 XZ（地形是平的），单位米，地图范围取配表 terrain_size 的「最小;最大」（当前 0 ~ 384）
   朝向为 yaw 度数，0° = +Z，与 PlayerEntityData 的 moveState.yaw 同口径
   不传高度：服务器按地面吸附
 
@@ -259,7 +259,7 @@ Battle
 本地玩家实体状态   OnEntityDisplayUpdate(10230) ← SCEntityDisplayInfo（血量、buff、持有技能）
 会话身份           ClientLoadingManager.HasSession / Camp / OwnEntityId
 昼夜               EnvironmentManager.Time01 / IsDay / dayDuration / nightDuration
-锚点               LandscapeSpawns（副守护点 / 主守护点 / 水晶 / 中立 / 进攻出生 / 防守出生）
+锚点               TerrainSpawns（副守护点 / 主守护点 / 防御塔位 / 中立 / 进攻出生 / 防守出生）
 路径长度           NavMesh.CalculatePath（客户端场景已烘焙）
 意图上行           CSAiIntent → NetworkManager.SendAiIntent → 服务器 AiIntentRelay 翻译成行为层请求
 AI 技能释放        CSAiSkillCast → NetworkManager.SendAiSkillCast → 服务器 ReceiveAiSkillCast（不受键盘拦截）
@@ -299,7 +299,7 @@ AI 技能释放        CSAiSkillCast → NetworkManager.SendAiSkillCast → 服�
 
 常用位置
   副守护点 ×3、主守护点、水晶雕像点、中立雕像候选点、进攻方出生/复活点、防守方出生/复活点
-  （均为世界坐标 XZ，来源 LandscapeSpawns）
+  （均为世界坐标 XZ，来源 TerrainSpawns）
 
 所有可被 lua 调用的内容
   可读：自身状态（位置/朝向/血量/buff/技能冷却与库存）、小地图实体、守护点进度、昼夜
