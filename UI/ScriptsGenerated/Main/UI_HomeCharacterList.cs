@@ -7,6 +7,7 @@ namespace Ros.UI.Main
 {
     public partial class UI_HomeCharacterList : GComponent
     {
+        public GButton m_btn_close;
         public UI_panel_2 m_panel;
         public GList m_characterList;
         public GList m_attrList;
@@ -23,7 +24,8 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
-            m_panel = (UI_panel_2)GetChildAt(0);
+            m_btn_close = (GButton)GetChildAt(0);
+            m_panel = (UI_panel_2)GetChildAt(1);
             m_characterList = (GList)GetChildAt(2);
             m_attrList = (GList)GetChildAt(3);
             m_btn_defense = (GButton)GetChildAt(4);

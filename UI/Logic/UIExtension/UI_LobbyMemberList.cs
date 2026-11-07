@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Ros.UI.Main
 {
-    // 大厅主视图：三阵营块（加入 / AI 数量 / 成员列表）、准备按钮、退出按钮
+    // 大厅主视图：三阵营块（加入 / AI 数量）+ 页面级的攻/守头像列表、准备与退出按钮
     public partial class UI_LobbyMemberList
     {
         // 大厅成员：clientId < 0 = AI，不进真人列表也不参与名额判定
@@ -26,6 +26,10 @@ namespace Ros.UI.Main
         }
 
         private readonly List<Member> members = new();
+        private GList attackerHeads;
+        private GList defenserHeads;
+        private GButton prepareButton;
+        private GButton exitButton;
         private Func<int, string> nameOf;
         private Action<int, bool, int, int> onStateChanged; // camp / ready / 攻方AI / 守方AI
         private Action onExit;
@@ -37,31 +41,39 @@ namespace Ros.UI.Main
         private int defenseAICount;
         private bool syncingFromServer; // 回显期间屏蔽本地回调，避免回环上报
 
-        // 构造期一次：阵营档位、按钮、文案；发包与退出都回调给调用方
-        public void Build(Func<int, string> memberNameOf, Action<int, bool, int, int> stateChanged, Action exitRequested)
+        // 构造期一次：阵营块档位与按钮、页面级头像列表与准备/退出按钮；发包与退出都回调给调用方
+        public void Build(GList attackerHeadList, GList defenserHeadList, GButton prepare, GButton exit,
+            Func<int, string> memberNameOf, Action<int, bool, int, int> stateChanged, Action exitRequested)
         {
+            attackerHeads = attackerHeadList;
+            defenserHeads = defenserHeadList;
+            prepareButton = prepare;
+            exitButton = exit;
             nameOf = memberNameOf;
             onStateChanged = stateChanged;
             onExit = exitRequested;
 
-            // 三个阵营块的图标档位（PlayerCampIcon.m_player_camp：0 进攻 / 1 防守 / 2 观战 / 3 中立）
-            m_camp_attack.m_player_camp.m_player_camp.selectedIndex = (int)PlayerCampType.Attack;
-            m_camp_defense.m_player_camp.m_player_camp.selectedIndex = (int)PlayerCampType.Defense;
+            // 三个阵营块的档位（m_entity_camp / PlayerCampIcon.m_player_camp：0 进攻 / 1 防守 / 2 观战 / 3 中立）
+            m_camp_attacker.m_entity_camp.selectedIndex = (int)PlayerCampType.Attack;
+            m_camp_defenser.m_entity_camp.selectedIndex = (int)PlayerCampType.Defense;
+            m_camp_spectate.m_entity_camp.selectedIndex = (int)PlayerCampType.Spectator;
+            m_camp_attacker.m_player_camp.m_player_camp.selectedIndex = (int)PlayerCampType.Attack;
+            m_camp_defenser.m_player_camp.m_player_camp.selectedIndex = (int)PlayerCampType.Defense;
             m_camp_spectate.m_player_camp.m_player_camp.selectedIndex = (int)PlayerCampType.Spectator;
 
-            m_camp_attack.m_camp_name.text = "进攻方";
-            m_camp_defense.m_camp_name.text = "防守方";
+            m_camp_attacker.m_camp_name.text = "进攻方";
+            m_camp_defenser.m_camp_name.text = "防守方";
             m_camp_spectate.m_camp_name.text = "观战";
 
-            m_camp_attack.m_btn_join.onClick.Add(() => JoinCamp((int)PlayerCampType.Attack));
-            m_camp_defense.m_btn_join.onClick.Add(() => JoinCamp((int)PlayerCampType.Defense));
+            m_camp_attacker.m_btn_join.onClick.Add(() => JoinCamp((int)PlayerCampType.Attack));
+            m_camp_defenser.m_btn_join.onClick.Add(() => JoinCamp((int)PlayerCampType.Defense));
             m_camp_spectate.m_btn_join.onClick.Add(() => JoinCamp((int)PlayerCampType.Spectator));
-            m_camp_attack.m_add_ai.onClick.Add(() => ChangeAICount(false, +1));
-            m_camp_attack.m_remove_ai.onClick.Add(() => ChangeAICount(false, -1));
-            m_camp_defense.m_add_ai.onClick.Add(() => ChangeAICount(true, +1));
-            m_camp_defense.m_remove_ai.onClick.Add(() => ChangeAICount(true, -1));
-            m_btn_prepare.onClick.Add(ToggleReady);
-            m_btn_exit.onClick.Add(OnExitClicked);
+            m_camp_attacker.m_add_ai.onClick.Add(() => ChangeAICount(false, +1));
+            m_camp_attacker.m_remove_ai.onClick.Add(() => ChangeAICount(false, -1));
+            m_camp_defenser.m_add_ai.onClick.Add(() => ChangeAICount(true, +1));
+            m_camp_defenser.m_remove_ai.onClick.Add(() => ChangeAICount(true, -1));
+            if (prepareButton != null) prepareButton.onClick.Add(ToggleReady);
+            if (exitButton != null) exitButton.onClick.Add(OnExitClicked);
 
             RefreshCampMark();
         }
@@ -90,8 +102,8 @@ namespace Ros.UI.Main
             RefreshAICountLabels();
             RefreshPrepareButton();
             RefreshCampMark();
-            RenderMemberList(m_camp_attack.m_attackerPlayers, (int)PlayerCampType.Attack);
-            RenderMemberList(m_camp_defense.m_attackerPlayers, (int)PlayerCampType.Defense);
+            RenderMemberList(attackerHeads, (int)PlayerCampType.Attack);
+            RenderMemberList(defenserHeads, (int)PlayerCampType.Defense);
             RenderSpectateCount();
             syncingFromServer = false;
         }
@@ -168,21 +180,21 @@ namespace Ros.UI.Main
 
         private void RefreshAICountLabels()
         {
-            if (m_camp_attack.m_label_AI_count != null) m_camp_attack.m_label_AI_count.text = $"x{attackAICount}";
-            if (m_camp_defense.m_label_AI_count != null) m_camp_defense.m_label_AI_count.text = $"x{defenseAICount}";
+            if (m_camp_attacker.m_label_AI_count != null) m_camp_attacker.m_label_AI_count.text = $"x{attackAICount}";
+            if (m_camp_defenser.m_label_AI_count != null) m_camp_defenser.m_label_AI_count.text = $"x{defenseAICount}";
         }
 
         // 当前所在阵营标记：0 = 不在 / 1 = 在（myCamp 以服务器回显为准）
         private void RefreshCampMark()
         {
-            m_camp_attack.m_is_in_this_camp.selectedIndex = myCamp == (int)PlayerCampType.Attack ? 1 : 0;
-            m_camp_defense.m_is_in_this_camp.selectedIndex = myCamp == (int)PlayerCampType.Defense ? 1 : 0;
+            m_camp_attacker.m_is_in_this_camp.selectedIndex = myCamp == (int)PlayerCampType.Attack ? 1 : 0;
+            m_camp_defenser.m_is_in_this_camp.selectedIndex = myCamp == (int)PlayerCampType.Defense ? 1 : 0;
             m_camp_spectate.m_is_in_this_camp.selectedIndex = myCamp == (int)PlayerCampType.Spectator ? 1 : 0;
         }
 
         private void RefreshPrepareButton()
         {
-            if (m_btn_prepare != null) m_btn_prepare.title = myReady ? "取消准备" : "准备";
+            if (prepareButton != null) prepareButton.title = myReady ? "取消准备" : "准备";
         }
 
         // 观战方只显示人数，不列具体人员
@@ -193,8 +205,6 @@ namespace Ros.UI.Main
                 if (members[i].camp == (int)PlayerCampType.Spectator) count++;
             if (m_camp_spectate.m_spectate_current_member_count != null)
                 m_camp_spectate.m_spectate_current_member_count.text = count.ToString();
-            m_camp_spectate.m_attackerPlayers.numItems = 0;
-            m_camp_spectate.m_attackerPlayers.visible = false;
         }
 
         private void RenderMemberList(GList list, int camp)

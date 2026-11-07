@@ -8,6 +8,10 @@ namespace Ros.UI.Main
     public partial class UI_LobbyPanel : GComponent
     {
         public UI_LobbyMemberList m_mainView;
+        public GButton m_btn_prepare;
+        public GButton m_btn_exit;
+        public GList m_attacker_member_list;
+        public GList m_defenser_member_list;
         public const string URL = "ui://q68vr2bftwqeh8";
 
         public static UI_LobbyPanel CreateInstance()
@@ -20,6 +24,10 @@ namespace Ros.UI.Main
             base.ConstructFromXML(xml);
 
             m_mainView = (UI_LobbyMemberList)GetChildAt(0);
+            m_btn_prepare = (GButton)GetChildAt(1);
+            m_btn_exit = (GButton)GetChildAt(2);
+            m_attacker_member_list = (GList)GetChildAt(3);
+            m_defenser_member_list = (GList)GetChildAt(4);
         }
     }
 }

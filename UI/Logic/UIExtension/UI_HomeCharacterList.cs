@@ -13,19 +13,23 @@ namespace Ros.UI.Main
         private const string NextGainOrange = "#FF9E47"; // 下一级将获得的增益
 
         private Action onSelectionChanged;
+        private Action<bool> onTabChanged;
+        private Action onClosed;
 
         public bool DefenseTab { get; private set; }
 
-        // 构造期一次：标题、页签、列表渲染器、底框关闭按钮（点了收起浮层）
-        public void Build(Action selectionChanged)
+        // 构造期一次：页签、列表渲染器、关闭按钮；浮层显隐由页面的 m_show_character_panel 控制器负责
+        public void Build(Action selectionChanged, Action<bool> tabChanged, Action closed)
         {
             onSelectionChanged = selectionChanged;
-            visible = false;
+            onTabChanged = tabChanged;
+            onClosed = closed;
             if (m_panel != null)
             {
                 m_panel.title = "角色选择";
-                if (m_panel.m_close != null) m_panel.m_close.onClick.Set(() => visible = false);
+                if (m_panel.m_close != null) m_panel.m_close.onClick.Set(() => onClosed?.Invoke());
             }
+            if (m_btn_close != null) m_btn_close.onClick.Set(() => onClosed?.Invoke());
             if (m_characterList != null) m_characterList.itemRenderer = RenderCharacter;
             if (m_btn_attack != null)
             {
@@ -43,11 +47,8 @@ namespace Ros.UI.Main
         // 打开：同步页签选中态（默认进攻页签，避免进入后无任何页签选中）
         public void Open()
         {
-            visible = true;
             SwitchTab(DefenseTab);
         }
-
-        public void Close() => visible = false;
 
         // 列表与属性表同面板，一起重画
         public void Refresh()
@@ -62,6 +63,7 @@ namespace Ros.UI.Main
             DefenseTab = defense;
             ApplyTabMark();
             Refresh();
+            onTabChanged?.Invoke(defense);
         }
 
         private void ApplyTabMark()

@@ -74,6 +74,11 @@ public class AssetsManager : MonoBehaviour
     public Dictionary<int, Texture> BuffIconMap { get; private set; } = new();
     #endregion
 
+    #region
+    public HomeDisplayArranger homeDisplayArranger;
+    public LobbyDisplayArranger lobbyDisplayArranger;
+    #endregion
+
     public bool TryGetGraphic(EntityType type, out GameObject graphic)
     {
         graphic = null;

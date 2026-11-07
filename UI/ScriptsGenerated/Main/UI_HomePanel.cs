@@ -7,6 +7,8 @@ namespace Ros.UI.Main
 {
     public partial class UI_HomePanel : GComponent
     {
+        public Controller m_show_character_panel;
+        public GButton m_btn_select_character;
         public UI_HomeConnect m_connectPanel;
         public UI_PlayerInfo m_playerInfo;
         public UI_HomeCharacterList m_characterList;
@@ -21,9 +23,11 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
-            m_connectPanel = (UI_HomeConnect)GetChildAt(0);
-            m_playerInfo = (UI_PlayerInfo)GetChildAt(1);
-            m_characterList = (UI_HomeCharacterList)GetChildAt(2);
+            m_show_character_panel = GetControllerAt(0);
+            m_btn_select_character = (GButton)GetChildAt(0);
+            m_connectPanel = (UI_HomeConnect)GetChildAt(1);
+            m_playerInfo = (UI_PlayerInfo)GetChildAt(2);
+            m_characterList = (UI_HomeCharacterList)GetChildAt(3);
         }
     }
 }

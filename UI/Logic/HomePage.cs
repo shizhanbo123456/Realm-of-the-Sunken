@@ -12,10 +12,9 @@ public class HomePage : PageBase
 
     public override void Construct()
     {
-        // 角色选择浮层自带页签/列表/属性表/关闭按钮，选角变化回调回来只做场景预览
-        panel.m_characterList.Build(RefreshPreview);
-        panel.m_connectPanel.m_btn_editSelection.title = "选择角色";
-        panel.m_connectPanel.m_btn_editSelection.onClick.Add(() => panel.m_characterList.Open());
+        // 角色选择浮层自带页签/列表/属性表/关闭按钮，选角、切页签、关闭三种回调分别回来做场景预览与相机转向
+        panel.m_characterList.Build(RefreshPreview, TurnToCamp, CloseCharacterList);
+        panel.m_btn_select_character.onClick.Add(OpenCharacterList);
 
         var nameInput = panel.m_playerInfo.m_input_playerName;
         nameInput.maxLength = ConfigManager.GlobalVariableConfig.name_length_max;
@@ -41,17 +40,38 @@ public class HomePage : PageBase
         base.Enter(param);
         panel.m_playerInfo.m_input_playerName.text = ClientSelection.playerName;
         RefreshPlayerExp();
-        panel.m_characterList.Close();   // 每次进入首页收起角色选择浮层
-        panel.m_characterList.Refresh(); // 列表与属性表按当前存档重画
-        RefreshPreview();                // 当前选中的两角色复制到预览锚点
+        panel.m_show_character_panel.selectedIndex = 0; // 每次进入首页收起角色选择浮层
+        panel.m_characterList.Refresh();                // 列表与属性表按当前存档重画
+        RefreshPreview();                               // 当前选中的两角色摆到场景锚点
+        if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
+            Tool.ClientLogicManager.HomePreview.ResetHomeView();
     }
 
     #region//Local
-    // 首页与组队大厅共用同一套选角预览：选中角色变化后重建
+    private void OpenCharacterList()
+    {
+        panel.m_show_character_panel.selectedIndex = 1;
+        panel.m_characterList.Open(); // 同步页签并让相机转向当前页签的角色
+    }
+
+    private void CloseCharacterList()
+    {
+        panel.m_show_character_panel.selectedIndex = 0;
+        if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
+            Tool.ClientLogicManager.HomePreview.ResetHomeView();
+    }
+
+    private void TurnToCamp(bool defense)
+    {
+        if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
+            Tool.ClientLogicManager.HomePreview.LookAtHome(defense ? PlayerCampType.Defense : PlayerCampType.Attack);
+    }
+
+    // 选中角色变化后重建场景里的预览模型
     private void RefreshPreview()
     {
         if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
-            Tool.ClientLogicManager.HomePreview.Refresh(ClientSelection.selectedAttackIndex, ClientSelection.selectedDefenseIndex);
+            Tool.ClientLogicManager.HomePreview.RefreshHome(ClientSelection.selectedAttackIndex, ClientSelection.selectedDefenseIndex);
     }
 
     // 玩家经验条：进度 = 当前级经验 / 升到下一级所需（经验与等级都在存档里，满级拉满）
