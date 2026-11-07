@@ -6,7 +6,7 @@ namespace TerrainGen
     public static class TerrainGenerator
     {
         public static TerrainPropCuller Generate(BuildingSettings settings, BuildingKitSet kit, bool culled = true,
-            bool colliderOnly = false, Transform parent = null)
+            bool colliderOnly = false, bool stripToCollider = false, Transform parent = null)
         {
             if (settings == null)
             {
@@ -46,6 +46,7 @@ namespace TerrainGen
             var culler = cullerGo.AddComponent<TerrainPropCuller>();
             culler.culled = culled;
             culler.colliderOnly = colliderOnly;
+            culler.stripToCollider = stripToCollider;
             culler.Initialize(data, kit, root.transform);
             return culler;
         }

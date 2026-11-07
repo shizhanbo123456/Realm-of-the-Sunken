@@ -15,6 +15,9 @@ namespace TerrainGen
         [Tooltip("true = 只放有启用碰撞体的类别，藤蔓/障碍装饰/漂浮装饰/鱼群/灌木全部跳过（服务器用）")]
         public bool colliderOnly;
 
+        [Tooltip("true = 除地面外只留根物体与碰撞体：子物体全销毁、根上 MeshRenderer 全移除（服务器用）")]
+        public bool stripToCollider;
+
         [Tooltip("检测间隔（秒）：隔这么久才判定一次，0 = 每帧判定")]
         public float checkInterval = 0.25f;
 
@@ -210,7 +213,7 @@ namespace TerrainGen
                 GameObject prefab = kit.GetPrefab(def.kind, def.prefabIndex);
                 if (prefab == null) continue;
 
-                GameObject go = Take(prefab, root);
+                GameObject go = Take(prefab, root, def.kind);
                 go.name = def.kind + "_" + prefab.name;
                 go.transform.position = rootPos + def.position;
                 go.transform.rotation = Quaternion.Euler(0f, def.yaw, 0f);
@@ -229,7 +232,7 @@ namespace TerrainGen
             liveChunks.Remove(key);
         }
 
-        GameObject Take(GameObject prefab, Transform parent)
+        GameObject Take(GameObject prefab, Transform parent, TerrainItemKind kind)
         {
             if (free.TryGetValue(prefab, out Stack<GameObject> stack) && stack.Count > 0)
             {
@@ -242,7 +245,24 @@ namespace TerrainGen
             created.SetActive(false);
             instancePrefabs[created] = prefab;
             InstanceCount++;
+            // 池化实例只精简一次：碰撞体在根物体上（见 ColliderPreprocessor），销毁子物体不影响物理
+            if (stripToCollider && kind != TerrainItemKind.Ground) StripInstance(created);
             return created;
+        }
+
+        void StripInstance(GameObject go)
+        {
+            // 先关再销毁：Destroy 延迟到帧末，不关的话当帧还会跟着 SetActive(true) 渲染一次
+            for (int i = go.transform.childCount - 1; i >= 0; i--)
+            {
+                GameObject child = go.transform.GetChild(i).gameObject;
+                child.SetActive(false);
+                Destroy(child);
+            }
+            foreach (MeshRenderer renderer in go.GetComponents<MeshRenderer>())
+            {
+                Destroy(renderer);
+            }
         }
 
         void Return(GameObject go)

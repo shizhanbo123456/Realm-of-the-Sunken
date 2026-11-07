@@ -23,7 +23,7 @@ namespace TerrainGen
                 Debug.LogError("[地形] 场景缺少 Tool，无法判定服务器/客户端：地形未生成", this);
                 return;
             }
-            if (Tool.Instance.isServer) Generate(false, true);
+            if (Tool.Instance.isServer) Generate(culled: false, colliderOnly: true, stripToCollider: true);
         }
 
         // 编辑器非播放态：只把数据烘焙到 StreamingAssets/TerrainGenerator 并返回 null
