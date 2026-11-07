@@ -288,7 +288,7 @@ namespace TerrainGen.EditorTools
             try
             {
                 TerrainAssembler.SpawnColliderOnly(data, kit, root.transform);
-                ok = TryBakeNavMesh(root.transform, out message);
+                ok = TryBakeNavMesh(root.transform, data.groundHeight, out message);
             }
             finally
             {
@@ -300,7 +300,7 @@ namespace TerrainGen.EditorTools
             Log(summary);
         }
 
-        bool TryBakeNavMesh(Transform root, out string message)
+        bool TryBakeNavMesh(Transform root, float groundY, out string message)
         {
             message = string.Empty;
 
@@ -311,17 +311,50 @@ namespace TerrainGen.EditorTools
                 return false;
             }
 
-            Bounds bounds = BakeBounds(root);
+            // 不能走 NavMeshBuilder.CollectSources：编辑器态刚 Instantiate 的碰撞体还没同步进物理场景，
+            // 收集到的全在预制体本地位置（原点附近），烘出来只有一小片。这里直接按生成物自己的 BoxCollider 造 source。
             var sources = new List<NavMeshBuildSource>();
-            NavMeshBuilder.CollectSources(bounds, ~0, NavMeshCollectGeometry.PhysicsColliders, 0,
-                new List<NavMeshBuildMarkup>(), sources);
+            Bounds bounds = default;
+            bool hasBounds = false;
+            int missingBox = 0;
+
+            foreach (Transform item in root)
+            {
+                var box = item.GetComponent<BoxCollider>();
+                if (box == null) { missingBox++; continue; }
+
+                float scale = item.localScale.x; // 摆放只做等比缩放
+                Vector3 center = item.position + item.rotation * (box.center * scale);
+                Vector3 size = box.size * scale;
+
+                sources.Add(new NavMeshBuildSource
+                {
+                    shape = NavMeshBuildSourceShape.Box,
+                    size = size,
+                    area = 0,
+                    transform = Matrix4x4.TRS(center, item.rotation, Vector3.one),
+                });
+
+                var itemBounds = new Bounds(center, size);
+                if (!hasBounds) { bounds = itemBounds; hasBounds = true; }
+                else bounds.Encapsulate(itemBounds);
+            }
+
             if (sources.Count == 0)
             {
-                message = "烘焙失败：收集到的碰撞几何为 0，检查素材表里的地面预制体是否有启用的碰撞体";
+                message = "烘焙失败：没有任何带 BoxCollider 的生成物，检查素材表里的地面预制体";
                 return false;
             }
 
-            NavMeshData data = NavMeshBuilder.BuildNavMeshData(build, sources, bounds, root.position, Quaternion.identity);
+            bounds.Expand(2f); // 留出 agent 半径余量
+            // Y 只留地面附近：高处/低空的摆件不参与寻路，带着会把体素量拉爆
+            Vector3 min = bounds.min;
+            Vector3 max = bounds.max;
+            min.y = groundY - 6f;
+            max.y = groundY + 6f;
+            bounds.SetMinMax(min, max);
+
+            NavMeshData data = NavMeshBuilder.BuildNavMeshData(build, sources, bounds, Vector3.zero, Quaternion.identity);
             if (data == null)
             {
                 message = "烘焙失败：BuildNavMeshData 返回空";
@@ -329,21 +362,9 @@ namespace TerrainGen.EditorTools
             }
 
             string path = SaveNavMeshAsset(data);
-            message = $"NavMesh 已烘焙：{sources.Count} 个碰撞几何、包围盒 {bounds.size.x:0}×{bounds.size.z:0}m → {path}；"
-                      + "运行时由 TerrainNavMesh 从 Resources 加载";
+            message = $"NavMesh 已烘焙：{sources.Count} 个 Box 几何、范围 X {bounds.min.x:0}~{bounds.max.x:0} / Z {bounds.min.z:0}~{bounds.max.z:0} → {path}"
+                      + (missingBox > 0 ? $"；另有 {missingBox} 个生成物没有 BoxCollider，未参与烘焙" : string.Empty);
             return true;
-        }
-
-        // 只按生成物自己的碰撞体算包围盒，别把场景里的其它东西包进来
-        static Bounds BakeBounds(Transform root)
-        {
-            Collider[] colliders = root.GetComponentsInChildren<Collider>(true);
-            if (colliders.Length == 0) return new Bounds(root.position, Vector3.one);
-
-            Bounds bounds = colliders[0].bounds;
-            for (int i = 1; i < colliders.Length; i++) bounds.Encapsulate(colliders[i].bounds);
-            bounds.Expand(2f); // 留出 agent 半径余量
-            return bounds;
         }
 
         static string SaveNavMeshAsset(NavMeshData data)
