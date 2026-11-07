@@ -336,7 +336,7 @@ namespace TerrainGen.EditorTools
                 sources.Add(new NavMeshBuildSource
                 {
                     shape = NavMeshBuildSourceShape.Mesh,
-                    mesh = mesh,
+                    sourceObject = mesh,
                     area = 0,
                     transform = filter.transform.localToWorldMatrix,
                 });
