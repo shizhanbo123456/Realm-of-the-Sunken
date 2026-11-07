@@ -26,7 +26,7 @@ namespace TerrainGen
     {
         public TerrainItemKind kind;
         public int prefabIndex;   // 对应 BuildingKitSet 该类别列表里的下标
-        public Vector3 position;  // 地形局部坐标（地形中心为原点）
+        public Vector3 position;  // 地图坐标：XZ 落在配表地形范围内，Y 自地块下表面起算
         public float yaw;
         public float scale;
     }

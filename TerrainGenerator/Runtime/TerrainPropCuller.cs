@@ -270,8 +270,9 @@ namespace TerrainGen
             var container = new GameObject("Points");
             container.transform.SetParent(contentRoot, false);
 
-            float ox = (data.sizeX - 1) * 0.5f * data.cellSize;
-            float oz = (data.sizeZ - 1) * 0.5f * data.cellSize;
+            // 与摆放数据同一口径：0 号格中心的地图坐标
+            float ox = Landscape.MapMin + data.cellSize * 0.5f;
+            float oz = Landscape.MapMin + data.cellSize * 0.5f;
             int subIndex = 0;
             int extraIndex = 0;
             int towerIndex = 0;
@@ -304,9 +305,9 @@ namespace TerrainGen
                 var go = new GameObject(label);
                 go.transform.SetParent(container.transform, false);
                 go.transform.localPosition = new Vector3(
-                    p.Cell.x * data.cellSize - ox,
+                    p.Cell.x * data.cellSize + ox,
                     data.groundHeight,
-                    p.Cell.y * data.cellSize - oz);
+                    p.Cell.y * data.cellSize + oz);
 
                 var marker = go.AddComponent<PointMarker>();
                 marker.label = label;

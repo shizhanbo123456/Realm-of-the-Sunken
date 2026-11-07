@@ -22,8 +22,9 @@ namespace TerrainGen
             var rng = new System.Random(seed ^ 0x51A7C3);
             var spots = new List<Spot>();
 
-            float ox = (f.SizeX - 1) * 0.5f * Gen.cell_size;
-            float oz = (f.SizeZ - 1) * 0.5f * Gen.cell_size;
+            // 0 号格中心的地图坐标；摆放数据直接存地图坐标，不以地形中心为原点
+            float ox = Landscape.MapMin + Gen.cell_size * 0.5f;
+            float oz = Landscape.MapMin + Gen.cell_size * 0.5f;
 
             int count = 0;
             var reserved = new HashSet<long>();
@@ -81,7 +82,7 @@ namespace TerrainGen
                 float spread = randomSpot ? Mathf.Max(0f, Gen.cell_size * 0.5f - radius) : 0f;
                 float jx = spread > 0f ? (float)(rng.NextDouble() * 2.0 - 1.0) * spread : 0f;
                 float jz = spread > 0f ? (float)(rng.NextDouble() * 2.0 - 1.0) * spread : 0f;
-                var pos = new Vector3(cell.x * Gen.cell_size - ox + jx, Gen.ground_height - b.min.y, cell.y * Gen.cell_size - oz + jz);
+                var pos = new Vector3(cell.x * Gen.cell_size + ox + jx, Gen.ground_height - b.min.y, cell.y * Gen.cell_size + oz + jz);
                 if (Blocked(pos, radius, Gen.prop_gap_padding, spots)) continue;
 
                 float yaw = freeYaw ? (float)rng.NextDouble() * 360f : rng.Next(4) * 90f;
@@ -120,9 +121,9 @@ namespace TerrainGen
                 {
                     if (f.Layer[x, z] < 0) continue;
 
-                    float x0 = x * c - ox - c * 0.5f;
+                    float x0 = x * c + ox - c * 0.5f;
                     float x1 = x0 + c;
-                    float z0 = z * c - oz - c * 0.5f;
+                    float z0 = z * c + oz - c * 0.5f;
                     float z1 = z0 + c;
                     int group = f.RegionGroup(x, z);
 
@@ -179,8 +180,8 @@ namespace TerrainGen
 
                 float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * Gen.prop_scale_range;
                 float radius = Mathf.Max(b.extents.x, b.extents.z) * scale;
-                float cx = cell.x * Gen.cell_size - ox + (float)(rng.NextDouble() * 2.0 - 1.0) * half;
-                float cz = cell.y * Gen.cell_size - oz + (float)(rng.NextDouble() * 2.0 - 1.0) * half;
+                float cx = cell.x * Gen.cell_size + ox + (float)(rng.NextDouble() * 2.0 - 1.0) * half;
+                float cz = cell.y * Gen.cell_size + oz + (float)(rng.NextDouble() * 2.0 - 1.0) * half;
                 var flat = new Vector2(cx, cz);
 
                 if (!TouchesVoid(f, cx, cz, radius, ox, oz, Gen.cell_size)) continue;
@@ -226,8 +227,8 @@ namespace TerrainGen
 
                 float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * Gen.prop_scale_range;
                 float spread = Gen.cell_size * 0.5f;
-                float cx = cell.x * Gen.cell_size - ox + (float)(rng.NextDouble() * 2.0 - 1.0) * spread;
-                float cz = cell.y * Gen.cell_size - oz + (float)(rng.NextDouble() * 2.0 - 1.0) * spread;
+                float cx = cell.x * Gen.cell_size + ox + (float)(rng.NextDouble() * 2.0 - 1.0) * spread;
+                float cz = cell.y * Gen.cell_size + oz + (float)(rng.NextDouble() * 2.0 - 1.0) * spread;
                 float y = (float)rng.NextDouble() * Gen.ground_height;
 
                 if (Add(kit, items, TerrainItemKind.ObstacleDecor, prefab, new Vector3(cx, y, cz),
@@ -244,17 +245,20 @@ namespace TerrainGen
             if (kit.floatingDecorations.Count == 0 || Gen.cells_per_floating_decoration <= 0) return 0;
 
             int target = Mathf.Max(1, Mathf.RoundToInt(f.SizeX * f.SizeZ / (float)Gen.cells_per_floating_decoration));
-            float halfW = f.SizeX * Gen.cell_size * 0.5f;
-            float halfD = f.SizeZ * Gen.cell_size * 0.5f;
+            float c = Gen.cell_size;
+            float halfW = f.SizeX * c * 0.5f;
+            float halfD = f.SizeZ * c * 0.5f;
+            float centerX = ox + (f.SizeX - 1) * 0.5f * c;
+            float centerZ = oz + (f.SizeZ - 1) * 0.5f * c;
             int made = 0;
 
             for (int i = 0; i < target * 40 + 200 && made < target; i++)
             {
-                float cx = (float)(rng.NextDouble() * 2.0 - 1.0) * halfW;
-                float cz = (float)(rng.NextDouble() * 2.0 - 1.0) * halfD;
+                float cx = centerX + (float)(rng.NextDouble() * 2.0 - 1.0) * halfW;
+                float cz = centerZ + (float)(rng.NextDouble() * 2.0 - 1.0) * halfD;
 
-                int gx = Mathf.Clamp(Mathf.RoundToInt((cx + ox) / Gen.cell_size), 0, f.SizeX - 1);
-                int gz = Mathf.Clamp(Mathf.RoundToInt((cz + oz) / Gen.cell_size), 0, f.SizeZ - 1);
+                int gx = Mathf.Clamp(Mathf.RoundToInt((cx - ox) / c), 0, f.SizeX - 1);
+                int gz = Mathf.Clamp(Mathf.RoundToInt((cz - oz) / c), 0, f.SizeZ - 1);
                 if (reserved.Contains(CellKey(gx, gz))) continue;
 
                 GameObject prefab = kit.PickFrom(kit.floatingDecorations, f.RegionGroup(gx, gz));
@@ -276,17 +280,20 @@ namespace TerrainGen
             if (kit.fishSchools.Count == 0 || Gen.cells_per_fish_school <= 0) return 0;
 
             int target = Mathf.Max(1, Mathf.RoundToInt(f.SizeX * f.SizeZ / (float)Gen.cells_per_fish_school));
-            float halfW = f.SizeX * Gen.cell_size * 0.5f;
-            float halfD = f.SizeZ * Gen.cell_size * 0.5f;
+            float c = Gen.cell_size;
+            float halfW = f.SizeX * c * 0.5f;
+            float halfD = f.SizeZ * c * 0.5f;
+            float centerX = ox + (f.SizeX - 1) * 0.5f * c;
+            float centerZ = oz + (f.SizeZ - 1) * 0.5f * c;
             int made = 0;
 
             for (int i = 0; i < target * 40 + 200 && made < target; i++)
             {
-                float cx = (float)(rng.NextDouble() * 2.0 - 1.0) * halfW;
-                float cz = (float)(rng.NextDouble() * 2.0 - 1.0) * halfD;
+                float cx = centerX + (float)(rng.NextDouble() * 2.0 - 1.0) * halfW;
+                float cz = centerZ + (float)(rng.NextDouble() * 2.0 - 1.0) * halfD;
 
-                int gx = Mathf.Clamp(Mathf.RoundToInt((cx + ox) / Gen.cell_size), 0, f.SizeX - 1);
-                int gz = Mathf.Clamp(Mathf.RoundToInt((cz + oz) / Gen.cell_size), 0, f.SizeZ - 1);
+                int gx = Mathf.Clamp(Mathf.RoundToInt((cx - ox) / c), 0, f.SizeX - 1);
+                int gz = Mathf.Clamp(Mathf.RoundToInt((cz - oz) / c), 0, f.SizeZ - 1);
                 if (reserved.Contains(CellKey(gx, gz))) continue;
 
                 GameObject prefab = kit.PickFrom(kit.fishSchools, f.RegionGroup(gx, gz));
@@ -310,10 +317,10 @@ namespace TerrainGen
         // 包围盒脚下的格子里至少有一个没有地面（含地图外），即"不是整个落在地面上"
         static bool TouchesVoid(BuildingField f, float cx, float cz, float r, float ox, float oz, float cell)
         {
-            int x0 = Mathf.FloorToInt((cx - r + ox) / cell + 0.5f);
-            int x1 = Mathf.FloorToInt((cx + r + ox) / cell + 0.5f);
-            int z0 = Mathf.FloorToInt((cz - r + oz) / cell + 0.5f);
-            int z1 = Mathf.FloorToInt((cz + r + oz) / cell + 0.5f);
+            int x0 = Mathf.FloorToInt((cx - r - ox) / cell + 0.5f);
+            int x1 = Mathf.FloorToInt((cx + r - ox) / cell + 0.5f);
+            int z0 = Mathf.FloorToInt((cz - r - oz) / cell + 0.5f);
+            int z1 = Mathf.FloorToInt((cz + r - oz) / cell + 0.5f);
 
             for (int x = x0; x <= x1; x++)
                 for (int z = z0; z <= z1; z++)

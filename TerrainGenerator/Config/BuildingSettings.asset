@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: BuildingSettings
   m_EditorClassIdentifier: 
   seed: 676654
-  version: 1
+  version: 2

@@ -13,8 +13,9 @@ namespace TerrainGen
             if (kit == null) return 0;
 
             float c = Gen.cell_size;
-            float ox = (f.SizeX - 1) * 0.5f * c;
-            float oz = (f.SizeZ - 1) * 0.5f * c;
+            // 0 号格中心的地图坐标；摆放数据直接存地图坐标，不以地形中心为原点
+            float ox = Landscape.MapMin + c * 0.5f;
+            float oz = Landscape.MapMin + c * 0.5f;
             float surface = Gen.ground_height;
             int count = 0;
 
@@ -25,7 +26,7 @@ namespace TerrainGen
                 {
                     if (f.Layer[x, z] < 0) continue;
                     count += Add(kit, items, TerrainItemKind.Ground, f.RegionGroup(x, z),
-                        new Vector3(x * c - ox, 0f, z * c - oz), 0f);
+                        new Vector3(x * c + ox, 0f, z * c + oz), 0f);
                 }
             }
 
@@ -41,9 +42,9 @@ namespace TerrainGen
                 {
                     if (f.Layer[x, z] < 0) continue;
 
-                    float x0 = x * c - ox - c * 0.5f;
+                    float x0 = x * c + ox - c * 0.5f;
                     float x1 = x0 + c;
-                    float z0 = z * c - oz - c * 0.5f;
+                    float z0 = z * c + oz - c * 0.5f;
                     float z1 = z0 + c;
                     int group = f.RegionGroup(x, z);
 
@@ -92,7 +93,7 @@ namespace TerrainGen
             {
                 Vector2Int v = verts[i];
                 int group = vertGroups[i];
-                var pos = new Vector3(v.x * c - ox - c * 0.5f, surface, v.y * c - oz - c * 0.5f);
+                var pos = new Vector3(v.x * c + ox - c * 0.5f, surface, v.y * c + oz - c * 0.5f);
 
                 GameObject tallPrefab = kit.UseTallPost(group) ? kit.PickTallPost(group) : null;
                 GameObject shortPrefab = kit.PickShortPost(group);
