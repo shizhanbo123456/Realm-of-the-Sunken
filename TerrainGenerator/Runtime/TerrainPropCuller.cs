@@ -12,6 +12,9 @@ namespace TerrainGen
         [Tooltip("false = 不剔除，全部区块一次常驻（服务器用）")]
         public bool culled = true;
 
+        [Tooltip("true = 只放有启用碰撞体的类别，藤蔓/障碍装饰/漂浮装饰/鱼群/灌木全部跳过（服务器用）")]
+        public bool colliderOnly;
+
         [Tooltip("检测间隔（秒）：隔这么久才判定一次，0 = 每帧判定")]
         public float checkInterval = 0.25f;
 
@@ -77,9 +80,12 @@ namespace TerrainGen
             pool.transform.SetParent(contentRoot, false);
             poolRoot = pool.transform;
 
+            var colliderCache = new Dictionary<GameObject, bool>();
             for (int i = 0; i < data.items.Count; i++)
             {
                 TerrainItemData item = data.items[i];
+                if (!KeepItem(item, colliderCache)) continue;
+
                 Vector3 world = contentRoot.position + item.position;
                 Vector2Int chunk = ChunkSearcher<GameObject>.GetChunkIndex(world);
                 // 贴边物件会因浮点误差落到图外，夹到最近的区块，跟随该区块一起显隐
@@ -125,6 +131,31 @@ namespace TerrainGen
             lastCheckPos = cameraPos;
             lastRadius = visibleDistance;
             SyncVisibility(cameraPos);
+        }
+
+        // 按预制体自身的碰撞体判定，碰撞体预处理改了模式也不用同步改这里
+        bool KeepItem(TerrainItemData item, Dictionary<GameObject, bool> cache)
+        {
+            if (!colliderOnly) return true;
+
+            GameObject prefab = kit.GetPrefab(item.kind, item.prefabIndex);
+            if (prefab == null) return false;
+            if (!cache.TryGetValue(prefab, out bool active))
+            {
+                active = HasActiveCollider(prefab);
+                cache[prefab] = active;
+            }
+            return active;
+        }
+
+        static bool HasActiveCollider(GameObject prefab)
+        {
+            Collider[] cols = prefab.GetComponentsInChildren<Collider>(true);
+            for (int i = 0; i < cols.Length; i++)
+            {
+                if (cols[i].enabled) return true;
+            }
+            return false;
         }
 
         // 按间隔判定；未到间隔、或相机没动且半径没变时直接 return，不做任何计算

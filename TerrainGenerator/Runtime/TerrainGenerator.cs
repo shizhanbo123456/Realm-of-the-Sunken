@@ -5,7 +5,8 @@ namespace TerrainGen
     // 生成入口：编辑器非播放态只烘焙数据到 StreamingAssets；播放态优先读缓存，缺失才运行期生成
     public static class TerrainGenerator
     {
-        public static TerrainPropCuller Generate(BuildingSettings settings, BuildingKitSet kit, bool culled = true, Transform parent = null)
+        public static TerrainPropCuller Generate(BuildingSettings settings, BuildingKitSet kit, bool culled = true,
+            bool colliderOnly = false, Transform parent = null)
         {
             if (settings == null)
             {
@@ -44,6 +45,7 @@ namespace TerrainGen
 
             var culler = cullerGo.AddComponent<TerrainPropCuller>();
             culler.culled = culled;
+            culler.colliderOnly = colliderOnly;
             culler.Initialize(data, kit, root.transform);
             return culler;
         }

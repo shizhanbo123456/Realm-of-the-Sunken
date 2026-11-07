@@ -15,7 +15,7 @@ namespace TerrainGen
             Tool.ModularTerrainGenerator = this;
         }
 
-        // 服务器启动即常驻整张地形：地面射线与点位要覆盖全图，区块不做剔除
+        // 服务器启动即常驻整张地形：只放有启用碰撞体的类别，地面射线与点位才覆盖全图
         void Start()
         {
             if (Tool.Instance == null)
@@ -23,12 +23,12 @@ namespace TerrainGen
                 Debug.LogError("[地形] 场景缺少 Tool，无法判定服务器/客户端：地形未生成", this);
                 return;
             }
-            if (Tool.Instance.isServer) Generate(false);
+            if (Tool.Instance.isServer) Generate(false, true);
         }
 
         // 编辑器非播放态：只把数据烘焙到 StreamingAssets/TerrainGenerator 并返回 null
         // 播放态：优先读缓存数据，缺失则运行期生成，返回挂好数据的 Culler
-        public TerrainPropCuller Generate(bool culled = true)
+        public TerrainPropCuller Generate(bool culled = true, bool colliderOnly = false)
         {
             if (settings == null)
             {
@@ -37,7 +37,7 @@ namespace TerrainGen
             }
 
             Clear();
-            culler = TerrainGenerator.Generate(settings, kit, culled);
+            culler = TerrainGenerator.Generate(settings, kit, culled, colliderOnly);
             return culler;
         }
 
