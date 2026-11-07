@@ -110,6 +110,7 @@ public class EntityAnim : MonoBehaviour
         for (int i = 0; i < animators.Count; i++)
         {
             Animator animator = animators[i];
+            animator.runtimeAnimatorController = Tool.AssetsManager.animatorController;
             var behaviours = animator.GetBehaviours<AnimEvent>();
             foreach (var behaviour in behaviours) behaviour.Init(this, data,i==0);
         }

@@ -33,7 +33,7 @@ public class AssetsManager : MonoBehaviour
         return map;
     }
 
-    #region 实体图形（客户端表现用；服务器不加载本组件）
+    #region 实体图形
     public List<GameObject> AttackCharacterGraphics = new();
     public List<GameObject> DefenseCharacterGraphics = new();
     public List<GameObject> ZombieGraphics = new();
@@ -44,6 +44,7 @@ public class AssetsManager : MonoBehaviour
     public List<GameObject> CoralLargeGraphics = new();
     public List<GameObject> CrystalStatueGraphics = new();
     public List<GameObject> NeutralStatueGraphics = new();
+    public RuntimeAnimatorController animatorController;
     #endregion
 
     #region 特效（编号与《特效清单与分配表.md》对应）
