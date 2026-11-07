@@ -24,16 +24,13 @@ public struct EntityType : IEquatable<EntityType>
     #endregion
 
     #region 预设
-    // 进攻方角色（9 人）
+    // 进攻方角色（6 人）
     public static EntityType Attack0 => Attack(0);
     public static EntityType Attack1 => Attack(1);
     public static EntityType Attack2 => Attack(2);
     public static EntityType Attack3 => Attack(3);
     public static EntityType Attack4 => Attack(4);
     public static EntityType Attack5 => Attack(5);
-    public static EntityType Attack6 => Attack(6);
-    public static EntityType Attack7 => Attack(7);
-    public static EntityType Attack8 => Attack(8);
     public static EntityType AttackFirst => Attack0;
     public static EntityType AttackLast => Attack(Config.attack_character_count - 1);
 
@@ -66,11 +63,11 @@ public struct EntityType : IEquatable<EntityType>
     public static EntityType AngelStatue => NeutralStatue(0);
     public static EntityType DemonStatue => NeutralStatue(1);
 
-    // 普通僵尸（0~20，暂用 21 种）
+    // 普通僵尸（0~4，共 5 种外观变体）
     public static EntityType ZombieFirst => Zombie(0);
     public static EntityType ZombieLast => Zombie(Config.zombie_variant_count - 1);
 
-    // 精英僵尸（14 种，type.value 0~13；种类数取 Config 常量，避免与召唤逻辑脱节）
+    // 精英僵尸（1 种，type.value 0；种类数取 Config 常量，避免与召唤逻辑脱节）
     public static EntityType EliteZombieFirst => EliteZombie(0);
     public static EntityType EliteZombieLast => EliteZombie(Config.elite_zombie_variant_count - 1);
     #endregion

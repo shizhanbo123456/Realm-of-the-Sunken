@@ -5,7 +5,7 @@ using UnityEngine;
 public static class Config
 {
     #region 角色
-    public const int attack_character_count = 9;
+    public const int attack_character_count = 6;
     public const int defense_character_count = 6;
 
     // 角色等级上限 = exp_character.csv 覆盖到的最高等级、战斗期等级上限 = global_variables，配表加行即生效
@@ -54,8 +54,8 @@ public static class Config
     #endregion
 
     #region 僵尸
-    public const int zombie_variant_count = 21;
-    public const int elite_zombie_variant_count = 14;
+    public const int zombie_variant_count = 5;
+    public const int elite_zombie_variant_count = 1;
     public const int zombie_spawn_level_passive_boost = 4;
 
     // —— AI 行为（策划案第九章只写了「无目标时游荡 / 发现目标后主动追击 / 设最大追击距离」，数值均为占位初值）——
