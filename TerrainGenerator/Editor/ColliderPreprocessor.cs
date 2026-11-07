@@ -41,7 +41,7 @@ namespace TerrainGen.EditorTools
             new Entry("建筑物", k => k.buildings, Mode.BoxEnabled),
             new Entry("装饰", k => k.decorations, Mode.BoxEnabled),
             new Entry("灌木", k => k.bushes, Mode.BoxDisabled),
-            new Entry("摆件", k => k.props, Mode.BoxEnabled),
+            new Entry("摆件", k => k.props, Mode.BoxDisabled),
             new Entry("藤蔓", k => k.vines, Mode.RemoveOnly),
             new Entry("障碍", k => k.obstacles, Mode.BoxEnabled),
             new Entry("障碍装饰", k => k.obstacleDecorations, Mode.RemoveOnly),
