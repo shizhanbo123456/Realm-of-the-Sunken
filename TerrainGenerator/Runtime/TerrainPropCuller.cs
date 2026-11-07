@@ -1,19 +1,33 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace TerrainGen
 {
-    // 显隐控制器：自身不含任何子物体，每帧按自身位置直接判定 contentRoot 下每个区块的显隐
+    // 显隐控制器：自身不含任何子物体；按间隔、且仅在位置变化时重新判定区块显隐
     public class TerrainPropCuller : MonoBehaviour
     {
         [Tooltip("可见半径（米），以本物体为中心；建议比相机可视范围略大")]
         public float visibleDistance = 250f;
 
-        readonly Dictionary<Vector2Int, Transform> chunkRoots = new Dictionary<Vector2Int, Transform>();
+        [Tooltip("检测间隔（秒）：隔这么久才判定一次，0 = 每帧判定")]
+        public float checkInterval = 0.25f;
+
+        [Tooltip("静默阈值（米）：位置移动小于该值视为静止，本轮不做任何判定")]
+        public float quietDistance = 1f;
+
+        readonly List<GameObject> chunks = new List<GameObject>();
+        readonly Dictionary<Vector2Int, int> chunkIds = new Dictionary<Vector2Int, int>();
 
         Transform contentRoot;
         Transform outOfMapRoot;
         bool warnedOutOfMap;
+        Vector3 lastCheckPos;
+        float lastRadius = float.NaN;
+
+        Coroutine loop;
+        WaitForSecondsRealtime wait;
+        float waitInterval = -1f;
 
         public int InstanceCount { get; private set; }
 
@@ -57,32 +71,110 @@ namespace TerrainGen
             }
 
             CreatePoints(data);
-            SyncVisibility();
-        }
 
-        void LateUpdate()
-        {
-            if (contentRoot == null) return;
-            SyncVisibility();
-        }
-
-        // 逐块比对目标状态，不做增量或缓存，改半径/移动本物体都在当帧生效
-        void SyncVisibility()
-        {
-            float radius = visibleDistance + Landscape.chunkSize;
-            float radiusSq = radius * radius;
-            Vector3 center = transform.position;
-
-            foreach (KeyValuePair<Vector2Int, Transform> pair in chunkRoots)
+            if (chunks.Count == 0)
             {
-                Transform chunk = pair.Value;
+                Debug.LogError($"[地形] 没有任何物件落入区块：地图边长 {Landscape.MapSize}，区块数 {Landscape.chunkCount}，"
+                               + $"内容根 {contentRoot.position}，剔除无法生效", this);
+            }
+            else if (!AnyChunkOutside(transform.position))
+            {
+                Debug.LogWarning($"[地形] 判定半径 {visibleDistance + Landscape.chunkSize:0}m 覆盖了全部 {chunks.Count} 个区块，"
+                                 + $"当前不会隐藏任何区块（visibleDistance = {visibleDistance}），需要调小半径或移动本物体", this);
+            }
+
+            lastCheckPos = transform.position;
+            lastRadius = visibleDistance;
+            SyncVisibility(transform.position);
+
+            if (isActiveAndEnabled && loop == null) loop = StartCoroutine(CheckLoop());
+        }
+
+        void OnEnable()
+        {
+            if (contentRoot != null && loop == null) loop = StartCoroutine(CheckLoop());
+        }
+
+        void OnDisable()
+        {
+            if (loop != null)
+            {
+                StopCoroutine(loop);
+                loop = null;
+            }
+        }
+
+        // 按间隔轮询：静止时直接跳过（静默），不占用 Update
+        IEnumerator CheckLoop()
+        {
+            while (true)
+            {
+                if (checkInterval > 0f)
+                {
+                    if (wait == null || !Mathf.Approximately(waitInterval, checkInterval))
+                    {
+                        wait = new WaitForSecondsRealtime(checkInterval);
+                        waitInterval = checkInterval;
+                    }
+                    yield return wait;
+                }
+                else
+                {
+                    yield return null;
+                }
+
+                Vector3 pos = transform.position;
+                bool moved = (pos - lastCheckPos).sqrMagnitude >= quietDistance * quietDistance;
+                bool radiusChanged = !Mathf.Approximately(visibleDistance, lastRadius);
+                if (!moved && !radiusChanged) continue;
+
+                lastCheckPos = pos;
+                lastRadius = visibleDistance;
+                SyncVisibility(pos);
+            }
+        }
+
+        // 逐块比对目标状态，不做增量记录，避免状态不同步导致"只开不关"
+        void SyncVisibility(Vector3 center)
+        {
+            float radiusSq = RadiusSquared;
+
+            for (int i = 0; i < chunks.Count; i++)
+            {
+                GameObject chunk = chunks[i];
                 if (chunk == null) continue;
 
-                Vector3 pos = chunk.position;
+                Vector3 pos = chunk.transform.position;
                 float dx = pos.x - center.x;
                 float dz = pos.z - center.z;
                 bool visible = dx * dx + dz * dz <= radiusSq;
-                if (chunk.gameObject.activeSelf != visible) chunk.gameObject.SetActive(visible);
+                if (chunk.activeSelf != visible) chunk.SetActive(visible);
+            }
+        }
+
+        bool AnyChunkOutside(Vector3 center)
+        {
+            float radiusSq = RadiusSquared;
+
+            for (int i = 0; i < chunks.Count; i++)
+            {
+                GameObject chunk = chunks[i];
+                if (chunk == null) continue;
+
+                Vector3 pos = chunk.transform.position;
+                float dx = pos.x - center.x;
+                float dz = pos.z - center.z;
+                if (dx * dx + dz * dz > radiusSq) return true;
+            }
+            return false;
+        }
+
+        float RadiusSquared
+        {
+            get
+            {
+                float radius = visibleDistance + Landscape.chunkSize;
+                return radius * radius;
             }
         }
 
@@ -105,7 +197,7 @@ namespace TerrainGen
                 return outOfMapRoot;
             }
 
-            if (chunkRoots.TryGetValue(chunk, out Transform root)) return root;
+            if (chunkIds.TryGetValue(chunk, out int index)) return chunks[index].transform;
 
             var chunkGo = new GameObject($"Chunk_{chunk.x}_{chunk.y}");
             chunkGo.transform.SetParent(contentRoot, false);
@@ -114,7 +206,8 @@ namespace TerrainGen
                 contentRoot.position.y,
                 (chunk.y + 0.5f) * Landscape.chunkSize);
 
-            chunkRoots[chunk] = chunkGo.transform;
+            chunkIds[chunk] = chunks.Count;
+            chunks.Add(chunkGo);
             return chunkGo.transform;
         }
 
