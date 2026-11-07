@@ -9,7 +9,6 @@ namespace TerrainGen.EditorTools
     public class ModularTerrainWindow : EditorWindow
     {
         const string ConfigFolder = "Assets/Scripts/TerrainGenerator/Config";
-        const string BakeRootName = "NavMeshBakeRoot"; // 烘焙导航用的临时地形根
 
         BuildingSettings settings;
         BuildingKitSet kit;
@@ -235,21 +234,7 @@ namespace TerrainGen.EditorTools
             Log(summary);
         }
 
-        // 临时排查用：清掉上一次烘焙保留下来的地形根
-        static void ClearBakeRoots()
-        {
-            for (int i = 0; i < SceneManager.sceneCount; i++)
-            {
-                Scene scene = SceneManager.GetSceneAt(i);
-                if (!scene.isLoaded) continue;
-                foreach (GameObject root in scene.GetRootGameObjects())
-                {
-                    if (root.name == BakeRootName) DestroyImmediate(root);
-                }
-            }
-        }
-
-        // 烘导航数据：先确认场景里没有别的网格/碰撞体，再按服务器那套铺一次地形来烘
+        // 烘导航数据：先确认场景里没有别的网格/碰撞体，再按服务器那套铺一次地形来烘，烘完清掉
         void BakeNavMesh()
         {
             report.Clear();
@@ -261,9 +246,6 @@ namespace TerrainGen.EditorTools
                 Log(summary);
                 return;
             }
-
-            // 临时排查用：烘完会保留地形，重烘前先把上一次留下的清掉，否则过不了场景干净检查
-            ClearBakeRoots();
 
             if (!TryCheckSceneClean(out string blocked))
             {
@@ -298,14 +280,22 @@ namespace TerrainGen.EditorTools
                 return;
             }
 
-            var root = new GameObject(BakeRootName);
+            var root = new GameObject("NavMeshBakeRoot");
             root.transform.position = Vector3.zero;
 
-            TerrainAssembler.SpawnColliderOnly(data, kit, root.transform, stripMeshes: false);
-            bool ok = TryBakeNavMesh(root.transform, data.groundHeight, out string message);
+            bool ok;
+            string message;
+            try
+            {
+                TerrainAssembler.SpawnColliderOnly(data, kit, root.transform, stripMeshes: false);
+                ok = TryBakeNavMesh(root.transform, data.groundHeight, out message);
+            }
+            finally
+            {
+                DestroyImmediate(root); // 烘完立刻清掉临时地形，场景回到干净状态
+            }
 
-            // 临时排查用：烘完保留地形，确认完改回 DestroyImmediate(root) 并删掉 ClearBakeRoots 调用
-            summary = message + "\n（临时：地形已保留在场景里）";
+            summary = message;
             summaryIsError = !ok;
             Log(summary);
         }
