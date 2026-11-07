@@ -33,8 +33,8 @@ namespace TerrainGen
 
             var obstacles = new List<Spot>();
             count += PlaceObstacles(f, s, kit, items, ox, oz, rng, obstacles, reserved, cache);
-            count += PlaceObstacleDecor(f, s, kit, items, ox, oz, rng, cache);
-            count += PlaceFloating(f, s, kit, items, ox, oz, rng, reserved, cache);
+            count += PlaceObstacleDecor(f, s, kit, items, ox, oz, rng);
+            count += PlaceFloating(f, s, kit, items, ox, oz, rng, reserved);
             count += PlaceFish(f, s, kit, items, ox, oz, rng, reserved);
             return count;
         }
@@ -206,7 +206,7 @@ namespace TerrainGen
 
         // 障碍装饰：虚空格上随机落点，高度在下表面与上表面之间随机
         static int PlaceObstacleDecor(BuildingField f, BuildingSettings s, BuildingKitSet kit, List<TerrainItemData> items,
-            float ox, float oz, System.Random rng, Dictionary<GameObject, Bounds> cache)
+            float ox, float oz, System.Random rng)
         {
             if (kit.obstacleDecorations.Count == 0 || s.cellsPerObstacleDecoration <= 0) return 0;
 
@@ -221,11 +221,9 @@ namespace TerrainGen
                 Vector2Int cell = voids[rng.Next(voids.Count)];
                 GameObject prefab = kit.PickFrom(kit.obstacleDecorations, f.RegionGroup(cell.x, cell.y));
                 if (prefab == null) continue;
-                if (!PrefabBounds.TryGet(prefab, cache, out Bounds b, false)) continue;
 
                 float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * s.propScaleRange;
-                float radius = Mathf.Max(b.extents.x, b.extents.z) * scale;
-                float spread = Mathf.Max(0f, s.cellSize * 0.5f - radius);
+                float spread = s.cellSize * 0.5f;
                 float cx = cell.x * s.cellSize - ox + (float)(rng.NextDouble() * 2.0 - 1.0) * spread;
                 float cz = cell.y * s.cellSize - oz + (float)(rng.NextDouble() * 2.0 - 1.0) * spread;
                 float y = (float)rng.NextDouble() * s.groundHeight;
@@ -239,7 +237,7 @@ namespace TerrainGen
         // 漂浮装饰：整张图任意位置，高度在地面之上抬 [0, floatingExtraHeight]
         // 只避免生成点与障碍/建筑物落在同一格，不做模型层面的重叠检测
         static int PlaceFloating(BuildingField f, BuildingSettings s, BuildingKitSet kit, List<TerrainItemData> items,
-            float ox, float oz, System.Random rng, HashSet<long> reserved, Dictionary<GameObject, Bounds> cache)
+            float ox, float oz, System.Random rng, HashSet<long> reserved)
         {
             if (kit.floatingDecorations.Count == 0 || s.cellsPerFloatingDecoration <= 0) return 0;
 
@@ -259,11 +257,10 @@ namespace TerrainGen
 
                 GameObject prefab = kit.PickFrom(kit.floatingDecorations, f.RegionGroup(gx, gz));
                 if (prefab == null) continue;
-                if (!PrefabBounds.TryGet(prefab, cache, out Bounds b, false)) continue;
 
                 float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * s.propScaleRange;
-                float bottom = s.groundHeight + (float)rng.NextDouble() * s.floatingExtraHeight;
-                if (Add(kit, items, TerrainItemKind.Floating, prefab, new Vector3(cx, bottom - b.min.y * scale, cz),
+                float y = s.groundHeight + (float)rng.NextDouble() * s.floatingExtraHeight;
+                if (Add(kit, items, TerrainItemKind.Floating, prefab, new Vector3(cx, y, cz),
                         (float)rng.NextDouble() * 360f, scale) > 0) made++;
             }
             return made;

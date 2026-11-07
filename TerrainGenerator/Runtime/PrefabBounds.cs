@@ -3,46 +3,30 @@ using UnityEngine;
 
 namespace TerrainGen
 {
-    // 取预制体的包围盒（根节点空间，已含根缩放）：优先根物体 BoxCollider，缺失时用 Mesh 兜底
+    // 生成期只认根物体 BoxCollider，O(1) 取 center/size，绝不遍历网格
     public static class PrefabBounds
     {
-        // warnMissingCollider：本来就不需要碰撞体的类型（障碍装饰/漂浮装饰等）传 false，避免刷告警
-        public static bool TryGet(GameObject prefab, Dictionary<GameObject, Bounds> cache, out Bounds bounds,
-            bool warnMissingCollider = true)
+        public static bool TryGet(GameObject prefab, Dictionary<GameObject, Bounds> cache, out Bounds bounds)
         {
             if (cache != null && cache.TryGetValue(prefab, out bounds)) return true;
 
-            Bounds raw;
             BoxCollider box = prefab.GetComponent<BoxCollider>();
-            if (box != null)
+            if (box == null)
             {
-                raw = new Bounds(box.center, box.size);
-            }
-            else if (!FromMesh(prefab, out raw))
-            {
-                Debug.LogWarning($"[地形] 预制体 {prefab.name} 既没有根物体 BoxCollider，也没有可用的 Mesh，已跳过");
+                Debug.LogWarning($"[地形] 预制体 {prefab.name} 根物体没有 BoxCollider，已跳过（先跑 模块化地形/碰撞体预处理）");
                 bounds = default;
                 return false;
-            }
-            else if (warnMissingCollider)
-            {
-                Debug.LogWarning($"[地形] 预制体 {prefab.name} 根物体没有 BoxCollider，已用 Mesh 包围盒兜底，建议补一个 BoxCollider");
             }
 
             Vector3 sc = prefab.transform.localScale;
             var absSc = new Vector3(Mathf.Abs(sc.x), Mathf.Abs(sc.y), Mathf.Abs(sc.z));
-            bounds = new Bounds(Vector3.Scale(raw.center, sc), Vector3.Scale(raw.size, absSc));
+            bounds = new Bounds(Vector3.Scale(box.center, sc), Vector3.Scale(box.size, absSc));
             if (cache != null) cache[prefab] = bounds;
             return true;
         }
 
-        // 只按 Mesh 算（不看 BoxCollider），供编辑器预处理工具用
+        // 仅供编辑器“碰撞体预处理”使用：按 Mesh 算包围盒去生成 BoxCollider，生成期不调用
         public static bool TryGetMeshBounds(GameObject prefab, out Bounds bounds)
-        {
-            return FromMesh(prefab, out bounds);
-        }
-
-        static bool FromMesh(GameObject prefab, out Bounds bounds)
         {
             bounds = default;
             bool has = false;
