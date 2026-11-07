@@ -6,8 +6,11 @@ namespace TerrainGen
     // 显隐控制器：自身不含子物体；区块进入视野时从池里取物件，离开时归还，全程不销毁
     public class TerrainPropCuller : MonoBehaviour
     {
-        [Tooltip("可见半径（米），以本物体为中心；建议比相机可视范围略大")]
+        [Tooltip("可见半径（米），以主相机为中心；建议比相机可视范围略大")]
         public float visibleDistance = 50f;
+
+        [Tooltip("false = 不剔除，全部区块一次常驻（服务器用）")]
+        public bool culled = true;
 
         [Tooltip("检测间隔（秒）：隔这么久才判定一次，0 = 每帧判定")]
         public float checkInterval = 0.25f;
@@ -103,34 +106,48 @@ namespace TerrainGen
             if (chunkDefs.Count == 0)
             {
                 Debug.LogError("[地形] 没有任何区块被创建，剔除无法生效", this);
-            }
-            else if (!AnyChunkOutside(transform.position))
-            {
-                Debug.LogWarning($"[地形] 判定半径 {visibleDistance + ConfigManager.GlobalVariableConfig.terrain_chunk_size:0}m 覆盖了全部 {chunkDefs.Count} 个区块，"
-                                 + $"当前不会回收任何区块（visibleDistance = {visibleDistance}），需要调小半径或移动本物体", this);
+                return;
             }
 
-            lastCheckPos = transform.position;
+            if (!culled)
+            {
+                LoadAll();
+                return;
+            }
+
+            Vector3 cameraPos = Camera.main.transform.position;
+            if (!AnyChunkOutside(cameraPos))
+            {
+                Debug.LogWarning($"[地形] 判定半径 {visibleDistance + ConfigManager.GlobalVariableConfig.terrain_chunk_size:0}m 以主相机位置为心覆盖了全部 {chunkDefs.Count} 个区块，"
+                                 + $"当前不会回收任何区块（visibleDistance = {visibleDistance}），需要调小半径", this);
+            }
+
+            lastCheckPos = cameraPos;
             lastRadius = visibleDistance;
-            SyncVisibility(transform.position);
+            SyncVisibility(cameraPos);
         }
 
-        // 按间隔判定；未到间隔、或位置没动且半径没变时直接 return，不做任何计算
+        // 按间隔判定；未到间隔、或相机没动且半径没变时直接 return，不做任何计算
         void LateUpdate()
         {
-            if (chunkDefs.Count == 0) return;
+            if (!culled || chunkDefs.Count == 0) return;
 
             timer += Time.unscaledDeltaTime;
             if (timer < checkInterval) return;
             timer = 0f;
 
-            Vector3 pos = transform.position;
+            Vector3 pos = Camera.main.transform.position;
             if ((pos - lastCheckPos).sqrMagnitude < quietDistance * quietDistance
                 && Mathf.Approximately(visibleDistance, lastRadius)) return;
 
             lastCheckPos = pos;
             lastRadius = visibleDistance;
             SyncVisibility(pos);
+        }
+
+        void LoadAll()
+        {
+            foreach (KeyValuePair<Vector2Int, List<ItemDef>> pair in chunkDefs) LoadChunk(pair.Key, pair.Value);
         }
 
         // 只处理状态翻转的区块：进视野整块取用，出视野整块归还

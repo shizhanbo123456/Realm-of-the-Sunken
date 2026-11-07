@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Ros.Transport;
+using UnityEngine;
 
 // 客户端加载管理器：切加载界面 → 逐步请求开战数据 → 回执加载完成 → 收到「开始战斗」后切页。
 // 战斗期的玩家名字与玩家↔实体关系全部来自这里，不再读组队期缓存。
@@ -58,6 +59,7 @@ public class ClientLoadingManager : ClientSubManager
         OwnEntityId = 0;
         step = Step.Idle;
         if (Tool.UIManager != null) Tool.UIManager.ShowLoading();
+        GenerateTerrain();
     }
 
     // 服务器预处理完成（实体 id 已预分配）：开始逐步请求数据
@@ -130,6 +132,19 @@ public class ClientLoadingManager : ClientSubManager
     #endregion
 
     #region//Local
+    // 地形一次性生成在加载界面：之后由 Culler 按主相机位置取还区块，离开战斗页再销毁
+    private void GenerateTerrain()
+    {
+        if (Tool.ModularTerrainGenerator == null)
+        {
+            Debug.LogError("[地形] 场景未挂 ModularTerrainGenerator：进战斗不会生成地形");
+            return;
+        }
+
+        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(0f, "正在生成地形…");
+        Tool.ModularTerrainGenerator.Generate();
+    }
+
     private void Merge(List<LoadingUnitEntry> list)
     {
         if (list == null) return;

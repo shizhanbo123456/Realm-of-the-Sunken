@@ -285,6 +285,8 @@ public class BattlePage : PageBase
         panel.m_skillSelectPanel.Close();
         HideAllTips();
         HideImportantBanner();
+        // 离开战斗界面即销毁地形场景（Culler 与内容根一起销毁，点位数据一并复位）
+        if (Tool.ModularTerrainGenerator != null) Tool.ModularTerrainGenerator.Clear();
     }
 
     public override void Tick(float deltaTime)
