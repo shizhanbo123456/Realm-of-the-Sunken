@@ -216,13 +216,14 @@ namespace TerrainGen
         {
             if (chunkRoots.TryGetValue(chunk, out Transform root) && root != null) return root;
 
-            var cfg = ConfigManager.GlobalVariableConfig;
             var go = new GameObject($"Chunk_{chunk.x}_{chunk.y}");
             go.transform.SetParent(contentRoot, false);
+            float mapMin = ConfigManager.GlobalVariableConfig.terrain_size_min;
+            float chunkSize = ConfigManager.GlobalVariableConfig.terrain_chunk_size;
             go.transform.position = new Vector3(
-                cfg.terrain_size_min + (chunk.x + 0.5f) * cfg.terrain_chunk_size,
+                mapMin + (chunk.x + 0.5f) * chunkSize,
                 contentRoot.position.y,
-                cfg.terrain_size_min + (chunk.y + 0.5f) * cfg.terrain_chunk_size);
+                mapMin + (chunk.y + 0.5f) * chunkSize);
 
             chunkRoots[chunk] = go.transform;
             return go.transform;
@@ -231,18 +232,20 @@ namespace TerrainGen
         // 图外坐标按最近区块夹取：越界的轴取端点，未越界的轴保留原索引
         Vector2Int NearestChunk(Vector3 world)
         {
-            var cfg = ConfigManager.GlobalVariableConfig;
-            int x = Mathf.FloorToInt((world.x - cfg.terrain_size_min) / cfg.terrain_chunk_size);
-            int z = Mathf.FloorToInt((world.z - cfg.terrain_size_min) / cfg.terrain_chunk_size);
-            int last = cfg.terrain_chunk_size_count - 1;
+            float mapMin = ConfigManager.GlobalVariableConfig.terrain_size_min;
+            float chunkSize = ConfigManager.GlobalVariableConfig.terrain_chunk_size;
+            int x = Mathf.FloorToInt((world.x - mapMin) / chunkSize);
+            int z = Mathf.FloorToInt((world.z - mapMin) / chunkSize);
+            int last = ConfigManager.GlobalVariableConfig.terrain_chunk_size_count - 1;
             return new Vector2Int(Mathf.Clamp(x, 0, last), Mathf.Clamp(z, 0, last));
         }
 
         float ChunkDistanceSq(Vector2Int chunk, Vector3 center)
         {
-            var cfg = ConfigManager.GlobalVariableConfig;
-            float cx = cfg.terrain_size_min + (chunk.x + 0.5f) * cfg.terrain_chunk_size;
-            float cz = cfg.terrain_size_min + (chunk.y + 0.5f) * cfg.terrain_chunk_size;
+            float mapMin = ConfigManager.GlobalVariableConfig.terrain_size_min;
+            float chunkSize = ConfigManager.GlobalVariableConfig.terrain_chunk_size;
+            float cx = mapMin + (chunk.x + 0.5f) * chunkSize;
+            float cz = mapMin + (chunk.y + 0.5f) * chunkSize;
             float dx = cx - center.x;
             float dz = cz - center.z;
             return dx * dx + dz * dz;

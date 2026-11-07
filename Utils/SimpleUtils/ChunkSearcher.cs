@@ -135,11 +135,13 @@ public class ChunkSearcher<T> : IEnumerable<T>
         Vector3 minPoint = center - new Vector3(radius, 0, radius);
         Vector3 maxPoint = center + new Vector3(radius, 0, radius);
 
-        var cfg = ConfigManager.GlobalVariableConfig;
-        int minChunkX = Mathf.Max(0, Mathf.FloorToInt((minPoint.x - cfg.terrain_size_min) / cfg.terrain_chunk_size));
-        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt((minPoint.z - cfg.terrain_size_min) / cfg.terrain_chunk_size));
-        int maxChunkX = Mathf.Min(cfg.terrain_chunk_size_count - 1, Mathf.FloorToInt((maxPoint.x - cfg.terrain_size_min) / cfg.terrain_chunk_size));
-        int maxChunkZ = Mathf.Min(cfg.terrain_chunk_size_count - 1, Mathf.FloorToInt((maxPoint.z - cfg.terrain_size_min) / cfg.terrain_chunk_size));
+        float mapMin = ConfigManager.GlobalVariableConfig.terrain_size_min;
+        float chunkSize = ConfigManager.GlobalVariableConfig.terrain_chunk_size;
+        int chunkCount = ConfigManager.GlobalVariableConfig.terrain_chunk_size_count;
+        int minChunkX = Mathf.Max(0, Mathf.FloorToInt((minPoint.x - mapMin) / chunkSize));
+        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt((minPoint.z - mapMin) / chunkSize));
+        int maxChunkX = Mathf.Min(chunkCount - 1, Mathf.FloorToInt((maxPoint.x - mapMin) / chunkSize));
+        int maxChunkZ = Mathf.Min(chunkCount - 1, Mathf.FloorToInt((maxPoint.z - mapMin) / chunkSize));
 
         for (int x = minChunkX; x <= maxChunkX; x++)
         {
@@ -173,11 +175,13 @@ public class ChunkSearcher<T> : IEnumerable<T>
         Vector3 minPoint = center - new Vector3(radius, 0, radius);
         Vector3 maxPoint = center + new Vector3(radius, 0, radius);
 
-        var cfg = ConfigManager.GlobalVariableConfig;
-        int minChunkX = Mathf.Max(0, Mathf.FloorToInt((minPoint.x - cfg.terrain_size_min) / cfg.terrain_chunk_size));
-        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt((minPoint.z - cfg.terrain_size_min) / cfg.terrain_chunk_size));
-        int maxChunkX = Mathf.Min(cfg.terrain_chunk_size_count - 1, Mathf.FloorToInt((maxPoint.x - cfg.terrain_size_min) / cfg.terrain_chunk_size));
-        int maxChunkZ = Mathf.Min(cfg.terrain_chunk_size_count - 1, Mathf.FloorToInt((maxPoint.z - cfg.terrain_size_min) / cfg.terrain_chunk_size));
+        float mapMin = ConfigManager.GlobalVariableConfig.terrain_size_min;
+        float chunkSize = ConfigManager.GlobalVariableConfig.terrain_chunk_size;
+        int chunkCount = ConfigManager.GlobalVariableConfig.terrain_chunk_size_count;
+        int minChunkX = Mathf.Max(0, Mathf.FloorToInt((minPoint.x - mapMin) / chunkSize));
+        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt((minPoint.z - mapMin) / chunkSize));
+        int maxChunkX = Mathf.Min(chunkCount - 1, Mathf.FloorToInt((maxPoint.x - mapMin) / chunkSize));
+        int maxChunkZ = Mathf.Min(chunkCount - 1, Mathf.FloorToInt((maxPoint.z - mapMin) / chunkSize));
 
         for (int x = minChunkX; x <= maxChunkX; x++)
         {
@@ -202,11 +206,13 @@ public class ChunkSearcher<T> : IEnumerable<T>
         Vector3 minPoint = center - new Vector3(radius, 0, radius);
         Vector3 maxPoint = center + new Vector3(radius, 0, radius);
 
-        var cfg = ConfigManager.GlobalVariableConfig;
-        int minChunkX = Mathf.Max(0, Mathf.FloorToInt((minPoint.x - cfg.terrain_size_min) / cfg.terrain_chunk_size));
-        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt((minPoint.z - cfg.terrain_size_min) / cfg.terrain_chunk_size));
-        int maxChunkX = Mathf.Min(cfg.terrain_chunk_size_count - 1, Mathf.FloorToInt((maxPoint.x - cfg.terrain_size_min) / cfg.terrain_chunk_size));
-        int maxChunkZ = Mathf.Min(cfg.terrain_chunk_size_count - 1, Mathf.FloorToInt((maxPoint.z - cfg.terrain_size_min) / cfg.terrain_chunk_size));
+        float mapMin = ConfigManager.GlobalVariableConfig.terrain_size_min;
+        float chunkSize = ConfigManager.GlobalVariableConfig.terrain_chunk_size;
+        int chunkCount = ConfigManager.GlobalVariableConfig.terrain_chunk_size_count;
+        int minChunkX = Mathf.Max(0, Mathf.FloorToInt((minPoint.x - mapMin) / chunkSize));
+        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt((minPoint.z - mapMin) / chunkSize));
+        int maxChunkX = Mathf.Min(chunkCount - 1, Mathf.FloorToInt((maxPoint.x - mapMin) / chunkSize));
+        int maxChunkZ = Mathf.Min(chunkCount - 1, Mathf.FloorToInt((maxPoint.z - mapMin) / chunkSize));
 
         for (int x = minChunkX; x <= maxChunkX; x++)
         {
@@ -289,16 +295,16 @@ public class ChunkSearcher<T> : IEnumerable<T>
 
     public static Vector2Int GetChunkIndex(Vector3 worldPos)
     {
-        var cfg = ConfigManager.GlobalVariableConfig;
-        float min = cfg.terrain_size_min;
-        float max = min + cfg.terrain_size;
+        float min = ConfigManager.GlobalVariableConfig.terrain_size_min;
+        float max = min + ConfigManager.GlobalVariableConfig.terrain_size;
         if (worldPos.x < min || worldPos.x >= max ||
             worldPos.z < min || worldPos.z >= max)
         {
             return OutOfMapChunk;
         }
-        int x = Mathf.FloorToInt((worldPos.x - min) / cfg.terrain_chunk_size);
-        int z = Mathf.FloorToInt((worldPos.z - min) / cfg.terrain_chunk_size);
+        float chunkSize = ConfigManager.GlobalVariableConfig.terrain_chunk_size;
+        int x = Mathf.FloorToInt((worldPos.x - min) / chunkSize);
+        int z = Mathf.FloorToInt((worldPos.z - min) / chunkSize);
         return new Vector2Int(x, z);
     }
     #endregion
