@@ -82,8 +82,5 @@ namespace TerrainGen
         }
 
         public TerrainPropCuller Culler => culler;
-
-        // 服务器没有 Culler，清理与显隐都靠这一份内容根
-        public Transform ContentRoot => contentRoot;
     }
 }

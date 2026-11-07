@@ -71,9 +71,6 @@ namespace Ros.Gm
         [GmLabel("画面-地形-显示半径")]
         [GmStatus(GmStatusType.Offline | GmStatusType.Lobby | GmStatusType.Battle)]
         Screen_Terrain_ShowRadius,
-        [GmLabel("画面-地形-显隐地形")]
-        [GmStatus(GmStatusType.Offline | GmStatusType.Lobby | GmStatusType.Battle)]
-        Screen_Terrain_ToggleTerrain,
         [GmLabel("画面-雾气")]
         [GmStatus(GmStatusType.Offline | GmStatusType.Lobby | GmStatusType.Battle)]
         Screen_Fog,

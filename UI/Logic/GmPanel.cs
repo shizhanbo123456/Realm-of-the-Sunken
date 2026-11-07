@@ -456,7 +456,6 @@ public class GmPanel
     private static bool IsLocalExecutable(GmEnum cmd) => cmd switch
     {
         GmEnum.Screen_Terrain_ShowRadius or
-        GmEnum.Screen_Terrain_ToggleTerrain or
         GmEnum.Screen_Fog or
         GmEnum.Save_PlayerLevel_AddExp or
         GmEnum.Save_PlayerLevel_ReduceExp or
@@ -476,9 +475,6 @@ public class GmPanel
         {
             case GmEnum.Screen_Terrain_ShowRadius:
                 SetTerrainRadius(ReadFloat(start));
-                break;
-            case GmEnum.Screen_Terrain_ToggleTerrain:
-                ToggleTerrain();
                 break;
             case GmEnum.Screen_Fog:
                 ToggleFog();
@@ -679,18 +675,6 @@ public class GmPanel
         var culler = Tool.ModularTerrainGenerator != null ? Tool.ModularTerrainGenerator.Culler : null;
         if (culler == null) { Debug.LogWarning("[GM] 地形尚未生成，显示半径不生效"); return; }
         culler.visibleDistance = Mathf.Max(0f, radius);
-    }
-
-    // 显隐地形：隐藏时先停掉剔除，否则它本帧的 LateUpdate 会把区块又打开
-    private static void ToggleTerrain()
-    {
-        var generator = Tool.ModularTerrainGenerator;
-        Transform content = generator != null ? generator.ContentRoot : null;
-        if (content == null) { Debug.LogWarning("[GM] 地形尚未生成，显隐开关不生效"); return; }
-
-        bool hide = content.gameObject.activeSelf;
-        if (generator.Culler != null) generator.Culler.enabled = !hide;
-        content.gameObject.SetActive(hide);
     }
 
     private static void ToggleFog()
