@@ -7,18 +7,12 @@ namespace TerrainGen
         public BuildingSettings settings;
         [Tooltip("地面/围栏/石柱/支撑/植被摆件素材表")]
         public BuildingKitSet kit;
-        public bool generateOnStart;
 
         TerrainPropCuller culler;
 
         void Awake()
         {
             Tool.ModularTerrainGenerator = this;
-        }
-
-        void Start()
-        {
-            if (generateOnStart) Generate();
         }
 
         // 编辑器非播放态：只把数据烘焙到 StreamingAssets/TerrainGenerator 并返回 null
