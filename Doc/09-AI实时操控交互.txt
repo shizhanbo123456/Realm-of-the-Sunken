@@ -25,7 +25,7 @@ AI 实时操控交互（命令行 + Lua）
   复用项目基础设施：BehaviorArbiter / IBehaviorHost / Behavior、EntitySkillController、Timer、EventManager
 
 坐标与时间口径：
-  位置只给 XZ（地形是平的），单位米，地图范围 0 ~ Landscape.MapSize
+  位置只给 XZ（地形是平的），单位米，地图范围 Landscape.MapMin ~ MapMax（取配表 terrain_size 的「最小;最大」，当前 0 ~ 384）
   朝向为 yaw 度数，0° = +Z，与 PlayerEntityData 的 moveState.yaw 同口径
   不传高度：服务器按地面吸附
 
