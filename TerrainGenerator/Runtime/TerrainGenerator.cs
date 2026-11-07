@@ -29,12 +29,17 @@ namespace TerrainGen
             }
             if (data == null) return null;
 
+            // 内容与显隐控制分离：TerrainRoot 挂全部地形实例，TerrainCuller 只做位置判定、不带子物体
             var root = new GameObject(TerrainAssembler.RootName);
             root.transform.SetParent(parent, false);
             root.transform.position = Landscape.MapCenter;
 
-            var culler = root.AddComponent<TerrainPropCuller>();
-            culler.Initialize(data, kit);
+            var cullerGo = new GameObject(TerrainAssembler.CullerName);
+            cullerGo.transform.SetParent(parent, false);
+            cullerGo.transform.position = Landscape.MapCenter;
+
+            var culler = cullerGo.AddComponent<TerrainPropCuller>();
+            culler.Initialize(data, kit, root.transform);
             return culler;
         }
 

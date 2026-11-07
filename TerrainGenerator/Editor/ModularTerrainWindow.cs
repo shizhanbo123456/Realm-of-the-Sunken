@@ -229,8 +229,16 @@ namespace TerrainGen.EditorTools
                 summaryIsError = false;
                 return;
             }
-            foreach (TerrainPropCuller c in cullers) Undo.DestroyObjectImmediate(c.gameObject);
-            summary = $"已删除 {cullers.Length} 个地形节点。";
+            int removed = 0;
+            foreach (TerrainPropCuller c in cullers)
+            {
+                if (c == null) continue;
+                Transform content = c.ContentRoot;
+                Undo.DestroyObjectImmediate(c.gameObject);
+                if (content != null) Undo.DestroyObjectImmediate(content.gameObject);
+                removed++;
+            }
+            summary = $"已删除 {removed} 个地形节点（Culler 与内容根各一）。";
             summaryIsError = false;
         }
 

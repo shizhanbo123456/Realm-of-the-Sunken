@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace TerrainGen
 {
-    // 按项目区块网格聚合地形物件：只调整自身位置，就能控制可见范围内的显隐
+    // 显隐控制器：自身不含任何子物体，只按自身位置决定 contentRoot 下哪些区块可见
     public class TerrainPropCuller : MonoBehaviour
     {
         [Tooltip("可见半径（米），以本物体为中心；建议比相机可视范围略大")]
@@ -14,6 +14,7 @@ namespace TerrainGen
         readonly HashSet<int> nextIds = new HashSet<int>();
 
         ChunkSearcher<GameObject> index;
+        Transform contentRoot;
         Transform outOfMapRoot;
         Vector3 lastPosition;
         bool dirty = true;
@@ -21,7 +22,10 @@ namespace TerrainGen
 
         public int InstanceCount { get; private set; }
 
-        public void Initialize(TerrainPlanData data, BuildingKitSet kit)
+        // 地形实例的挂载点（TerrainRoot），与本物体是兄弟节点，移动本物体不会带走地形
+        public Transform ContentRoot => contentRoot;
+
+        public void Initialize(TerrainPlanData data, BuildingKitSet kit, Transform content)
         {
             if (data == null)
             {
@@ -33,7 +37,13 @@ namespace TerrainGen
                 Debug.LogError("[地形] Culler 初始化失败：未指定素材表", this);
                 return;
             }
+            if (content == null)
+            {
+                Debug.LogError("[地形] Culler 初始化失败：未指定内容根节点", this);
+                return;
+            }
 
+            contentRoot = content;
             index = new ChunkSearcher<GameObject>(go => go.transform.position);
 
             for (int i = 0; i < data.items.Count; i++)
@@ -42,7 +52,7 @@ namespace TerrainGen
                 GameObject prefab = kit.GetPrefab(item.kind, item.prefabIndex);
                 if (prefab == null) continue;
 
-                Vector3 world = transform.position + item.position;
+                Vector3 world = contentRoot.position + item.position;
                 Transform parent = GetChunkRoot(world);
                 var go = (GameObject)Object.Instantiate(prefab, parent);
                 go.name = item.kind + "_" + prefab.name;
@@ -110,7 +120,7 @@ namespace TerrainGen
                 if (outOfMapRoot == null)
                 {
                     var go = new GameObject("OutOfMap");
-                    go.transform.SetParent(transform, false);
+                    go.transform.SetParent(contentRoot, false);
                     outOfMapRoot = go.transform;
                 }
                 return outOfMapRoot;
@@ -119,10 +129,10 @@ namespace TerrainGen
             if (chunkRoots.TryGetValue(chunk, out Transform root)) return root;
 
             var chunkGo = new GameObject($"Chunk_{chunk.x}_{chunk.y}");
-            chunkGo.transform.SetParent(transform, false);
+            chunkGo.transform.SetParent(contentRoot, false);
             chunkGo.transform.position = new Vector3(
                 (chunk.x + 0.5f) * Landscape.chunkSize,
-                transform.position.y,
+                contentRoot.position.y,
                 (chunk.y + 0.5f) * Landscape.chunkSize);
 
             chunkRoots[chunk] = chunkGo.transform;
@@ -135,7 +145,7 @@ namespace TerrainGen
             if (data.points.Count == 0) return;
 
             var container = new GameObject("Points");
-            container.transform.SetParent(transform, false);
+            container.transform.SetParent(contentRoot, false);
 
             float ox = (data.sizeX - 1) * 0.5f * data.cellSize;
             float oz = (data.sizeZ - 1) * 0.5f * data.cellSize;

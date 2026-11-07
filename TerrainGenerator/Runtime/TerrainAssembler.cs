@@ -5,6 +5,7 @@ namespace TerrainGen
     public static class TerrainAssembler
     {
         public const string RootName = "TerrainRoot";
+        public const string CullerName = "TerrainCuller";
 
         // 布局 → 摆放数据：只产出数据，不实例化任何预制体
         public static TerrainPlanData BuildPlan(BuildingField field, BuildingSettings s, BuildingKitSet kit)

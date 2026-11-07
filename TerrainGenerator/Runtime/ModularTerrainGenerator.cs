@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace TerrainGen
@@ -36,12 +37,24 @@ namespace TerrainGen
         public void Clear()
         {
             Transform parent = container != null ? container : transform;
-            for (int i = parent.childCount - 1; i >= 0; i--)
+            var doomed = new List<GameObject>();
+
+            // Culler 与内容根是同级的两个节点，两边都要清
+            for (int i = 0; i < parent.childCount; i++)
             {
                 Transform child = parent.GetChild(i);
-                if (child.GetComponent<TerrainPropCuller>() == null) continue;
-                if (Application.isPlaying) Destroy(child.gameObject);
-                else DestroyImmediate(child.gameObject);
+                var found = child.GetComponent<TerrainPropCuller>();
+                if (found == null) continue;
+                if (found.ContentRoot != null && found.ContentRoot.parent == parent)
+                    doomed.Add(found.ContentRoot.gameObject);
+                doomed.Add(child.gameObject);
+            }
+
+            for (int i = 0; i < doomed.Count; i++)
+            {
+                if (doomed[i] == null) continue;
+                if (Application.isPlaying) Destroy(doomed[i]);
+                else DestroyImmediate(doomed[i]);
             }
             culler = null;
         }
