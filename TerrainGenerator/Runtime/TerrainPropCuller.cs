@@ -3,24 +3,16 @@ using UnityEngine;
 
 namespace TerrainGen
 {
-    // 显隐控制器：自身不含任何子物体，只按自身位置决定 contentRoot 下哪些区块可见
+    // 显隐控制器：自身不含任何子物体，每帧按自身位置直接判定 contentRoot 下每个区块的显隐
     public class TerrainPropCuller : MonoBehaviour
     {
         [Tooltip("可见半径（米），以本物体为中心；建议比相机可视范围略大")]
         public float visibleDistance = 250f;
 
-        [Tooltip("显隐中心跟随目标（相机/玩家）；留空则由外部直接移动本物体")]
-        public Transform followTarget;
-
         readonly Dictionary<Vector2Int, Transform> chunkRoots = new Dictionary<Vector2Int, Transform>();
-        readonly HashSet<int> activeIds = new HashSet<int>();
-        readonly HashSet<int> nextIds = new HashSet<int>();
 
-        ChunkSearcher<GameObject> index;
         Transform contentRoot;
         Transform outOfMapRoot;
-        Vector3 lastPosition;
-        bool dirty = true;
         bool warnedOutOfMap;
 
         public int InstanceCount { get; private set; }
@@ -47,7 +39,6 @@ namespace TerrainGen
             }
 
             contentRoot = content;
-            index = new ChunkSearcher<GameObject>(go => go.transform.position);
 
             for (int i = 0; i < data.items.Count; i++)
             {
@@ -66,49 +57,33 @@ namespace TerrainGen
             }
 
             CreatePoints(data);
-
-            // 初始全部视为可见，第一次同步把范围外的关掉（否则会漏掉"一开始就不在范围内"的区块）
-            foreach (int id in index.Keys) activeIds.Add(id);
-
-            lastPosition = transform.position;
             SyncVisibility();
-        }
-
-        void OnEnable()
-        {
-            dirty = true;
         }
 
         void LateUpdate()
         {
-            if (index == null) return;
-            if (followTarget != null) transform.position = followTarget.position;
-            if (!dirty && (transform.position - lastPosition).sqrMagnitude < 0.0001f) return;
+            if (contentRoot == null) return;
             SyncVisibility();
         }
 
+        // 逐块比对目标状态，不做增量或缓存，改半径/移动本物体都在当帧生效
         void SyncVisibility()
         {
-            lastPosition = transform.position;
-            dirty = false;
+            float radius = visibleDistance + Landscape.chunkSize;
+            float radiusSq = radius * radius;
+            Vector3 center = transform.position;
 
-            // 块中心在半径内不代表整块可见，多放一个块尺寸的余量
-            index.GetIdsInRange(transform.position, visibleDistance + Landscape.chunkSize, nextIds);
-
-            foreach (int id in nextIds)
+            foreach (KeyValuePair<Vector2Int, Transform> pair in chunkRoots)
             {
-                if (activeIds.Contains(id)) continue;
-                if (index.TryGetObject(id, out GameObject go) && go != null && !go.activeSelf) go.SetActive(true);
-            }
+                Transform chunk = pair.Value;
+                if (chunk == null) continue;
 
-            foreach (int id in activeIds)
-            {
-                if (nextIds.Contains(id)) continue;
-                if (index.TryGetObject(id, out GameObject go) && go != null && go.activeSelf) go.SetActive(false);
+                Vector3 pos = chunk.position;
+                float dx = pos.x - center.x;
+                float dz = pos.z - center.z;
+                bool visible = dx * dx + dz * dz <= radiusSq;
+                if (chunk.gameObject.activeSelf != visible) chunk.gameObject.SetActive(visible);
             }
-
-            activeIds.Clear();
-            activeIds.UnionWith(nextIds);
         }
 
         Transform GetChunkRoot(Vector3 world)
@@ -140,7 +115,6 @@ namespace TerrainGen
                 (chunk.y + 0.5f) * Landscape.chunkSize);
 
             chunkRoots[chunk] = chunkGo.transform;
-            index.Add(chunkGo.GetInstanceID(), chunkGo);
             return chunkGo.transform;
         }
 
