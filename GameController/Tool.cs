@@ -56,6 +56,7 @@ public class Tool : MonoBehaviour
     public static VfxManager VfxManager;
     public static TransitionManager TransitionManager;
     public static LuaManager LuaManager;
+    public static TerrainGen.ModularTerrainGenerator ModularTerrainGenerator;
 
     public static LandscapeSpawns LandscapeSpawns
     {

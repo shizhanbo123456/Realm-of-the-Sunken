@@ -13,6 +13,11 @@ namespace TerrainGen
 
         TerrainPropCuller culler;
 
+        void Awake()
+        {
+            Tool.ModularTerrainGenerator = this;
+        }
+
         void Start()
         {
             if (generateOnStart) Generate();
