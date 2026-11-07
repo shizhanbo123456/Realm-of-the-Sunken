@@ -456,7 +456,6 @@ public class GmPanel
     private static bool IsLocalExecutable(GmEnum cmd) => cmd switch
     {
         GmEnum.Screen_Terrain_ShowRadius or
-        GmEnum.Screen_Terrain_ObjectRadius or
         GmEnum.Screen_Terrain_ToggleTerrain or
         GmEnum.Screen_Fog or
         GmEnum.Save_PlayerLevel_AddExp or
@@ -477,9 +476,6 @@ public class GmPanel
         {
             case GmEnum.Screen_Terrain_ShowRadius:
                 SetTerrainRadius(ReadFloat(start));
-                break;
-            case GmEnum.Screen_Terrain_ObjectRadius:
-                SetObjectRadius(ReadFloat(start));
                 break;
             case GmEnum.Screen_Terrain_ToggleTerrain:
                 ToggleTerrain();
@@ -677,17 +673,12 @@ public class GmPanel
         return faces;
     }
 
-    // 新地形只有一套区块剔除（TerrainPropCuller.visibleDistance），地形与物件共用同一个半径
+    // 新地形只有一套区块剔除，半径改 TerrainPropCuller.visibleDistance
     private static void SetTerrainRadius(float radius)
     {
         var culler = Tool.ModularTerrainGenerator != null ? Tool.ModularTerrainGenerator.Culler : null;
         if (culler == null) { Debug.LogWarning("[GM] 地形尚未生成，显示半径不生效"); return; }
         culler.visibleDistance = Mathf.Max(0f, radius);
-    }
-
-    private static void SetObjectRadius(float radius)
-    {
-        SetTerrainRadius(radius);
     }
 
     // 显隐地形：隐藏时先停掉剔除，否则它本帧的 LateUpdate 会把区块又打开
