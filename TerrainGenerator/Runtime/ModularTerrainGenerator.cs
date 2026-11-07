@@ -7,8 +7,6 @@ namespace TerrainGen
         public BuildingSettings settings;
         [Tooltip("地面/围栏/石柱/支撑/植被摆件素材表")]
         public BuildingKitSet kit;
-        [Tooltip("生成到哪个节点下，留空则生成到自身")]
-        public Transform container;
         public bool generateOnStart;
 
         TerrainPropCuller culler;
@@ -34,13 +32,13 @@ namespace TerrainGen
             }
 
             Clear();
-            culler = TerrainGenerator.Generate(settings, kit, container != null ? container : transform);
+            culler = TerrainGenerator.Generate(settings, kit);
             return culler;
         }
 
         public void Clear()
         {
-            // Culler 在场景根上、内容根挂在 container 下，两处都要清；靠 Culler 上记录的 ContentRoot 找到内容
+            // Culler 与内容根都是场景根物体，两处都要清；靠 Culler 上记录的 ContentRoot 找到内容
             TerrainPropCuller[] found = FindObjectsOfType<TerrainPropCuller>();
             for (int i = 0; i < found.Length; i++)
             {

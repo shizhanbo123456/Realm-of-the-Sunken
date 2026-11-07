@@ -32,7 +32,7 @@ namespace TerrainGen
             // 数据本身即地图坐标（最小角落在 MapMin），内容根不再做平移
             Vector3 origin = Vector3.zero;
 
-            // 内容挂到 parent 下；Culler 是场景里的独立物体：不挂父级，也不允许有子物体
+            // parent 为空时内容根就建在场景根；Culler 也是场景里的独立物体：不挂父级，也不允许有子物体
             var root = new GameObject(TerrainAssembler.RootName);
             root.transform.SetParent(parent, false);
             root.transform.position = origin;
