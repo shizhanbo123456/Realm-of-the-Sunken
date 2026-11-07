@@ -29,12 +29,6 @@ namespace TerrainGen
             }
             if (data == null) return null;
 
-            if (Landscape.chunkCount <= 0)
-            {
-                Debug.LogError($"[地形] 配表 terrain_size 未就绪（地形边长 {Landscape.MapSize}），地图中心无法确定，"
-                               + "地形将生成在世界原点，刷新点与剔除都会错位");
-            }
-
             // 内容挂到 parent 下；Culler 是场景里的独立物体：不挂父级，也不允许有子物体
             var root = new GameObject(TerrainAssembler.RootName);
             root.transform.SetParent(parent, false);

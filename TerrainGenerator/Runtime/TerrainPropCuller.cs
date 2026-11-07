@@ -6,8 +6,8 @@ namespace TerrainGen
     // 显隐控制器：自身不含任何子物体；按间隔、且仅在位置变化时重新判定区块显隐
     public class TerrainPropCuller : MonoBehaviour
     {
-        [Tooltip("可见半径（米），以本物体为中心；地形边长约 384m，该值过大会覆盖全部区块")]
-        public float visibleDistance = 120f;
+        [Tooltip("可见半径（米），以本物体为中心；建议比相机可视范围略大")]
+        public float visibleDistance = 250f;
 
         [Tooltip("检测间隔（秒）：隔这么久才判定一次，0 = 每帧判定")]
         public float checkInterval = 0.25f;
@@ -19,6 +19,8 @@ namespace TerrainGen
         readonly Dictionary<Vector2Int, int> chunkIds = new Dictionary<Vector2Int, int>();
 
         Transform contentRoot;
+        Transform outOfMapRoot;
+        bool warnedOutOfMap;
         float timer;
         Vector3 lastCheckPos;
         float lastRadius = float.NaN;
@@ -68,7 +70,8 @@ namespace TerrainGen
 
             if (chunks.Count == 0)
             {
-                Debug.LogError("[地形] 没有任何区块被创建，剔除无法生效", this);
+                Debug.LogError($"[地形] 没有任何物件落入区块：地图边长 {Landscape.MapSize}，区块数 {Landscape.chunkCount}，"
+                               + $"内容根 {contentRoot.position}，剔除无法生效", this);
             }
             else if (!AnyChunkOutside(transform.position))
             {
@@ -145,10 +148,22 @@ namespace TerrainGen
 
         Transform GetChunkRoot(Vector3 world)
         {
-            // 直接按世界坐标切块，不依赖配表地图范围，配表未就绪时也不会全部落进同一个兜底节点
-            var chunk = new Vector2Int(
-                Mathf.FloorToInt(world.x / Landscape.chunkSize),
-                Mathf.FloorToInt(world.z / Landscape.chunkSize));
+            Vector2Int chunk = ChunkSearcher<GameObject>.GetChunkIndex(world);
+            if (chunk == ChunkSearcher<GameObject>.OutOfMapChunk)
+            {
+                if (!warnedOutOfMap)
+                {
+                    Debug.LogWarning("[地形] 有物件落在地图范围外，这些物件不参与区块剔除（始终显示）", this);
+                    warnedOutOfMap = true;
+                }
+                if (outOfMapRoot == null)
+                {
+                    var go = new GameObject("OutOfMap");
+                    go.transform.SetParent(contentRoot, false);
+                    outOfMapRoot = go.transform;
+                }
+                return outOfMapRoot;
+            }
 
             if (chunkIds.TryGetValue(chunk, out int index)) return chunks[index].transform;
 
