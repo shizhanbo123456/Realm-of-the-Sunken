@@ -840,8 +840,12 @@ public class ConfigManager : MonoBehaviour
         public static int zombie_refresh_rate_slow;     // 每批尝试次数：白天
         public static int zombie_spawn_level;           // 初始僵尸刷新等级
         public static float zombie_level_step_ratio;    // 刷新等级每 +1 所需的战斗进程比例
-        public static float terrain_size;               // 地形边长（米），必须为 chunkSize 的整数倍
-        public static float terrain_height;             // 地形最大高度（米）
+        public static float terrain_size_min;           // 地形 XZ 范围起点（米）
+        public static float terrain_size;               // 地形 XZ 边长（米）= 表内 最大 - 最小
+        public static float terrain_height_min;         // 地形高度范围起点（米）
+        public static float terrain_height;             // 地形高度范围（米）= 表内 最大 - 最小
+        public static float terrain_chunk_size;         // 区块边长（米）
+        public static int terrain_chunk_size_count;     // 每边区块数
         public static float ground_probe_up;            // 地面检测探针起点抬高（米）
         public static float ground_probe_length;        // 地面检测探针向下长度（米）
         public static int name_length_max;              // 名字最大长度
@@ -1056,13 +1060,18 @@ public class ConfigManager : MonoBehaviour
                             $"[配表] {FileName} 的 zombie_spawn_range 必须是 最小;最大 且最小大于 0、最大大于最小：「{row.value}」");
                     break;
                 case "terrain_size":
-                    terrain_size = Positive(Float(row), row.key);
-                    if (terrain_size % Landscape.chunkSize != 0f)
-                        throw new FormatException(
-                            $"[配表] {FileName} 的 terrain_size 必须是区块边长 {Landscape.chunkSize} 的整数倍：{terrain_size}");
+                    Pair(row, out terrain_size_min, out float terrainSizeMax);
+                    terrain_size = Positive(terrainSizeMax - terrain_size_min, row.key);
                     break;
                 case "terrain_height":
-                    terrain_height = Positive(Float(row), row.key);
+                    Pair(row, out terrain_height_min, out float terrainHeightMax);
+                    terrain_height = Positive(terrainHeightMax - terrain_height_min, row.key);
+                    break;
+                case "terrain_chunk_size":
+                    terrain_chunk_size = Positive(Float(row), row.key);
+                    break;
+                case "terrain_chunk_size_count":
+                    terrain_chunk_size_count = Positive(Int(row), row.key);
                     break;
                 case "ground_probe_up":
                     ground_probe_up = NonNegative(Float(row), row.key);
@@ -1140,6 +1149,14 @@ public class ConfigManager : MonoBehaviour
                 || sync_precision_minimap_xz <= 0f || sync_max_buff_count <= 0 || max_entity_health <= 0
                 || sync_entity_turn_rate <= 0f || sync_precision_entity_turn_rate <= 0f)
                 throw new FormatException($"[配表] {FileName} 缺少位级同步所需参数行（terrain_size/terrain_height/sync_*/max_entity_health）");
+
+            // 区块必须正好铺满地形，否则区块索引与地图边界会错位
+            if (terrain_chunk_size <= 0f || terrain_chunk_size_count <= 0)
+                throw new FormatException($"[配表] {FileName} 缺少 terrain_chunk_size / terrain_chunk_size_count（区块尺寸）");
+            if (Mathf.Abs(terrain_chunk_size * terrain_chunk_size_count - terrain_size) > 0.001f)
+                throw new FormatException(
+                    $"[配表] {FileName} 的 terrain_chunk_size({terrain_chunk_size}) × terrain_chunk_size_count({terrain_chunk_size_count}) "
+                    + $"必须等于地形边长 {terrain_size}");
 
             // 角色显示半径缺行会退化成 0，所有角色模型都不再下发，先显式拦下
             if (entity_character_visiable_radius <= 0f)

@@ -135,10 +135,10 @@ public class ChunkSearcher<T> : IEnumerable<T>
         Vector3 minPoint = center - new Vector3(radius, 0, radius);
         Vector3 maxPoint = center + new Vector3(radius, 0, radius);
 
-        int minChunkX = Mathf.Max(0, Mathf.FloorToInt(minPoint.x / Landscape.chunkSize));
-        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt(minPoint.z / Landscape.chunkSize));
-        int maxChunkX = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt(maxPoint.x / Landscape.chunkSize));
-        int maxChunkZ = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt(maxPoint.z / Landscape.chunkSize));
+        int minChunkX = Mathf.Max(0, Mathf.FloorToInt((minPoint.x - Landscape.MapMin) / Landscape.chunkSize));
+        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt((minPoint.z - Landscape.MapMin) / Landscape.chunkSize));
+        int maxChunkX = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt((maxPoint.x - Landscape.MapMin) / Landscape.chunkSize));
+        int maxChunkZ = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt((maxPoint.z - Landscape.MapMin) / Landscape.chunkSize));
 
         for (int x = minChunkX; x <= maxChunkX; x++)
         {
@@ -172,10 +172,10 @@ public class ChunkSearcher<T> : IEnumerable<T>
         Vector3 minPoint = center - new Vector3(radius, 0, radius);
         Vector3 maxPoint = center + new Vector3(radius, 0, radius);
 
-        int minChunkX = Mathf.Max(0, Mathf.FloorToInt(minPoint.x / Landscape.chunkSize));
-        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt(minPoint.z / Landscape.chunkSize));
-        int maxChunkX = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt(maxPoint.x / Landscape.chunkSize));
-        int maxChunkZ = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt(maxPoint.z / Landscape.chunkSize));
+        int minChunkX = Mathf.Max(0, Mathf.FloorToInt((minPoint.x - Landscape.MapMin) / Landscape.chunkSize));
+        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt((minPoint.z - Landscape.MapMin) / Landscape.chunkSize));
+        int maxChunkX = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt((maxPoint.x - Landscape.MapMin) / Landscape.chunkSize));
+        int maxChunkZ = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt((maxPoint.z - Landscape.MapMin) / Landscape.chunkSize));
 
         for (int x = minChunkX; x <= maxChunkX; x++)
         {
@@ -200,10 +200,10 @@ public class ChunkSearcher<T> : IEnumerable<T>
         Vector3 minPoint = center - new Vector3(radius, 0, radius);
         Vector3 maxPoint = center + new Vector3(radius, 0, radius);
 
-        int minChunkX = Mathf.Max(0, Mathf.FloorToInt(minPoint.x / Landscape.chunkSize));
-        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt(minPoint.z / Landscape.chunkSize));
-        int maxChunkX = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt(maxPoint.x / Landscape.chunkSize));
-        int maxChunkZ = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt(maxPoint.z / Landscape.chunkSize));
+        int minChunkX = Mathf.Max(0, Mathf.FloorToInt((minPoint.x - Landscape.MapMin) / Landscape.chunkSize));
+        int minChunkZ = Mathf.Max(0, Mathf.FloorToInt((minPoint.z - Landscape.MapMin) / Landscape.chunkSize));
+        int maxChunkX = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt((maxPoint.x - Landscape.MapMin) / Landscape.chunkSize));
+        int maxChunkZ = Mathf.Min(Landscape.chunkCount - 1, Mathf.FloorToInt((maxPoint.z - Landscape.MapMin) / Landscape.chunkSize));
 
         for (int x = minChunkX; x <= maxChunkX; x++)
         {
@@ -258,9 +258,8 @@ public class ChunkSearcher<T> : IEnumerable<T>
 
     public bool IsPositionInMap(Vector3 worldPos)
     {
-        float mapMaxRange = Landscape.chunkCount * Landscape.chunkSize;
-        return worldPos.x >= 0 && worldPos.x < mapMaxRange &&
-               worldPos.z >= 0 && worldPos.z < mapMaxRange;
+        return worldPos.x >= Landscape.MapMin && worldPos.x < Landscape.MapMax &&
+               worldPos.z >= Landscape.MapMin && worldPos.z < Landscape.MapMax;
     }
 
     private void ValidateChunkIndex(Vector2Int chunkIndex)
@@ -283,14 +282,13 @@ public class ChunkSearcher<T> : IEnumerable<T>
 
     public static Vector2Int GetChunkIndex(Vector3 worldPos)
     {
-        float mapMaxRange = Landscape.chunkCount * Landscape.chunkSize;
-        if (worldPos.x < 0 || worldPos.x >= mapMaxRange ||
-            worldPos.z < 0 || worldPos.z >= mapMaxRange)
+        if (worldPos.x < Landscape.MapMin || worldPos.x >= Landscape.MapMax ||
+            worldPos.z < Landscape.MapMin || worldPos.z >= Landscape.MapMax)
         {
             return OutOfMapChunk;
         }
-        int x = Mathf.FloorToInt(worldPos.x / Landscape.chunkSize);
-        int z = Mathf.FloorToInt(worldPos.z / Landscape.chunkSize);
+        int x = Mathf.FloorToInt((worldPos.x - Landscape.MapMin) / Landscape.chunkSize);
+        int z = Mathf.FloorToInt((worldPos.z - Landscape.MapMin) / Landscape.chunkSize);
         return new Vector2Int(x, z);
     }
     #endregion

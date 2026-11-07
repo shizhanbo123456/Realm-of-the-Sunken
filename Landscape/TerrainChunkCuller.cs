@@ -153,8 +153,8 @@ public class TerrainChunkCuller : MonoBehaviour
 
         foreach (Vector2Int chunk in scratchChunks)
         {
-            float chunkMinX = chunk.x * Landscape.chunkSize;
-            float chunkMinZ = chunk.y * Landscape.chunkSize;
+            float chunkMinX = Landscape.MapMin + chunk.x * Landscape.chunkSize;
+            float chunkMinZ = Landscape.MapMin + chunk.y * Landscape.chunkSize;
             float chunkMaxX = chunkMinX + Landscape.chunkSize;
             float chunkMaxZ = chunkMinZ + Landscape.chunkSize;
 

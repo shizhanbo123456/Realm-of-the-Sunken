@@ -29,11 +29,11 @@ namespace TerrainGen
             }
             if (data == null) return null;
 
-            // 地形局部坐标以自身中心为原点，整体抬半个尺寸后，生成区域的最小角正好落在世界原点
+            // 地形局部坐标以自身中心为原点，抬半个尺寸后生成区域的最小角正好落在配表的地形起点
             var origin = new Vector3(
-                data.sizeX * data.cellSize * 0.5f,
+                Landscape.MapMin + data.sizeX * data.cellSize * 0.5f,
                 0f,
-                data.sizeZ * data.cellSize * 0.5f);
+                Landscape.MapMin + data.sizeZ * data.cellSize * 0.5f);
 
             // 内容挂到 parent 下；Culler 是场景里的独立物体：不挂父级，也不允许有子物体
             var root = new GameObject(TerrainAssembler.RootName);

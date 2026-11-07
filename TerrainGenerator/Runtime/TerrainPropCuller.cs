@@ -223,9 +223,9 @@ namespace TerrainGen
             go.transform.position = chunk == OutOfMapKey
                 ? contentRoot.position
                 : new Vector3(
-                    (chunk.x + 0.5f) * Landscape.chunkSize,
+                    Landscape.MapMin + (chunk.x + 0.5f) * Landscape.chunkSize,
                     contentRoot.position.y,
-                    (chunk.y + 0.5f) * Landscape.chunkSize);
+                    Landscape.MapMin + (chunk.y + 0.5f) * Landscape.chunkSize);
 
             chunkRoots[chunk] = go.transform;
             return go.transform;
@@ -233,8 +233,8 @@ namespace TerrainGen
 
         float ChunkDistanceSq(Vector2Int chunk, Vector3 center)
         {
-            float cx = (chunk.x + 0.5f) * Landscape.chunkSize;
-            float cz = (chunk.y + 0.5f) * Landscape.chunkSize;
+            float cx = Landscape.MapMin + (chunk.x + 0.5f) * Landscape.chunkSize;
+            float cz = Landscape.MapMin + (chunk.y + 0.5f) * Landscape.chunkSize;
             float dx = cx - center.x;
             float dz = cz - center.z;
             return dx * dx + dz * dz;
