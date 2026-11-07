@@ -9,6 +9,8 @@ namespace TerrainGen.EditorTools
     public class ModularTerrainWindow : EditorWindow
     {
         const string ConfigFolder = "Assets/Scripts/TerrainGenerator/Config";
+        const int WalkableArea = 0;      // 项目 NavMeshAreas 第 0 项 Walkable
+        const int NotWalkableArea = 1;   // 第 1 项 Not Walkable：只当障碍，不生成行走面
 
         BuildingSettings settings;
         BuildingKitSet kit;
@@ -295,7 +297,7 @@ namespace TerrainGen.EditorTools
             try
             {
                 TerrainAssembler.SpawnColliderOnly(data, kit, root.transform, stripMeshes: false);
-                ok = TryBakeNavMesh(root.transform, data.groundHeight, out message);
+                ok = TryBakeNavMesh(root.transform, data, out message);
             }
             finally
             {
@@ -307,9 +309,10 @@ namespace TerrainGen.EditorTools
             Log(summary);
         }
 
-        bool TryBakeNavMesh(Transform root, float groundY, out string message)
+        bool TryBakeNavMesh(Transform root, TerrainPlanData data, out string message)
         {
             message = string.Empty;
+            float groundY = data.groundHeight;
 
             NavMeshBuildSettings build = NavMesh.GetSettingsByID(0);
             if (build.agentTypeID < 0)
@@ -332,30 +335,57 @@ namespace TerrainGen.EditorTools
                 build.minRegionArea = minRegion;
             }
 
-            // 按真实网格烘：取生成物下所有 MeshFilter，门洞、柱隙、栏杆镂空都能保真。
-            // 不用 CollectSources(PhysicsColliders)：编辑器态刚生成的碰撞体还没同步进物理场景，会收错；
-            // 也不用 BoxCollider 包围盒：每个物件糊成一个实心块，通道全没了。
+            // 地面按格子铺整块 Box（素材网格自身有缝也能保证底板连续）；其余物件用真实网格但标成 Not Walkable，
+            // 只当障碍、不产生可行走面——否则围栏顶、立柱顶、岩石顶、屋檐全是一块块孤岛。
+            // 不用 CollectSources(PhysicsColliders)：编辑器态刚生成的碰撞体还没同步进物理场景，会收错。
             var sources = new List<NavMeshBuildSource>();
             Bounds bounds = default;
             bool hasBounds = false;
+            int groundCount = 0;
+            int meshCount = 0;
+            float cell = data.cellSize;
+            var cellSize = new Vector3(cell + 0.1f, 1f, cell + 0.1f); // 略微重叠，保证相邻地块接得上
 
-            foreach (MeshFilter filter in root.GetComponentsInChildren<MeshFilter>(true))
+            foreach (Transform item in root)
             {
-                Mesh mesh = filter.sharedMesh;
-                if (mesh == null) continue;
-
-                sources.Add(new NavMeshBuildSource
+                if (item.name.StartsWith("Ground_", System.StringComparison.Ordinal))
                 {
-                    shape = NavMeshBuildSourceShape.Mesh,
-                    sourceObject = mesh,
-                    area = 0,
-                    transform = filter.transform.localToWorldMatrix,
-                });
+                    Vector3 center = new Vector3(item.position.x, groundY - 0.5f, item.position.z);
+                    sources.Add(new NavMeshBuildSource
+                    {
+                        shape = NavMeshBuildSourceShape.Box,
+                        size = cellSize,
+                        area = WalkableArea,
+                        transform = Matrix4x4.TRS(center, Quaternion.identity, Vector3.one),
+                    });
 
-                var renderer = filter.GetComponent<MeshRenderer>();
-                if (renderer == null) continue;
-                if (!hasBounds) { bounds = renderer.bounds; hasBounds = true; }
-                else bounds.Encapsulate(renderer.bounds);
+                    var slab = new Bounds(center, cellSize);
+                    if (!hasBounds) { bounds = slab; hasBounds = true; }
+                    else bounds.Encapsulate(slab);
+
+                    groundCount++;
+                    continue;
+                }
+
+                foreach (MeshFilter filter in item.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    Mesh mesh = filter.sharedMesh;
+                    if (mesh == null) continue;
+
+                    sources.Add(new NavMeshBuildSource
+                    {
+                        shape = NavMeshBuildSourceShape.Mesh,
+                        sourceObject = mesh,
+                        area = NotWalkableArea,
+                        transform = filter.transform.localToWorldMatrix,
+                    });
+                    meshCount++;
+
+                    var renderer = filter.GetComponent<MeshRenderer>();
+                    if (renderer == null) continue;
+                    if (!hasBounds) { bounds = renderer.bounds; hasBounds = true; }
+                    else bounds.Encapsulate(renderer.bounds);
+                }
             }
 
             if (sources.Count == 0 || !hasBounds)
@@ -365,24 +395,24 @@ namespace TerrainGen.EditorTools
             }
 
             bounds.Expand(2f); // 留出 agent 半径余量
-            // Y 只留「地面 + 一个 agent 高」：屋檐、屋顶、岩石顶都在这个体积之上，不进来就不会烘出孤岛；
-            // 围栏/立柱/建筑下段仍在体积内，照样当障碍用
+            // Y 只留「地面 + 一个 agent 高」：再高的几何不参与，省体素也省得烘出高处的面
             Vector3 min = bounds.min;
             Vector3 max = bounds.max;
             min.y = groundY - 1f;
             max.y = groundY + Mathf.Max(build.agentHeight, 1f);
             bounds.SetMinMax(min, max);
 
-            NavMeshData data = NavMeshBuilder.BuildNavMeshData(build, sources, bounds, Vector3.zero, Quaternion.identity);
-            if (data == null)
+            NavMeshData navData = NavMeshBuilder.BuildNavMeshData(build, sources, bounds, Vector3.zero, Quaternion.identity);
+            if (navData == null)
             {
                 message = "烘焙失败：BuildNavMeshData 返回空";
                 return false;
             }
 
-            string path = SaveNavMeshAsset(data);
-            message = $"NavMesh 已烘焙：{sources.Count} 个网格、范围 X {bounds.min.x:0}~{bounds.max.x:0} / Z {bounds.min.z:0}~{bounds.max.z:0}、"
-                      + $"Y {bounds.min.y:0.#}~{bounds.max.y:0.#}、minRegionArea {minRegion:0} 体素²（≈{minRegion * build.voxelSize * build.voxelSize:0.#} m²）→ {path}";
+            string path = SaveNavMeshAsset(navData);
+            message = $"NavMesh 已烘焙：地面 {groundCount} 块 + 障碍网格 {meshCount} 个，"
+                      + $"范围 X {bounds.min.x:0}~{bounds.max.x:0} / Z {bounds.min.z:0}~{bounds.max.z:0}、Y {bounds.min.y:0.#}~{bounds.max.y:0.#}、"
+                      + $"minRegionArea {minRegion:0} 体素²（≈{minRegion * build.voxelSize * build.voxelSize:0.#} m²）→ {path}";
             return true;
         }
 
