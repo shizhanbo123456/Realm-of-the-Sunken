@@ -322,8 +322,13 @@ namespace TerrainGen.EditorTools
             int minRegion = build.minRegionArea;
             if (minRegionAreaM2 > 0f)
             {
-                float cellArea = build.cellSize * build.cellSize;
-                minRegion = Mathf.Max(1, Mathf.RoundToInt(minRegionAreaM2 / cellArea));
+                float voxelArea = build.voxelSize * build.voxelSize;
+                if (voxelArea <= 0f)
+                {
+                    message = "烘焙失败：agent 的 voxelSize 读不到（0），无法把 m² 换算成体素²";
+                    return false;
+                }
+                minRegion = Mathf.Max(1, Mathf.RoundToInt(minRegionAreaM2 / voxelArea));
                 build.minRegionArea = minRegion;
             }
 
@@ -376,7 +381,7 @@ namespace TerrainGen.EditorTools
 
             string path = SaveNavMeshAsset(data);
             message = $"NavMesh 已烘焙：{sources.Count} 个网格、范围 X {bounds.min.x:0}~{bounds.max.x:0} / Z {bounds.min.z:0}~{bounds.max.z:0}、"
-                      + $"minRegionArea {minRegion} 体素²（≈{minRegion * build.cellSize * build.cellSize:0.#} m²）→ {path}";
+                      + $"minRegionArea {minRegion} 体素²（≈{minRegion * build.voxelSize * build.voxelSize:0.#} m²）→ {path}";
             return true;
         }
 
