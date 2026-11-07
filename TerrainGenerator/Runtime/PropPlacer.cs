@@ -221,7 +221,7 @@ namespace TerrainGen
                 Vector2Int cell = voids[rng.Next(voids.Count)];
                 GameObject prefab = kit.PickFrom(kit.obstacleDecorations, f.RegionGroup(cell.x, cell.y));
                 if (prefab == null) continue;
-                if (!PrefabBounds.TryGet(prefab, cache, out Bounds b)) continue;
+                if (!PrefabBounds.TryGet(prefab, cache, out Bounds b, false)) continue;
 
                 float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * s.propScaleRange;
                 float radius = Mathf.Max(b.extents.x, b.extents.z) * scale;
@@ -259,7 +259,7 @@ namespace TerrainGen
 
                 GameObject prefab = kit.PickFrom(kit.floatingDecorations, f.RegionGroup(gx, gz));
                 if (prefab == null) continue;
-                if (!PrefabBounds.TryGet(prefab, cache, out Bounds b)) continue;
+                if (!PrefabBounds.TryGet(prefab, cache, out Bounds b, false)) continue;
 
                 float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * s.propScaleRange;
                 float bottom = s.groundHeight + (float)rng.NextDouble() * s.floatingExtraHeight;

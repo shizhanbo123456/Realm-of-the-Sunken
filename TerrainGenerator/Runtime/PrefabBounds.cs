@@ -6,7 +6,9 @@ namespace TerrainGen
     // 取预制体的包围盒（根节点空间，已含根缩放）：优先根物体 BoxCollider，缺失时用 Mesh 兜底
     public static class PrefabBounds
     {
-        public static bool TryGet(GameObject prefab, Dictionary<GameObject, Bounds> cache, out Bounds bounds)
+        // warnMissingCollider：本来就不需要碰撞体的类型（障碍装饰/漂浮装饰等）传 false，避免刷告警
+        public static bool TryGet(GameObject prefab, Dictionary<GameObject, Bounds> cache, out Bounds bounds,
+            bool warnMissingCollider = true)
         {
             if (cache != null && cache.TryGetValue(prefab, out bounds)) return true;
 
@@ -22,7 +24,7 @@ namespace TerrainGen
                 bounds = default;
                 return false;
             }
-            else
+            else if (warnMissingCollider)
             {
                 Debug.LogWarning($"[地形] 预制体 {prefab.name} 根物体没有 BoxCollider，已用 Mesh 包围盒兜底，建议补一个 BoxCollider");
             }
