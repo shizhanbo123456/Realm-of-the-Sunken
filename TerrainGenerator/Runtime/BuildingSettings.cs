@@ -2,95 +2,14 @@ using UnityEngine;
 
 namespace TerrainGen
 {
+    // 只保留生成数据标识，其余生成参数见 StreamingAssets/ConfigData/terrain_generation.csv
     [CreateAssetMenu(menuName = "模块化地形/建筑生成参数", fileName = "BuildingSettings")]
     public class BuildingSettings : ScriptableObject
     {
-        [Header("网格")]
-        [Tooltip("格子边长，应与地面预制体的长宽一致")]
-        [Min(1f)] public float cellSize = 6f;
-        [Tooltip("地面预制体的高度，围墙/石桩/点位都放在这个高度上")]
-        [Min(0f)] public float groundHeight = 4f;
-        [Min(4)] public int mapCellsX = 64;
-        [Min(4)] public int mapCellsZ = 64;
-
-        [Header("房间划分")]
+        [Tooltip("随机种子：种子 + 版本号 一起决定烘焙文件的路径")]
         public int seed = 20261105;
-        [Tooltip("生成数据版本号：改过生成逻辑或素材表后 +1，运行时会按 种子 + 版本号 找缓存文件")]
+
+        [Tooltip("生成数据版本号：改过生成逻辑或素材表后 +1")]
         [Min(1)] public int version = 1;
-        [Tooltip("房间最大边长（格），地图越大房间自动越多")]
-        [Min(4)] public int maxRoomCells = 12;
-        [Tooltip("单个房间最少几格")]
-        [Min(2)] public int minRoomCells = 4;
-        [Tooltip("房间离切分边界留几格，留 2 格以上走廊才走得开")]
-        [Min(0)] public int roomMargin = 2;
-        [Tooltip("走廊最大宽度（格），每条走廊在 1~该值之间随机")]
-        [Min(1)] public int corridorMaxWidth = 3;
-        [Tooltip("每个房间至少连到多少个最近邻房间，2 以上才会形成环路")]
-        [Range(1, 4)] public int minRoomLinks = 2;
-        [Tooltip("额外随机环路的生成概率，越高路线越密")]
-        [Range(0f, 1f)] public float extraLinkChance = 0.4f;
-        [Tooltip("房间随机缺角概率，避免所有房间都是同一个矩形")]
-        [Range(0f, 1f)] public float notchChance = 0.35f;
-        [Tooltip("勾选：房间贴走廊的地方整段开洞（多路线）；取消：只有走廊端点开门")]
-        public bool openAlongCorridor = true;
-
-        [Header("点位")]
-        [Tooltip("空置判定半径（格）：点位周围这么多格内不能有走廊或空地")]
-        [Min(1)] public int pointOpenRadius = 2;
-        [Tooltip("所有点位离地图边缘至少几格")]
-        [Min(0)] public int pointEdgeMargin = 8;
-        [Tooltip("副守护点数量")]
-        [Min(1)] public int subGuardCount = 3;
-        [Tooltip("普通点位数量下限")]
-        [Min(0)] public int extraPointMin = 4;
-        [Tooltip("普通点位数量上限")]
-        [Min(0)] public int extraPointMax = 6;
-        [Tooltip("普通点位与其他所有点位的最小间距（格）")]
-        [Min(1)] public int pointSpacing = 8;
-
-        [Tooltip("每个守护点周围生成几个防御塔点位")]
-        [Min(0)] public int towerCountPerGuard = 3;
-        [Tooltip("防御塔点位离所属守护点的最小距离（格）")]
-        [Min(1)] public int towerMinDistance = 2;
-        [Tooltip("防御塔点位离所属守护点的最大距离（格）")]
-        [Min(2)] public int towerMaxDistance = 6;
-        [Tooltip("同一守护点下防御塔点位之间的最小间距（格）")]
-        [Min(1)] public int towerSpacing = 3;
-
-        [Header("建筑物 / 植被 / 摆件")]
-        [Tooltip("平均多少格放一座建筑物，0 = 不生成")]
-        [Min(0)] public int cellsPerBuilding = 200;
-        [Tooltip("平均多少格放一个装饰，0 = 不生成")]
-        [Min(0)] public int cellsPerDecoration = 60;
-        [Tooltip("平均多少格放一丛灌木，0 = 不生成")]
-        [Min(0)] public int cellsPerBush = 40;
-        [Tooltip("平均多少格放一个摆件，0 = 不生成")]
-        [Min(0)] public int cellsPerProp = 80;
-        [Tooltip("建筑物/装饰/灌木/摆件之间的额外间距（世界单位），叠加在各自包围盒半径之上")]
-        [Min(0f)] public float propGapPadding = 0.5f;
-        [Tooltip("勾选：装饰/摆件/灌木在格内随机落点，同一格可放多件；取消：每格居中只放一件")]
-        public bool randomPropPosition = true;
-        [Tooltip("每条临空外墙边贴藤蔓的概率")]
-        [Range(0f, 1f)] public float vineChance = 0.25f;
-
-        [Header("障碍")]
-        [Tooltip("平均多少格虚空放一个障碍，0 = 不生成")]
-        [Min(0)] public int cellsPerObstacle = 60;
-        [Tooltip("障碍底面的竖直随机范围下限（世界 Y）")]
-        public float obstacleBaseMinY = 0f;
-        [Tooltip("障碍底面的竖直随机范围上限（世界 Y）")]
-        public float obstacleBaseMaxY = 4f;
-        [Tooltip("平均多少格虚空放一个障碍装饰，0 = 不生成")]
-        [Min(0)] public int cellsPerObstacleDecoration = 80;
-        [Tooltip("障碍/障碍装饰/漂浮装饰的随机缩放幅度：0.5 表示在 0.5~1.5 倍之间随机")]
-        [Range(0f, 0.9f)] public float propScaleRange = 0.5f;
-
-        [Header("漂浮装饰 / 鱼群")]
-        [Tooltip("平均多少格放一个漂浮装饰，0 = 不生成")]
-        [Min(0)] public int cellsPerFloatingDecoration = 150;
-        [Tooltip("平均多少格放一群鱼，0 = 不生成")]
-        [Min(0)] public int cellsPerFishSchool = 150;
-        [Tooltip("漂浮装饰和鱼群的底面在地面之上再抬高的随机上限")]
-        [Min(0f)] public float floatingExtraHeight = 6f;
     }
 }

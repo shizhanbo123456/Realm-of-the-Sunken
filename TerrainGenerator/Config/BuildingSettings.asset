@@ -12,41 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 20191ccf1f67e604495e258a0e4d6ac7, type: 3}
   m_Name: BuildingSettings
   m_EditorClassIdentifier: 
-  cellSize: 6
-  groundHeight: 4
-  mapCellsX: 64
-  mapCellsZ: 64
   seed: 676654
-  maxRoomCells: 6
-  minRoomCells: 4
-  roomMargin: 6
-  corridorMaxWidth: 1
-  minRoomLinks: 1
-  extraLinkChance: 0.2
-  notchChance: 0.35
-  openAlongCorridor: 1
-  pointOpenRadius: 2
-  pointEdgeMargin: 6
-  subGuardCount: 3
-  extraPointMin: 4
-  extraPointMax: 6
-  pointSpacing: 8
-  towerCountPerGuard: 3
-  towerMinDistance: 2
-  towerMaxDistance: 6
-  towerSpacing: 3
-  cellsPerBuilding: 50
-  cellsPerDecoration: 4
-  cellsPerBush: 6
-  cellsPerProp: 1
-  propGapPadding: 0.5
-  randomPropPosition: 1
-  vineChance: 0.25
-  cellsPerObstacle: 20
-  obstacleBaseMinY: -4
-  obstacleBaseMaxY: 6
-  cellsPerObstacleDecoration: 5
-  propScaleRange: 0.2
-  cellsPerFloatingDecoration: 20
-  cellsPerFishSchool: 120
-  floatingExtraHeight: 6
+  version: 1

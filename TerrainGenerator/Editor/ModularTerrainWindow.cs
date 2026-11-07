@@ -131,8 +131,9 @@ namespace TerrainGen.EditorTools
                 sumW += room.width;
                 sumH += room.height;
             }
-            float avgW = field.Rooms.Count > 0 ? sumW * settings.cellSize / field.Rooms.Count : 0f;
-            float avgH = field.Rooms.Count > 0 ? sumH * settings.cellSize / field.Rooms.Count : 0f;
+            float cell = ConfigManager.TerrainGenerationConfig.cell_size;
+            float avgW = field.Rooms.Count > 0 ? sumW * cell / field.Rooms.Count : 0f;
+            float avgH = field.Rooms.Count > 0 ? sumH * cell / field.Rooms.Count : 0f;
 
             int guards = 0;
             int extras = 0;
@@ -201,7 +202,8 @@ namespace TerrainGen.EditorTools
         void GenerateIntoScene()
         {
             report.Clear();
-            if (field == null || dirty || field.SizeX != settings.mapCellsX || field.SizeZ != settings.mapCellsZ) Rebuild();
+            int cells = ConfigManager.TerrainGenerationConfig.map_cells_xz;
+            if (field == null || dirty || field.SizeX != cells || field.SizeZ != cells) Rebuild();
 
             TerrainPlanData data = TerrainGenerator.Bake(settings, kit);
             if (data == null)

@@ -33,13 +33,14 @@ public class ConfigManager : MonoBehaviour
         int expPlayer = ExpPlayerConfig.Load(ReadTable(dir, ExpPlayerConfig.FileName));
         int revive = ReviveTimeConfig.Load(ReadTable(dir, ReviveTimeConfig.FileName));
         int global = GlobalVariableConfig.Load(ReadTable(dir, GlobalVariableConfig.FileName));
+        int terrainGen = TerrainGenerationConfig.Load(ReadTable(dir, TerrainGenerationConfig.FileName));
         int notice = NoticeConfig.Load(ReadTable(dir, NoticeConfig.FileName));
         int attrRange = AttrRangeConfig.Load(ReadTable(dir, AttrRangeConfig.FileName));
         int settingTips = SettingTipsConfig.Load(ReadTable(dir, SettingTipsConfig.FileName));
         int quickMessage = QuickMessageConfig.Load(ReadTable(dir, QuickMessageConfig.FileName));
 
         Debug.Log($"[配表] {dir} 加载完成 | battle_fury_layer {battleFury} | entity {entity} | skill {skill} | effect {effect} | " +
-                  $"exp_character {expCharacter} | exp_player {expPlayer} | revive_time {revive} | global_variables {global} | notice {notice} | attr_range {attrRange} | setting_tips {settingTips} | quick_message {quickMessage}");
+                  $"exp_character {expCharacter} | exp_player {expPlayer} | revive_time {revive} | global_variables {global} | notice {notice} | attr_range {attrRange} | setting_tips {settingTips} | quick_message {quickMessage} | terrain_generation {terrainGen}");
     }
 
     #region 文件读取与拆分
@@ -1295,6 +1296,255 @@ public class ConfigManager : MonoBehaviour
                 result.Add(value);
             }
             return result;
+        }
+    }
+    #endregion
+
+    #region 地形生成参数表：0 key / 1 说明 / 2 value
+    public struct TerrainGenerationConfig
+    {
+        public const string FileName = "terrain_generation.csv";
+        private const int ColumnCount = 3;
+        public static readonly Dictionary<string, TerrainGenerationConfig> content = new();
+
+        public static int map_cells_xz;                  // 地形 X/Z 各自的格子数
+        public static float cell_size;                   // 单个格子边长（米）
+        public static float ground_height;               // 地面预制体高度（可行走面 Y）
+        public static int max_room_cells;                // 房间最大边长（格）
+        public static int min_room_cells;                // 单个房间最少格数
+        public static int room_margin;                   // 房间离切分边界留的格数
+        public static int corridor_max_width;            // 走廊最大宽度（格）
+        public static int min_room_links;                // 每间房至少连到的最近邻房间数
+        public static float extra_link_chance;           // 额外随机环路概率
+        public static float notch_chance;                // 房间随机缺角概率
+        public static bool open_along_corridor;          // 房间贴走廊是否整段开洞
+        public static int point_open_radius;             // 点位空置判定半径（格）
+        public static int point_edge_margin;             // 点位离地图边缘格数
+        public static int sub_guard_count;               // 副守护点数量
+        public static int extra_point_min;               // 普通点位数量下限
+        public static int extra_point_max;               // 普通点位数量上限
+        public static int point_spacing;                 // 普通点位最小间距（格）
+        public static int tower_count_per_guard;         // 每个守护点的防御塔点位数
+        public static int tower_min_distance;            // 防御塔点位离守护点最小距离（格）
+        public static int tower_max_distance;            // 防御塔点位离守护点最大距离（格）
+        public static int tower_spacing;                 // 同守护点防御塔点位间距（格）
+        public static int cells_per_building;            // 平均多少格一座建筑物
+        public static int cells_per_decoration;          // 平均多少格一个装饰
+        public static int cells_per_bush;                // 平均多少格一丛灌木
+        public static int cells_per_prop;                // 平均多少格一个摆件
+        public static float prop_gap_padding;            // 摆放物之间的额外间距（米）
+        public static bool random_prop_position;         // 是否格内随机落点
+        public static float vine_chance;                 // 临空外墙贴藤蔓概率
+        public static int cells_per_obstacle;            // 平均多少格虚空一个障碍
+        public static float obstacle_base_min_y;         // 障碍底面 Y 下限
+        public static float obstacle_base_max_y;         // 障碍底面 Y 上限
+        public static int cells_per_obstacle_decoration; // 平均多少格虚空一个障碍装饰
+        public static float prop_scale_range;            // 随机缩放幅度
+        public static int cells_per_floating_decoration; // 平均多少格一个漂浮装饰
+        public static int cells_per_fish_school;         // 平均多少格一群鱼
+        public static float floating_extra_height;       // 漂浮物在地面之上再抬高的上限
+
+        public string key;
+        public string description;
+        public string value;
+
+        public TerrainGenerationConfig(string[] rowData)
+        {
+            key = ParseString(rowData, 0);
+            description = ParseString(rowData, 1);
+            value = ParseString(rowData, 2);
+        }
+
+        public static int Load(ConfigTable table)
+        {
+            table.RequireColumnCount(ColumnCount);
+            int count = Fill(table, content, row => new TerrainGenerationConfig(row), row => row.key);
+            foreach (TerrainGenerationConfig row in content.Values) Apply(row);
+            return count;
+        }
+
+        // 表内行 → 静态字段：多出未处理的行直接抛错（新增配表行必须同步这里）
+        private static void Apply(TerrainGenerationConfig row)
+        {
+            switch (row.key)
+            {
+                case "map_cells_xz":
+                    map_cells_xz = Positive(Int(row), row.key);
+                    break;
+                case "cell_size":
+                    cell_size = Positive(Float(row), row.key);
+                    break;
+                case "ground_height":
+                    ground_height = NonNegative(Float(row), row.key);
+                    break;
+                case "max_room_cells":
+                    max_room_cells = Positive(Int(row), row.key);
+                    break;
+                case "min_room_cells":
+                    min_room_cells = Positive(Int(row), row.key);
+                    break;
+                case "room_margin":
+                    room_margin = NonNegative(Int(row), row.key);
+                    break;
+                case "corridor_max_width":
+                    corridor_max_width = Positive(Int(row), row.key);
+                    break;
+                case "min_room_links":
+                    min_room_links = Positive(Int(row), row.key);
+                    break;
+                case "extra_link_chance":
+                    extra_link_chance = Ratio(Float(row), row.key);
+                    break;
+                case "notch_chance":
+                    notch_chance = Ratio(Float(row), row.key);
+                    break;
+                case "open_along_corridor":
+                    open_along_corridor = Bool(row);
+                    break;
+                case "point_open_radius":
+                    point_open_radius = Positive(Int(row), row.key);
+                    break;
+                case "point_edge_margin":
+                    point_edge_margin = NonNegative(Int(row), row.key);
+                    break;
+                case "sub_guard_count":
+                    sub_guard_count = Positive(Int(row), row.key);
+                    break;
+                case "extra_point_min":
+                    extra_point_min = NonNegative(Int(row), row.key);
+                    break;
+                case "extra_point_max":
+                    extra_point_max = NonNegative(Int(row), row.key);
+                    break;
+                case "point_spacing":
+                    point_spacing = Positive(Int(row), row.key);
+                    break;
+                case "tower_count_per_guard":
+                    tower_count_per_guard = NonNegative(Int(row), row.key);
+                    break;
+                case "tower_min_distance":
+                    tower_min_distance = Positive(Int(row), row.key);
+                    break;
+                case "tower_max_distance":
+                    tower_max_distance = Positive(Int(row), row.key);
+                    break;
+                case "tower_spacing":
+                    tower_spacing = Positive(Int(row), row.key);
+                    break;
+                case "cells_per_building":
+                    cells_per_building = NonNegative(Int(row), row.key);
+                    break;
+                case "cells_per_decoration":
+                    cells_per_decoration = NonNegative(Int(row), row.key);
+                    break;
+                case "cells_per_bush":
+                    cells_per_bush = NonNegative(Int(row), row.key);
+                    break;
+                case "cells_per_prop":
+                    cells_per_prop = NonNegative(Int(row), row.key);
+                    break;
+                case "prop_gap_padding":
+                    prop_gap_padding = NonNegative(Float(row), row.key);
+                    break;
+                case "random_prop_position":
+                    random_prop_position = Bool(row);
+                    break;
+                case "vine_chance":
+                    vine_chance = Ratio(Float(row), row.key);
+                    break;
+                case "cells_per_obstacle":
+                    cells_per_obstacle = NonNegative(Int(row), row.key);
+                    break;
+                case "obstacle_base_min_y":
+                    obstacle_base_min_y = Float(row);
+                    break;
+                case "obstacle_base_max_y":
+                    obstacle_base_max_y = Float(row);
+                    break;
+                case "cells_per_obstacle_decoration":
+                    cells_per_obstacle_decoration = NonNegative(Int(row), row.key);
+                    break;
+                case "prop_scale_range":
+                    prop_scale_range = Ratio(Float(row), row.key);
+                    break;
+                case "cells_per_floating_decoration":
+                    cells_per_floating_decoration = NonNegative(Int(row), row.key);
+                    break;
+                case "cells_per_fish_school":
+                    cells_per_fish_school = NonNegative(Int(row), row.key);
+                    break;
+                case "floating_extra_height":
+                    floating_extra_height = NonNegative(Float(row), row.key);
+                    break;
+                default:
+                    throw new FormatException($"[配表] {FileName} 的行「{row.key}」没有对应的静态字段");
+            }
+        }
+
+        private static string[] Tokens(TerrainGenerationConfig row)
+        {
+            if (row.value.Length == 0)
+                throw new FormatException($"[配表] {FileName} 的行「{row.key}」value 不能为空");
+            return row.value.Split('|');
+        }
+
+        private static int Int(TerrainGenerationConfig row)
+        {
+            string[] tokens = Tokens(row);
+            if (tokens.Length != 1 ||
+                !int.TryParse(tokens[0].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int value))
+                throw new FormatException($"[配表] {FileName} 的行「{row.key}」value 必须是单个整数：「{row.value}」");
+            return value;
+        }
+
+        private static float Float(TerrainGenerationConfig row)
+        {
+            string[] tokens = Tokens(row);
+            if (tokens.Length != 1 ||
+                !float.TryParse(tokens[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float value))
+                throw new FormatException($"[配表] {FileName} 的行「{row.key}」value 必须是单个数值：「{row.value}」");
+            return value;
+        }
+
+        // 开关行：1/0（也接受 true/false）
+        private static bool Bool(TerrainGenerationConfig row)
+        {
+            string raw = Tokens(row)[0].Trim();
+            if (raw == "1") return true;
+            if (raw == "0") return false;
+            if (bool.TryParse(raw, out bool value)) return value;
+            throw new FormatException($"[配表] {FileName} 的行「{row.key}」value 必须是 1 或 0：「{row.value}」");
+        }
+
+        private static int Positive(int value, string key)
+        {
+            if (value <= 0) throw new FormatException($"[配表] {FileName} 的行「{key}」必须大于 0：{value}");
+            return value;
+        }
+
+        private static float Positive(float value, string key)
+        {
+            if (value <= 0f) throw new FormatException($"[配表] {FileName} 的行「{key}」必须大于 0：{value}");
+            return value;
+        }
+
+        private static int NonNegative(int value, string key)
+        {
+            if (value < 0) throw new FormatException($"[配表] {FileName} 的行「{key}」不能为负：{value}");
+            return value;
+        }
+
+        private static float NonNegative(float value, string key)
+        {
+            if (value < 0f) throw new FormatException($"[配表] {FileName} 的行「{key}」不能为负：{value}");
+            return value;
+        }
+
+        private static float Ratio(float value, string key)
+        {
+            if (value < 0f || value > 1f)
+                throw new FormatException($"[配表] {FileName} 的行「{key}」必须是 0~1 的概率：{value}");
+            return value;
         }
     }
     #endregion

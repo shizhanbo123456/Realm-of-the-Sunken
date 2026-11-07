@@ -64,7 +64,7 @@ namespace TerrainGen
             if (settings == null) return null;
 
             var field = new BuildingField();
-            field.Generate(settings, settings.seed);
+            field.Generate(settings.seed);
             return TerrainAssembler.BuildPlan(field, settings, kit);
         }
     }

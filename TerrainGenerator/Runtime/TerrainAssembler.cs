@@ -2,6 +2,8 @@ using UnityEngine;
 
 namespace TerrainGen
 {
+    using Gen = ConfigManager.TerrainGenerationConfig;
+
     public static class TerrainAssembler
     {
         public const string RootName = "TerrainRoot";
@@ -25,16 +27,16 @@ namespace TerrainGen
             {
                 seed = s.seed,
                 configVersion = s.version,
-                cellSize = s.cellSize,
-                groundHeight = s.groundHeight,
+                cellSize = Gen.cell_size,
+                groundHeight = Gen.ground_height,
                 sizeX = field.SizeX,
                 sizeZ = field.SizeZ,
             };
 
             if (kit != null)
             {
-                BuildingDecorator.BuildPlan(field, s, kit, data.items);
-                PropPlacer.PlacePlan(field, s, kit, data.items);
+                BuildingDecorator.BuildPlan(field, kit, data.items);
+                PropPlacer.PlacePlan(field, kit, data.items, s.seed);
             }
 
             data.points.AddRange(field.Points);

@@ -3,17 +3,19 @@ using UnityEngine;
 
 namespace TerrainGen
 {
-    // 只按约定产出摆放数据：地面 6×6×4、原点在底面中心；围墙 6 米长、默认沿 Z 延伸
+    using Gen = ConfigManager.TerrainGenerationConfig;
+
+    // 只按约定产出摆放数据：地面以 cell_size 见方、底面中心对齐格心；围墙沿 cell_size 边长、默认沿 Z 延伸
     public static class BuildingDecorator
     {
-        public static int BuildPlan(BuildingField f, BuildingSettings s, BuildingKitSet kit, List<TerrainItemData> items)
+        public static int BuildPlan(BuildingField f, BuildingKitSet kit, List<TerrainItemData> items)
         {
             if (kit == null) return 0;
 
-            float c = s.cellSize;
+            float c = Gen.cell_size;
             float ox = (f.SizeX - 1) * 0.5f * c;
             float oz = (f.SizeZ - 1) * 0.5f * c;
-            float surface = s.groundHeight;
+            float surface = Gen.ground_height;
             int count = 0;
 
             // 地面：每格一块，底面中心对齐格子中心
