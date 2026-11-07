@@ -15,6 +15,7 @@ namespace TerrainGen.EditorTools
         BuildingField field;
         bool dirty;
         bool showSettings = true;
+        float minRegionAreaM2; // 0 = 用项目 NavMeshAreas 的设置；>0 时覆盖 minRegionArea
         Texture2D preview;
         Vector2 scroll;
         string summary;
@@ -72,7 +73,13 @@ namespace TerrainGen.EditorTools
                 EditorGUILayout.HelpBox(summary, summaryIsError ? MessageType.Error : MessageType.Info);
 
             EditorGUILayout.Space(4);
-            if (GUILayout.Button("烘焙 NavMesh（要求空场景，按真实网格生成）", GUILayout.Height(24))) BakeNavMesh();
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                minRegionAreaM2 = EditorGUILayout.FloatField("最小区域面积(m²)", minRegionAreaM2);
+                if (GUILayout.Button("烘焙 NavMesh（要求空场景，按真实网格生成）", GUILayout.Height(24))) BakeNavMesh();
+            }
+            EditorGUILayout.LabelField("0 = 用项目 NavMeshAreas 里的 minRegionArea；大于 0 时按该面积换算成体素² 覆盖",
+                EditorStyles.wordWrappedMiniLabel);
 
             scroll = EditorGUILayout.BeginScrollView(scroll, GUILayout.ExpandHeight(true));
 
@@ -311,6 +318,15 @@ namespace TerrainGen.EditorTools
                 return false;
             }
 
+            // 项目设置里的 minRegionArea 在 Navigation 面板上没暴露，这里按 m² 换算成体素² 覆盖
+            int minRegion = build.minRegionArea;
+            if (minRegionAreaM2 > 0f)
+            {
+                float cellArea = build.cellSize * build.cellSize;
+                minRegion = Mathf.Max(1, Mathf.RoundToInt(minRegionAreaM2 / cellArea));
+                build.minRegionArea = minRegion;
+            }
+
             // 按真实网格烘：取生成物下所有 MeshFilter，门洞、柱隙、栏杆镂空都能保真。
             // 不用 CollectSources(PhysicsColliders)：编辑器态刚生成的碰撞体还没同步进物理场景，会收错；
             // 也不用 BoxCollider 包围盒：每个物件糊成一个实心块，通道全没了。
@@ -359,7 +375,8 @@ namespace TerrainGen.EditorTools
             }
 
             string path = SaveNavMeshAsset(data);
-            message = $"NavMesh 已烘焙：{sources.Count} 个网格、范围 X {bounds.min.x:0}~{bounds.max.x:0} / Z {bounds.min.z:0}~{bounds.max.z:0} → {path}";
+            message = $"NavMesh 已烘焙：{sources.Count} 个网格、范围 X {bounds.min.x:0}~{bounds.max.x:0} / Z {bounds.min.z:0}~{bounds.max.z:0}、"
+                      + $"minRegionArea {minRegion} 体素²（≈{minRegion * build.cellSize * build.cellSize:0.#} m²）→ {path}";
             return true;
         }
 
