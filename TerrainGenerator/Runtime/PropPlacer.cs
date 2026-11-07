@@ -210,12 +210,12 @@ namespace TerrainGen
         static int PlaceObstacleDecor(BuildingField f, BuildingKitSet kit, List<TerrainItemData> items,
             float ox, float oz, System.Random rng)
         {
-            if (kit.obstacleDecorations.Count == 0 || Gen.cells_per_obstacleDecoration <= 0) return 0;
+            if (kit.obstacleDecorations.Count == 0 || Gen.cells_per_obstacle_decoration <= 0) return 0;
 
             List<Vector2Int> voids = CollectVoidCells(f);
             if (voids.Count == 0) return 0;
 
-            int target = Mathf.Max(1, Mathf.RoundToInt(voids.Count / (float)Gen.cells_per_obstacleDecoration));
+            int target = Mathf.Max(1, Mathf.RoundToInt(voids.Count / (float)Gen.cells_per_obstacle_decoration));
             int made = 0;
 
             for (int i = 0; i < target * 40 + 200 && made < target; i++)
