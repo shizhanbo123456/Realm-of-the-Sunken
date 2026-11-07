@@ -136,9 +136,9 @@ public static class EntityHeadshotMenu
             // 水平方向取实体根位置（本地 x/z = 0），包围盒偏心会让角色偏出画面中心
             Vector3 center = info.transform.TransformPoint(new Vector3(0f, info.yRange.y, 0f));
 
-            // 角色面朝 -X：相机从 -X 侧平视取景中心
-            cam.transform.SetPositionAndRotation(center - Vector3.right * (side * CameraGap),
-                Quaternion.LookRotation(Vector3.right, Vector3.up));
+            // 角色面朝 +Z：相机从 +Z 侧平视取景中心
+            cam.transform.SetPositionAndRotation(center + Vector3.forward * (side * CameraGap),
+                Quaternion.LookRotation(Vector3.back, Vector3.up));
             cam.orthographicSize = side * 0.5f;
             cam.nearClipPlane = side * CameraGap * 0.5f;
             cam.farClipPlane = side * CameraGap * 1.5f;
@@ -173,13 +173,14 @@ public static class EntityHeadshotMenu
         return cam;
     }
 
+    // 打光按角色面朝 +Z 布置：主光在 +Z 前上方偏 -X，补光在 +Z 前下方偏 +X，轮廓光在身后
     private static Light[] CreateLights()
     {
         return new[]
         {
-            NewLight("Key", new Vector3(1f, -0.85f, 0.5f), 1.0f),
-            NewLight("Fill", new Vector3(1f, -0.25f, -0.9f), 0.45f),
-            NewLight("Rim", new Vector3(-0.8f, -0.2f, 0.6f), 0.35f),
+            NewLight("Key", new Vector3(0.5f, -0.85f, -1f), 1.0f),
+            NewLight("Fill", new Vector3(-0.9f, -0.25f, -1f), 0.45f),
+            NewLight("Rim", new Vector3(0.6f, -0.2f, 0.8f), 0.35f),
         };
     }
 
