@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.AI;
+using UnityEngine.SceneManagement;
 
 namespace TerrainGen.EditorTools
 {
@@ -68,6 +70,9 @@ namespace TerrainGen.EditorTools
 
             if (!string.IsNullOrEmpty(summary))
                 EditorGUILayout.HelpBox(summary, summaryIsError ? MessageType.Error : MessageType.Info);
+
+            EditorGUILayout.Space(4);
+            if (GUILayout.Button("烘焙 NavMesh（要求空场景，烘完自动清空临时地形）", GUILayout.Height(24))) BakeNavMesh();
 
             scroll = EditorGUILayout.BeginScrollView(scroll, GUILayout.ExpandHeight(true));
 
@@ -202,6 +207,14 @@ namespace TerrainGen.EditorTools
         void GenerateIntoScene()
         {
             report.Clear();
+            if (!EnsureConfig(out string configError))
+            {
+                summary = "烘焙失败：" + configError;
+                summaryIsError = true;
+                Log(summary);
+                return;
+            }
+
             int cells = ConfigManager.TerrainGenerationConfig.map_cells_xz;
             if (field == null || dirty || field.SizeX != cells || field.SizeZ != cells) Rebuild();
 
@@ -219,6 +232,186 @@ namespace TerrainGen.EditorTools
                       + "；进播放模式后由 Culler 按区块动态生成";
             summaryIsError = false;
             Log(summary);
+        }
+
+        // 烘导航数据：先确认场景里没有别的网格/碰撞体，再按服务器那套铺一次地形来烘，烘完清掉
+        void BakeNavMesh()
+        {
+            report.Clear();
+
+            if (Application.isPlaying)
+            {
+                summary = "烘焙终止：请退出播放模式再烘 NavMesh。";
+                summaryIsError = true;
+                Log(summary);
+                return;
+            }
+
+            if (!TryCheckSceneClean(out string blocked))
+            {
+                summary = "烘焙终止：场景里还有其它网格或碰撞体，先清空场景再烘。\n" + blocked;
+                summaryIsError = true;
+                Log(summary);
+                return;
+            }
+
+            if (!EnsureConfig(out string configError))
+            {
+                summary = "烘焙失败：" + configError;
+                summaryIsError = true;
+                Log(summary);
+                return;
+            }
+
+            if (kit == null)
+            {
+                summary = "烘焙失败：未指定素材表";
+                summaryIsError = true;
+                Log(summary);
+                return;
+            }
+
+            TerrainPlanData data = TerrainGenerator.BuildData(settings, kit);
+            if (data == null)
+            {
+                summary = "烘焙失败：无法构建摆放数据，检查生成参数与素材表";
+                summaryIsError = true;
+                Log(summary);
+                return;
+            }
+
+            var root = new GameObject("NavMeshBakeRoot");
+            root.transform.position = Vector3.zero;
+
+            bool ok;
+            string message;
+            try
+            {
+                TerrainAssembler.SpawnColliderOnly(data, kit, root.transform);
+                ok = TryBakeNavMesh(root.transform, out message);
+            }
+            finally
+            {
+                DestroyImmediate(root); // 烘完立刻清掉临时地形，场景回到干净状态
+            }
+
+            summary = message;
+            summaryIsError = !ok;
+            Log(summary);
+        }
+
+        bool TryBakeNavMesh(Transform root, out string message)
+        {
+            message = string.Empty;
+
+            NavMeshBuildSettings build = NavMesh.GetSettingsByID(0);
+            if (build.agentTypeID < 0)
+            {
+                message = "烘焙失败：项目里没有 AgentType 0 的导航设置（菜单 Window > AI > Navigation）";
+                return false;
+            }
+
+            Bounds bounds = BakeBounds(root);
+            var sources = new List<NavMeshBuildSource>();
+            NavMeshBuilder.CollectSources(bounds, ~0, NavMeshCollectGeometry.PhysicsColliders, 0,
+                new List<NavMeshBuildMarkup>(), sources);
+            if (sources.Count == 0)
+            {
+                message = "烘焙失败：收集到的碰撞几何为 0，检查素材表里的地面预制体是否有启用的碰撞体";
+                return false;
+            }
+
+            NavMeshData data = NavMeshBuilder.BuildNavMeshData(build, sources, bounds, root.position, Quaternion.identity);
+            if (data == null)
+            {
+                message = "烘焙失败：BuildNavMeshData 返回空";
+                return false;
+            }
+
+            string path = SaveNavMeshAsset(data);
+            message = $"NavMesh 已烘焙：{sources.Count} 个碰撞几何、包围盒 {bounds.size.x:0}×{bounds.size.z:0}m → {path}；"
+                      + "运行时由 TerrainNavMesh 从 Resources 加载";
+            return true;
+        }
+
+        // 只按生成物自己的碰撞体算包围盒，别把场景里的其它东西包进来
+        static Bounds BakeBounds(Transform root)
+        {
+            Collider[] colliders = root.GetComponentsInChildren<Collider>(true);
+            if (colliders.Length == 0) return new Bounds(root.position, Vector3.one);
+
+            Bounds bounds = colliders[0].bounds;
+            for (int i = 1; i < colliders.Length; i++) bounds.Encapsulate(colliders[i].bounds);
+            bounds.Expand(2f); // 留出 agent 半径余量
+            return bounds;
+        }
+
+        static string SaveNavMeshAsset(NavMeshData data)
+        {
+            if (!AssetDatabase.IsValidFolder("Assets/Resources")) AssetDatabase.CreateFolder("Assets", "Resources");
+            if (!AssetDatabase.IsValidFolder(TerrainNavMesh.Folder)) AssetDatabase.CreateFolder("Assets/Resources", "Nav");
+
+            string path = TerrainNavMesh.Folder + "/" + TerrainNavMesh.AssetName + ".asset";
+            AssetDatabase.DeleteAsset(path);
+            AssetDatabase.CreateAsset(data, path);
+            AssetDatabase.SaveAssets();
+            return path;
+        }
+
+        // 场景必须干净：任何网格或碰撞体都会污染烘焙结果（含上次运行留下的地形、预览内容）
+        static bool TryCheckSceneClean(out string detail)
+        {
+            var meshes = new List<string>();
+            var colliders = new List<string>();
+
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+            {
+                Scene scene = SceneManager.GetSceneAt(i);
+                if (!scene.isLoaded) continue;
+
+                foreach (GameObject sceneRoot in scene.GetRootGameObjects())
+                {
+                    foreach (MeshFilter filter in sceneRoot.GetComponentsInChildren<MeshFilter>(true)) meshes.Add(filter.name);
+                    foreach (SkinnedMeshRenderer skin in sceneRoot.GetComponentsInChildren<SkinnedMeshRenderer>(true)) meshes.Add(skin.name);
+                    foreach (Terrain terrain in sceneRoot.GetComponentsInChildren<Terrain>(true)) meshes.Add(terrain.name);
+                    foreach (Collider collider in sceneRoot.GetComponentsInChildren<Collider>(true)) colliders.Add(collider.name);
+                }
+            }
+
+            if (meshes.Count == 0 && colliders.Count == 0)
+            {
+                detail = string.Empty;
+                return true;
+            }
+
+            detail = $"场景里还有网格 {meshes.Count} 个、碰撞体 {colliders.Count} 个"
+                     + (meshes.Count > 0 ? $"，例如「{meshes[0]}」" : $"，例如「{colliders[0]}」");
+            return false;
+        }
+
+        // 编辑器非播放态 ConfigManager.Awake 不会跑，配表静态字段还是 0 时整张图会塌到原点
+        static bool EnsureConfig(out string error)
+        {
+            if (ConfigManager.TerrainGenerationConfig.cell_size > 0f)
+            {
+                error = string.Empty;
+                return true;
+            }
+
+            try
+            {
+                ConfigManager.LoadAll();
+            }
+            catch (System.Exception e)
+            {
+                error = "配表加载失败：" + e.Message;
+                return false;
+            }
+
+            error = ConfigManager.TerrainGenerationConfig.cell_size > 0f
+                ? string.Empty
+                : "terrain_generation 配表里没有有效数据";
+            return error.Length == 0;
         }
 
         void ClearScene()

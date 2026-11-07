@@ -91,12 +91,19 @@ namespace TerrainGen
             {
                 GameObject child = go.transform.GetChild(i).gameObject;
                 child.SetActive(false);
-                Object.Destroy(child);
+                Kill(child);
             }
             foreach (MeshRenderer renderer in go.GetComponents<MeshRenderer>())
             {
-                Object.Destroy(renderer);
+                Kill(renderer);
             }
+        }
+
+        // 编辑器里烘焙导航时会走同一套铺设，Destroy 在非播放态不生效
+        static void Kill(Object target)
+        {
+            if (Application.isPlaying) Object.Destroy(target);
+            else Object.DestroyImmediate(target);
         }
 
         // 点位标记：空物体 + Gizmo，客户端与服务器都要，供调试与战斗逻辑读坐标

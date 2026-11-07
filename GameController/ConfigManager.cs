@@ -21,7 +21,10 @@ public class ConfigManager : MonoBehaviour
         Load();
     }
 
-    public void Load()
+    public void Load() => LoadAll();
+
+    // 静态入口：编辑器工具在非播放态也要读配表（Awake 不会跑）
+    public static void LoadAll()
     {
         string dir = Path.Combine(Application.streamingAssetsPath, ConfigDirName);
 

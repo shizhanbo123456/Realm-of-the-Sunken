@@ -22,6 +22,7 @@ namespace TerrainGen
             culler.Initialize(data, kit, contentRoot);
 
             TerrainAssembler.CreatePoints(data, contentRoot);
+            TerrainNavMesh.Attach(contentRoot);
             return culler;
         }
 
@@ -36,6 +37,7 @@ namespace TerrainGen
             contentRoot = CreateRoot();
             TerrainAssembler.SpawnColliderOnly(data, kit, contentRoot);
             TerrainAssembler.CreatePoints(data, contentRoot);
+            TerrainNavMesh.Attach(contentRoot);
         }
 
         // 数据本身即地图坐标（最小角落在 MapMin），内容根不做平移
