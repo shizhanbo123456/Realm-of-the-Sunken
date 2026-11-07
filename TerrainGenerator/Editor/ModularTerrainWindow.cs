@@ -365,11 +365,12 @@ namespace TerrainGen.EditorTools
             }
 
             bounds.Expand(2f); // 留出 agent 半径余量
-            // Y 只留地面附近：高空摆件不参与地面寻路，带着会把体素量拉爆
+            // Y 只留「地面 + 一个 agent 高」：屋檐、屋顶、岩石顶都在这个体积之上，不进来就不会烘出孤岛；
+            // 围栏/立柱/建筑下段仍在体积内，照样当障碍用
             Vector3 min = bounds.min;
             Vector3 max = bounds.max;
-            min.y = groundY - 6f;
-            max.y = groundY + 6f;
+            min.y = groundY - 1f;
+            max.y = groundY + Mathf.Max(build.agentHeight, 1f);
             bounds.SetMinMax(min, max);
 
             NavMeshData data = NavMeshBuilder.BuildNavMeshData(build, sources, bounds, Vector3.zero, Quaternion.identity);
@@ -381,7 +382,7 @@ namespace TerrainGen.EditorTools
 
             string path = SaveNavMeshAsset(data);
             message = $"NavMesh 已烘焙：{sources.Count} 个网格、范围 X {bounds.min.x:0}~{bounds.max.x:0} / Z {bounds.min.z:0}~{bounds.max.z:0}、"
-                      + $"minRegionArea {minRegion:0} 体素²（≈{minRegion * build.voxelSize * build.voxelSize:0.#} m²）→ {path}";
+                      + $"Y {bounds.min.y:0.#}~{bounds.max.y:0.#}、minRegionArea {minRegion:0} 体素²（≈{minRegion * build.voxelSize * build.voxelSize:0.#} m²）→ {path}";
             return true;
         }
 
