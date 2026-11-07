@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace TerrainGen
 {
-    // 显隐控制器：自身不含任何子物体；按间隔、且仅在位置变化时重新判定区块显隐
+    // 显隐控制器：自身不含子物体；区块进入视野时从池里取物件，离开时归还，全程不销毁
     public class TerrainPropCuller : MonoBehaviour
     {
         [Tooltip("可见半径（米），以本物体为中心；建议比相机可视范围略大")]
@@ -15,19 +15,33 @@ namespace TerrainGen
         [Tooltip("静默阈值（米）：位置移动小于该值视为静止，本轮不做任何判定")]
         public float quietDistance = 1f;
 
-        readonly List<GameObject> chunks = new List<GameObject>();
-        readonly Dictionary<Vector2Int, int> chunkIds = new Dictionary<Vector2Int, int>();
+        struct ItemDef
+        {
+            public TerrainItemKind kind;
+            public int prefabIndex;
+            public Vector3 position;   // 相对内容根
+            public float yaw;
+            public float scale;
+        }
 
+        static readonly Vector2Int OutOfMapKey = new Vector2Int(int.MinValue, int.MinValue);
+
+        readonly Dictionary<Vector2Int, List<ItemDef>> chunkDefs = new Dictionary<Vector2Int, List<ItemDef>>();
+        readonly Dictionary<Vector2Int, List<GameObject>> liveChunks = new Dictionary<Vector2Int, List<GameObject>>();
+        readonly Dictionary<Vector2Int, Transform> chunkRoots = new Dictionary<Vector2Int, Transform>();
+        readonly Dictionary<GameObject, Stack<GameObject>> free = new Dictionary<GameObject, Stack<GameObject>>();
+        readonly Dictionary<GameObject, GameObject> instancePrefabs = new Dictionary<GameObject, GameObject>();
+
+        BuildingKitSet kit;
         Transform contentRoot;
-        Transform outOfMapRoot;
-        bool warnedOutOfMap;
+        Transform poolRoot;
         float timer;
         Vector3 lastCheckPos;
         float lastRadius = float.NaN;
 
+        // 已创建过的实例总数（在场景里的 + 池里的）
         public int InstanceCount { get; private set; }
 
-        // 地形实例的挂载点（TerrainRoot），与本物体无父子关系，移动本物体不会带走地形
         public Transform ContentRoot => contentRoot;
 
         public void Initialize(TerrainPlanData data, BuildingKitSet kit, Transform content)
@@ -48,35 +62,54 @@ namespace TerrainGen
                 return;
             }
 
+            this.kit = kit;
             contentRoot = content;
 
+            var pool = new GameObject("Pool");
+            pool.transform.SetParent(contentRoot, false);
+            poolRoot = pool.transform;
+
+            bool warnedOutOfMap = false;
             for (int i = 0; i < data.items.Count; i++)
             {
                 TerrainItemData item = data.items[i];
-                GameObject prefab = kit.GetPrefab(item.kind, item.prefabIndex);
-                if (prefab == null) continue;
+                Vector2Int chunk = ChunkSearcher<GameObject>.GetChunkIndex(contentRoot.position + item.position);
+                if (chunk == ChunkSearcher<GameObject>.OutOfMapChunk)
+                {
+                    if (!warnedOutOfMap)
+                    {
+                        Debug.LogWarning("[地形] 有物件落在地图范围外，这些物件常驻显示", this);
+                        warnedOutOfMap = true;
+                    }
+                    chunk = OutOfMapKey;
+                }
 
-                Vector3 world = contentRoot.position + item.position;
-                Transform parent = GetChunkRoot(world);
-                var go = (GameObject)Object.Instantiate(prefab, parent);
-                go.name = item.kind + "_" + prefab.name;
-                go.transform.position = world;
-                go.transform.rotation = Quaternion.Euler(0f, item.yaw, 0f);
-                go.transform.localScale = Vector3.one * item.scale;
-                InstanceCount++;
+                if (!chunkDefs.TryGetValue(chunk, out List<ItemDef> list))
+                {
+                    list = new List<ItemDef>();
+                    chunkDefs[chunk] = list;
+                }
+
+                list.Add(new ItemDef
+                {
+                    kind = item.kind,
+                    prefabIndex = item.prefabIndex,
+                    position = item.position,
+                    yaw = item.yaw,
+                    scale = item.scale,
+                });
             }
 
             CreatePoints(data);
 
-            if (chunks.Count == 0)
+            if (chunkDefs.Count == 0)
             {
-                Debug.LogError($"[地形] 没有任何物件落入区块：地图边长 {Landscape.MapSize}，区块数 {Landscape.chunkCount}，"
-                               + $"内容根 {contentRoot.position}，剔除无法生效", this);
+                Debug.LogError("[地形] 没有任何区块被创建，剔除无法生效", this);
             }
             else if (!AnyChunkOutside(transform.position))
             {
-                Debug.LogWarning($"[地形] 判定半径 {visibleDistance + Landscape.chunkSize:0}m 覆盖了全部 {chunks.Count} 个区块，"
-                                 + $"当前不会隐藏任何区块（visibleDistance = {visibleDistance}），需要调小半径或移动本物体", this);
+                Debug.LogWarning($"[地形] 判定半径 {visibleDistance + Landscape.chunkSize:0}m 覆盖了全部 {chunkDefs.Count} 个区块，"
+                                 + $"当前不会回收任何区块（visibleDistance = {visibleDistance}），需要调小半径或移动本物体", this);
             }
 
             lastCheckPos = transform.position;
@@ -87,7 +120,7 @@ namespace TerrainGen
         // 按间隔判定；未到间隔、或位置没动且半径没变时直接 return，不做任何计算
         void LateUpdate()
         {
-            if (chunks.Count == 0) return;
+            if (chunkDefs.Count == 0) return;
 
             timer += Time.unscaledDeltaTime;
             if (timer < checkInterval) return;
@@ -102,37 +135,118 @@ namespace TerrainGen
             SyncVisibility(pos);
         }
 
-        // 逐块比对目标状态，不做增量记录，避免状态不同步导致"只开不关"
+        // 只处理状态翻转的区块：进视野整块取用，出视野整块归还
         void SyncVisibility(Vector3 center)
         {
             float radiusSq = RadiusSquared;
 
-            for (int i = 0; i < chunks.Count; i++)
+            foreach (KeyValuePair<Vector2Int, List<ItemDef>> pair in chunkDefs)
             {
-                GameObject chunk = chunks[i];
-                if (chunk == null) continue;
+                Vector2Int key = pair.Key;
+                bool visible = key == OutOfMapKey || ChunkDistanceSq(key, center) <= radiusSq;
+                bool loaded = liveChunks.ContainsKey(key);
+                if (visible == loaded) continue;
 
-                Vector3 pos = chunk.transform.position;
-                float dx = pos.x - center.x;
-                float dz = pos.z - center.z;
-                bool visible = dx * dx + dz * dz <= radiusSq;
-                if (chunk.activeSelf != visible) chunk.SetActive(visible);
+                if (visible) LoadChunk(key, pair.Value);
+                else UnloadChunk(key);
             }
+        }
+
+        void LoadChunk(Vector2Int key, List<ItemDef> defs)
+        {
+            Transform root = GetChunkRoot(key);
+            var list = new List<GameObject>(defs.Count);
+            Vector3 rootPos = contentRoot.position;
+
+            for (int i = 0; i < defs.Count; i++)
+            {
+                ItemDef def = defs[i];
+                GameObject prefab = kit.GetPrefab(def.kind, def.prefabIndex);
+                if (prefab == null) continue;
+
+                GameObject go = Take(prefab, root);
+                go.name = def.kind + "_" + prefab.name;
+                go.transform.position = rootPos + def.position;
+                go.transform.rotation = Quaternion.Euler(0f, def.yaw, 0f);
+                go.transform.localScale = Vector3.one * def.scale;
+                go.SetActive(true);
+                list.Add(go);
+            }
+
+            liveChunks[key] = list;
+        }
+
+        void UnloadChunk(Vector2Int key)
+        {
+            if (!liveChunks.TryGetValue(key, out List<GameObject> list)) return;
+            for (int i = 0; i < list.Count; i++) Return(list[i]);
+            liveChunks.Remove(key);
+        }
+
+        GameObject Take(GameObject prefab, Transform parent)
+        {
+            if (free.TryGetValue(prefab, out Stack<GameObject> stack) && stack.Count > 0)
+            {
+                GameObject reused = stack.Pop();
+                reused.transform.SetParent(parent, false);
+                return reused;
+            }
+
+            GameObject created = Instantiate(prefab, parent);
+            created.SetActive(false);
+            instancePrefabs[created] = prefab;
+            InstanceCount++;
+            return created;
+        }
+
+        void Return(GameObject go)
+        {
+            if (go == null) return;
+            go.SetActive(false);
+            go.transform.SetParent(poolRoot, false);
+            if (!instancePrefabs.TryGetValue(go, out GameObject prefab)) return;
+
+            if (!free.TryGetValue(prefab, out Stack<GameObject> stack))
+            {
+                stack = new Stack<GameObject>();
+                free[prefab] = stack;
+            }
+            stack.Push(go);
+        }
+
+        Transform GetChunkRoot(Vector2Int chunk)
+        {
+            if (chunkRoots.TryGetValue(chunk, out Transform root) && root != null) return root;
+
+            var go = new GameObject(chunk == OutOfMapKey ? "OutOfMap" : $"Chunk_{chunk.x}_{chunk.y}");
+            go.transform.SetParent(contentRoot, false);
+            go.transform.position = chunk == OutOfMapKey
+                ? contentRoot.position
+                : new Vector3(
+                    (chunk.x + 0.5f) * Landscape.chunkSize,
+                    contentRoot.position.y,
+                    (chunk.y + 0.5f) * Landscape.chunkSize);
+
+            chunkRoots[chunk] = go.transform;
+            return go.transform;
+        }
+
+        float ChunkDistanceSq(Vector2Int chunk, Vector3 center)
+        {
+            float cx = (chunk.x + 0.5f) * Landscape.chunkSize;
+            float cz = (chunk.y + 0.5f) * Landscape.chunkSize;
+            float dx = cx - center.x;
+            float dz = cz - center.z;
+            return dx * dx + dz * dz;
         }
 
         bool AnyChunkOutside(Vector3 center)
         {
             float radiusSq = RadiusSquared;
-
-            for (int i = 0; i < chunks.Count; i++)
+            foreach (Vector2Int chunk in chunkDefs.Keys)
             {
-                GameObject chunk = chunks[i];
-                if (chunk == null) continue;
-
-                Vector3 pos = chunk.transform.position;
-                float dx = pos.x - center.x;
-                float dz = pos.z - center.z;
-                if (dx * dx + dz * dz > radiusSq) return true;
+                if (chunk == OutOfMapKey) continue;
+                if (ChunkDistanceSq(chunk, center) > radiusSq) return true;
             }
             return false;
         }
@@ -144,39 +258,6 @@ namespace TerrainGen
                 float radius = visibleDistance + Landscape.chunkSize;
                 return radius * radius;
             }
-        }
-
-        Transform GetChunkRoot(Vector3 world)
-        {
-            Vector2Int chunk = ChunkSearcher<GameObject>.GetChunkIndex(world);
-            if (chunk == ChunkSearcher<GameObject>.OutOfMapChunk)
-            {
-                if (!warnedOutOfMap)
-                {
-                    Debug.LogWarning("[地形] 有物件落在地图范围外，这些物件不参与区块剔除（始终显示）", this);
-                    warnedOutOfMap = true;
-                }
-                if (outOfMapRoot == null)
-                {
-                    var go = new GameObject("OutOfMap");
-                    go.transform.SetParent(contentRoot, false);
-                    outOfMapRoot = go.transform;
-                }
-                return outOfMapRoot;
-            }
-
-            if (chunkIds.TryGetValue(chunk, out int index)) return chunks[index].transform;
-
-            var chunkGo = new GameObject($"Chunk_{chunk.x}_{chunk.y}");
-            chunkGo.transform.SetParent(contentRoot, false);
-            chunkGo.transform.position = new Vector3(
-                (chunk.x + 0.5f) * Landscape.chunkSize,
-                contentRoot.position.y,
-                (chunk.y + 0.5f) * Landscape.chunkSize);
-
-            chunkIds[chunk] = chunks.Count;
-            chunks.Add(chunkGo);
-            return chunkGo.transform;
         }
 
         void CreatePoints(TerrainPlanData data)
