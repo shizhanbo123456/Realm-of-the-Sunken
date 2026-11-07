@@ -227,7 +227,14 @@ namespace TerrainGen.EditorTools
             TerrainPropCuller[] cullers = Object.FindObjectsOfType<TerrainPropCuller>();
             if (cullers.Length == 0)
             {
-                summary = "场景里没有地形节点。";
+                // 服务器地形只有内容根、没有 Culler
+                GameObject root = GameObject.Find(TerrainAssembler.RootName);
+                if (root != null)
+                {
+                    Undo.DestroyObjectImmediate(root);
+                    summary = "已删除 1 个地形内容根（服务器地形没有 Culler）。";
+                }
+                else summary = "场景里没有地形节点。";
                 summaryIsError = false;
                 return;
             }

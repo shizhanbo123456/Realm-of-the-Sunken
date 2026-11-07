@@ -9,13 +9,14 @@ namespace TerrainGen
         public BuildingKitSet kit;
 
         TerrainPropCuller culler;
+        Transform contentRoot;
 
         void Awake()
         {
             Tool.ModularTerrainGenerator = this;
         }
 
-        // 服务器启动即常驻整张地形：只放有启用碰撞体的类别，地面射线与点位才覆盖全图
+        // 服务器启动即常驻整张地形：只放有启用碰撞体的类别，且除地面外只留碰撞体，供地面射线与点位使用
         void Start()
         {
             if (Tool.Instance == null)
@@ -23,12 +24,12 @@ namespace TerrainGen
                 Debug.LogError("[地形] 场景缺少 Tool，无法判定服务器/客户端：地形未生成", this);
                 return;
             }
-            if (Tool.Instance.isServer) Generate(culled: false, colliderOnly: true, stripToCollider: true);
+            if (Tool.Instance.isServer) GenerateServer();
         }
 
+        // 客户端：建内容根与点位，物件交给 Culler 按区块流式取还
         // 编辑器非播放态：只把数据烘焙到 StreamingAssets/TerrainGenerator 并返回 null
-        // 播放态：优先读缓存数据，缺失则运行期生成，返回挂好数据的 Culler
-        public TerrainPropCuller Generate(bool culled = true, bool colliderOnly = false)
+        public TerrainPropCuller Generate()
         {
             if (settings == null)
             {
@@ -37,24 +38,40 @@ namespace TerrainGen
             }
 
             Clear();
-            culler = TerrainGenerator.Generate(settings, kit, culled, colliderOnly);
+            culler = TerrainGenerator.Generate(settings, kit, out contentRoot);
             return culler;
+        }
+
+        // 服务器：一次性铺设整张地形，不建 Culler（服务器不做剔除）
+        public void GenerateServer()
+        {
+            if (settings == null)
+            {
+                Debug.LogError("[地形] 未指定生成参数 BuildingSettings", this);
+                return;
+            }
+
+            Clear();
+            TerrainGenerator.GenerateServer(settings, kit, out contentRoot);
         }
 
         public void Clear()
         {
             TerrainSpawns.Reset();
 
-            // Culler 与内容根都是场景根物体，两处都要清；靠 Culler 上记录的 ContentRoot 找到内容
+            // 客户端的内容根记在 Culler 上，服务器没有 Culler，记在自己身上
+            Transform content = contentRoot;
+            contentRoot = null;
+
             TerrainPropCuller[] found = FindObjectsOfType<TerrainPropCuller>();
             for (int i = 0; i < found.Length; i++)
             {
-                TerrainPropCuller item = found[i];
-                if (item == null) continue;
-                Transform content = item.ContentRoot;
-                DestroyNode(item.gameObject);
-                if (content != null) DestroyNode(content.gameObject);
+                if (found[i] == null) continue;
+                if (content == null) content = found[i].ContentRoot;
+                DestroyNode(found[i].gameObject);
             }
+
+            if (content != null) DestroyNode(content.gameObject);
             culler = null;
         }
 
@@ -65,5 +82,8 @@ namespace TerrainGen
         }
 
         public TerrainPropCuller Culler => culler;
+
+        // 服务器没有 Culler，清理与显隐都靠这一份内容根
+        public Transform ContentRoot => contentRoot;
     }
 }

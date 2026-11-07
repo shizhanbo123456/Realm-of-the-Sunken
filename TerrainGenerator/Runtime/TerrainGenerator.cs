@@ -5,8 +5,48 @@ namespace TerrainGen
     // 生成入口：编辑器非播放态只烘焙数据到 StreamingAssets；播放态优先读缓存，缺失才运行期生成
     public static class TerrainGenerator
     {
-        public static TerrainPropCuller Generate(BuildingSettings settings, BuildingKitSet kit, bool culled = true,
-            bool colliderOnly = false, bool stripToCollider = false, Transform parent = null)
+        // 客户端：内容根 + 点位由生成层建好，物件交给 Culler 按区块流式取还
+        public static TerrainPropCuller Generate(BuildingSettings settings, BuildingKitSet kit, out Transform contentRoot)
+        {
+            contentRoot = null;
+            TerrainPlanData data = LoadData(settings, kit);
+            if (data == null) return null;
+
+            TerrainSpawns.Build(data);
+            contentRoot = CreateRoot();
+
+            var cullerGo = new GameObject(TerrainAssembler.CullerName);
+            cullerGo.transform.position = Vector3.zero;
+
+            var culler = cullerGo.AddComponent<TerrainPropCuller>();
+            culler.Initialize(data, kit, contentRoot);
+
+            TerrainAssembler.CreatePoints(data, contentRoot);
+            return culler;
+        }
+
+        // 服务器：一次性铺设整张地形，只留碰撞体；不建 Culler（服务器不做剔除）
+        public static void GenerateServer(BuildingSettings settings, BuildingKitSet kit, out Transform contentRoot)
+        {
+            contentRoot = null;
+            TerrainPlanData data = LoadData(settings, kit);
+            if (data == null) return;
+
+            TerrainSpawns.Build(data);
+            contentRoot = CreateRoot();
+            TerrainAssembler.SpawnColliderOnly(data, kit, contentRoot);
+            TerrainAssembler.CreatePoints(data, contentRoot);
+        }
+
+        // 数据本身即地图坐标（最小角落在 MapMin），内容根不做平移
+        static Transform CreateRoot()
+        {
+            var root = new GameObject(TerrainAssembler.RootName);
+            root.transform.position = Vector3.zero;
+            return root.transform;
+        }
+
+        static TerrainPlanData LoadData(BuildingSettings settings, BuildingKitSet kit)
         {
             if (settings == null)
             {
@@ -14,41 +54,20 @@ namespace TerrainGen
                 return null;
             }
 
-            string path = TerrainPlanData.PathFor(settings.seed, settings.version);
-
             if (!Application.isPlaying)
             {
                 Bake(settings, kit);
                 return null;
             }
 
+            string path = TerrainPlanData.PathFor(settings.seed, settings.version);
             TerrainPlanData data = TerrainPlanData.TryLoad(path);
             if (data == null)
             {
                 Debug.LogWarning($"[地形] 未找到 {path}，改为运行期生成（不写盘）");
                 data = BuildData(settings, kit);
             }
-            if (data == null) return null;
-
-            TerrainSpawns.Build(data);
-
-            // 数据本身即地图坐标（最小角落在 MapMin），内容根不再做平移
-            Vector3 origin = Vector3.zero;
-
-            // parent 为空时内容根就建在场景根；Culler 也是场景里的独立物体：不挂父级，也不允许有子物体
-            var root = new GameObject(TerrainAssembler.RootName);
-            root.transform.SetParent(parent, false);
-            root.transform.position = origin;
-
-            var cullerGo = new GameObject(TerrainAssembler.CullerName);
-            cullerGo.transform.position = origin;
-
-            var culler = cullerGo.AddComponent<TerrainPropCuller>();
-            culler.culled = culled;
-            culler.colliderOnly = colliderOnly;
-            culler.stripToCollider = stripToCollider;
-            culler.Initialize(data, kit, root.transform);
-            return culler;
+            return data;
         }
 
         public static TerrainPlanData Bake(BuildingSettings settings, BuildingKitSet kit)

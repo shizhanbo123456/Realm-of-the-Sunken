@@ -684,12 +684,13 @@ public class GmPanel
     // 显隐地形：隐藏时先停掉剔除，否则它本帧的 LateUpdate 会把区块又打开
     private static void ToggleTerrain()
     {
-        var culler = Tool.ModularTerrainGenerator != null ? Tool.ModularTerrainGenerator.Culler : null;
-        if (culler == null || culler.ContentRoot == null) { Debug.LogWarning("[GM] 地形尚未生成，显隐开关不生效"); return; }
+        var generator = Tool.ModularTerrainGenerator;
+        Transform content = generator != null ? generator.ContentRoot : null;
+        if (content == null) { Debug.LogWarning("[GM] 地形尚未生成，显隐开关不生效"); return; }
 
-        bool hide = culler.ContentRoot.gameObject.activeSelf;
-        culler.enabled = !hide;
-        culler.ContentRoot.gameObject.SetActive(hide);
+        bool hide = content.gameObject.activeSelf;
+        if (generator.Culler != null) generator.Culler.enabled = !hide;
+        content.gameObject.SetActive(hide);
     }
 
     private static void ToggleFog()
