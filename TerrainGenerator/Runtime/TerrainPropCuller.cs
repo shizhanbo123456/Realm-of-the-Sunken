@@ -24,8 +24,6 @@ namespace TerrainGen
             public float scale;
         }
 
-        static readonly Vector2Int OutOfMapKey = new Vector2Int(int.MinValue, int.MinValue);
-
         readonly Dictionary<Vector2Int, List<ItemDef>> chunkDefs = new Dictionary<Vector2Int, List<ItemDef>>();
         readonly Dictionary<Vector2Int, List<GameObject>> liveChunks = new Dictionary<Vector2Int, List<GameObject>>();
         readonly Dictionary<Vector2Int, Transform> chunkRoots = new Dictionary<Vector2Int, Transform>();
@@ -65,24 +63,23 @@ namespace TerrainGen
             this.kit = kit;
             contentRoot = content;
 
+            if (Landscape.chunkSize <= 0f || Landscape.chunkCount <= 0)
+            {
+                Debug.LogError("[地形] Culler 初始化失败：区块尺寸/数量未从配表读到", this);
+                return;
+            }
+
             var pool = new GameObject("Pool");
             pool.transform.SetParent(contentRoot, false);
             poolRoot = pool.transform;
 
-            bool warnedOutOfMap = false;
             for (int i = 0; i < data.items.Count; i++)
             {
                 TerrainItemData item = data.items[i];
-                Vector2Int chunk = ChunkSearcher<GameObject>.GetChunkIndex(contentRoot.position + item.position);
-                if (chunk == ChunkSearcher<GameObject>.OutOfMapChunk)
-                {
-                    if (!warnedOutOfMap)
-                    {
-                        Debug.LogWarning("[地形] 有物件落在地图范围外，这些物件常驻显示", this);
-                        warnedOutOfMap = true;
-                    }
-                    chunk = OutOfMapKey;
-                }
+                Vector3 world = contentRoot.position + item.position;
+                Vector2Int chunk = ChunkSearcher<GameObject>.GetChunkIndex(world);
+                // 贴边物件会因浮点误差落到图外，夹到最近的区块，跟随该区块一起显隐
+                if (chunk == ChunkSearcher<GameObject>.OutOfMapChunk) chunk = NearestChunk(world);
 
                 if (!chunkDefs.TryGetValue(chunk, out List<ItemDef> list))
                 {
@@ -143,7 +140,7 @@ namespace TerrainGen
             foreach (KeyValuePair<Vector2Int, List<ItemDef>> pair in chunkDefs)
             {
                 Vector2Int key = pair.Key;
-                bool visible = key == OutOfMapKey || ChunkDistanceSq(key, center) <= radiusSq;
+                bool visible = ChunkDistanceSq(key, center) <= radiusSq;
                 bool loaded = liveChunks.ContainsKey(key);
                 if (visible == loaded) continue;
 
@@ -218,17 +215,24 @@ namespace TerrainGen
         {
             if (chunkRoots.TryGetValue(chunk, out Transform root) && root != null) return root;
 
-            var go = new GameObject(chunk == OutOfMapKey ? "OutOfMap" : $"Chunk_{chunk.x}_{chunk.y}");
+            var go = new GameObject($"Chunk_{chunk.x}_{chunk.y}");
             go.transform.SetParent(contentRoot, false);
-            go.transform.position = chunk == OutOfMapKey
-                ? contentRoot.position
-                : new Vector3(
-                    Landscape.MapMin + (chunk.x + 0.5f) * Landscape.chunkSize,
-                    contentRoot.position.y,
-                    Landscape.MapMin + (chunk.y + 0.5f) * Landscape.chunkSize);
+            go.transform.position = new Vector3(
+                Landscape.MapMin + (chunk.x + 0.5f) * Landscape.chunkSize,
+                contentRoot.position.y,
+                Landscape.MapMin + (chunk.y + 0.5f) * Landscape.chunkSize);
 
             chunkRoots[chunk] = go.transform;
             return go.transform;
+        }
+
+        // 图外坐标按最近区块夹取：越界的轴取端点，未越界的轴保留原索引
+        Vector2Int NearestChunk(Vector3 world)
+        {
+            int x = Mathf.FloorToInt((world.x - Landscape.MapMin) / Landscape.chunkSize);
+            int z = Mathf.FloorToInt((world.z - Landscape.MapMin) / Landscape.chunkSize);
+            int last = Landscape.chunkCount - 1;
+            return new Vector2Int(Mathf.Clamp(x, 0, last), Mathf.Clamp(z, 0, last));
         }
 
         float ChunkDistanceSq(Vector2Int chunk, Vector3 center)
@@ -245,7 +249,6 @@ namespace TerrainGen
             float radiusSq = RadiusSquared;
             foreach (Vector2Int chunk in chunkDefs.Keys)
             {
-                if (chunk == OutOfMapKey) continue;
                 if (ChunkDistanceSq(chunk, center) > radiusSq) return true;
             }
             return false;
