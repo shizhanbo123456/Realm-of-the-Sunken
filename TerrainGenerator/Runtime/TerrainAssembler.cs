@@ -37,6 +37,8 @@ namespace TerrainGen
             }
 
             data.points.AddRange(field.Points);
+            Debug.Log($"[地形] 摆放数据完成：{data.items.Count} 个物件、{data.points.Count} 个点位；"
+                      + "尺寸只读取根物体 BoxCollider（O(1)），未做任何网格计算");
             return data;
         }
     }
