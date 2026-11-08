@@ -5,16 +5,16 @@ using UnityEngine;
 
 namespace TerrainGen.EditorTools
 {
-    // 把素材表里每类预制体统一成"根物体一个 BoxCollider"，生成器就不必再回退到 Mesh 测量
+    // 只维护素材预制体根上的一个“尺寸盒”（禁用的 BoxCollider），生成期靠它 O(1) 量尺寸；
+    // 预制体里其它碰撞体（手摆的激活碰撞体）一律不碰
     public static class ColliderPreprocessor
     {
         const string KitPath = "Assets/Scripts/TerrainGenerator/Config/BuildingKitSet.asset";
 
         enum Mode
         {
-            BoxEnabled,   // 移除原有碰撞体，根物体加一个启用的 BoxCollider
-            BoxDisabled,  // 同上但 enabled = false，只供生成器量尺寸，场景里不参与物理
-            RemoveOnly    // 只移除碰撞体，不加任何碰撞体
+            BoxDisabled,  // 根物体写一个禁用 BoxCollider，只供生成器量尺寸，场景里不参与物理
+            NoBounds      // 不加尺寸盒，预制体完全不动
         }
 
         struct Entry
@@ -33,20 +33,20 @@ namespace TerrainGen.EditorTools
 
         static readonly Entry[] Entries =
         {
-            new Entry("地面", k => k.ground, Mode.BoxEnabled),
-            new Entry("围栏", k => k.fences, Mode.BoxEnabled),
-            new Entry("矮石柱", k => k.shortPosts, Mode.BoxEnabled),
-            new Entry("高石柱", k => k.tallPosts, Mode.BoxEnabled),
-            new Entry("支撑", k => k.supports, Mode.BoxEnabled),
-            new Entry("建筑物", k => k.buildings, Mode.BoxEnabled),
-            new Entry("装饰", k => k.decorations, Mode.BoxEnabled),
+            new Entry("地面", k => k.ground, Mode.BoxDisabled),
+            new Entry("围栏", k => k.fences, Mode.BoxDisabled),
+            new Entry("矮石柱", k => k.shortPosts, Mode.BoxDisabled),
+            new Entry("高石柱", k => k.tallPosts, Mode.BoxDisabled),
+            new Entry("支撑", k => k.supports, Mode.BoxDisabled),
+            new Entry("建筑物", k => k.buildings, Mode.BoxDisabled),
+            new Entry("装饰", k => k.decorations, Mode.BoxDisabled),
             new Entry("灌木", k => k.bushes, Mode.BoxDisabled),
             new Entry("摆件", k => k.props, Mode.BoxDisabled),
-            new Entry("藤蔓", k => k.vines, Mode.RemoveOnly),
-            new Entry("障碍", k => k.obstacles, Mode.BoxEnabled),
-            new Entry("障碍装饰", k => k.obstacleDecorations, Mode.RemoveOnly),
-            new Entry("漂浮装饰", k => k.floatingDecorations, Mode.RemoveOnly),
-            new Entry("鱼群", k => k.fishSchools, Mode.RemoveOnly),
+            new Entry("藤蔓", k => k.vines, Mode.NoBounds),
+            new Entry("障碍", k => k.obstacles, Mode.BoxDisabled),
+            new Entry("障碍装饰", k => k.obstacleDecorations, Mode.NoBounds),
+            new Entry("漂浮装饰", k => k.floatingDecorations, Mode.NoBounds),
+            new Entry("鱼群", k => k.fishSchools, Mode.NoBounds),
         };
 
         [MenuItem("Tools/模块化地形/碰撞体预处理/全部处理")]
@@ -176,6 +176,8 @@ namespace TerrainGen.EditorTools
 
         static bool ProcessOne(string path, Mode mode)
         {
+            if (mode == Mode.NoBounds) return true; // 这类不加尺寸盒，也不动预制体
+
             GameObject root = PrefabUtility.LoadPrefabContents(path);
             if (root == null)
             {
@@ -186,38 +188,24 @@ namespace TerrainGen.EditorTools
             bool ok = false;
             try
             {
-                Bounds bounds = default;
-                if (mode != Mode.RemoveOnly && !PrefabBounds.TryGetMeshBounds(root, out bounds))
+                if (!PrefabBounds.TryGetMeshBounds(root, out Bounds bounds))
                 {
-                    // 先量后改：没有 Mesh 就整体跳过，避免把原有碰撞体删了却没东西补
                     Debug.LogWarning($"[地形] {path} 下没有任何 Mesh，跳过（预制体未做改动）");
                     return false;
                 }
 
-                foreach (Collider col in root.GetComponentsInChildren<Collider>(true))
-                {
-                    if (PrefabUtility.IsPartOfPrefabInstance(col))
-                    {
-                        Debug.LogWarning($"[地形] {path} 的 {col.GetType().Name} 属于嵌套预制体实例，无法移除，请到源预制体处理");
-                        continue;
-                    }
-                    UnityEngine.Object.DestroyImmediate(col);
-                }
+                // 只维护根上这一个尺寸盒，永远禁用；预制体里其它碰撞体（手摆的激活碰撞体）一律不碰
+                var box = root.GetComponent<BoxCollider>();
+                if (box == null) box = root.AddComponent<BoxCollider>();
+                box.center = bounds.center;
 
-                if (mode != Mode.RemoveOnly)
-                {
-                    var box = root.GetComponent<BoxCollider>();
-                    if (box == null) box = root.AddComponent<BoxCollider>();
-                    box.center = bounds.center;
-
-                    // 零厚度轴（贴片类素材）给个极小厚度，避免出现无效碰撞体
-                    Vector3 size = bounds.size;
-                    if (size.x <= 0f) size.x = 0.01f;
-                    if (size.y <= 0f) size.y = 0.01f;
-                    if (size.z <= 0f) size.z = 0.01f;
-                    box.size = size;
-                    box.enabled = mode == Mode.BoxEnabled;
-                }
+                // 零厚度轴（贴片类素材）给个极小厚度，避免出现无效尺寸
+                Vector3 size = bounds.size;
+                if (size.x <= 0f) size.x = 0.01f;
+                if (size.y <= 0f) size.y = 0.01f;
+                if (size.z <= 0f) size.z = 0.01f;
+                box.size = size;
+                box.enabled = false;
 
                 if (PrefabUtility.SaveAsPrefabAsset(root, path) == null)
                 {

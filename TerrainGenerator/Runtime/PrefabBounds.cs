@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace TerrainGen
 {
-    // 生成期只认根物体 BoxCollider，O(1) 取 center/size，绝不遍历网格
+    // 生成期只认根物体 BoxCollider（预处理的尺寸盒，enabled = false 也照读），O(1) 取 center/size，绝不遍历网格
     public static class PrefabBounds
     {
         public static bool TryGet(GameObject prefab, Dictionary<GameObject, Bounds> cache, out Bounds bounds)

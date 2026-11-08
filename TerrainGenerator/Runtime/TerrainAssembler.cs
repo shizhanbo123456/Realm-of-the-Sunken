@@ -45,7 +45,7 @@ namespace TerrainGen
             return data;
         }
 
-        // 服务器一次性铺设：只铺有启用碰撞体的类别；stripMeshes 时除地面外只留根物体与根碰撞体
+        // 服务器一次性铺设：只铺有激活碰撞体的类别（地面无条件铺，它是底板）；stripMeshes 时除地面外只留碰撞体
         // 烘焙导航时传 stripMeshes = false：类别过滤不变，但保留完整网格，NavMesh 才按真实几何生成
         public static void SpawnColliderOnly(TerrainPlanData data, BuildingKitSet kit, Transform root, bool stripMeshes = true)
         {
@@ -56,7 +56,7 @@ namespace TerrainGen
                 TerrainItemData item = data.items[i];
                 GameObject prefab = kit.GetPrefab(item.kind, item.prefabIndex);
                 if (prefab == null) continue;
-                if (!HasActiveCollider(prefab)) continue;
+                if (item.kind != TerrainItemKind.Ground && !HasActiveCollider(prefab)) continue;
 
                 var go = Object.Instantiate(prefab, root);
                 go.name = item.kind + "_" + prefab.name;
@@ -66,7 +66,7 @@ namespace TerrainGen
 
                 if (stripMeshes && item.kind != TerrainItemKind.Ground)
                 {
-                    StripToCollider(go);
+                    StripVisuals(go.transform);
                     stripped++;
                 }
                 placed++;
@@ -80,6 +80,7 @@ namespace TerrainGen
             Debug.Log($"[地形] 服务器铺设完成：{placed} 个物件（其中 {stripped} 个只保留根碰撞体，其余为地面模型）");
         }
 
+        // 有真正参与物理的碰撞体（根上那个禁用的尺寸盒不算），决定服务器铺设与 NavMesh 烘焙是否包含该物件
         static bool HasActiveCollider(GameObject prefab)
         {
             Collider[] cols = prefab.GetComponentsInChildren<Collider>(true);
@@ -90,16 +91,24 @@ namespace TerrainGen
             return false;
         }
 
-        // 先关子物体再销毁：Destroy 延迟到帧末，不关的话当帧还会渲染一次根上的模型
-        static void StripToCollider(GameObject go)
+        // 服务器只留碰撞：删掉所有 MeshRenderer，砍掉不含任何碰撞体的子树，带碰撞体的子树原样保留
+        static void StripVisuals(Transform node)
         {
-            for (int i = go.transform.childCount - 1; i >= 0; i--)
+            for (int i = node.childCount - 1; i >= 0; i--)
             {
-                GameObject child = go.transform.GetChild(i).gameObject;
-                child.SetActive(false);
-                Kill(child);
+                Transform child = node.GetChild(i);
+                if (child.GetComponentsInChildren<Collider>(true).Length == 0)
+                {
+                    // 先关再销毁：Destroy 延迟到帧末，不关的话当帧还会渲染一次
+                    child.gameObject.SetActive(false);
+                    Kill(child.gameObject);
+                    continue;
+                }
+
+                StripVisuals(child);
             }
-            foreach (MeshRenderer renderer in go.GetComponents<MeshRenderer>())
+
+            foreach (MeshRenderer renderer in node.GetComponents<MeshRenderer>())
             {
                 Kill(renderer);
             }
