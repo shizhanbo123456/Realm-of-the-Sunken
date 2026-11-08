@@ -111,22 +111,31 @@ public class SaveManager : MonoBehaviour
             CreateNewSave();
             return;
         }
-        int attackIndex = 0;
-        int defenseIndex = 0;
+        int attackIndex;
+        int defenseIndex;
         try
         {
             var parts = data.Split('|');
+            // 字段数必须与当前格式完全一致：不兼容旧格式，长度不符即判为无效存档
+            int expected = 3 + CharacterTotalCount * 3 + 4; // 头 3 项 + 等级/经验/解锁各一列 + 名称/令牌/攻方下标/守方下标
+            if (parts.Length != expected)
+                throw new System.FormatException($"字段数 {parts.Length} 与当前存档格式 {expected} 不符");
+
             int idx = 0;
             playerLevel = int.Parse(parts[idx++]);
             playerExp = int.Parse(parts[idx++]);
             int count = int.Parse(parts[idx++]);
-            for (int i = 0; i < count && idx < parts.Length; i++) characterLevels[i] = int.Parse(parts[idx++]);
-            for (int i = 0; i < count && idx < parts.Length; i++) characterExp[i] = int.Parse(parts[idx++]);
-            for (int i = 0; i < count && idx < parts.Length; i++) characterUnlocked[i] = parts[idx++] == "1";
-            if (idx < parts.Length) playerName = parts[idx++];
-            if (idx < parts.Length) int.TryParse(parts[idx++], out token);
-            if (idx < parts.Length) int.TryParse(parts[idx++], out attackIndex);
-            if (idx < parts.Length) int.TryParse(parts[idx++], out defenseIndex);
+            if (count != CharacterTotalCount)
+                throw new System.FormatException($"角色数 {count} 与配置 {CharacterTotalCount} 不符");
+            for (int i = 0; i < count; i++) characterLevels[i] = int.Parse(parts[idx++]);
+            for (int i = 0; i < count; i++) characterExp[i] = int.Parse(parts[idx++]);
+            for (int i = 0; i < count; i++) characterUnlocked[i] = parts[idx++] == "1";
+            playerName = parts[idx++];
+            token = int.Parse(parts[idx++]);
+            attackIndex = int.Parse(parts[idx++]);
+            defenseIndex = int.Parse(parts[idx++]);
+            if (!IsTokenValid(token))
+                throw new System.FormatException($"令牌 {token} 越界");
         }
         catch (System.Exception e)
         {
@@ -143,16 +152,8 @@ public class SaveManager : MonoBehaviour
             return;
         }
 
-        // 选中角色：先落进运行时，下面补令牌触发的 Save 才会把同一份选择写回存档
         ClientSelection.selectedAttackIndex = InRange(attackIndex, Config.attack_character_count);
         ClientSelection.selectedDefenseIndex = InRange(defenseIndex, Config.defense_character_count);
-
-        // 令牌缺失/越界（旧存档或损坏）→ 补生成并立即落盘，保证一次会话内只有一个令牌
-        if (!IsTokenValid(token))
-        {
-            token = GenerateToken();
-            Save();
-        }
     }
 
     // 存档里的选中下标超出当前角色数（配表改过）时退回 0
