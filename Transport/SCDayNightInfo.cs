@@ -3,8 +3,8 @@ namespace Ros.Transport
     public class SCDayNightInfo
     {
         public float cycleTime = 1f;
-        public float dayDuration = 90f;
-        public float nightDuration = 90f;
+        public float dayDuration;
+        public float nightDuration;
     }
 
     public struct SCDayNightInfoSerializer

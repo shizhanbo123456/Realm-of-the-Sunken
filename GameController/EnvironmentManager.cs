@@ -109,7 +109,6 @@ public class EnvironmentManager : MonoBehaviour
 
         // 速率 = 1 / 当前区间时长（倒数）：改时长只变速，不改当前时间
         float duration = wasDay ? dayDuration : nightDuration;
-        if (duration < 0.0001f) duration = 0.0001f;
         CycleTime += deltaTime / duration; // 恒正向推进；按光照方向折返会锁死在正午
 
         // 周期回绕：[0, 2) 循环（0 与 2 都是午夜）
@@ -134,8 +133,8 @@ public class EnvironmentManager : MonoBehaviour
     public void ApplyServerSync(float cycleTime, float dayDuration, float nightDuration)
     {
         bool wasDay = IsDay;
-        this.dayDuration = Mathf.Max(0.01f, dayDuration);
-        this.nightDuration = Mathf.Max(0.01f, nightDuration);
+        this.dayDuration = dayDuration;
+        this.nightDuration = nightDuration;
         lastDayDuration = this.dayDuration;
         lastNightDuration = this.nightDuration;
         CycleTime = Mathf.Repeat(cycleTime, CycleLength);
