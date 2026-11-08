@@ -18,9 +18,6 @@ public class BattlePage : PageBase
     private readonly List<SCEntityDisplayInfo.BuffRuntime> localBuffs = new();                      // 本地玩家左上角血条的 buff 数据源
     private readonly float barDefaultSizeDistance = ConfigManager.GlobalVariableConfig.distance_of_bar_default_size; // 血条 scale=(1,1) 时的相机距离
     private readonly float labelDefaultSizeDistance = ConfigManager.GlobalVariableConfig.distance_of_label_default_size; // 飘字 scale=(1,1) 时的相机距离
-    private Texture2D mapAreaTexture;    // AssetsManager.MapArea 的 Texture2D 引用（贴图需开 Read/Write）
-
-    private int localPlayerArea = -1;    // 本地玩家当前区域（EventBanner 页 index，-1=未知；死亡观战期间冻结）
     private UI_SkillTip skillTip;     // 技能悬浮提示（技能栏条目）
     private UI_BuffTip buffTip;       // buff 悬浮提示（任意 buff 图标）
     private int localPlayerCamp = -1; // 本地玩家阵营（随本地实体摘要更新；小地图敌我识别用）
@@ -230,7 +227,6 @@ public class BattlePage : PageBase
         localPlayerCamp = -1;
         spectatorMode = Session != null && Session.IsSpectator;
         localPlayerAlive = !spectatorMode;
-        localPlayerArea = -1;
         panel.m_onlook.selectedIndex = spectatorMode ? 1 : 0; // onlook=1：FGUI 自动隐藏血条/技能等非观战元素
         if (panel.m_onlookComboBox != null) panel.m_onlookComboBox.onChanged.Set(OnOnlookComboBoxChanged);
         RefreshCampAliveCount(NetworkManager.LatestCampAliveCount); // 进入战斗先填一次缓存值，随后由变更包刷新
@@ -628,7 +624,6 @@ public class BattlePage : PageBase
         bool hasCenter = TryGetMinimapCenter(out var center);
         bool hasYaw = TryGetSelfYaw(out float yaw);
         panel.m_Minimap?.Tick(center, hasCenter, yaw, hasYaw);
-        if (hasCenter) TickLocalPlayerArea(center);
     }
 
     #region 小地图展开 / 上帝视角
@@ -719,30 +714,8 @@ public class BattlePage : PageBase
         return centerId != 0 && Tool.ClientLogicManager.EntityPlayers.TryGetEntityPosition(centerId, out pos);
     }
 
-    // 区域横幅的数据源：圆心由小地图那边算出后传进来，EventBanner 本身属于 BattlePanel（日出/日落也走它）
-    // EventBanner.m_type 控制器页序：0 城市 / 1 工厂区 / 2 野外 / 3 郊区 / 4 日出 / 5 日落
-    private const int BannerCity = 0, BannerFactory = 1, BannerWild = 2, BannerSuburb = 3, BannerSunrise = 4, BannerSunset = 5;
-
-    // 区域判定：采样 MapArea 贴图（图左下=世界(0,0)，上=+Z）；alpha<128=野外，否则 RGB 最大者 = r 郊区 / g 城区 / b 工厂区
-    private void TickLocalPlayerArea(Vector3 myPos)
-    {
-        if (spectatorMode || !localPlayerAlive) return; // 死亡观战期间冻结区域，不更新
-        if (mapAreaTexture == null && Tool.AssetsManager != null)
-            mapAreaTexture = Tool.AssetsManager.MapArea as Texture2D;
-        if (mapAreaTexture == null) return;
-
-        float mapSize = ConfigManager.GlobalVariableConfig.terrain_size;
-        float u = Mathf.Clamp01(myPos.x / mapSize);
-        float v = Mathf.Clamp01(myPos.z / mapSize);
-        Color c = mapAreaTexture.GetPixelBilinear(u, v);
-        int area = c.a * 255f < 128f ? BannerWild
-            : c.g >= c.r && c.g >= c.b ? BannerCity
-            : c.r >= c.b ? BannerSuburb
-            : BannerFactory;
-        if (area == localPlayerArea) return;
-        localPlayerArea = area;
-        ShowEventBanner(area);
-    }
+    // EventBanner.m_type 控制器页序：0 天亮 / 1 天黑
+    private const int BannerDaybreak = 0, BannerNightfall = 1;
 
     // 切 EventBanner 档位并播 BattlePanel 的显隐转场
     private void ShowEventBanner(int page)
@@ -798,8 +771,8 @@ public class BattlePage : PageBase
     private void OnBattleEvent(SCBattleEvent e)
     {
         if (e == null) return;
-        if (e.type == SCBattleEvent.Type.Nightfall) ShowEventBanner(BannerSunset);       // 日落横幅
-        else if (e.type == SCBattleEvent.Type.Daybreak) ShowEventBanner(BannerSunrise);   // 日出横幅
+        if (e.type == SCBattleEvent.Type.Nightfall) ShowEventBanner(BannerNightfall);     // 天黑横幅
+        else if (e.type == SCBattleEvent.Type.Daybreak) ShowEventBanner(BannerDaybreak);  // 天亮横幅
         else if (e.type == SCBattleEvent.Type.SkillBroadcast) EnqueueImportantBanner(e.textId); // 特殊技能播报
     }
 
