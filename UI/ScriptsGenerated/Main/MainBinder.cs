@@ -60,7 +60,6 @@ namespace Ros.UI.Main
             UIObjectFactory.SetPackageItemExtension(UI_GmButtonList.URL, typeof(UI_GmButtonList));
             UIObjectFactory.SetPackageItemExtension(UI_GmItem.URL, typeof(UI_GmItem));
             UIObjectFactory.SetPackageItemExtension(UI_GmComboBox_popup.URL, typeof(UI_GmComboBox_popup));
-            UIObjectFactory.SetPackageItemExtension(UI_HomeCharacterList.URL, typeof(UI_HomeCharacterList));
             UIObjectFactory.SetPackageItemExtension(UI_AttrItem.URL, typeof(UI_AttrItem));
             UIObjectFactory.SetPackageItemExtension(UI_LobbyPanel.URL, typeof(UI_LobbyPanel));
             UIObjectFactory.SetPackageItemExtension(UI_LobbyMemberList.URL, typeof(UI_LobbyMemberList));

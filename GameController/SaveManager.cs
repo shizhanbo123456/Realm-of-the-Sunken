@@ -39,6 +39,12 @@ public class SaveManager : MonoBehaviour
         return characterLevels[index];
     }
 
+    public int GetCharacterExp(int index)
+    {
+        if (index < 0 || index >= characterExp.Count) return 0;
+        return characterExp[index];
+    }
+
     public bool IsCharacterUnlocked(int index)
     {
         if (index < 0 || index >= characterUnlocked.Count) return IsUnlockedByPlayerLevel(index);
