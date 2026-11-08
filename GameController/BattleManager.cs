@@ -203,8 +203,8 @@ public partial class BattleManager : EnsBehaviour
             return 0;
         }
         ushort id = reservedId;
-        // 人形统一离地抬升：出生点给的是地面高度，直接落上去会卡进地面
-        if (type.IsHumanoid) pos.y += Config.entity_spawn_rise;
+        // 人形判定走预制体是否挂 EntityAnim（项目唯一口径）：人形离地抬升，出生点给的是地面高度，直接落上去会卡进地面
+        if (prefab.GetComponentInChildren<EntityAnim>(true) != null) pos.y += Config.entity_spawn_rise;
         var go = Instantiate(prefab, pos, Quaternion.identity);
         // EntityData 不挂预制体（图形预制体自带表现），生成时按类别补上对应子类
         var data = go.GetComponent<EntityData>();
