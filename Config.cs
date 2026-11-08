@@ -189,6 +189,9 @@ public static class Config
     public const float entity_fall_recover_height = 1f;   // 落点 = Terrain 高度 + 1
     #endregion
 
+    // 人形实体生成时相对地面抬升，脚底与地面完全重合会陷进去
+    public const float entity_spawn_rise = 1f;
+
     #region 通用
     public const int entity_id_max = 30000;
     public const int unarmed_punch_left = (int)SkillType.SkillPunchLeft;

@@ -109,8 +109,6 @@ namespace TerrainGen
 
         #region 地面射线（GroundLayer，命中高度贴合上表面 ±0.5 才算合法）
         private const float SurfaceTolerance = 0.5f;
-        private const float HumanoidOffset = 1f;
-        private const float PropOffset = 0f;
         private const int MaxSampleAttempts = 32;
 
         private static bool warnedNoLayer;
@@ -139,11 +137,12 @@ namespace TerrainGen
             return true;
         }
 
-        public static bool TryGetGroundPos(float x, float z, bool humanoid, out Vector3 pos)
+        // 只给地面高度，人形抬升由 BattleManager.SpawnEntity 统一处理
+        public static bool TryGetGroundPos(float x, float z, out Vector3 pos)
         {
             pos = default;
             if (!TrySampleGroundY(x, z, out float y)) return false;
-            pos = new Vector3(x, y + (humanoid ? HumanoidOffset : PropOffset), z);
+            pos = new Vector3(x, y, z);
             return true;
         }
 
@@ -169,13 +168,13 @@ namespace TerrainGen
                 float x = MapMin + Random.value * MapSize;
                 float z = MapMin + Random.value * MapSize;
                 if (!TrySampleLegalPoint(x, z, out float y)) continue;
-                pos = new Vector3(x, y + HumanoidOffset, z);
+                pos = new Vector3(x, y, z);
                 return true;
             }
             return false;
         }
 
-        public static bool TrySampleSpawnPointInRing(Vector3 center, float minRadius, float maxRadius, bool humanoid, out Vector3 pos)
+        public static bool TrySampleSpawnPointInRing(Vector3 center, float minRadius, float maxRadius, out Vector3 pos)
         {
             pos = default;
             float minSq = minRadius * minRadius;
@@ -189,7 +188,7 @@ namespace TerrainGen
                 float x = center.x + Mathf.Cos(angle) * radius;
                 float z = center.z + Mathf.Sin(angle) * radius;
                 if (!TrySampleLegalPoint(x, z, out float y)) continue;
-                pos = new Vector3(x, y + (humanoid ? HumanoidOffset : PropOffset), z);
+                pos = new Vector3(x, y, z);
                 return true;
             }
             return false;

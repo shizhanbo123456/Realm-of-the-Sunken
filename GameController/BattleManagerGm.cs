@@ -238,14 +238,14 @@ public partial class BattleManager
         switch (type)
         {
             case GmEntityType.Zombie:
-                GmSpawnAtPlayer(clientId, EntityType.Zombie(Random.Range(0, Config.zombie_variant_count)), GetZombieSpawnLevel(), EntityCamp.Defense, humanoid: true);
+                GmSpawnAtPlayer(clientId, EntityType.Zombie(Random.Range(0, Config.zombie_variant_count)), GetZombieSpawnLevel(), EntityCamp.Defense);
                 break;
             case GmEntityType.EliteZombie:
-                GmSpawnAtPlayer(clientId, EntityType.EliteZombie(Random.Range(0, Config.elite_zombie_variant_count)), GetZombieSpawnLevel(), EntityCamp.Defense, humanoid: true);
+                GmSpawnAtPlayer(clientId, EntityType.EliteZombie(Random.Range(0, Config.elite_zombie_variant_count)), GetZombieSpawnLevel(), EntityCamp.Defense);
                 break;
             case GmEntityType.Coral:
                 EntityType coral = Random.value < ConfigManager.GlobalVariableConfig.coral_spawn_as_large_chance ? EntityType.CoralLarge : EntityType.CoralSmall;
-                GmSpawnAtPlayer(clientId, coral, 1, EntityCamp.Neutral, humanoid: false);
+                GmSpawnAtPlayer(clientId, coral, 1, EntityCamp.Neutral);
                 break;
             case GmEntityType.Neutral:
                 // 中立单位（中立雕像）场上最多 1 个，已有就不再刷
@@ -256,13 +256,13 @@ public partial class BattleManager
         }
     }
 
-    // 落点 = 令牌对应玩家实体的 x/z（高度按人形/非人形吸附地形）；取不到玩家实体就不刷
-    private void GmSpawnAtPlayer(int clientId, EntityType type, int level, EntityCamp camp, bool humanoid)
+    // 落点 = 令牌对应玩家实体的 x/z（高度吸附地形，人形抬升由 SpawnEntity 统一处理）；取不到玩家实体就不刷
+    private void GmSpawnAtPlayer(int clientId, EntityType type, int level, EntityCamp camp)
     {
         var owner = GetGmPlayerEntity(clientId);
         if (owner == null) return;
         Vector3 p = owner.transform.position;
-        if (!TerrainSpawns.TryGetGroundPos(p.x, p.z, humanoid, out Vector3 pos)) return;
+        if (!TerrainSpawns.TryGetGroundPos(p.x, p.z, out Vector3 pos)) return;
         SpawnEntity(type, level, pos, camp);
     }
 

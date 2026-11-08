@@ -75,10 +75,10 @@ public partial class BattleManager
     }
 
     // 环带内取一个候选点：离所有存活玩家都不小于 minDist，避免贴脸刷新
-    private bool TrySampleRingPoint(Vector3 center, float minDist, float maxDist, bool humanoid, out Vector3 pos)
+    private bool TrySampleRingPoint(Vector3 center, float minDist, float maxDist, out Vector3 pos)
     {
         pos = default;
-        if (!TerrainSpawns.TrySampleSpawnPointInRing(center, minDist, maxDist, humanoid, out pos)) return false;
+        if (!TerrainSpawns.TrySampleSpawnPointInRing(center, minDist, maxDist, out pos)) return false;
         return !IsAnyPlayerWithin(pos, minDist);
     }
 
@@ -93,7 +93,7 @@ public partial class BattleManager
         for (int attempt = 0; attempt < RingSampleAttempts; attempt++)
         {
             Vector3 center = s_playerPosScratch[Random.Range(0, s_playerPosScratch.Count)];
-            if (TrySampleRingPoint(center, minDist, maxDist, humanoid: true, out pos)) return true;
+            if (TrySampleRingPoint(center, minDist, maxDist, out pos)) return true;
         }
         pos = default;
         return false;
@@ -166,7 +166,7 @@ public partial class BattleManager
         for (int attempt = 0; attempt < RingSampleAttempts; attempt++)
         {
             // 采样：所选玩家的环带内 + 离所有存活玩家不小于内径 + 向下射线命中地形上表面
-            if (!TrySampleRingPoint(center, minDist, maxDist, humanoid: false, out Vector3 pos)) continue;
+            if (!TrySampleRingPoint(center, minDist, maxDist, out Vector3 pos)) continue;
             if (IsAnyCoralWithin(pos, spacing)) continue;               // 与已有珊瑚的最小间距
             if (CoralDensityAt(pos) >= maxDensity) continue;            // 所在区块珊瑚密度已达上限
 

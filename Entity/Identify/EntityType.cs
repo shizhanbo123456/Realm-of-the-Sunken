@@ -12,6 +12,12 @@ public struct EntityType : IEquatable<EntityType>
         this.value = value;
     }
 
+    // 人形：进攻/防守角色 + 普通/精英僵尸；雕像、珊瑚、防御塔都不是
+    public bool IsHumanoid => category == EntityCategory.Character_Attack
+                              || category == EntityCategory.Character_Defense
+                              || category == EntityCategory.Zombie
+                              || category == EntityCategory.EliteZombie;
+
     #region 构造器
     public static EntityType Attack(int value) => new EntityType(EntityCategory.Character_Attack, value);
     public static EntityType Defense(int value) => new EntityType(EntityCategory.Character_Defense, value);
