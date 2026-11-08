@@ -107,6 +107,7 @@ public class HomePage : PageBase
         {
             if (defenseTab) ClientSelection.selectedDefenseIndex = index;
             else ClientSelection.selectedAttackIndex = index;
+            if (Tool.SaveManager != null) Tool.SaveManager.Save(); // 选角即落盘，下次启动沿用
             Refresh();
             RefreshPreview();
         });

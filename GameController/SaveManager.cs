@@ -107,6 +107,8 @@ public class SaveManager : MonoBehaviour
             CreateNewSave();
             return;
         }
+        int attackIndex = 0;
+        int defenseIndex = 0;
         try
         {
             var parts = data.Split('|');
@@ -119,6 +121,8 @@ public class SaveManager : MonoBehaviour
             for (int i = 0; i < count && idx < parts.Length; i++) characterUnlocked[i] = parts[idx++] == "1";
             if (idx < parts.Length) playerName = parts[idx++];
             if (idx < parts.Length) int.TryParse(parts[idx++], out token);
+            if (idx < parts.Length) int.TryParse(parts[idx++], out attackIndex);
+            if (idx < parts.Length) int.TryParse(parts[idx++], out defenseIndex);
         }
         catch (System.Exception e)
         {
@@ -135,6 +139,10 @@ public class SaveManager : MonoBehaviour
             return;
         }
 
+        // 选中角色：先落进运行时，下面补令牌触发的 Save 才会把同一份选择写回存档
+        ClientSelection.selectedAttackIndex = InRange(attackIndex, Config.attack_character_count);
+        ClientSelection.selectedDefenseIndex = InRange(defenseIndex, Config.defense_character_count);
+
         // 令牌缺失/越界（旧存档或损坏）→ 补生成并立即落盘，保证一次会话内只有一个令牌
         if (!IsTokenValid(token))
         {
@@ -142,6 +150,9 @@ public class SaveManager : MonoBehaviour
             Save();
         }
     }
+
+    // 存档里的选中下标超出当前角色数（配表改过）时退回 0
+    private static int InRange(int index, int count) => index >= 0 && index < count ? index : 0;
 
     private static bool IsTokenValid(int value) => value >= TokenMinInclusive && value < TokenMaxExclusive;
 
@@ -157,7 +168,9 @@ public class SaveManager : MonoBehaviour
         for (int i = 0; i < CharacterTotalCount; i++) sb.Append(characterExp[i]).Append('|');
         for (int i = 0; i < CharacterTotalCount; i++) sb.Append(characterUnlocked[i] ? "1" : "0").Append('|');
         sb.Append((playerName ?? "").Replace("|", "")).Append('|');
-        sb.Append(token);
+        sb.Append(token).Append('|');
+        sb.Append(ClientSelection.selectedAttackIndex).Append('|');
+        sb.Append(ClientSelection.selectedDefenseIndex);
         PlayerPrefs.SetString(SaveKey, sb.ToString());
         PlayerPrefs.Save();
     }
@@ -178,6 +191,8 @@ public class SaveManager : MonoBehaviour
         EnsureListSize(0);
         playerName = GenerateRandomName();
         token = GenerateToken();
+        ClientSelection.selectedAttackIndex = 0;
+        ClientSelection.selectedDefenseIndex = 0;
         Save();
     }
 
