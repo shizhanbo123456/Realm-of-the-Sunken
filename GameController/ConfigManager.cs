@@ -140,12 +140,12 @@ public class ConfigManager : MonoBehaviour
         return value;
     }
 
-    // 品质档只允许 0~2（B/A/S），与 RoleHead 的 m_quality 页序一致
+    // 品质档 0~3（无/B/A/S），与 RoleHead 的 m_quality 页序一致
     public static int ParseQuality(string[] rowData, int col)
     {
         int value = ParseInt(rowData, col);
-        if (value < 0 || value > 2)
-            throw new FormatException($"第 {col} 列的角色品质 {value} 超出 0~2（0:B / 1:A / 2:S）");
+        if (value < 0 || value > 3)
+            throw new FormatException($"第 {col} 列的角色品质 {value} 超出 0~3（0:无 / 1:B / 2:A / 3:S）");
         return value;
     }
 
@@ -422,7 +422,7 @@ public class ConfigManager : MonoBehaviour
         public int upgradeB;
         public int unlockLevel;
         public List<int> initialSkills;
-        public int quality;           // 0:B / 1:A / 2:S，直接对应 RoleHead 的 m_quality 页序
+        public int quality;           // 0:无 / 1:B / 2:A / 3:S，直接对应 RoleHead 的 m_quality 页序
         public bool showHealthBar;    // 客户端是否为该实体创建头顶血条
         public EndureType endureLevel; // 第16列：默认霸体等级，实体霸体等级的下限（留空 = None）
 
