@@ -1,6 +1,5 @@
 using Ros.Transport;
 using UnityEngine;
-using VolumetricFogAndMist;
 
 public class EnvironmentManager : MonoBehaviour
 {
@@ -16,8 +15,8 @@ public class EnvironmentManager : MonoBehaviour
     public const float SunRotationDawn = 0f;
     public const float SunRotationEvening = 180f;
 
-    public const float FogVoidFallOffOn = 0f;
-    public const float FogVoidFallOffOff = 1.55f;
+    public const float FogDensityClear = 0.08f;
+    public const float FogDensityFogged = 0.5f;
 
     [Header("昼夜时长（秒）")]
     [Tooltip("白天时长：光照值 ≥ 0.5 区间的总耗时。修改后只改变推进速率，当前时间不变。\n（客户端上的值仅作首帧前的初始值，运行时会被服务器下发的值覆盖）")]
@@ -30,17 +29,14 @@ public class EnvironmentManager : MonoBehaviour
     [Tooltip("天空盒材质球：昼夜变化时线性调整其 " + SkyExposureProperty + "（午夜 0.28 ~ 正午 1.92）")]
     public Material skyboxMaterial;
 
-    [Tooltip("体积雾组件（Volumetric Fog & Mist）：按是否有雾效平滑调整其 Fog Void 的 FallOff")]
-    public VolumetricFog fog;
-
-    [Header("雾气")]
-    [Tooltip("是否启用雾效：开启 = Fog Void FallOff 0，关闭 = 1.55；切换时按 fogTransitionDuration 秒线性过渡。（客户端由「迷雾」Buff 自动驱动，此处只是初始值）")]
+    [Header("雾气（Unity 内置雾）")]
+    [Tooltip("是否起雾：无雾 = Density 0.08，起雾 = Density 0.5；切换时按 fogTransitionDuration 秒线性过渡。（客户端由「迷雾」Buff 自动驱动，此处只是初始值）")]
     public bool fogEnabled = false;
 
     [Tooltip("雾效开关的过渡时间（秒）")]
     [Min(0.01f)] public float fogTransitionDuration = 10f;
 
-    [Tooltip("雾气 Albedo（Fog Colors → Albedo）在正午的颜色（8bit 64,82,89）；凌晨 / 傍晚（及夜间）线性衰减为黑")]
+    [Tooltip("雾色（RenderSettings.fogColor）在正午的颜色（8bit 64,82,89）；凌晨 / 傍晚（及夜间）线性衰减为黑")]
     public Color fogAlbedoNoon = new Color(64f / 255f, 82f / 255f, 89f / 255f, 1f);
 
     [Header("太阳")]
@@ -66,7 +62,7 @@ public class EnvironmentManager : MonoBehaviour
     private float lastNightDuration;
     private bool syncRequested;
 
-    private float fogVoidFallOffCurrent;
+    private float fogDensityCurrent;
     private int skyExposureId;
     private bool exposureWarningLogged;
 
@@ -77,7 +73,10 @@ public class EnvironmentManager : MonoBehaviour
         skyExposureId = Shader.PropertyToID(SkyExposureProperty);
         lastDayDuration = dayDuration;
         lastNightDuration = nightDuration;
-        fogVoidFallOffCurrent = fogEnabled ? FogVoidFallOffOn : FogVoidFallOffOff;
+        fogDensityCurrent = fogEnabled ? FogDensityFogged : FogDensityClear;
+        // 内置雾常开，浓淡只由 fogDensity 表达（指数平方 = Unity 默认雾模式）
+        RenderSettings.fog = true;
+        RenderSettings.fogMode = FogMode.ExponentialSquared;
         ApplyVisual();
     }
 
@@ -103,7 +102,7 @@ public class EnvironmentManager : MonoBehaviour
         if (!NetworkManager.BattleRunning)
         {
             // 非对局中不推进昼夜，但雾效开关的过渡仍要能走完（允许在组队大厅切换雾效）
-            ApplyFogVoid();
+            ApplyFogDensity();
             return;
         }
         Tick(Time.deltaTime);
@@ -193,7 +192,7 @@ public class EnvironmentManager : MonoBehaviour
         ApplySkyboxExposure();
         ApplySun();
         ApplyFogColor();
-        ApplyFogVoid();
+        ApplyFogDensity();
     }
 
     private void NotifyFlipped(bool wasDay)
@@ -234,23 +233,21 @@ public class EnvironmentManager : MonoBehaviour
 
     private void ApplyFogColor()
     {
-        if (fog == null) return;
         Color target = fogAlbedoNoon * DayFactor;
         target.a = 1f;
-        if (fog.color != target) fog.color = target;
+        if (RenderSettings.fogColor != target) RenderSettings.fogColor = target;
     }
 
-    private void ApplyFogVoid()
+    // 雾浓淡：无雾 0.08 ↔ 起雾 0.5，按 fogTransitionDuration 秒线性过渡
+    private void ApplyFogDensity()
     {
-        float target = fogEnabled ? FogVoidFallOffOn : FogVoidFallOffOff;
-        if (!Mathf.Approximately(fogVoidFallOffCurrent, target))
+        float target = fogEnabled ? FogDensityFogged : FogDensityClear;
+        if (!Mathf.Approximately(fogDensityCurrent, target))
         {
-            float speed = (FogVoidFallOffOff - FogVoidFallOffOn) / Mathf.Max(0.01f, fogTransitionDuration);
-            fogVoidFallOffCurrent = Mathf.MoveTowards(fogVoidFallOffCurrent, target, speed * Time.deltaTime);
+            float speed = (FogDensityFogged - FogDensityClear) / Mathf.Max(0.01f, fogTransitionDuration);
+            fogDensityCurrent = Mathf.MoveTowards(fogDensityCurrent, target, speed * Time.deltaTime);
         }
-        if (fog != null && !Mathf.Approximately(fog.fogVoidFallOff, fogVoidFallOffCurrent))
-        {
-            fog.fogVoidFallOff = fogVoidFallOffCurrent;
-        }
+        if (!Mathf.Approximately(RenderSettings.fogDensity, fogDensityCurrent))
+            RenderSettings.fogDensity = fogDensityCurrent;
     }
 }
