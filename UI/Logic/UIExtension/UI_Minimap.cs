@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using FairyGUI;
+using TerrainGen;
 using UnityEngine;
 
 namespace Ros.UI.Main
@@ -208,8 +209,11 @@ namespace Ros.UI.Main
             mapLoader = new GLoader();
             mapLoader.fill = FillType.Scale; // 地形图与目标区域同为正方形，直接拉伸铺满
             m_mask.AddChild(mapLoader);
-            if (mapTexture == null && Tool.AssetsManager != null && Tool.AssetsManager.MapTexture != null)
-                mapTexture = new NTexture(Tool.AssetsManager.MapTexture);
+            if (mapTexture == null)
+            {
+                Texture2D tex = TerrainMapImage.Load();
+                if (tex != null) mapTexture = new NTexture(tex);
+            }
             mapLoader.texture = mapTexture;
         }
 

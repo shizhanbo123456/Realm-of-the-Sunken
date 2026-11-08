@@ -24,6 +24,11 @@ namespace TerrainGen.EditorTools
         bool summaryIsError;
         readonly List<string> report = new List<string>();
 
+        const string FloorColorKey = "TerrainGen.MapFloorColor";
+        const string VoidColorKey = "TerrainGen.MapVoidColor";
+        Color mapFloorColor = new Color(0.72f, 0.68f, 0.60f, 1f);
+        Color mapVoidColor = new Color(0.09f, 0.10f, 0.14f, 1f);
+
         [MenuItem("Tools/模块化地形/建筑生成器")]
         public static void Open()
         {
@@ -37,6 +42,8 @@ namespace TerrainGen.EditorTools
         {
             settings = AssetDatabase.LoadAssetAtPath<BuildingSettings>(ConfigFolder + "/BuildingSettings.asset");
             kit = AssetDatabase.LoadAssetAtPath<BuildingKitSet>(ConfigFolder + "/BuildingKitSet.asset");
+            mapFloorColor = LoadColor(FloorColorKey, mapFloorColor);
+            mapVoidColor = LoadColor(VoidColorKey, mapVoidColor);
         }
 
         void OnDisable() => DestroyImmediate(preview);
@@ -73,6 +80,15 @@ namespace TerrainGen.EditorTools
 
             if (!string.IsNullOrEmpty(summary))
                 EditorGUILayout.HelpBox(summary, summaryIsError ? MessageType.Error : MessageType.Info);
+
+            EditorGUILayout.Space(4);
+            EditorGUI.BeginChangeCheck();
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                mapFloorColor = EditorGUILayout.ColorField("底图地面色", mapFloorColor);
+                mapVoidColor = EditorGUILayout.ColorField("底图虚空色", mapVoidColor);
+            }
+            if (EditorGUI.EndChangeCheck()) SaveMapColors();
 
             EditorGUILayout.Space(4);
             using (new EditorGUILayout.HorizontalScope())
@@ -236,11 +252,53 @@ namespace TerrainGen.EditorTools
                 return;
             }
 
+            bool mapOk = TerrainMapImage.Write(field, mapFloorColor, mapVoidColor, out string mapPath);
+            // 落盘后要等编辑器导入完才拿得到 importer，放到延迟回调里做
+            if (mapOk) EditorApplication.delayCall += () =>
+            {
+                AssetDatabase.Refresh();
+                ApplyTextureImport(mapPath);
+            };
+
             summary = $"已烘焙 {data.items.Count} 个物件、{data.points.Count} 个点位（{field.Rooms.Count} 个房间）→ "
                       + TerrainPlanData.PathFor(settings.seed, settings.version)
                       + "；进播放模式后由 Culler 按区块动态生成";
-            summaryIsError = false;
+            summary += mapOk
+                ? $"\n底图 → {mapPath}（{TerrainMapImage.Resolution}×{TerrainMapImage.Resolution}，只画有无地面）"
+                : "\n底图生成失败，小地图将缺少底板";
+            summaryIsError = !mapOk;
             Log(summary);
+        }
+
+        void SaveMapColors()
+        {
+            EditorPrefs.SetString(FloorColorKey, "#" + ColorUtility.ToHtmlStringRGBA(mapFloorColor));
+            EditorPrefs.SetString(VoidColorKey, "#" + ColorUtility.ToHtmlStringRGBA(mapVoidColor));
+        }
+
+        static Color LoadColor(string key, Color fallback)
+        {
+            string html = EditorPrefs.GetString(key, string.Empty);
+            return !string.IsNullOrEmpty(html) && ColorUtility.TryParseHtmlString(html, out Color c) ? c : fallback;
+        }
+
+        // 底图是纯色块，压缩或 mipmap 会让格子边缘发糊，导入后固定成未压缩 + 双线性
+        static void ApplyTextureImport(string assetPath)
+        {
+            var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            if (importer == null)
+            {
+                Debug.LogError($"[地形] 底图导入失败：编辑器里找不到 {assetPath}，检查 Resources/Map 是否被忽略");
+                return;
+            }
+            importer.textureType = TextureImporterType.Default;
+            importer.mipmapEnabled = false;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.filterMode = FilterMode.Bilinear;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.maxTextureSize = TerrainMapImage.Resolution;
+            importer.sRGBTexture = true;
+            importer.SaveAndReimport();
         }
 
         // 烘导航数据：先确认场景里没有别的网格/碰撞体，再按服务器那套铺一次地形来烘，烘完清掉

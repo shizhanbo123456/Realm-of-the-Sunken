@@ -67,7 +67,6 @@ public class AssetsManager : MonoBehaviour
     public List<Texture2D> DefenseCharacterIcons = new();
     [SerializeField] private List<Texture> skillIconTextures = new();   // 贴图名前 3 位 = 技能 id
     [SerializeField] private List<Texture> buffIconTextures = new();    // 贴图名前 3 位 = Buff(EffectType) id
-    public Texture MapTexture;
 
     public Dictionary<int, Texture> SkillIconMap { get; private set; } = new();
     public Dictionary<int, Texture> BuffIconMap { get; private set; } = new();

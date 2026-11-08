@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using FairyGUI;
+using TerrainGen;
 using UnityEngine;
 
 namespace Ros.UI.Main
@@ -92,8 +93,11 @@ namespace Ros.UI.Main
         {
             if (m_loader == null) return;
             m_loader.fill = FillType.Scale;
-            if (mapTexture == null && Tool.AssetsManager != null && Tool.AssetsManager.MapTexture != null)
-                mapTexture = new NTexture(Tool.AssetsManager.MapTexture);
+            if (mapTexture == null)
+            {
+                Texture2D tex = TerrainMapImage.Load();
+                if (tex != null) mapTexture = new NTexture(tex);
+            }
             if (m_loader.texture == null) m_loader.texture = mapTexture;
         }
     }

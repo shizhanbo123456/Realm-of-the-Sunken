@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using FairyGUI;
 using Ros.Transport;
+using TerrainGen;
 using UnityEngine;
 
 namespace Ros.UI.Main
@@ -338,8 +339,11 @@ namespace Ros.UI.Main
             var loader = m_largeMinimapContainer != null ? m_largeMinimapContainer.m_loader : null;
             if (loader == null) return;
             loader.fill = FillType.Scale;
-            if (mapTexture == null && Tool.AssetsManager != null && Tool.AssetsManager.MapTexture != null)
-                mapTexture = new NTexture(Tool.AssetsManager.MapTexture);
+            if (mapTexture == null)
+            {
+                Texture2D tex = TerrainMapImage.Load();
+                if (tex != null) mapTexture = new NTexture(tex);
+            }
             if (loader.texture == null) loader.texture = mapTexture;
         }
 
