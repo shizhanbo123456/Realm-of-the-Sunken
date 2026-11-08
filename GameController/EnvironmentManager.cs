@@ -94,7 +94,8 @@ public class EnvironmentManager : MonoBehaviour
         if (BattleManager.AtServer) return;
         if (!NetworkManager.BattleRunning)
         {
-            // 非对局中不推进昼夜，但雾效开关的过渡仍要能走完（允许在组队大厅切换雾效）
+            // 非对局中不推进昼夜、不显示太阳（首页/大厅各有专用光照），但雾效开关的过渡仍要能走完
+            ApplySunVisible();
             ApplyFogDensity();
             return;
         }
@@ -183,6 +184,7 @@ public class EnvironmentManager : MonoBehaviour
     {
         ApplySkyboxExposure();
         ApplySun();
+        ApplySunVisible();
         ApplyFogColor();
         ApplyFogDensity();
     }
@@ -214,6 +216,14 @@ public class EnvironmentManager : MonoBehaviour
     {
         if (sun == null) return;
         sun.intensity = DayFactor * SunIntensityMax;
+    }
+
+    // 平行光只属于战斗：首页/大厅各有专用光照，非对局一律不显示
+    private void ApplySunVisible()
+    {
+        if (sun == null || BattleManager.AtServer) return;
+        bool visible = NetworkManager.BattleRunning;
+        if (sun.enabled != visible) sun.enabled = visible;
     }
 
     private void ApplyFogColor()
