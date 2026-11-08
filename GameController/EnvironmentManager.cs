@@ -18,12 +18,10 @@ public class EnvironmentManager : MonoBehaviour
     public const float FogDensityClear = 0.08f;
     public const float FogDensityFogged = 0.5f;
 
-    [Header("昼夜时长（秒）")]
-    [Tooltip("白天时长：光照值 ≥ 0.5 区间的总耗时。修改后只改变推进速率，当前时间不变。\n（客户端上的值仅作首帧前的初始值，运行时会被服务器下发的值覆盖）")]
-    [Min(0.01f)] public float dayDuration = 90f;
-
-    [Tooltip("晚上时长：光照值 < 0.5 区间的总耗时。修改后只改变推进速率，当前时间不变。\n（客户端上的值仅作首帧前的初始值，运行时会被服务器下发的值覆盖）")]
-    [Min(0.01f)] public float nightDuration = 90f;
+    // 昼夜时长（秒）：白天 = 光照值 ≥ 0.5 区间总耗时，晚上 = 光照值 < 0.5 区间总耗时。
+    // 不序列化：唯一来源是 global_variables 的 day_duration / night_duration（GM 可在运行时改写并随快照下发）
+    [System.NonSerialized] public float dayDuration;
+    [System.NonSerialized] public float nightDuration;
 
     [Header("表现引用（两套场景各自挂自己那份；服务器可不填）")]
     [Tooltip("天空盒材质球：昼夜变化时线性调整其 " + SkyExposureProperty + "（午夜 0.28 ~ 正午 1.92）")]
@@ -80,17 +78,14 @@ public class EnvironmentManager : MonoBehaviour
         ApplyVisual();
     }
 
-    // 昼夜时长默认值来自配表 global_variables
+    // 昼夜时长只来自配表 global_variables，代码里不设默认值
     private void ApplyConfigDurations()
     {
         int day = ConfigManager.GlobalVariableConfig.day_duration;
         int night = ConfigManager.GlobalVariableConfig.night_duration;
 
         if (day <= 0 || night <= 0)
-        {
-            Debug.LogError("[配表] global_variables.csv 的 day_duration / night_duration 必须填大于 0 的整数，已保留 Inspector 值");
-            return;
-        }
+            throw new System.InvalidOperationException("[配表] global_variables.csv 的 day_duration / night_duration 必须填大于 0 的整数");
 
         dayDuration = day;
         nightDuration = night;

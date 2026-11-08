@@ -112,8 +112,7 @@ public static class Config
     #endregion
 
     #region 昼夜
-    // 昼夜时长已移至 EnvironmentManager 的 Inspector 字段（dayDuration / nightDuration），
-    // 时间改为归一化周期值（[0,2)：0/2 = 午夜，1 = 正午）循环推演，此处不再保留"阶段时长"常量。
+    // 昼夜时长取配表 global_variables 的 day_duration / night_duration；时间用归一化周期值（[0,2)：0/2 = 午夜，1 = 正午）循环推演
     public const float daynight_sync_interval = 10f;
     #endregion
 
