@@ -136,10 +136,6 @@ public class HomePage : PageBase
             var range = ConfigManager.AttrRangeConfig.Get(i); // 属性条比例：最小值=空、最大值=满
             item.m_attrName.text = StatKeys[i];
             item.m_attrValue.text = values[i];
-            // 三条填充同位置叠画：最窄的依次压在上面，才看得出「基础 / 已成长 / 下一级预览」三段
-            item.SetChildIndex(item.m_next_level_fill, 0);
-            item.SetChildIndex(item.m_growth_fill, 1);
-            item.SetChildIndex(item.m_base, 2);
             item.m_base.fillAmount = range.Ratio(baseValues[i]);
             item.m_growth_fill.fillAmount = range.Ratio(curValues[i]);
             item.m_next_level_fill.fillAmount = range.Ratio(nextValues[i]);
