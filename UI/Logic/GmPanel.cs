@@ -688,7 +688,7 @@ public class GmPanel
         var sm = Tool.SaveManager;
         if (sm == null || delta == 0) return;
         if (delta > 0) sm.AddPlayerExp(delta); // 正向走存档的升级结算
-        else { sm.playerExp = Mathf.Max(0, sm.playerExp + delta); sm.Save(); }
+        else sm.playerExp = Mathf.Max(0, sm.playerExp + delta);
     }
 
     private static void ModifyPlayerLevel(int delta)
@@ -696,7 +696,6 @@ public class GmPanel
         var sm = Tool.SaveManager;
         if (sm == null || delta == 0) return;
         sm.playerLevel = Mathf.Clamp(sm.playerLevel + delta, 1, Config.player_max_level);
-        sm.Save();
     }
 
     private static void SetCharacterLevel(int index, int level)
@@ -704,7 +703,6 @@ public class GmPanel
         var sm = Tool.SaveManager;
         if (sm == null || index < 0 || index >= sm.characterLevels.Count) return;
         sm.characterLevels[index] = Mathf.Clamp(level, 1, Config.save_max_level);
-        sm.Save();
     }
     #endregion
 }

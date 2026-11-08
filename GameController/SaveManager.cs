@@ -13,6 +13,12 @@ public class SaveManager : MonoBehaviour
         ClientSelection.playerName = playerName;
     }
 
+    // 唯一的常规落盘时机：进程退出时统一写一次（改名/选角/结算入账都只改内存）
+    private void OnApplicationQuit()
+    {
+        Save();
+    }
+
     #region 数据
     public int playerLevel = 1;
     public int playerExp;
@@ -72,7 +78,6 @@ public class SaveManager : MonoBehaviour
             level++;
         }
         characterLevels[index] = level;
-        Save();
     }
 
     public void AddPlayerExp(int exp)
@@ -83,7 +88,6 @@ public class SaveManager : MonoBehaviour
             playerExp -= Config.GetPlayerLevelUpExp(playerLevel);
             playerLevel++;
         }
-        Save();
     }
     #endregion
 

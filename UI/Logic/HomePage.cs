@@ -32,12 +32,11 @@ public class HomePage : PageBase
         {
             ClientSelection.playerName = nameInput.text;
             if (Tool.SaveManager == null) return;
-            // 只有长度合法才落盘：空/超长名字写进存档会让下次启动判为无效存档并重建（等级经验一起丢）
+            // 只有长度合法才记进存档字段：空/超长名字写进存档会让下次启动判为无效存档并重建（等级经验一起丢）
             string trimmed = nameInput.text != null ? nameInput.text.Trim() : "";
             if (trimmed.Length < ConfigManager.GlobalVariableConfig.name_length_min
                 || trimmed.Length > ConfigManager.GlobalVariableConfig.name_length_max) return;
             Tool.SaveManager.playerName = trimmed;
-            Tool.SaveManager.Save();
         });
 
         panel.m_connectPanel.m_btn_connect.title = "连接";
@@ -107,7 +106,6 @@ public class HomePage : PageBase
         {
             if (defenseTab) ClientSelection.selectedDefenseIndex = index;
             else ClientSelection.selectedAttackIndex = index;
-            if (Tool.SaveManager != null) Tool.SaveManager.Save(); // 选角即落盘，下次启动沿用
             Refresh();
             RefreshPreview();
         });
@@ -226,11 +224,7 @@ public class HomePage : PageBase
             // 首尾空白去掉后回写：上报、显示与存档保持同一口径
             ClientSelection.playerName = name;
             panel.m_playerInfo.m_input_playerName.text = name;
-            if (Tool.SaveManager != null)
-            {
-                Tool.SaveManager.playerName = name;
-                Tool.SaveManager.Save();
-            }
+            if (Tool.SaveManager != null) Tool.SaveManager.playerName = name;
         }
         if (Tool.NetworkManager == null) return;
         var result = await Tool.NetworkManager.TryConnect(panel.m_connectPanel.m_input_ipaddress.m_content.text);
