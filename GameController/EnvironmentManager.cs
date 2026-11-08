@@ -12,8 +12,6 @@ public class EnvironmentManager : MonoBehaviour
     public const string SkyExposureProperty = "_Exposure";
 
     public const float SunIntensityMax = 1.5f;
-    public const float SunRotationDawn = 0f;
-    public const float SunRotationEvening = 180f;
 
     public const float FogDensityClear = 0.08f;
     public const float FogDensityFogged = 0.5f;
@@ -38,7 +36,7 @@ public class EnvironmentManager : MonoBehaviour
     public Color fogAlbedoNoon = new Color(64f / 255f, 82f / 255f, 89f / 255f, 1f);
 
     [Header("太阳")]
-    [Tooltip("太阳（平行光）：强度与旋转由昼夜时间驱动")]
+    [Tooltip("太阳（平行光）：强度由昼夜时间驱动；朝向固定为场景默认角度，不随时间旋转")]
     public Light sun;
 
     public static float CycleTime { get; private set; } = 1f;
@@ -211,18 +209,11 @@ public class EnvironmentManager : MonoBehaviour
         skyboxMaterial.SetFloat(skyExposureId, Mathf.Lerp(SkyExposureMidnight, SkyExposureNoon, Time01));
     }
 
+    // 只改强度：朝向保持场景里摆好的默认角度，昼夜推进不旋转
     private void ApplySun()
     {
         if (sun == null) return;
-
         sun.intensity = DayFactor * SunIntensityMax;
-
-        if (IsDay)
-        {
-            // CycleTime - 0.5 ∈ [0,1] 覆盖白天区间：0.5 → 0°，1 → 90°，1.5 → 180°
-            float x = (CycleTime - DayNightBoundary) * SunRotationEvening;
-            sun.transform.eulerAngles = new Vector3(x, 0f, 0f);
-        }
     }
 
     private void ApplyFogColor()
