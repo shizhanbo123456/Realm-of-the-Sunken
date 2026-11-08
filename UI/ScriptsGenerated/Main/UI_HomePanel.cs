@@ -13,9 +13,10 @@ namespace Ros.UI.Main
         public GList m_characterList;
         public GButton m_btn_defense;
         public GButton m_btn_attack;
+        public GTextField m_label_character_name;
         public GList m_attrList;
-        public GImage m_bar_fill_eexp;
-        public GTextField m_label_exp;
+        public GImage m_bar_fill_character_exp;
+        public GTextField m_label_character_exp;
         public const string URL = "ui://q68vr2bfvjeqgv";
 
         public static UI_HomePanel CreateInstance()
@@ -33,9 +34,10 @@ namespace Ros.UI.Main
             m_characterList = (GList)GetChildAt(4);
             m_btn_defense = (GButton)GetChildAt(5);
             m_btn_attack = (GButton)GetChildAt(6);
+            m_label_character_name = (GTextField)GetChildAt(8);
             m_attrList = (GList)GetChildAt(9);
-            m_bar_fill_eexp = (GImage)GetChildAt(11);
-            m_label_exp = (GTextField)GetChildAt(12);
+            m_bar_fill_character_exp = (GImage)GetChildAt(11);
+            m_label_character_exp = (GTextField)GetChildAt(12);
         }
     }
 }

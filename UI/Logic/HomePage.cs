@@ -73,12 +73,12 @@ public class HomePage : PageBase
 
     private int SelectedSaveIndex => defenseTab ? Config.attack_character_count + SelectedIndex : SelectedIndex;
 
-    // 列表、属性表、角色经验条同属「当前选中角色」，一起重画
+    // 列表、属性表、选中角色信息同属「当前选中角色」，一起重画
     private void Refresh()
     {
         panel.m_characterList.numItems = defenseTab ? Config.defense_character_count : Config.attack_character_count;
         RefreshAttrList();
-        RefreshCharacterExp();
+        RefreshCharacterInfo();
     }
 
     private void RenderCharacter(int index, GObject obj)
@@ -86,11 +86,10 @@ public class HomePage : PageBase
         var head = (UI_RoleHead)obj;
         int saveIndex = defenseTab ? Config.attack_character_count + index : index;
         ConfigManager.EntityConfig info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
-        string name = !string.IsNullOrEmpty(info.name) ? info.name : (defenseTab ? $"防守角色 {index}" : $"进攻角色 {index}");
         int level = Tool.SaveManager != null ? Tool.SaveManager.GetCharacterLevel(saveIndex) : 1;
         bool unlocked = Tool.SaveManager == null || Tool.SaveManager.IsCharacterUnlocked(saveIndex);
 
-        head.m_roleName.text = name;
+        head.m_roleName.text = DisplayName(info, index);
         head.m_level.selectedIndex = Mathf.Clamp(level - 1, 0, head.m_level.pageCount - 1);
         head.m_lock.selectedIndex = unlocked ? 0 : 1;
         head.m_quality.selectedIndex = info.quality;
@@ -144,16 +143,26 @@ public class HomePage : PageBase
         panel.m_attrList.numItems = StatKeys.Length;
     }
 
-    // 选中角色经验条：进度 = 当前级经验 / 升到下一级所需（满级拉满）
-    private void RefreshCharacterExp()
+    // 右侧角色信息：名称 + 经验条（进度 = 当前级经验 / 升到下一级所需，满级拉满）
+    private void RefreshCharacterInfo()
     {
         int saveIndex = SelectedSaveIndex;
+        ConfigManager.EntityConfig info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
         int level = Tool.SaveManager != null ? Tool.SaveManager.GetCharacterLevel(saveIndex) : 1;
         int exp = Tool.SaveManager != null ? Tool.SaveManager.GetCharacterExp(saveIndex) : 0;
         bool maxed = level >= Config.save_max_level;
         int need = maxed ? 0 : ConfigManager.ExpCharacterConfig.Get(level + 1).exp;
-        panel.m_bar_fill_eexp.fillAmount = need > 0 ? Mathf.Clamp01((float)exp / need) : 1f;
-        panel.m_label_exp.text = need > 0 ? $"{exp}/{need}" : "MAX";
+
+        panel.m_label_character_name.text = DisplayName(info, SelectedIndex);
+        panel.m_bar_fill_character_exp.fillAmount = need > 0 ? Mathf.Clamp01((float)exp / need) : 1f;
+        panel.m_label_character_exp.text = need > 0 ? $"{exp}/{need}" : "MAX";
+    }
+
+    // 列表条目与右侧标题共用一个名字口径：配表没名字时退回「进攻/防守角色 + 页签内下标」
+    private string DisplayName(ConfigManager.EntityConfig info, int index)
+    {
+        if (!string.IsNullOrEmpty(info.name)) return info.name;
+        return defenseTab ? $"防守角色 {index}" : $"进攻角色 {index}";
     }
 
     private static float[] ToValues(EntityAttribute attr)
