@@ -10,6 +10,7 @@ public class HomePage : PageBase
     private const string NextGainOrange = "#FF9E47"; // 下一级将获得的增益
 
     private readonly UI_HomePanel panel;
+    private UI_RemanePanel renamePanel; // 改名弹窗：设计自带全屏遮罩，挂 GRoot 置顶
     private bool defenseTab;
 
     public HomePage(UI_HomePanel panel) : base(panel)
@@ -25,19 +26,8 @@ public class HomePage : PageBase
         panel.m_btn_defense.onClick.Add(() => SwitchTab(true));
         ApplyTabMark();
 
-        var nameInput = panel.m_playerInfo.m_input_playerName;
-        nameInput.maxLength = ConfigManager.GlobalVariableConfig.name_length_max;
-        nameInput.text = ClientSelection.playerName;
-        nameInput.onChanged.Add(() =>
-        {
-            ClientSelection.playerName = nameInput.text;
-            if (Tool.SaveManager == null) return;
-            // 只有长度合法才记进存档字段：空/超长名字写进存档会让下次启动判为无效存档并重建（等级经验一起丢）
-            string trimmed = nameInput.text != null ? nameInput.text.Trim() : "";
-            if (trimmed.Length < ConfigManager.GlobalVariableConfig.name_length_min
-                || trimmed.Length > ConfigManager.GlobalVariableConfig.name_length_max) return;
-            Tool.SaveManager.playerName = trimmed;
-        });
+        panel.m_playerInfo.m_remame_button.onClick.Add(OpenRename);
+        BuildRenamePanel();
 
         panel.m_connectPanel.m_btn_connect.title = "连接";
         panel.m_connectPanel.m_btn_connect.onClick.Add(OnConnectClicked);
@@ -46,15 +36,87 @@ public class HomePage : PageBase
     public override void Enter(ShowParam param)
     {
         base.Enter(param);
-        panel.m_playerInfo.m_input_playerName.text = ClientSelection.playerName;
+        RefreshPlayerName();
         RefreshPlayerExp();
         Refresh();                                      // 列表、属性表与角色经验条按当前存档重画
         RefreshPreview();                               // 当前选中的两角色摆到场景锚点
+        if (renamePanel != null) renamePanel.visible = false;
         if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
             Tool.ClientLogicManager.HomePreview.ResetHomeView();
     }
 
+    public override void Exit()
+    {
+        base.Exit();
+        if (renamePanel != null) renamePanel.visible = false; // 弹窗挂 GRoot，不收起来会留在别的页面上
+    }
+
+    public override void OnResize(float width, float height)
+    {
+        base.OnResize(width, height);
+        ApplyRenameTransform();
+    }
+
     #region//Local
+    private void BuildRenamePanel()
+    {
+        renamePanel = UI_RemanePanel.CreateInstance();
+        renamePanel.opaque = true;   // 吞掉点击：弹窗开着时首页与连接按钮都不响应
+        renamePanel.touchable = true;
+        GRoot.inst.AddChild(renamePanel);
+        renamePanel.visible = false;
+
+        renamePanel.m_input.maxLength = ConfigManager.GlobalVariableConfig.name_length_max;
+        renamePanel.m_confirm.onClick.Add(CommitRename);
+        renamePanel.m_panel.m_close.onClick.Set(CloseRename); // 关闭 = 放弃修改
+    }
+
+    private void OpenRename()
+    {
+        renamePanel.m_input.text = ClientSelection.playerName;
+        GRoot.inst.AddChild(renamePanel); // 每次弹出都重新置顶
+        renamePanel.visible = true;
+        ApplyRenameTransform();
+    }
+
+    private void CloseRename()
+    {
+        renamePanel.visible = false;
+    }
+
+    // 只有名字合法才改名并关闭；不合法只飘字，弹窗留在原地
+    private void CommitRename()
+    {
+        int min = ConfigManager.GlobalVariableConfig.name_length_min;
+        int max = ConfigManager.GlobalVariableConfig.name_length_max;
+        string name = (renamePanel.m_input.text ?? "").Trim();
+        if (name.Length < min || name.Length > max)
+        {
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText($"玩家名字必须为{min}-{max}个字符");
+            return;
+        }
+
+        ClientSelection.playerName = name;
+        if (Tool.SaveManager != null) Tool.SaveManager.playerName = name;
+        RefreshPlayerName();
+        renamePanel.visible = false;
+    }
+
+    private void RefreshPlayerName()
+    {
+        panel.m_playerInfo.m_label_playerName.text = ClientSelection.playerName;
+    }
+
+    // 与页面同比例缩放并居中（弹窗尺寸 400×300，自带全屏遮罩）
+    private void ApplyRenameTransform()
+    {
+        if (renamePanel == null) return;
+        renamePanel.scale = new Vector2(UiScale, UiScale);
+        renamePanel.pivotAsAnchor = true;
+        renamePanel.pivot = new Vector2(0.5f, 0.5f);
+        renamePanel.SetXY(GRoot.inst.width * 0.5f, GRoot.inst.height * 0.5f);
+    }
+
     private void SwitchTab(bool defense)
     {
         defenseTab = defense;
@@ -223,8 +285,8 @@ public class HomePage : PageBase
         {
             // 首尾空白去掉后回写：上报、显示与存档保持同一口径
             ClientSelection.playerName = name;
-            panel.m_playerInfo.m_input_playerName.text = name;
             if (Tool.SaveManager != null) Tool.SaveManager.playerName = name;
+            RefreshPlayerName();
         }
         if (Tool.NetworkManager == null) return;
         var result = await Tool.NetworkManager.TryConnect(panel.m_connectPanel.m_input_ipaddress.m_content.text);

@@ -7,9 +7,9 @@ namespace Ros.UI.Main
 {
     public partial class UI_AttrItem : GComponent
     {
-        public GImage m_base;
-        public GImage m_growth_fill;
         public GImage m_next_level_fill;
+        public GImage m_growth_fill;
+        public GImage m_base;
         public GTextField m_attrName;
         public GTextField m_attrValue;
         public const string URL = "ui://q68vr2bftwqeh5";
@@ -23,9 +23,9 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
-            m_base = (GImage)GetChildAt(0);
+            m_next_level_fill = (GImage)GetChildAt(0);
             m_growth_fill = (GImage)GetChildAt(1);
-            m_next_level_fill = (GImage)GetChildAt(2);
+            m_base = (GImage)GetChildAt(2);
             m_attrName = (GTextField)GetChildAt(4);
             m_attrValue = (GTextField)GetChildAt(5);
         }

@@ -53,6 +53,7 @@ namespace Ros.UI.Main
             UIObjectFactory.SetPackageItemExtension(UI_ChatItem.URL, typeof(UI_ChatItem));
             UIObjectFactory.SetPackageItemExtension(UI_LoadingPanel.URL, typeof(UI_LoadingPanel));
             UIObjectFactory.SetPackageItemExtension(UI_PlayerInfo.URL, typeof(UI_PlayerInfo));
+            UIObjectFactory.SetPackageItemExtension(UI_RemanePanel.URL, typeof(UI_RemanePanel));
             UIObjectFactory.SetPackageItemExtension(UI_btn_chatShowHide.URL, typeof(UI_btn_chatShowHide));
             UIObjectFactory.SetPackageItemExtension(UI_DefensivePointBar.URL, typeof(UI_DefensivePointBar));
             UIObjectFactory.SetPackageItemExtension(UI_ConfirmPanel.URL, typeof(UI_ConfirmPanel));
