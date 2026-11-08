@@ -118,15 +118,15 @@ public class HomePage : PageBase
         ConfigManager.EntityConfig info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
         int level = Tool.SaveManager != null ? Tool.SaveManager.GetCharacterLevel(saveIndex) : 1;
 
-        float[] baseValues = ToValues(info.GetAttribute(1));    // 基础：1 级属性
-        float[] curValues = ToValues(info.GetAttribute(level)); // 当前等级加成后
+        int[] baseValues = ToValues(info.GetAttribute(1));      // 基础：1 级属性
+        int[] curValues = ToValues(info.GetAttribute(level));   // 当前等级加成后
         var nextAttr = level < Config.save_max_level ? info.GetAttribute(level + 1) : null;
-        float[] nextValues = nextAttr != null ? ToValues(nextAttr) : curValues; // 满级没有下一级：条与当前一致
+        int[] nextValues = nextAttr != null ? ToValues(nextAttr) : curValues; // 满级没有下一级：条与当前一致
 
         string[] values = new string[StatKeys.Length];
         for (int i = 0; i < StatKeys.Length; i++)
         {
-            float? next = nextAttr != null ? nextValues[i] : (float?)null;
+            int? next = nextAttr != null ? nextValues[i] : (int?)null;
             values[i] = StatPart(curValues[i], baseValues[i], next, AttrSuffixes[i]);
         }
 
@@ -136,6 +136,10 @@ public class HomePage : PageBase
             var range = ConfigManager.AttrRangeConfig.Get(i); // 属性条比例：最小值=空、最大值=满
             item.m_attrName.text = StatKeys[i];
             item.m_attrValue.text = values[i];
+            // 三条填充同位置叠画：最窄的依次压在上面，才看得出「基础 / 已成长 / 下一级预览」三段
+            item.SetChildIndex(item.m_next_level_fill, 0);
+            item.SetChildIndex(item.m_growth_fill, 1);
+            item.SetChildIndex(item.m_base, 2);
             item.m_base.fillAmount = range.Ratio(baseValues[i]);
             item.m_growth_fill.fillAmount = range.Ratio(curValues[i]);
             item.m_next_level_fill.fillAmount = range.Ratio(nextValues[i]);
@@ -165,31 +169,30 @@ public class HomePage : PageBase
         return defenseTab ? $"防守角色 {index}" : $"进攻角色 {index}";
     }
 
-    private static float[] ToValues(EntityAttribute attr)
+    // 属性一律取整显示（配置里的成长系数会算出小数，界面上不出现小数）
+    private static int[] ToValues(EntityAttribute attr)
     {
         return new[]
         {
-            attr.health, attr.attack, attr.critRate,
-            attr.critDamage, attr.viewDistance, attr.weaponSlotCount,
+            Mathf.RoundToInt(attr.health), Mathf.RoundToInt(attr.attack), Mathf.RoundToInt(attr.critRate),
+            Mathf.RoundToInt(attr.critDamage), Mathf.RoundToInt(attr.viewDistance), Mathf.RoundToInt(attr.weaponSlotCount),
         };
     }
 
-    private static string StatPart(float current, float baseVal, float? nextVal, string suffix = "")
+    private static string StatPart(int current, int baseVal, int? nextVal, string suffix = "")
     {
-        string s = Num(current) + suffix;
-        float gain = current - baseVal;
-        if (!Mathf.Approximately(gain, 0f))
-            s += $"[color={GainGreen}]+{Num(gain)}{suffix}[/color]";
+        string s = current + suffix;
+        int gain = current - baseVal;
+        if (gain != 0)
+            s += $"[color={GainGreen}]+{gain}{suffix}[/color]";
         if (nextVal.HasValue)
         {
-            float next = nextVal.Value - current;
-            if (!Mathf.Approximately(next, 0f))
-                s += $"[color={NextGainOrange}]（+{Num(next)}{suffix}）[/color]";
+            int next = nextVal.Value - current;
+            if (next != 0)
+                s += $"[color={NextGainOrange}]（+{next}{suffix}）[/color]";
         }
         return s;
     }
-
-    private static string Num(float v) => v.ToString("0.#");
 
     // 选中角色变化后重建场景里的预览模型
     private void RefreshPreview()
@@ -198,7 +201,7 @@ public class HomePage : PageBase
             Tool.ClientLogicManager.HomePreview.RefreshHome(ClientSelection.selectedAttackIndex, ClientSelection.selectedDefenseIndex);
     }
 
-    // 玩家经验条：进度 = 当前级经验 / 升到下一级所需（经验与等级都在存档里，满级拉满）
+    // 玩家经验条：等级 + 进度（当前级经验 / 升到下一级所需，满级拉满）
     private void RefreshPlayerExp()
     {
         var info = panel.m_playerInfo;
@@ -207,7 +210,7 @@ public class HomePage : PageBase
         bool maxed = level >= Config.player_max_level;
         int need = maxed ? 0 : Config.GetPlayerLevelUpExp(level);
         info.m_bar_fill_energy.fillAmount = need > 0 ? Mathf.Clamp01((float)exp / need) : 1f;
-        info.m_label_exp.text = need > 0 ? $"{exp}/{need}" : "MAX";
+        info.m_label_exp.text = need > 0 ? $"等级 {level}   {exp}/{need}" : $"等级 {level}   MAX";
     }
 
     private async void OnConnectClicked()
