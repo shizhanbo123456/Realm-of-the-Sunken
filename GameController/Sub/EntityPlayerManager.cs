@@ -29,7 +29,6 @@ public class EntityPlayerManager : ClientSubManager
         public float pendingPlayFrame;
         public int pendingPlayTick;
 
-        public WeaponRef heldWeapon;
         public EntityModelInfo modelInfo; // 烘焙包围盒（CreateView 时缓存，发射点/头顶锚点共用）
         public Transform cameraAnchor;    // 相机注视点 = EntityAnchor.Camera；旋转取实体根，供相机偏航同步
 
@@ -269,7 +268,6 @@ public class EntityPlayerManager : ClientSubManager
         if (view.anim != null) view.anim.ApplyParamPack(info.animParams);
         if (view.anim != null) view.anim.SetMoveSpeedScale(info.moveSpeedScale);
         if (view.anim != null) view.anim.SetPaused(info.paused); // 强控期间置 0：与服务器一致地冻结动画
-        ApplyHeldWeapon(view, info.heldWeaponCategory, info.heldWeaponIndex); // 手持武器随动画事件同步（仅武器类攻击动画期间有值）
 
         // -1 = "未进入任何状态"哨兵；fullPathHash 是路径哈希、可能为负，不能用 > 0 判有效
         if (view.animator != null && info.animId != -1 && info.animId != view.animHash)
@@ -361,7 +359,13 @@ public class EntityPlayerManager : ClientSubManager
             // EntityAnim 挂在预制体根节点、Animator 在子物体（模型）上，故从根往下找，不能用 animator.GetComponent
             view.anim = go.GetComponentInChildren<EntityAnim>();
             // 客户端动画：与服务器同一 Controller 资产；无 EntityData，攻击帧回调不传（伤害只由服务器算）
-            if (view.anim != null) view.anim.Init(null);
+            if (view.anim != null)
+            {
+                view.anim.Init(null);
+                // 武器由实体配表固定，显示位置之后完全由动画状态驱动
+                var config = ConfigManager.EntityConfig.GetByCategory(info.type);
+                view.anim.SetWeapon(config.weaponId, config.weaponDisplay);
+            }
 
             // 客户端表现刚体：dynamic + 关重力，逐帧 MovePosition 喂位姿；只有 dynamic 才与场景静态碰撞体做穿透解算
             view.modelInfo.BuildCapsuleCollider();
@@ -376,21 +380,6 @@ public class EntityPlayerManager : ClientSubManager
             view.rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
         }
         return view;
-    }
-
-    private void ApplyHeldWeapon(ClientEntityView view, int weaponCategory, int weaponIndex)
-    {
-        var weapon = new WeaponRef((WeaponCategory)weaponCategory, weaponIndex);
-        if (view.heldWeapon == weapon) return;
-        view.heldWeapon = weapon;
-        if (view.anim == null) return; // 非人形单位没有手部，不显示手上武器
-        if (!weapon.IsValid || Tool.AssetsManager == null
-            || !Tool.AssetsManager.TryGetWeaponPrefab(weapon, out var prefab))
-        {
-            view.anim.SetHeldObject(null);
-            return;
-        }
-        view.anim.SetHeldObject(prefab); // 挂点未配置时自动取 Humanoid 手部骨骼，无需手工配置
     }
 
     private static readonly HashSet<int> s_activeBuffs = new();

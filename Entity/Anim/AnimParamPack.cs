@@ -5,6 +5,7 @@ public struct AnimParamPack
     public bool inAir;          // InAir
     public bool moving;         // Moving
     public bool slide;          // Slide
+    public int hit;             // Hit（0 短受击 / 1 长受击）
 
     public static AnimParamPack Default => default;
 }
@@ -18,6 +19,7 @@ public struct AnimParamPackSerializer
         if (!BoolSerializer.Serialize(value.inAir, result, ref indexStart)) return false;
         if (!BoolSerializer.Serialize(value.moving, result, ref indexStart)) return false;
         if (!BoolSerializer.Serialize(value.slide, result, ref indexStart)) return false;
+        if (!IntSerializer.Serialize(value.hit, result, ref indexStart)) return false;
         return true;
     }
 
@@ -30,6 +32,7 @@ public struct AnimParamPackSerializer
             inAir = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
             moving = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
             slide = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
+            hit = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
         };
     }
 }

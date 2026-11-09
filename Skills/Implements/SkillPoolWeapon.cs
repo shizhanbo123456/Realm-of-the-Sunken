@@ -5,7 +5,7 @@ using UnityEngine;
 namespace Ros.Skill
 {
     // 武器技能（50 个）。槽位 → 技能 的对应是临时顺序分配（刀 11 / 长枪 8 / 枪械 15 / 魔法球 16），
-    // 需要调整时只改本文件里各类的 WeaponRef 与 SkillTypes 顺序，不用动实现。
+    // 需要调整时只改本文件的注册顺序与 SkillTypes 顺序，不用动实现。
     public static class SkillPoolWeapon
     {
         public static void RegisterAll()
@@ -349,7 +349,7 @@ namespace Ros.Skill
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.RightHand, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
-            int vfx = (int)Weapon;
+            int vfx = WeaponOf(caster);
             var attack = BuildAttack(caster);
             var spec = HitSpec(SkillVfxKind.Weapon, vfx, VfxScale());
             Spread.Fan(origin, aim, Shots, 1, SpreadDeg, 0f, BulletLife,
@@ -362,7 +362,7 @@ namespace Ros.Skill
             Vector3 origin = context.ReadVector3();
             Vector3 aim = context.ReadVector3();
             Spread.Fan(origin, aim, Shots, 1, SpreadDeg, 0f, BulletLife,
-                trajectory => VfxHelper.PlayOne(SkillVfxKind.Weapon, (int)Weapon, trajectory, VfxScale()));
+                trajectory => VfxHelper.PlayOne(SkillVfxKind.Weapon, DisplayWeapon(context), trajectory, VfxScale()));
         }
     }
 
@@ -378,7 +378,7 @@ namespace Ros.Skill
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
-            int vfx = (int)Weapon;
+            int vfx = WeaponOf(caster);
             var attack = BuildAttack(caster);
             var spec = HitSpec(SkillVfxKind.Weapon, vfx, VfxScale());
             Spread.Fan(origin, aim, Shots, 1, SpreadDeg, 0f, BulletLife,
@@ -391,7 +391,7 @@ namespace Ros.Skill
             Vector3 origin = context.ReadVector3();
             Vector3 aim = context.ReadVector3();
             Spread.Fan(origin, aim, Shots, 1, SpreadDeg, 0f, BulletLife,
-                trajectory => VfxHelper.PlayOne(SkillVfxKind.Weapon, (int)Weapon, trajectory, VfxScale()));
+                trajectory => VfxHelper.PlayOne(SkillVfxKind.Weapon, DisplayWeapon(context), trajectory, VfxScale()));
         }
     }
 
@@ -406,7 +406,7 @@ namespace Ros.Skill
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
-            int vfx = (int)Weapon;
+            int vfx = WeaponOf(caster);
             Tool.BattleManager.ShootBullet(caster, BuildAttack(caster),
                 new SkillTrajectorySkyFall(origin, aim, BulletLife), BulletLife,
                 HitSpec(SkillVfxKind.Weapon, vfx, VfxScale()));
@@ -417,7 +417,7 @@ namespace Ros.Skill
         {
             Vector3 origin = context.ReadVector3();
             Vector3 aim = context.ReadVector3();
-            VfxHelper.PlayOne(SkillVfxKind.Weapon, (int)Weapon,
+            VfxHelper.PlayOne(SkillVfxKind.Weapon, DisplayWeapon(context),
                 new SkillTrajectorySkyFall(origin, aim, BulletLife), VfxScale());
         }
     }
@@ -433,7 +433,7 @@ namespace Ros.Skill
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.RightHand, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
-            int vfx = (int)Weapon;
+            int vfx = WeaponOf(caster);
             Tool.BattleManager.ShootBullet(caster, BuildAttack(caster),
                 new SkillTrajectoryBoomerang(caster.id, origin, aim), BulletLife,
                 HitSpec(SkillVfxKind.Weapon, vfx, VfxScale()));
@@ -444,7 +444,7 @@ namespace Ros.Skill
         {
             Vector3 origin = context.ReadVector3();
             Vector3 aim = context.ReadVector3();
-            VfxHelper.PlayOne(SkillVfxKind.Weapon, (int)Weapon,
+            VfxHelper.PlayOne(SkillVfxKind.Weapon, DisplayWeapon(context),
                 new SkillTrajectoryBoomerang(context.caster.id, origin, aim), VfxScale());
         }
     }
@@ -463,7 +463,7 @@ namespace Ros.Skill
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Offset);
             Vector3 aim = Aim(caster, origin);
-            int vfx = (int)Weapon;
+            int vfx = WeaponOf(caster);
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
             var spec = HitSpec(SkillVfxKind.Weapon, vfx, VfxScale());
             Spread.Fan(origin, aim, Shots, 1, 0f, 0f, BulletLife,
@@ -476,9 +476,9 @@ namespace Ros.Skill
             Vector3 origin = context.ReadVector3();
             Vector3 aim = context.ReadVector3();
             Spread.Fan(origin, aim, Shots, 1, 0f, 0f, BulletLife,
-                trajectory => VfxHelper.PlayOne(SkillVfxKind.Weapon, (int)Weapon, trajectory, VfxScale()));
+                trajectory => VfxHelper.PlayOne(SkillVfxKind.Weapon, DisplayWeapon(context), trajectory, VfxScale()));
             // 命中后原地静止漂浮：纯表现，不参与判定
-            VfxHelper.PlayOne(SkillVfxKind.Weapon, (int)Weapon,
+            VfxHelper.PlayOne(SkillVfxKind.Weapon, DisplayWeapon(context),
                 new SkillTrajectoryPoint(aim, HoverTime), VfxScale());
         }
     }
@@ -502,7 +502,7 @@ namespace Ros.Skill
         protected override void OnCast(EntityData caster)
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
-            int vfx = (int)Weapon;
+            int vfx = WeaponOf(caster);
             var attack = BuildAttack(caster);
             var spec = HitSpec(SkillVfxKind.Weapon, vfx, VfxScale());
             for (int i = 0; i < Shots; i++)
@@ -519,7 +519,7 @@ namespace Ros.Skill
             Vector3 origin = context.ReadVector3();
             for (int i = 0; i < Shots; i++)
             {
-                VfxHelper.PlayOne(SkillVfxKind.Weapon, (int)Weapon,
+                VfxHelper.PlayOne(SkillVfxKind.Weapon, DisplayWeapon(context),
                     new SkillTrajectoryOrbit(context.caster.id, origin, Radius, i * 360f / Shots, Turns, BulletLife),
                     VfxScale());
             }
@@ -875,7 +875,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Weapon, (int)Weapon, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Weapon, WeaponOf(caster), VfxScale());
             for (int wave = 0; wave < Waves; wave++)
             {
                 int w = wave;
@@ -899,20 +899,21 @@ namespace Ros.Skill
         {
             Vector3 center = context.ReadVector3();
             Vector3 aim = context.ReadVector3();
+            int weapon = DisplayWeapon(context);
             for (int wave = 0; wave < Waves; wave++)
             {
                 int w = wave;
-                if (w == 0) PlayOneWave(center, aim, 0);
-                else Timer.AddTimer(w, _ => PlayOneWave(center, aim, w), WaveGap * w, 1, false);
+                if (w == 0) PlayOneWave(center, aim, 0, weapon);
+                else Timer.AddTimer(w, _ => PlayOneWave(center, aim, w, weapon), WaveGap * w, 1, false);
             }
         }
 
-        private void PlayOneWave(Vector3 center, Vector3 aim, int wave)
+        private void PlayOneWave(Vector3 center, Vector3 aim, int wave, int weapon)
         {
             for (int i = 0; i < Shots; i++)
             {
                 Vector3 start = center + SpreadStyle.CircleDests(center, 1.5f, 6, wave * 60f + i * 30f)[0];
-                VfxHelper.PlayOne(SkillVfxKind.Weapon, (int)Weapon,
+                VfxHelper.PlayOne(SkillVfxKind.Weapon, weapon,
                     new SkillTrajectoryLine(start, aim, BulletLife), VfxScale());
             }
         }
@@ -933,7 +934,7 @@ namespace Ros.Skill
         {
             Vector3 center = caster.transform.position; // 落点中心是自己脚下
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Weapon, (int)Weapon, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Weapon, WeaponOf(caster), VfxScale());
             for (int wave = 0; wave < Waves; wave++)
             {
                 int w = wave;
@@ -957,21 +958,22 @@ namespace Ros.Skill
         public override void PlayWave(SCSkillDisplayContext context)
         {
             Vector3 center = context.ReadVector3();
+            int weapon = DisplayWeapon(context);
             for (int wave = 0; wave < Waves; wave++)
             {
                 int w = wave;
-                if (w == 0) PlayOneWave(center, 0);
-                else Timer.AddTimer(w, _ => PlayOneWave(center, w), WaveGap * w, 1, false);
+                if (w == 0) PlayOneWave(center, 0, weapon);
+                else Timer.AddTimer(w, _ => PlayOneWave(center, w, weapon), WaveGap * w, 1, false);
             }
         }
 
-        private void PlayOneWave(Vector3 center, int wave)
+        private void PlayOneWave(Vector3 center, int wave, int weapon)
         {
             Vector3[] ring = SpreadStyle.CircleDests(Vector3.zero, Ring, 6);
             for (int i = 0; i < Shots; i++)
             {
                 Vector3 land = center + ring[(wave * Shots + i) % 6];
-                VfxHelper.PlayOne(SkillVfxKind.Weapon, (int)Weapon,
+                VfxHelper.PlayOne(SkillVfxKind.Weapon, weapon,
                     new SkillTrajectorySkyFall(center + Vector3.up * 8f, land, BulletLife), VfxScale());
             }
         }
@@ -1640,7 +1642,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Offset);
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Weapon, (int)Weapon, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Weapon, WeaponOf(caster), VfxScale());
             for (int wave = 0; wave < Waves; wave++)
             {
                 int w = wave;
@@ -1664,20 +1666,21 @@ namespace Ros.Skill
         {
             Vector3 origin = context.ReadVector3();
             Vector3 aim = context.ReadVector3();
+            int weapon = DisplayWeapon(context);
             for (int wave = 0; wave < Waves; wave++)
             {
                 int w = wave;
-                if (w == 0) PlayOneWave(origin, aim, 0);
-                else Timer.AddTimer(w, _ => PlayOneWave(origin, aim, w), WaveGap * w, 1, false);
+                if (w == 0) PlayOneWave(origin, aim, 0, weapon);
+                else Timer.AddTimer(w, _ => PlayOneWave(origin, aim, w, weapon), WaveGap * w, 1, false);
             }
         }
 
-        private void PlayOneWave(Vector3 origin, Vector3 aim, int wave)
+        private void PlayOneWave(Vector3 origin, Vector3 aim, int wave, int weapon)
         {
             Vector3[] dests = SpreadStyle.FanDests(origin, aim, Shots, SpreadDeg);
             for (int i = 0; i < Shots; i++)
             {
-                VfxHelper.PlayOne(SkillVfxKind.Weapon, (int)Weapon,
+                VfxHelper.PlayOne(SkillVfxKind.Weapon, weapon,
                     new SkillTrajectoryBezier(origin, dests[i], BulletLife), VfxScale());
             }
         }

@@ -1,5 +1,6 @@
 using Ros.Transport;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -16,9 +17,8 @@ public class EntityAnim : MonoBehaviour
     private const string key_hit = "Hit";
     public enum CharcterAnimType
     {
-        Female=0,
-        Male=1,
-        Zombie=2
+        Spear=0,
+        Sword=1
     }
     public enum AnimState
     {
@@ -36,20 +36,32 @@ public class EntityAnim : MonoBehaviour
     }
     public enum AttackType
     {
-        Attack_Hand_L=1,
-        Attack_Hand_R=2,
-        Jump_Hit=11,
-        Jump_Mega=12,
-        Attack_Weapon_R=21,
-        Attack_Weapon_L=22,
-        Attack_Weapon_R_And_L=23,
-        Mega_Short=31,
-        Mega_Middle=32,
-        Mega_Long=33,
-        Zombie_Hand_Attack_R=41,
-        Zombie_Hand_Attack_L=42,
-        Zombie_Scream=43,
-        Kick=51,
+        Combo=0,
+        Attack_Hand=10,
+        Attack_Weapon=11,
+        Attack_AirDrop=20,
+        Attack_AirFront=21,
+        Kick=30,
+        Scream=31,
+        Mega_Short=40,
+        Mega_Middle=41,
+        Mega_Long=42,
+        Weapon_A=50,
+        Weapon_B=51,
+        Weapon_C=52,
+        Weapon_D=53,
+    }
+    public enum WeaponPos
+    {
+        Hide,   // 不显示
+        Show,   // 收起：长枪背在背上，刀收在腰间
+        Hand,   // 拿在手上
+    }
+    public enum WeaponDisplayType
+    {
+        Spear,      // 长枪
+        Sword,      // 刀
+        DualSword,  // 双刀
     }
     private AnimState currentState = AnimState.Motion;
     public AnimState CurrentState
@@ -127,6 +139,7 @@ public class EntityAnim : MonoBehaviour
             animator.SetBool(key_inAir, paramPack.inAir);
             animator.SetBool(key_moving, paramPack.moving);
             animator.SetBool(key_slide, paramPack.slide);
+            animator.SetInteger(key_hit, paramPack.hit);
         }
     }
     public void SetType(CharcterAnimType type)
@@ -158,14 +171,99 @@ public class EntityAnim : MonoBehaviour
         }
     }
 
-    public WeaponRef GetDisplayHeldWeapon(WeaponRef serverHeld)
+    #region//武器显示（持有哪把武器由实体配表决定，显示位置由动画状态决定）
+    private int weaponId = -1;
+    private WeaponDisplayType weaponDisplay;
+    private WeaponPos weaponPos = WeaponPos.Hide;
+    private readonly List<GameObject> weaponVisuals = new();
+
+    public int WeaponId => weaponId;
+
+    // 实体固定武器：服务器与客户端视图、首页角色各在 Init 之后调一次
+    public void SetWeapon(int id, WeaponDisplayType display)
     {
-        bool weaponAttack = CurrentState == AnimState.Attack
-            && paramPack.attackId is (int)AttackType.Attack_Weapon_R
-                or (int)AttackType.Attack_Weapon_L
-                or (int)AttackType.Attack_Weapon_R_And_L;
-        return weaponAttack && serverHeld.IsValid ? serverHeld : WeaponRef.None;
+        weaponId = id;
+        weaponDisplay = display;
+        RefreshWeaponVisuals();
     }
+
+    // 每次进入新动画状态时由 AnimEvent 调用
+    public void SetWeaponPos(WeaponPos pos)
+    {
+        if (weaponPos == pos) return;
+        weaponPos = pos;
+        RefreshWeaponVisuals();
+    }
+
+    private void RefreshWeaponVisuals()
+    {
+        for (int i = 0; i < weaponVisuals.Count; i++)
+        {
+            if (weaponVisuals[i] != null) Destroy(weaponVisuals[i]);
+        }
+        weaponVisuals.Clear();
+
+        if (weaponPos == WeaponPos.Hide || weaponId < 0) return;
+        if (Tool.AssetsManager == null)
+        {
+            Debug.LogError($"{gameObject.name} 显示武器需要 AssetsManager");
+            return;
+        }
+        if (!Tool.AssetsManager.TryGetWeaponPrefab(weaponId, out var prefab))
+        {
+            Debug.LogError($"{gameObject.name} 的武器 {weaponId} 不在 AssetsManager 的武器列表中");
+            return;
+        }
+        if (weaponPos == WeaponPos.Hand)
+        {
+            AttachWeapon(prefab, GetHandMount(false));
+            if (weaponDisplay == WeaponDisplayType.DualSword) AttachWeapon(prefab, GetHandMount(true));
+            return;
+        }
+        // 收起：长枪背在背上，刀收在右腰，双刀左右腰各一把
+        switch (weaponDisplay)
+        {
+            case WeaponDisplayType.Spear:
+                AttachWeapon(prefab, BackMount());
+                break;
+            case WeaponDisplayType.Sword:
+                AttachWeapon(prefab, HipMount(false));
+                break;
+            case WeaponDisplayType.DualSword:
+                AttachWeapon(prefab, HipMount(true));
+                AttachWeapon(prefab, HipMount(false));
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(weaponDisplay), weaponDisplay, "未知武器显示类型");
+        }
+    }
+
+    private void AttachWeapon(GameObject prefab, Transform mount)
+    {
+        if (mount == null) return;
+        GameObject instance = Instantiate(prefab, mount);
+        instance.transform.localPosition = Vector3.zero;
+        instance.transform.localRotation = Quaternion.identity;
+        weaponVisuals.Add(instance);
+    }
+
+    private Transform BackMount()
+    {
+        if (animData != null && animData.weaponBackMount != null) return animData.weaponBackMount;
+        Debug.LogError($"{gameObject.name} 缺少背挂点，无法收起长枪（EntityAnimData.weaponBackMount）");
+        return null;
+    }
+
+    private Transform HipMount(bool left)
+    {
+        Transform mount = animData != null
+            ? (left ? animData.weaponHipLeftMount : animData.weaponHipRightMount)
+            : null;
+        if (mount != null) return mount;
+        Debug.LogError($"{gameObject.name} 缺少{(left ? "左" : "右")}腰挂点，无法收起武器（EntityAnimData.weaponHip{(left ? "Left" : "Right")}Mount）");
+        return null;
+    }
+    #endregion
 
     #region//设置速度
     private float PlaybackSpeed => paused ? 0f : speed;
@@ -231,21 +329,7 @@ public class EntityAnim : MonoBehaviour
         boneCache[humanBoneId] = boneTransform;
         return boneTransform;
     }
-    private readonly GameObject[] heldObjects = new GameObject[2];
-    public void SetHeldObject(GameObject prefab, bool leftHand = false)
-    {
-        int slot = leftHand ? 1 : 0;
-        if (heldObjects[slot] != null) Destroy(heldObjects[slot]);
-        heldObjects[slot] = null;
-        if (prefab == null) return;
-
-        Transform mount = GetHandMount(leftHand);
-        if (mount == null) return;
-        heldObjects[slot] = Instantiate(prefab, mount);
-        heldObjects[slot].transform.localPosition = Vector3.zero;
-        heldObjects[slot].transform.localRotation = Quaternion.identity;
-    }
-    public Transform GetHandMount(bool leftHand)
+    private Transform GetHandMount(bool leftHand)
     {
         return mainAnimator != null
             ? mainAnimator.GetBoneTransform(leftHand ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand)
@@ -337,9 +421,9 @@ public class EntityAnim : MonoBehaviour
         SetIntParam(ref paramPack.attackId, (int)attack, key_attackId);
         SetTriggerAll(key_doAttack);
     }
-    public void DoHit()
+    public void DoHit(bool longHit)
     {
-        SetTriggerAll(key_hit);
+        SetIntParam(ref paramPack.hit, longHit?1:0, key_hit);
     }
     #endregion
 }

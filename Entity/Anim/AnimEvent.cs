@@ -6,6 +6,7 @@ public class AnimEvent : StateMachineBehaviour
     protected virtual InputBlockOp blockOp { get; } = InputBlockOp.None;
     protected virtual bool UseGravity { get; } = true;
     public virtual EndureType? Endure { get; }
+    public virtual EntityAnim.WeaponPos ShowWeapon { get; }
     //用于传递给客户端识别动画片段
     public int AnimId { get; private set; } = -1;
 
@@ -30,9 +31,10 @@ public class AnimEvent : StateMachineBehaviour
     public override void OnStateEnter(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
     {
         base.OnStateEnter(animator, stateInfo, layerIndex);
+        if (!main) return;
+        anim.SetWeaponPos(ShowWeapon); // 武器显示只跟动画状态走：客户端与首页角色（无 EntityData）同样要切
         if (data == null) return;
         AnimId = stateInfo.fullPathHash;
-        if (!main) return;
         anim.NotifyStateEnter(AnimId, State);
 
         data.SetGravityEnabled(UseGravity);

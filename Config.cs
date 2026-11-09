@@ -149,20 +149,14 @@ public static class Config
     #endregion
 
     #region 武器与技能
-    #region 武器技能 id 区间（珊瑚掉武器全段随机；段长 = 武器数量，段长与顺序不可随意调整）
-    public const int weapon_id_melee_min = (int)SkillType.SkillFanIceCone;         // 近战刀 11 把
-    public const int weapon_id_melee_max = (int)SkillType.SkillSkyfallWeapon;
-    public const int weapon_id_spear_min = (int)SkillType.SkillBoomerangWeapon;    // 长枪 8 把
-    public const int weapon_id_spear_max = (int)SkillType.SkillIceFanTiny;
-    public const int weapon_id_gun_min = (int)SkillType.SkillBackVolley;          // 枪械 15 把
-    public const int weapon_id_gun_max = (int)SkillType.SkillShieldFour;
-    public const int weapon_id_magic_min = (int)SkillType.SkillSplitShot;         // 魔法球 16 个
-    public const int weapon_id_magic_max = (int)SkillType.SkillAllyShieldTwentyFive;
+    #region 武器技能 id 区间（珊瑚掉落在这段技能里均匀随机；段长与顺序不可随意调整）
+    public const int weapon_skill_id_min = (int)SkillType.SkillFanIceCone;
+    public const int weapon_skill_id_max = (int)SkillType.SkillAllyShieldTwentyFive;
 
-    public static int GetRandomWeaponId()
+    public static int GetRandomWeaponSkillId()
     {
-        // 四段在 SkillType 里连续（刀 11 / 长枪 8 / 枪械 15 / 魔法球 16 = 50），整段随机即全武器均匀随机
-        return Random.Range(weapon_id_melee_min, weapon_id_magic_max + 1);
+        // 四个武器技能段在 SkillType 里连续（刀 11 / 长枪 8 / 枪械 15 / 魔法球 16 = 50），整段随机即均匀随机
+        return Random.Range(weapon_skill_id_min, weapon_skill_id_max + 1);
     }
     #endregion
     #endregion

@@ -313,10 +313,14 @@ public class Tool : MonoBehaviour
         e += CheckList("AssetsManager.BuffVFX", m.BuffVFX, vfx_buff_count);
         e += CheckList("AssetsManager.HitVFX", m.HitVFX, vfx_hit_count);
 
-        e += CheckList("AssetsManager.MeleeWeaponPrefabs", m.MeleeWeaponPrefabs, Config.weapon_id_melee_max - Config.weapon_id_melee_min + 1);
-        e += CheckList("AssetsManager.SpearWeaponPrefabs", m.SpearWeaponPrefabs, Config.weapon_id_spear_max - Config.weapon_id_spear_min + 1);
-        e += CheckList("AssetsManager.GunWeaponPrefabs", m.GunWeaponPrefabs, Config.weapon_id_gun_max - Config.weapon_id_gun_min + 1);
-        e += CheckList("AssetsManager.MagicOrbPrefabs", m.MagicOrbPrefabs, Config.weapon_id_magic_max - Config.weapon_id_magic_min + 1);
+        // 武器一维列表：entity.csv 里用到的编号必须都取得到预制体
+        foreach (var row in ConfigManager.EntityConfig.content.Values)
+        {
+            if (row.weaponId < 0) continue;
+            if (row.weaponId < m.WeaponPrefabs.Count && m.WeaponPrefabs[row.weaponId] != null) continue;
+            Debug.LogError($"[启动自检] AssetsManager.WeaponPrefabs 缺少武器 {row.weaponId}（{row.name} 使用）");
+            e++;
+        }
 
         e += CheckList("AssetsManager.AttackCharacterIcons", m.AttackCharacterIcons, Config.attack_character_count);
         e += CheckList("AssetsManager.DefenseCharacterIcons", m.DefenseCharacterIcons, Config.defense_character_count);

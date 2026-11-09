@@ -96,7 +96,7 @@ public class VfxManager : MonoBehaviour
         return Play(GetBulletVfx(index), trajectory, lifeTime, rotation, scale);
     }
 
-    // 传全局武器 id，内部经隐式转换还原 WeaponRef
+    // 传武器编号（entity.csv「武器编号」）
     public GameObject PlayWeaponVFX(int weaponId, BulletTrajectory trajectory, float lifeTime = 0f,
         BulletPlayer.RotationMode rotation = BulletPlayer.RotationMode.Tangent, float scale = 0f)
     {
@@ -104,7 +104,7 @@ public class VfxManager : MonoBehaviour
         return Play(prefab, trajectory, lifeTime, rotation, scale);
     }
 
-    // 传全局武器 id，内部经隐式转换还原 WeaponRef
+    // 传武器编号（entity.csv「武器编号」）
     public GameObject PlayWeaponVFX(int weaponId, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
     {
         if (Tool.AssetsManager == null || !Tool.AssetsManager.TryGetWeaponPrefab(weaponId, out var prefab)) return null;

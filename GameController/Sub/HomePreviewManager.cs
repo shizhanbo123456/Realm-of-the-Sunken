@@ -135,13 +135,10 @@ public class HomePreviewManager : ClientSubManager
             return go;
         }
         anim.Init(null);
-        var animData = go.GetComponentInChildren<EntityAnimData>();
-        if (animData == null)
-        {
-            Debug.LogError($"[展示] 角色模型缺少 EntityAnimData，动作集类型无法赋值：{type}");
-            return go;
-        }
-        anim.SetType(animData.type);
+        // 动画类型与武器都取实体配表，与战斗客户端同口径
+        var config = ConfigManager.EntityConfig.GetByCategory(type);
+        anim.SetType(config.animType);
+        anim.SetWeapon(config.weaponId, config.weaponDisplay);
         return go;
     }
 

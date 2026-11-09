@@ -55,7 +55,8 @@ public abstract class EntityData : MonoBehaviour
     // 飞行模式（仅玩家实体启用，见 PlayerEntityData.SetFlightMode）：重力关闭、免疫击飞/打断/位移，动画按地面状态播放
     public virtual bool FlightMode => false;
 
-    [HideInInspector] public WeaponRef heldWeapon = WeaponRef.None;
+    // 实体固定武器编号（一维，对应 AssetsManager 的武器列表；-1 = 无武器）
+    [HideInInspector] public int weaponId = -1;
 
     [HideInInspector] public EntityData lastAttacker;
 
@@ -106,8 +107,11 @@ public abstract class EntityData : MonoBehaviour
         level = this.level;
         this.camp = camp;
         baseAttribute = Tool.InfoManager != null ? Tool.InfoManager.GetAttribute(type, level) : new EntityAttribute();
+        var config = Tool.InfoManager != null ? Tool.InfoManager.GetEntityConfig(type) : null;
         // 霸体下限：entity.csv「霸体等级」列
-        defaultEndure = Tool.InfoManager != null ? Tool.InfoManager.GetEntityConfig(type).endureLevel : EndureType.None;
+        defaultEndure = config != null ? config.endureLevel : EndureType.None;
+        // 固定武器编号：entity.csv「武器编号」列
+        weaponId = config != null ? config.weaponId : -1;
         // 克隆即满血：base 的 health 是"生命值上限"，同一个字段克隆到 floating 后就承载"当前生命值"（复活走重建实体，同样落在这里）
         floatingAttribute = baseAttribute.Clone();
         effectController = new EntityEffectController();
@@ -121,15 +125,15 @@ public abstract class EntityData : MonoBehaviour
         ModelInfo = GetComponentInChildren<EntityModelInfo>();
         if (ModelInfo == null) Debug.LogError($"实体缺少 EntityModelInfo：{name}（{type}，id={id}）");
 
-        // 预制体/模板上的共用参数（动画类型）：服务端模板与客户端模型参数一致
-        var animData = GetComponent<EntityAnimData>();
-        if (animData == null) animData = GetComponentInChildren<EntityAnimData>();
-
-        // 动画初始化（一切动画控制统一走 EntityAnim）
+        // 动画类型与武器：都取实体配表（预制体上不再配）
         if (anim != null) anim.Init(this);
         if (anim != null)
         {
-            if (animData != null) anim.SetType(animData.type);
+            if (config != null)
+            {
+                anim.SetType(config.animType);
+                anim.SetWeapon(config.weaponId, config.weaponDisplay);
+            }
             anim.DoSpawn();
         }
 
@@ -479,11 +483,10 @@ public abstract class EntityData : MonoBehaviour
     public EndureType GetEndureLevel()
     {
         EndureType level;
-        // 配表「霸体等级覆盖」优先于强控/位移/动画片段
+        // 配表「霸体等级覆盖」优先于强控/动画片段
         if (effectController != null && effectController.TryGetEndureOverride(out var endure)) level = endure;
         else if (effectController != null && effectController.IsActionBlocked()) level = EndureType.None;
-        else if (motion != null) level = EndureType.Common;
-        else level = EndureOverride ?? EndureType.None;
+        else level = EndureOverride ?? EndureType.None; // 霸体只由动画片段（AnimEvent.Endure）提供
         // 实体默认霸体等级是下限，任何来源都不得低于它
         return level < defaultEndure ? defaultEndure : level;
     }
@@ -497,14 +500,15 @@ public abstract class EntityData : MonoBehaviour
             return;
         }
         EndureType endure = GetEndureLevel();
-        bool enterHit = anim!=null && (attack.breakEndure ? (endure == EndureType.None || endure == EndureType.Common) : endure == EndureType.None);
+        // 破霸体一律打断；不破霸体只对无霸体目标生效，打中霸体目标完全不打断（不进受击、不击飞、不停位移）
+        bool enterHit = anim != null && (attack.breakEndure || endure == EndureType.None);
         if (enterHit && FlightMode) enterHit = false; // 飞行免疫：不受击飞/被打断（伤害照常结算）
         if (enterHit)
         {
-            motion=null;  // 破霸体命中：打断位移
-            // 被击飞/被打断
-            if (!ApplyKnockback(attack, hitOrigin)) 
-                OnHitInterrupted(hitOrigin);
+            motion = null;  // 打断位移
+            anim.DoHit(attack.breakEndure); // 破霸体 = 长受击，否则短受击
+            if (!ApplyKnockback(attack, hitOrigin))
+                FaceHitOrigin(hitOrigin);
         }
         EntityData attacker = null;
         if (BattleManager.EntityContainer.Entities.TryGetObject(attack.shooter, out var shooter)) attacker = shooter;
@@ -528,10 +532,9 @@ public abstract class EntityData : MonoBehaviour
         return true;
     }
 
-    // 被打断但没击飞
-    private void OnHitInterrupted(Vector3 hitOrigin)
+    // 被打断但没击飞：转身面向命中来源（受击动画已在 ProcessHit 里播）
+    private void FaceHitOrigin(Vector3 hitOrigin)
     {
-        anim.DoHit();
         Vector3 to = hitOrigin - transform.position;
         to.y = 0f;
         if (to.sqrMagnitude < 0.0001f) return; // 命中来源几乎在正上/正下方，保持原朝向

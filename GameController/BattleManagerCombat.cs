@@ -250,7 +250,7 @@ public partial class BattleManager
             : ConfigManager.GlobalVariableConfig.coral_large_drop_chance;
         if (UnityEngine.Random.value > chance) return;
 
-        int weaponId = Config.GetRandomWeaponId(); // 全部武器均匀随机
+        int weaponId = Config.GetRandomWeaponSkillId(); // 掉的是技能：武器技能段内均匀随机
         var ids = player.skillController.GetSkillIds();
         if (ids.Contains(weaponId)) return;
         player.skillController.AddSkill(weaponId);

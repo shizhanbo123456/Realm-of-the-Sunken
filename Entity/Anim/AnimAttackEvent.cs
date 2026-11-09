@@ -5,7 +5,7 @@ public class AnimAttackEvent : AnimEvent
     protected override EntityAnim.AnimState State => EntityAnim.AnimState.Attack;
     protected override InputBlockOp blockOp => InputBlockOp.Rotation|InputBlockOp.Jump|InputBlockOp.Slide|InputBlockOp.Attack;
     protected override bool UseGravity => AttackClipUseGravity;
-    public override EndureType? Endure => EndureType.Common;
+    public override EndureType? Endure => EndureType.Super;
     [SerializeField] private EntityAnim.AttackType type;
     [SerializeField] private bool AttackClipUseGravity;
     [SerializeField] private AnimationCurve speedForward;//是位置，导数才是速度
@@ -50,9 +50,6 @@ public class AnimAttackEvent : AnimEvent
     public override void OnStateExit(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
     {
         base.OnStateExit(animator, stateInfo, layerIndex);
-        if (data == null) return;
-        if (!main) return;
-        // 手持武器不在此清除：发包时按当前动画状态解析（非武器类攻击 = 空手），残留值不会发给客户端
     }
     private void OnAttack()
     {

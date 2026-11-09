@@ -12,8 +12,6 @@ namespace Ros.Transport
         public AnimParamPack animParams;
         public float moveSpeedScale = 1f;
         public bool paused;
-        public int heldWeaponCategory;
-        public int heldWeaponIndex = -1;
     }
 
     public struct SCEntityAnimInfoSerializer
@@ -30,14 +28,13 @@ namespace Ros.Transport
                 if (!AnimParamPackSerializer.Serialize(value.animParams, result, ref indexStart)) return false;
                 if (!FloatSerializer.Serialize(value.moveSpeedScale, result, ref indexStart)) return false;
                 if (!BoolSerializer.Serialize(value.paused, result, ref indexStart)) return false;
-                if (!IntSerializer.Serialize(value.heldWeaponCategory, result, ref indexStart)) return false;
-                return IntSerializer.Serialize(value.heldWeaponIndex, result, ref indexStart);
+                return true;
             }
             else
             {
-                if (result.Length - indexStart < (value == null ? 1 : 12)) return false;
+                if (result.Length - indexStart < (value == null ? 1 : 11)) return false;
 
-                // 位级：1+15+32+10+2+6+3+12+1+3+7=92 位
+                // 位级：1+15+32+10+2+6+3+12+1+1=83 位
                 BitField.SetBuffer(result, indexStart);
                 BitField.WriteBool(value != null);
                 if (value != null)
@@ -50,10 +47,9 @@ namespace Ros.Transport
                     BitField.WriteBool(value.animParams.inAir);
                     BitField.WriteBool(value.animParams.moving);
                     BitField.WriteBool(value.animParams.slide);
+                    BitField.WriteInt(value.animParams.hit, 0, 1);                 // 0 短受击 / 1 长受击
                     BitField.WriteFloat(value.moveSpeedScale, 0f, SyncRanges.MoveSpeedScaleMax, 0.01f);
                     BitField.WriteBool(value.paused);
-                    BitField.WriteInt(value.heldWeaponCategory, 0, 7);
-                    BitField.WriteInt(value.heldWeaponIndex, -1, 63);              // -1 = 空手 / 无武器
                 }
                 indexStart += BitField.Flush();
                 return true;
@@ -74,8 +70,6 @@ namespace Ros.Transport
                     moveSpeedScale = FloatSerializer.Deserialize(data, ref indexStart, invalidIndex),
                     paused = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
                 };
-                info.heldWeaponCategory = IntSerializer.Deserialize(data, ref indexStart, invalidIndex);
-                info.heldWeaponIndex = IntSerializer.Deserialize(data, ref indexStart, invalidIndex);
                 return info;
             }
             else
@@ -88,18 +82,16 @@ namespace Ros.Transport
                     indexStart += 1;
                     return null;
                 }
-                if (invalidIndex - indexStart < 12) throw new Exception("反序列化 SCEntityAnimInfo 失败：剩余数据不足");
+                if (invalidIndex - indexStart < 11) throw new Exception("反序列化 SCEntityAnimInfo 失败：剩余数据不足");
 
                 var r = new SCEntityAnimInfo();
                 r.entityId = (ushort)BitField.ReadInt(0, SyncRanges.EntityIdMax);
                 r.animId = BitField.ReadInt(int.MinValue, int.MaxValue);
                 r.animFrame = BitField.ReadFloat(0f, 1f, 0.001f);
-                r.animParams = new AnimParamPack() { characterType = BitField.ReadInt(0, 3), attackId = BitField.ReadInt(0, 63), inAir = BitField.ReadBool(), moving = BitField.ReadBool(), slide = BitField.ReadBool() };
+                r.animParams = new AnimParamPack() { characterType = BitField.ReadInt(0, 3), attackId = BitField.ReadInt(0, 63), inAir = BitField.ReadBool(), moving = BitField.ReadBool(), slide = BitField.ReadBool(), hit = BitField.ReadInt(0, 1) };
                 r.moveSpeedScale = BitField.ReadFloat(0f, SyncRanges.MoveSpeedScaleMax, 0.01f);
                 r.paused = BitField.ReadBool();
-                r.heldWeaponCategory = BitField.ReadInt(0, 7);
-                r.heldWeaponIndex = BitField.ReadInt(-1, 63);
-                indexStart += 12;
+                indexStart += 11;
                 return r;
             }
         }

@@ -34,14 +34,14 @@ public class AttackData
         };
     }
 
-    // 倍率唯一来源是 skill.csv 第 13 列，代码不再额外乘任何系数
+    // 倍率唯一来源是 skill.csv 第 11 列，代码不再额外乘任何系数
     public int GetDamage(out CombatLabelType type, float segmentRate)
     {
         type = CombatLabelType.Normal;
         if (attribute == null) return 0;
         float final = attribute.attack;
         final *= outDamageMultiplier;                            // 出伤乘区
-        final *= segmentRate;                                    // 多段伤害倍率（skill.csv 第 13 列）
+        final *= segmentRate;                                    // 多段伤害倍率（skill.csv 第 11 列）
         if (attribute.critRate > 0f && UnityEngine.Random.Range(0f, 100f) < attribute.critRate)
         {
             type = CombatLabelType.Crit;

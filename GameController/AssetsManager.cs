@@ -56,10 +56,7 @@ public class AssetsManager : MonoBehaviour
     #endregion
 
     #region 武器（悬浮武器模型，SelectedWeaponPrefabCreator 生成到 Assets/Files/Prefabs/Weapons）
-    public List<GameObject> MeleeWeaponPrefabs = new();
-    public List<GameObject> SpearWeaponPrefabs = new();
-    public List<GameObject> GunWeaponPrefabs = new();
-    public List<GameObject> MagicOrbPrefabs = new();
+    public List<GameObject> WeaponPrefabs = new();
     #endregion
 
     #region UI 图标
@@ -117,22 +114,12 @@ public class AssetsManager : MonoBehaviour
 
     private static GameObject RandomOf(List<GameObject> list) => list.Count > 0 ? list[UnityEngine.Random.Range(0, list.Count)] : null;
 
-    public bool TryGetWeaponPrefab(WeaponRef weapon, out GameObject prefab)
+    // 武器是一维列表：编号即 entity.csv「武器编号」
+    public bool TryGetWeaponPrefab(int weaponId, out GameObject prefab)
     {
         prefab = null;
-        if (!weapon.IsValid) return false;
-        switch (weapon.category)
-        {
-            case WeaponCategory.Knife:    prefab = WeaponAt(MeleeWeaponPrefabs, weapon.index); break;
-            case WeaponCategory.Spear:    prefab = WeaponAt(SpearWeaponPrefabs, weapon.index); break;
-            case WeaponCategory.Gun:      prefab = WeaponAt(GunWeaponPrefabs, weapon.index); break;
-            case WeaponCategory.MagicOrb: prefab = WeaponAt(MagicOrbPrefabs, weapon.index); break;
-        }
+        if (weaponId < 0 || weaponId >= WeaponPrefabs.Count) return false;
+        prefab = WeaponPrefabs[weaponId];
         return prefab != null;
-    }
-
-    private static GameObject WeaponAt(List<GameObject> list, int index)
-    {
-        return list != null && index >= 0 && index < list.Count ? list[index] : null;
     }
 }

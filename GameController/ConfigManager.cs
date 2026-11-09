@@ -160,15 +160,42 @@ public class ConfigManager : MonoBehaviour
         throw new FormatException($"第 {col} 列的显示血条 {value} 只允许 空 / 0 / 1");
     }
 
-    // 默认霸体等级：留空 = 0（None），只允许 0~2（对应 EndureType）
+    // 默认霸体等级：留空 = 0（无霸体），只允许 0~1（对应 EndureType）
     public static EndureType ParseEndureLevel(string[] rowData, int col)
     {
         string raw = Cell(rowData, col);
         if (raw.Length == 0) return EndureType.None;
         int value = ParseInt(rowData, col);
-        if (value < 0 || value > 2)
-            throw new FormatException($"第 {col} 列的霸体等级 {value} 超出 0~2（0:None / 1:Common / 2:Super）");
+        if (value < 0 || value > 1)
+            throw new FormatException($"第 {col} 列的霸体等级 {value} 超出 0~1（0:无霸体 / 1:霸体）");
         return (EndureType)value;
+    }
+
+    // 武器编号：一维武器列表下标，留空 = -1（没有武器）
+    public static int ParseWeaponId(string[] rowData, int col) => ParseIntOrNull(rowData, col) ?? -1;
+
+    // 武器动画类型：攻击动画走哪类武器，必填
+    public static EntityAnim.CharcterAnimType ParseAnimType(string[] rowData, int col)
+    {
+        string raw = Cell(rowData, col);
+        if (raw.Length == 0)
+            throw new FormatException($"第 {col} 列的武器动画类型为空（必填：0:长枪 / 1:刀）");
+        int value = ParseInt(rowData, col);
+        if (!Enum.IsDefined(typeof(EntityAnim.CharcterAnimType), value))
+            throw new FormatException($"第 {col} 列的武器动画类型 {value} 未在 EntityAnim.CharcterAnimType 中定义");
+        return (EntityAnim.CharcterAnimType)value;
+    }
+
+    // 武器显示类型：收起时挂在哪，必填
+    public static EntityAnim.WeaponDisplayType ParseWeaponDisplay(string[] rowData, int col)
+    {
+        string raw = Cell(rowData, col);
+        if (raw.Length == 0)
+            throw new FormatException($"第 {col} 列的武器显示类型为空（必填：0:长枪 / 1:刀 / 2:双刀）");
+        int value = ParseInt(rowData, col);
+        if (!Enum.IsDefined(typeof(EntityAnim.WeaponDisplayType), value))
+            throw new FormatException($"第 {col} 列的武器显示类型 {value} 未在 EntityAnim.WeaponDisplayType 中定义");
+        return (EntityAnim.WeaponDisplayType)value;
     }
 
     // 射程：留空 = 0（该技能不瞄准、不进 AI 作战距离），填了必须大于 0
@@ -193,14 +220,14 @@ public class ConfigManager : MonoBehaviour
         throw new FormatException($"第 {col} 列的破霸体 {value} 只允许 空 / 0 / 1");
     }
 
-    // 技能攻击动画：空/0 = 无动画，其余必须是 EntityAnim.AttackType 里定义的值
+    // 技能攻击动画：空 = -1 = 无动画，其余必须是 EntityAnim.AttackType 里定义的值
     public static int ParseAttackAnim(string[] rowData, int col)
     {
-        int value = ParseIntOrNull(rowData, col) ?? 0;
-        if (value == 0) return 0;
-        if (!Enum.IsDefined(typeof(EntityAnim.AttackType), value))
-            throw new FormatException($"第 {col} 列的攻击动画 {value} 未在 EntityAnim.AttackType 中定义");
-        return (int)(EntityAnim.AttackType)value;
+        int? value = ParseIntOrNull(rowData, col);
+        if (!value.HasValue) return -1;
+        if (!Enum.IsDefined(typeof(EntityAnim.AttackType), value.Value))
+            throw new FormatException($"第 {col} 列的攻击动画 {value.Value} 未在 EntityAnim.AttackType 中定义");
+        return value.Value;
     }
 
     // Buff 特效类别：留空 = 不播特效，其余必须是 SkillVfxKind 里定义的值
@@ -406,7 +433,7 @@ public class ConfigManager : MonoBehaviour
     public struct EntityConfig
     {
         public const string FileName = "entity.csv";
-        private const int ColumnCount = 16;
+        private const int ColumnCount = 19;
         public static readonly Dictionary<EntityType, EntityConfig> content = new();
 
         public EntityCategory category;
@@ -424,7 +451,10 @@ public class ConfigManager : MonoBehaviour
         public List<int> initialSkills;
         public int quality;           // 0:无 / 1:B / 2:A / 3:S，直接对应 RoleHead 的 m_quality 页序
         public bool showHealthBar;    // 客户端是否为该实体创建头顶血条
-        public EndureType endureLevel; // 第16列：默认霸体等级，实体霸体等级的下限（留空 = None）
+        public EndureType endureLevel; // 第16列：默认霸体等级，实体霸体等级的下限（留空 = 无霸体）
+        public int weaponId;                       // 第17列：固定武器编号（一维），留空 = -1
+        public EntityAnim.CharcterAnimType animType;      // 第18列：攻击动画用哪类武器
+        public EntityAnim.WeaponDisplayType weaponDisplay; // 第19列：武器收起时的挂法
 
         public EntityConfig(string[] rowData)
         {
@@ -444,6 +474,9 @@ public class ConfigManager : MonoBehaviour
             quality = ParseQuality(rowData, 13);
             showHealthBar = ParseShowHealthBar(rowData, 14);
             endureLevel = ParseEndureLevel(rowData, 15);
+            weaponId = ParseWeaponId(rowData, 16);
+            animType = ParseAnimType(rowData, 17);
+            weaponDisplay = ParseWeaponDisplay(rowData, 18);
         }
 
         public static int Load(ConfigTable table)
@@ -550,7 +583,7 @@ public class ConfigManager : MonoBehaviour
     public struct SkillConfig
     {
         public const string FileName = "skill.csv";
-        private const int ColumnCount = 20;
+        private const int ColumnCount = 18;
         public static readonly Dictionary<int, SkillConfig> content = new();
 
         public int key;
@@ -560,20 +593,18 @@ public class ConfigManager : MonoBehaviour
         public int qualityRank;          // 品质序：B/空 = 0，A = 1，S = 2（人机入栏优先级用，越大越优先）
         public float cd;                 // 第5列
         public int storeLimit;           // 第6列：-1 = 无限库存
-        public int? weaponCategory;      // 第7列：0 无 / 1 刀 / 2 长枪 / 3 枪械 / 4 魔法球
-        public int? weaponSubId;         // 第8列
-        public float? knockback;         // 第9列
-        public List<BuffEntry> buffs;    // 第10列：类型;等级;持续时间，多个用 | 分隔
-        public List<float> bulletSizes;  // 第11列：有特效=缩放倍率（1=原大小），无特效近战=判定半径
-        public float damageInterval;     // 第12列：同一目标最短再伤害间隔（秒）；留空 = 100（只结算一次）
-        public List<float> damageRates;  // 第13列：伤害倍率，空 = 全 1；1 项 = 所有段共用；多项 = 按段序
-        public int attackAnim;           // 第14列：EntityAnim.AttackType 数值，空 = 0 = 无动画
-        public float targetSector;       // 第15列：索敌扇形半角（度，实际扇区 = 该值×2）；<=0.1 = 不索敌；>179.9 = 不限方向
-        public float targetRadius;       // 第16列：索敌半径；>9999 = 不限距离；夹角 <=0.1 时可留空
-        public bool broadcast;           // 第17列：使用时是否全场播报，1 = 播报，空 = 不播报
-        public SkillScore scores;        // 第18列：定长 6 项，分号分隔
-        public float castRange;          // 第19列：射程（弹道瞄准距离 / AI 作战距离），留空 = 无射程
-        public bool breakEndure;         // 第20列：命中时是否破霸体（留空 / 0 = 不破）
+        public float? knockback;         // 第7列
+        public List<BuffEntry> buffs;    // 第8列：类型;等级;持续时间，多个用 | 分隔
+        public List<float> bulletSizes;  // 第9列：有特效=缩放倍率（1=原大小），无特效近战=判定半径
+        public float damageInterval;     // 第10列：同一目标最短再伤害间隔（秒）；留空 = 100（只结算一次）
+        public List<float> damageRates;  // 第11列：伤害倍率，空 = 全 1；1 项 = 所有段共用；多项 = 按段序
+        public int attackAnim;           // 第12列：EntityAnim.AttackType 数值，空 = -1 = 无动画
+        public float targetSector;       // 第13列：索敌扇形半角（度，实际扇区 = 该值×2）；<=0.1 = 不索敌；>179.9 = 不限方向
+        public float targetRadius;       // 第14列：索敌半径；>9999 = 不限距离；夹角 <=0.1 时可留空
+        public bool broadcast;           // 第15列：使用时是否全场播报，1 = 播报，空 = 不播报
+        public SkillScore scores;        // 第16列：定长 6 项，分号分隔
+        public float castRange;          // 第17列：射程（弹道瞄准距离 / AI 作战距离），留空 = 无射程
+        public bool breakEndure;         // 第18列：命中时是否破霸体（留空 / 0 = 不破）
 
         public SkillConfig(string[] rowData)
         {
@@ -584,20 +615,18 @@ public class ConfigManager : MonoBehaviour
             qualityRank = ParseQualityRank(quality);
             cd = ParseFloat(rowData, 4);
             storeLimit = ParseInt(rowData, 5);
-            weaponCategory = ParseIntOrNull(rowData, 6);
-            weaponSubId = ParseIntOrNull(rowData, 7);
-            knockback = ParseFloatOrNull(rowData, 8);
-            buffs = ParseBuffList(rowData, 9);
-            bulletSizes = ParseFloatList(rowData, 10);
-            damageInterval = ParseFloatOrNull(rowData, 11) ?? 100f;
-            damageRates = ParseFloatList(rowData, 12);
-            attackAnim = ParseAttackAnim(rowData, 13);
-            targetSector = ParseFloat(rowData, 14);
-            targetRadius = ParseFloatOrNull(rowData, 15) ?? 0f;
-            broadcast = ParseBoolOrNull(rowData, 16) ?? false;
-            scores = ParseSkillScore(rowData, 17);
-            castRange = ParseCastRange(rowData, 18);
-            breakEndure = ParseBreakEndure(rowData, 19);
+            knockback = ParseFloatOrNull(rowData, 6);
+            buffs = ParseBuffList(rowData, 7);
+            bulletSizes = ParseFloatList(rowData, 8);
+            damageInterval = ParseFloatOrNull(rowData, 9) ?? 100f;
+            damageRates = ParseFloatList(rowData, 10);
+            attackAnim = ParseAttackAnim(rowData, 11);
+            targetSector = ParseFloat(rowData, 12);
+            targetRadius = ParseFloatOrNull(rowData, 13) ?? 0f;
+            broadcast = ParseBoolOrNull(rowData, 14) ?? false;
+            scores = ParseSkillScore(rowData, 15);
+            castRange = ParseCastRange(rowData, 16);
+            breakEndure = ParseBreakEndure(rowData, 17);
             if (targetSector < 0f || targetSector > 180f)
                 throw new FormatException($"[配表] skill.csv 技能 {key} 的索敌范围夹角 {targetSector} 超出 [0,180]");
             if (targetSector > Config.skill_target_no_sector && targetRadius <= 0f)

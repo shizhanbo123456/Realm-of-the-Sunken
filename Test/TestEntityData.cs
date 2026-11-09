@@ -4,6 +4,13 @@ public class TestEntityData : EntityData
 {
     private float turnInput; // -1 左 / +1 右
 
+    [Tooltip("动作集类型")]
+    [SerializeField] private EntityAnim.CharcterAnimType testAnimType;
+    [Tooltip("武器编号（-1 = 无武器）")]
+    [SerializeField] private int testWeaponId = -1;
+    [Tooltip("武器显示类型")]
+    [SerializeField] private EntityAnim.WeaponDisplayType testWeaponDisplay;
+
     public bool TestMoving => moveInput.sqrMagnitude > 0.0001f;
 
     public void SetTestInput(bool forward, float turn)
@@ -15,14 +22,13 @@ public class TestEntityData : EntityData
     public void SetupTest()
     {
         anim = GetComponentInChildren<EntityAnim>();
-        var animData = GetComponent<EntityAnimData>();
-        if (animData == null) animData = GetComponentInChildren<EntityAnimData>();
 
         // SetType 必须在 Init 之后：EntityAnim 的 animators 列表在 Init 里才收集
         if (anim != null) anim.Init(this);
         if (anim != null)
         {
-            if (animData != null) anim.SetType(animData.type);
+            anim.SetType(testAnimType);
+            anim.SetWeapon(testWeaponId, testWeaponDisplay);
             anim.DoSpawn();
         }
 

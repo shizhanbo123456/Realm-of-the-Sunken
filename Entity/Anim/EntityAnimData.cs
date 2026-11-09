@@ -4,7 +4,12 @@ public class EntityAnimData : MonoBehaviour
 {
     public float height;                    // 身高
     public float legHeight;                 // 腿高
-    public EntityAnim.CharcterAnimType type;// 动作集类型
+    [Tooltip("收起武器挂点：长枪用这里")]
+    public Transform weaponBackMount;
+    [Tooltip("收起武器挂点：刀用这里，双刀的右手那把也用这里")]
+    public Transform weaponHipRightMount;
+    [Tooltip("收起武器挂点：双刀的左手那把")]
+    public Transform weaponHipLeftMount;
 
     private void OnDrawGizmos()
     {
