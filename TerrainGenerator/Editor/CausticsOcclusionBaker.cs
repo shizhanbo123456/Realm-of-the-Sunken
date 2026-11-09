@@ -1,3 +1,4 @@
+using System;
 using UnityEditor;
 using UnityEngine;
 
@@ -18,6 +19,20 @@ namespace TerrainGen.EditorTools
         // root 必须是 SpawnColliderOnly(stripMeshes: false) 铺出来的完整地形
         public static bool Bake(Transform root, float groundHeight, out string message)
         {
+            try
+            {
+                return BakeInternal(root, groundHeight, out message);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+                message = "烘焙失败：异常 " + e.GetType().Name + " - " + e.Message;
+                return false;
+            }
+        }
+
+        static bool BakeInternal(Transform root, float groundHeight, out string message)
+        {
             float mapMin = TerrainSpawns.MapMin;
             float mapSize = TerrainSpawns.MapSize;
             if (mapSize <= 0f)
@@ -29,7 +44,7 @@ namespace TerrainGen.EditorTools
             Shader shader = Shader.Find(ShaderName);
             if (shader == null)
             {
-                message = $"烘焙失败：找不到 shader「{ShaderName}」";
+                message = $"烘焙失败：找不到 shader「{ShaderName}」（检查 Assets/Files/Shaders/Caustics/CausticsHeightBake.shader 是否编译通过）";
                 return false;
             }
 
@@ -49,13 +64,16 @@ namespace TerrainGen.EditorTools
                 if (bounds.min.y < minY) minY = bounds.min.y;
             }
 
-            var rt = new RenderTexture(Resolution, Resolution, 24, RenderTextureFormat.RFloat, RenderTextureReadWrite.Linear);
-            rt.Create();
-
-            var camGo = new GameObject("CausticsHeightBakeCamera");
-            Texture2D readback = new Texture2D(Resolution, Resolution, TextureFormat.RFloat, false, true);
+            RenderTexture rt = null;
+            GameObject camGo = null;
+            Texture2D readback = null;
+            Debug.Log($"[焦散遮挡图] 开始烘焙：mapMin={mapMin:0.#} mapSize={mapSize:0.#} 高度 {minY:0.##}~{maxY:0.##}m 物件 {renderers.Length} 个");
             try
             {
+                rt = new RenderTexture(Resolution, Resolution, 24, RenderTextureFormat.RFloat, RenderTextureReadWrite.Linear);
+                rt.Create();
+
+                camGo = new GameObject("CausticsHeightBakeCamera");
                 Camera cam = camGo.AddComponent<Camera>();
                 cam.orthographic = true;
                 cam.orthographicSize = mapSize * 0.5f;
@@ -74,6 +92,7 @@ namespace TerrainGen.EditorTools
 
                 cam.Render();
 
+                readback = new Texture2D(Resolution, Resolution, TextureFormat.RFloat, false, true);
                 RenderTexture.active = rt;
                 readback.ReadPixels(new Rect(0, 0, Resolution, Resolution), 0, 0);
                 readback.Apply();
@@ -81,12 +100,15 @@ namespace TerrainGen.EditorTools
             }
             finally
             {
-                Object.DestroyImmediate(camGo);
-                rt.Release();
-                Object.DestroyImmediate(rt);
+                if (camGo != null) UnityEngine.Object.DestroyImmediate(camGo);
+                if (rt != null)
+                {
+                    rt.Release();
+                    UnityEngine.Object.DestroyImmediate(rt);
+                }
             }
 
-            // RFloat → 半浮点；值为 0 的列说明没有几何，按地面高度填（等于不遮挡）
+            // RFloat → 半浮点；值为 0 的列说明没有渲染到几何，按地面高度填（等于不遮挡）
             var raw = readback.GetRawTextureData<float>();
             var half = new ushort[raw.Length];
             for (int i = 0; i < raw.Length; i++)
@@ -95,7 +117,7 @@ namespace TerrainGen.EditorTools
                 if (v <= 0f) v = groundHeight;
                 half[i] = Mathf.FloatToHalf(v);
             }
-            Object.DestroyImmediate(readback);
+            UnityEngine.Object.DestroyImmediate(readback);
 
             // RHalf 存世界高度：R16 是归一化整数，塞半浮点位模式会被读成 值/65535
             var texture = new Texture2D(Resolution, Resolution, TextureFormat.RHalf, false, true)
