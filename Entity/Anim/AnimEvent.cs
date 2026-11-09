@@ -6,7 +6,7 @@ public class AnimEvent : StateMachineBehaviour
     protected virtual InputBlockOp blockOp { get; } = InputBlockOp.None;
     protected virtual bool UseGravity { get; } = true;
     public virtual EndureType? Endure { get; }
-    public virtual EntityAnim.WeaponPos ShowWeapon { get; }
+    public virtual EntityAnim.WeaponPos ShowWeapon { get; } = EntityAnim.WeaponPos.Show;
     //用于传递给客户端识别动画片段
     public int AnimId { get; private set; } = -1;
 

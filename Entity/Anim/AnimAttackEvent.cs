@@ -6,22 +6,18 @@ public class AnimAttackEvent : AnimEvent
     protected override InputBlockOp blockOp => InputBlockOp.Rotation|InputBlockOp.Jump|InputBlockOp.Slide|InputBlockOp.Attack;
     protected override bool UseGravity => AttackClipUseGravity;
     public override EndureType? Endure => EndureType.Super;
+    public override EntityAnim.WeaponPos ShowWeapon => WeaponInHand ? EntityAnim.WeaponPos.Hand : EntityAnim.WeaponPos.Show;
     [SerializeField] private EntityAnim.AttackType type;
     [SerializeField] private bool AttackClipUseGravity;
+    [SerializeField] private bool WeaponInHand=true;
     [SerializeField] private AnimationCurve speedForward;//是位置，导数才是速度
     [SerializeField] private AnimationCurve speedUpward;//是位置，导数才是速度
-    [Header("Hit1")]
     [SerializeField][Range(0,1)] private float threshold;
     private bool canTrigAttack;
-    [Header("Hit2")]
-    [SerializeField] private bool useHit2 = false;
-    [SerializeField][Range(0, 1)] private float threshold2;
-    private bool canTrigAttack2;
     public override void OnStateEnter(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
     {
         base.OnStateEnter(animator,stateInfo,layerIndex);
         canTrigAttack = true;   // 客户端无 EntityData：仍允许攻击帧触发 onAttack（特效/表现用），不依赖 data
-        canTrigAttack2 = true;
         if (data == null) return;
         if (!main) return;
     }
@@ -39,11 +35,6 @@ public class AnimAttackEvent : AnimEvent
         if (canTrigAttack && stateInfo.normalizedTime > threshold)
         {
             canTrigAttack = false;
-            OnAttack();
-        }
-        if (useHit2&&canTrigAttack2 && stateInfo.normalizedTime > threshold2)
-        {
-            canTrigAttack2 = false;
             OnAttack();
         }
     }
