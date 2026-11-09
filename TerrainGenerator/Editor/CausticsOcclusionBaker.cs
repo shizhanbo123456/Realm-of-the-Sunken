@@ -16,7 +16,7 @@ namespace TerrainGen.EditorTools
         const string EffectsFolder = "Assets/Resources/Effects";
         const string ResourcesFolder = "Assets/Resources";
 
-        // 相机清屏用的哨兵值：既区别于真实高度（可能为负），也能被 shader 原样写出
+        // 相机清屏用的哨兵值：远低于任何真实高度即可，运行时判空靠的是「超出真实高度范围」而不是这个具体数值
         const float NoGeometryValue = -10000f;
 
         // root 必须是 SpawnColliderOnly(stripMeshes: false) 铺出来的完整地形
@@ -111,17 +111,23 @@ namespace TerrainGen.EditorTools
                 }
             }
 
-            // RFloat → 半浮点；空列（渲染不到几何、值为哨兵）按地面高度填，等于不遮挡
+            // RFloat → 半浮点；清屏色会被 Linear 色彩空间做 gamma→线性转换（-10000 变 -773.99），
+            // 所以不能用等值比较判断空列，改为落在渲染前真实高度范围之外的像素一律视为空列
             var raw = readback.GetRawTextureData<float>();
             var half = new ushort[raw.Length];
             float readMin = float.MaxValue;
             float readMax = float.MinValue;
+            int emptyCount = 0;
             for (int i = 0; i < raw.Length; i++)
             {
                 float v = raw[i];
-                if (v <= NoGeometryValue + 1f) v = groundHeight;
                 if (v < readMin) readMin = v;
                 if (v > readMax) readMax = v;
+                if (v < minY - 1f || v > maxY + 1f)
+                {
+                    v = groundHeight;
+                    emptyCount++;
+                }
                 half[i] = Mathf.FloatToHalf(v);
             }
 
@@ -133,7 +139,7 @@ namespace TerrainGen.EditorTools
                 return false;
             }
             UnityEngine.Object.DestroyImmediate(readback);
-            Debug.Log($"[焦散遮挡图] 回读高度 {readMin:0.##}~{readMax:0.##}m（场景高度 {minY:0.##}~{maxY:0.##}m）");
+            Debug.Log($"[焦散遮挡图] 回读高度 {readMin:0.##}~{readMax:0.##}m（场景高度 {minY:0.##}~{maxY:0.##}m），空列 {emptyCount} 个按地面高度填充");
 
             // RHalf 存世界高度：R16 是归一化整数，塞半浮点位模式会被读成 值/65535
             var texture = new Texture2D(Resolution, Resolution, TextureFormat.RHalf, false, true)
