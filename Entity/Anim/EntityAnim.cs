@@ -256,10 +256,14 @@ public class EntityAnim : MonoBehaviour
             Debug.LogError($"{gameObject.name} 的 {anchor} 锚点取不到骨骼，武器无法显示");
             return;
         }
-        GameObject instance = Instantiate(prefab, bone);
+        Transform mount = CreateMount(bone, anchor.ToString());
+        mount.localPosition = Vector3.zero;
+        mount.localRotation = Quaternion.identity;
+
+        GameObject instance = Instantiate(prefab, mount);
         instance.transform.localPosition = Vector3.zero;
         instance.transform.localRotation = Quaternion.identity;
-        weaponVisuals.Add(instance);
+        weaponVisuals.Add(mount.gameObject);
     }
 
     // 收起：挂点必须建在骨骼下（武器要跟着人物动画动）；位置与朝向取锚点算出的世界值
@@ -271,8 +275,7 @@ public class EntityAnim : MonoBehaviour
             Debug.LogError($"{gameObject.name} 的 {anchor} 锚点没有关联骨骼，武器不会跟随动画");
             return;
         }
-        Transform mount = new GameObject($"{name}_WeaponMount_{anchor}").transform;
-        mount.SetParent(info.transform, false);
+        Transform mount = CreateMount(info.transform, anchor.ToString());
         mount.position = info.position;
         mount.rotation = info.rotation;
 
@@ -280,6 +283,22 @@ public class EntityAnim : MonoBehaviour
         instance.transform.localPosition = Vector3.zero;
         instance.transform.localRotation = Quaternion.identity;
         weaponVisuals.Add(mount.gameObject);
+    }
+
+    // 骨骼常带百倍量级的缩放（美术导出遗留）：挂点按骨骼世界缩放反向抵消，武器保持预制体原大小
+    private Transform CreateMount(Transform bone, string label)
+    {
+        Transform mount = new GameObject($"{name}_WeaponMount_{label}").transform;
+        mount.SetParent(bone, false);
+
+        Vector3 scale = bone.lossyScale;
+        if (Mathf.Approximately(scale.x, 0f) || Mathf.Approximately(scale.y, 0f) || Mathf.Approximately(scale.z, 0f))
+        {
+            Debug.LogError($"{gameObject.name} 的 {label} 挂点骨骼缩放为 0：{scale}，武器大小无法换算");
+            return mount;
+        }
+        mount.localScale = new Vector3(1f / scale.x, 1f / scale.y, 1f / scale.z);
+        return mount;
     }
     #endregion
 
