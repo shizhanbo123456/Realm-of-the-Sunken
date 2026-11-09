@@ -508,9 +508,12 @@ public abstract class EntityData : MonoBehaviour
         if (enterHit)
         {
             motion = null;  // 打断位移
-            anim.DoHit(attack.breakEndure); // 破霸体 = 长受击，否则短受击
+            // 击飞不播受击动画；没被击飞才播（破霸体 = 长受击，否则短受击）
             if (!ApplyKnockback(attack, hitOrigin))
+            {
+                anim.DoHit(attack.breakEndure);
                 FaceHitOrigin(hitOrigin);
+            }
         }
         EntityData attacker = null;
         if (BattleManager.EntityContainer.Entities.TryGetObject(attack.shooter, out var shooter)) attacker = shooter;

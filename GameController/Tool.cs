@@ -313,14 +313,7 @@ public class Tool : MonoBehaviour
         e += CheckList("AssetsManager.BuffVFX", m.BuffVFX, vfx_buff_count);
         e += CheckList("AssetsManager.HitVFX", m.HitVFX, vfx_hit_count);
 
-        // 武器一维列表：entity.csv 里用到的编号必须都取得到预制体
-        foreach (var row in ConfigManager.EntityConfig.content.Values)
-        {
-            if (row.weaponId < 0) continue;
-            if (row.weaponId < m.WeaponPrefabs.Count && m.WeaponPrefabs[row.weaponId] != null) continue;
-            Debug.LogError($"[启动自检] AssetsManager.WeaponPrefabs 缺少武器 {row.weaponId}（{row.name} 使用）");
-            e++;
-        }
+        e += CheckList("AssetsManager.WeaponPrefabs", m.WeaponPrefabs, weapon_count);
 
         e += CheckList("AssetsManager.AttackCharacterIcons", m.AttackCharacterIcons, Config.attack_character_count);
         e += CheckList("AssetsManager.DefenseCharacterIcons", m.DefenseCharacterIcons, Config.defense_character_count);
@@ -347,6 +340,7 @@ public class Tool : MonoBehaviour
     private const int vfx_magic_circle_count = 10;
     private const int vfx_buff_count = 31;
     private const int vfx_hit_count = 2;          // 下标 0 = buff/DoT 类（实体中心），1 = 直接伤害（命中点高度 + 实体所在列）
+    private const int weapon_count = 14;          // 武器预制体一维列表长度
 
     private static int CheckObject(string label, UnityEngine.Object obj)
     {
