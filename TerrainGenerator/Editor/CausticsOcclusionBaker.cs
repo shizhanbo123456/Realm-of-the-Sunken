@@ -59,8 +59,8 @@ namespace TerrainGen.EditorTools
             var half = new ushort[heights.Length];
             for (int i = 0; i < heights.Length; i++) half[i] = Mathf.FloatToHalf(heights[i]);
 
-            // R16 存世界高度（半浮点），不做 0~1 归一化，省掉高度范围这一层配置
-            var texture = new Texture2D(Resolution, Resolution, TextureFormat.R16, false, true)
+            // RHalf 存世界高度（16 位半浮点）：R16 是归一化整数，塞半浮点位模式会读成 值/65535
+            var texture = new Texture2D(Resolution, Resolution, TextureFormat.RHalf, false, true)
             {
                 name = "CausticsOcclusion",
                 wrapMode = TextureWrapMode.Clamp,
