@@ -15,6 +15,7 @@ public class ScreenSpaceCaustics : MonoBehaviour
         Normal = 2,  // 重建的世界法线
         WorldXZ = 3, // 世界 XZ 棋盘：应贴合地面透视
         Split = 4,   // 四象限对照：左下都不翻 / 右下只翻角方向 / 左上只翻深度 uv / 右上都翻
+        Occlusion = 6, // 遮挡判据：亮 = 该处顶面高出本像素（应被遮挡），整屏红 = 遮挡被关闭
     }
 
     [Header("贴图")]
