@@ -105,6 +105,7 @@ public class ScreenSpaceCaustics : MonoBehaviour
     private float mapMin;
     private float mapSize;
     private int currentPass = -1;
+    private bool cornerLogged;
 
     private void Awake()
     {
@@ -239,25 +240,36 @@ public class ScreenSpaceCaustics : MonoBehaviour
         UpdateFrustumCorners();
     }
 
-    // 四个视锥角方向（世界空间、视空间 z = -1），shader 里乘深度即得世界坐标
+    // 四个视锥角方向（裁剪空间角点反投影到世界空间，归一到视空间 z = -1），与像素同一套坐标
     private void UpdateFrustumCorners()
     {
         Matrix4x4 invProj = cam.projectionMatrix.inverse;
         Matrix4x4 camToWorld = cam.cameraToWorldMatrix;
         Vector3 origin = camToWorld.GetColumn(3);
 
+        Vector3 bl = Corner(invProj, camToWorld, origin, -1f, -1f);
+        Vector3 br = Corner(invProj, camToWorld, origin, 1f, -1f);
+        Vector3 tl = Corner(invProj, camToWorld, origin, -1f, 1f);
+        Vector3 tr = Corner(invProj, camToWorld, origin, 1f, 1f);
+
         material.SetVector(CamPosId, origin);
-        material.SetVector(CornerBLId, Corner(invProj, camToWorld, origin, -1f, -1f));
-        material.SetVector(CornerBRId, Corner(invProj, camToWorld, origin, 1f, -1f));
-        material.SetVector(CornerTLId, Corner(invProj, camToWorld, origin, -1f, 1f));
-        material.SetVector(CornerTRId, Corner(invProj, camToWorld, origin, 1f, 1f));
+        material.SetVector(CornerBLId, bl);
+        material.SetVector(CornerBRId, br);
+        material.SetVector(CornerTLId, tl);
+        material.SetVector(CornerTRId, tr);
+
+        if (!cornerLogged)
+        {
+            cornerLogged = true;
+            Debug.Log($"[ScreenSpaceCaustics] camPos={origin} forward={cam.transform.forward} BL={bl} TR={tr}");
+        }
     }
 
-    private static Vector4 Corner(Matrix4x4 invProj, Matrix4x4 camToWorld, Vector3 origin, float ndcX, float ndcY)
+    private static Vector3 Corner(Matrix4x4 invProj, Matrix4x4 camToWorld, Vector3 origin, float ndcX, float ndcY)
     {
         Vector4 p = invProj * new Vector4(ndcX, ndcY, 1f, 1f);
         Vector3 view = new Vector3(p.x, p.y, p.z) / p.w;
-        view /= -view.z; // 归一到视空间 z = -1，这样乘 eyeDepth 就落在正确距离
+        view /= -view.z; // 归一到视空间 z = -1，这样乘 eyeDepth 就落在这个像素看到的位置
         return camToWorld.MultiplyPoint3x4(view) - origin;
     }
 
