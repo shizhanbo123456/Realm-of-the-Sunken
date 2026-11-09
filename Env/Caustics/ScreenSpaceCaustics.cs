@@ -71,6 +71,9 @@ public class ScreenSpaceCaustics : MonoBehaviour
     [Tooltip("角方向上下翻转，必须与 flipDepthV 相反；两者同向时地面会被镜像到地平线以上")]
     public bool flipRayV = false;
 
+    [Tooltip("排查用：法线整体取反。若打开后朝上的面才亮、地面才有焦散，说明重建法线方向反了")]
+    public bool flipNormal = false;
+
     private static readonly int CausticsMapId = Shader.PropertyToID("_CausticsMap");
     private static readonly int FlowMapId = Shader.PropertyToID("_FlowMap");
     private static readonly int OcclusionMapId = Shader.PropertyToID("_OcclusionMap");
@@ -93,6 +96,7 @@ public class ScreenSpaceCaustics : MonoBehaviour
     private static readonly int DebugModeId = Shader.PropertyToID("_DebugMode");
     private static readonly int DepthFlipVId = Shader.PropertyToID("_DepthFlipV");
     private static readonly int RayFlipVId = Shader.PropertyToID("_RayFlipV");
+    private static readonly int NormalFlipId = Shader.PropertyToID("_NormalFlip");
 
     private Camera cam;
     private Material material;
@@ -232,6 +236,7 @@ public class ScreenSpaceCaustics : MonoBehaviour
         material.SetFloat(DebugModeId, (float)debugView);
         material.SetFloat(DepthFlipVId, flipDepthV ? 1f : 0f);
         material.SetFloat(RayFlipVId, flipRayV ? 1f : 0f);
+        material.SetFloat(NormalFlipId, flipNormal ? -1f : 1f);
 
         // MapSize 为 0 时 shader 里整段遮挡判定被跳过（世界可能在 Y<0，不能用黑图代替"不遮挡"）
         material.SetVector(MapMinId, new Vector4(mapMin, 0f, mapMin, 0f));
