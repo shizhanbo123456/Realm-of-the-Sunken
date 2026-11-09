@@ -101,6 +101,8 @@ public class EntityAnim : MonoBehaviour
 
         animData = GetComponent<EntityAnimData>();
         if (animData == null) Debug.LogError($"{gameObject.name}未挂载animData");
+        modelInfo = GetComponentInChildren<EntityModelInfo>();
+        if (modelInfo == null) Debug.LogError($"{gameObject.name}未挂载 EntityModelInfo：武器挂点解析不了");
 
         animators = new();
         if(TryGetComponent<Animator>(out var anim))
@@ -177,6 +179,7 @@ public class EntityAnim : MonoBehaviour
     private WeaponDisplayType weaponDisplay;
     private WeaponPos weaponPos = WeaponPos.Hide;
     private readonly List<GameObject> weaponVisuals = new();
+    private EntityModelInfo modelInfo;
 
     public int WeaponId => weaponId;
 
@@ -205,6 +208,11 @@ public class EntityAnim : MonoBehaviour
         weaponVisuals.Clear();
 
         if (weaponPos == WeaponPos.Hide || weaponId < 0) return;
+        if (modelInfo == null)
+        {
+            Debug.LogError($"{gameObject.name} 缺少 EntityModelInfo，武器挂点解析不了");
+            return;
+        }
         if (Tool.AssetsManager == null)
         {
             Debug.LogError($"{gameObject.name} 显示武器需要 AssetsManager");
@@ -217,52 +225,57 @@ public class EntityAnim : MonoBehaviour
         }
         if (weaponPos == WeaponPos.Hand)
         {
-            AttachWeapon(prefab, GetHandMount(false));
-            if (weaponDisplay == WeaponDisplayType.DualSword) AttachWeapon(prefab, GetHandMount(true));
+            AttachToBone(prefab, EntityAnchor.RightHand);
+            if (weaponDisplay == WeaponDisplayType.DualSword) AttachToBone(prefab, EntityAnchor.LeftHand);
             return;
         }
-        // 收起：长枪背在背上，刀收在右腰，双刀左右腰各一把
+        // 收起：长枪挂背，刀挂右腰，双刀左右腰各一把
         switch (weaponDisplay)
         {
             case WeaponDisplayType.Spear:
-                AttachWeapon(prefab, BackMount());
+                AttachToAnchor(prefab, EntityAnchor.WeaponBack);
                 break;
             case WeaponDisplayType.Sword:
-                AttachWeapon(prefab, HipMount(false));
+                AttachToAnchor(prefab, EntityAnchor.WeaponHipRight);
                 break;
             case WeaponDisplayType.DualSword:
-                AttachWeapon(prefab, HipMount(true));
-                AttachWeapon(prefab, HipMount(false));
+                AttachToAnchor(prefab, EntityAnchor.WeaponHipLeft);
+                AttachToAnchor(prefab, EntityAnchor.WeaponHipRight);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(weaponDisplay), weaponDisplay, "未知武器显示类型");
         }
     }
 
-    private void AttachWeapon(GameObject prefab, Transform mount)
+    // 手上：直接作为骨骼子物体，跟骨骼旋转一起动
+    private void AttachToBone(GameObject prefab, EntityAnchor anchor)
     {
-        if (mount == null) return;
-        GameObject instance = Instantiate(prefab, mount);
+        Transform bone = anchor.GetTransform(modelInfo, this).transform;
+        if (bone == null)
+        {
+            Debug.LogError($"{gameObject.name} 的 {anchor} 锚点取不到骨骼，武器无法显示");
+            return;
+        }
+        GameObject instance = Instantiate(prefab, bone);
         instance.transform.localPosition = Vector3.zero;
         instance.transform.localRotation = Quaternion.identity;
         weaponVisuals.Add(instance);
     }
 
-    private Transform BackMount()
+    // 收起：在锚点骨骼下建挂点，位置取锚点算出的世界位置；带偏移的锚点只给位置，父节点取同一基准骨骼
+    private void AttachToAnchor(GameObject prefab, EntityAnchor anchor)
     {
-        if (animData != null && animData.weaponBackMount != null) return animData.weaponBackMount;
-        Debug.LogError($"{gameObject.name} 缺少背挂点，无法收起长枪（EntityAnimData.weaponBackMount）");
-        return null;
-    }
+        EntityAnchorInfo info = anchor.GetTransform(modelInfo, this);
+        Transform parent = info.transform != null ? info.transform : GetBoneTransform(HumanBodyBones.Hips);
+        Transform mount = new GameObject($"{name}_WeaponMount_{anchor}").transform;
+        mount.SetParent(parent, false);
+        mount.position = info.position;
+        mount.rotation = info.rotation;
 
-    private Transform HipMount(bool left)
-    {
-        Transform mount = animData != null
-            ? (left ? animData.weaponHipLeftMount : animData.weaponHipRightMount)
-            : null;
-        if (mount != null) return mount;
-        Debug.LogError($"{gameObject.name} 缺少{(left ? "左" : "右")}腰挂点，无法收起武器（EntityAnimData.weaponHip{(left ? "Left" : "Right")}Mount）");
-        return null;
+        GameObject instance = Instantiate(prefab, mount);
+        instance.transform.localPosition = Vector3.zero;
+        instance.transform.localRotation = Quaternion.identity;
+        weaponVisuals.Add(mount.gameObject);
     }
     #endregion
 
@@ -329,12 +342,6 @@ public class EntityAnim : MonoBehaviour
 
         boneCache[humanBoneId] = boneTransform;
         return boneTransform;
-    }
-    private Transform GetHandMount(bool leftHand)
-    {
-        return mainAnimator != null
-            ? mainAnimator.GetBoneTransform(leftHand ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand)
-            : null;
     }
     #endregion
 

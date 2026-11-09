@@ -21,6 +21,9 @@ public enum EntityAnchor
     LeftFoot,
     RightFoot,
     Chest,
+    WeaponHipLeft,
+    WeaponHipRight,
+    WeaponBack,
 }
 public struct EntityAnchorInfo
 {
@@ -53,7 +56,9 @@ public static class EntityAnchorExtensions
                 case EntityAnchor.LeftFoot: return anim.GetBoneTransform(HumanBodyBones.LeftFoot).ToAnchorInfo(model.transform.rotation);
                 case EntityAnchor.RightFoot: return anim.GetBoneTransform(HumanBodyBones.RightFoot).ToAnchorInfo(model.transform.rotation);
                 case EntityAnchor.Chest: return anim.GetBoneTransform(HumanBodyBones.Chest).ToAnchorInfo(model.transform.rotation);
-                case EntityAnchor.Camera: return EntityAnchor.ModelRootPosition.GetTransform(model, anim) + (model.yRange.y*0.5f + 0.5f) * Vector3.up;
+                case EntityAnchor.WeaponHipLeft:return anim.GetBoneTransform(HumanBodyBones.Hips).ToAnchorInfo(model.transform.rotation)+(-model.xRange.x*model.transform.right);
+                case EntityAnchor.WeaponHipRight:return anim.GetBoneTransform(HumanBodyBones.Hips).ToAnchorInfo(model.transform.rotation)+model.xRange.x*model.transform.right;
+                case EntityAnchor.WeaponBack:return anim.GetBoneTransform(HumanBodyBones.Hips).ToAnchorInfo(model.transform.rotation);
 
                 case EntityAnchor.Bar: 
                     {
@@ -63,6 +68,7 @@ public static class EntityAnchorExtensions
                     }
                 case EntityAnchor.UpCenter: return EntityAnchor.Chest.GetTransform(model, anim);
                 case EntityAnchor.UpFront: return EntityAnchor.Chest.GetTransform(model, anim) + (model.zRange.y+0.5f) * model.transform.forward;
+                case EntityAnchor.Camera: return EntityAnchor.ModelRootPosition.GetTransform(model, anim) + (model.yRange.y * 0.5f + 0.5f) * Vector3.up;
             }
         }
         switch (anchor)
