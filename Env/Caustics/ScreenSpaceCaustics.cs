@@ -17,14 +17,6 @@ public class ScreenSpaceCaustics : MonoBehaviour
         Split = 4,   // 四象限对照：左下都不翻 / 右下只翻角方向 / 左上只翻深度 uv / 右上都翻
     }
 
-    // 相机渲到中间 RT 时 D3D 翻转投影，深度行号和视锥角方向会错位（表现为焦散镜像、抬升速度翻倍）
-    public enum FlipMode
-    {
-        Auto = 0,  // 按 _ProjectionParams.x 自动判断
-        Flip = 1,  // 强制翻转
-        NoFlip = -1, // 强制不翻转
-    }
-
     [Header("贴图")]
     [Tooltip("焦散网纹：Assets/Files/Shaders/Caustics/T_Caustics")]
     public Texture causticsMap;
@@ -73,8 +65,11 @@ public class ScreenSpaceCaustics : MonoBehaviour
     [Tooltip("排查用：临时覆盖屏幕显示深度/法线/世界坐标，正常运行时保持 Off")]
     public DebugView debugView = DebugView.Off;
 
-    [Tooltip("焦散相对几何上下错位时切到 Flip / NoFlip 手动确认（Auto 按平台自动判断）")]
-    public FlipMode flipMode = FlipMode.Auto;
+    [Tooltip("深度图上下翻转：D3D 渲到中间 RT 时深度是上下颠倒存的，实测本工程必须开")]
+    public bool flipDepthV = true;
+
+    [Tooltip("角方向上下翻转，必须与 flipDepthV 相反；两者同向时地面会被镜像到地平线以上")]
+    public bool flipRayV = false;
 
     private static readonly int CausticsMapId = Shader.PropertyToID("_CausticsMap");
     private static readonly int FlowMapId = Shader.PropertyToID("_FlowMap");
@@ -96,7 +91,8 @@ public class ScreenSpaceCaustics : MonoBehaviour
     private static readonly int CornerTLId = Shader.PropertyToID("_CornerTL");
     private static readonly int CornerTRId = Shader.PropertyToID("_CornerTR");
     private static readonly int DebugModeId = Shader.PropertyToID("_DebugMode");
-    private static readonly int FlipVId = Shader.PropertyToID("_FlipV");
+    private static readonly int DepthFlipVId = Shader.PropertyToID("_DepthFlipV");
+    private static readonly int RayFlipVId = Shader.PropertyToID("_RayFlipV");
 
     private Camera cam;
     private Material material;
@@ -233,7 +229,8 @@ public class ScreenSpaceCaustics : MonoBehaviour
         material.SetFloat(OcclusionBiasId, occlusionBias);
         material.SetFloat(OcclusionFadeId, occlusionFade);
         material.SetFloat(DebugModeId, (float)debugView);
-        material.SetFloat(FlipVId, (float)(int)flipMode);
+        material.SetFloat(DepthFlipVId, flipDepthV ? 1f : 0f);
+        material.SetFloat(RayFlipVId, flipRayV ? 1f : 0f);
 
         // MapSize 为 0 时 shader 里整段遮挡判定被跳过（世界可能在 Y<0，不能用黑图代替"不遮挡"）
         material.SetVector(MapMinId, new Vector4(mapMin, 0f, mapMin, 0f));
