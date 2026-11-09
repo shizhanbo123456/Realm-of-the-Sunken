@@ -14,6 +14,7 @@ public class ScreenSpaceCaustics : MonoBehaviour
         Depth = 1,   // 深度原始值：应能看到远近层次；整屏全白 = 深度纹理没读到
         Normal = 2,  // 重建的世界法线
         WorldXZ = 3, // 世界 XZ 棋盘：应贴合地面透视
+        Split = 4,   // 四象限对照：左下都不翻 / 右下只翻角方向 / 左上只翻深度 uv / 右上都翻
     }
 
     // 相机渲到中间 RT 时 D3D 翻转投影，深度行号和视锥角方向会错位（表现为焦散镜像、抬升速度翻倍）
