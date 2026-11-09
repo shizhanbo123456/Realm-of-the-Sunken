@@ -8,6 +8,14 @@ public class ScreenSpaceCaustics : MonoBehaviour
     public const string ShaderName = "Hidden/Caustics/ScreenProjection";
     public const string OcclusionResourcePath = "Effects/Caustics/CausticsOcclusion";
 
+    public enum DebugView
+    {
+        Off = 0,
+        Depth = 1,   // 深度原始值：应能看到远近层次；整屏全白 = 深度纹理没读到
+        Normal = 2,  // 重建的世界法线
+        WorldXZ = 3, // 世界 XZ 棋盘：应贴合地面透视
+    }
+
     [Header("贴图")]
     [Tooltip("焦散网纹：Assets/Files/Shaders/Caustics/T_Caustics")]
     public Texture causticsMap;
@@ -52,6 +60,10 @@ public class ScreenSpaceCaustics : MonoBehaviour
     [Tooltip("遮挡过渡带宽度（米），太小会出硬边")]
     [Min(0.01f)] public float occlusionFade = 1f;
 
+    [Header("调试")]
+    [Tooltip("排查用：临时覆盖屏幕显示深度/法线/世界坐标，正常运行时保持 Off")]
+    public DebugView debugView = DebugView.Off;
+
     private static readonly int CausticsMapId = Shader.PropertyToID("_CausticsMap");
     private static readonly int FlowMapId = Shader.PropertyToID("_FlowMap");
     private static readonly int OcclusionMapId = Shader.PropertyToID("_OcclusionMap");
@@ -66,6 +78,12 @@ public class ScreenSpaceCaustics : MonoBehaviour
     private static readonly int MapSizeId = Shader.PropertyToID("_MapSize");
     private static readonly int OcclusionBiasId = Shader.PropertyToID("_OcclusionBias");
     private static readonly int OcclusionFadeId = Shader.PropertyToID("_OcclusionFade");
+    private static readonly int CamPosId = Shader.PropertyToID("_CamPos");
+    private static readonly int CornerBLId = Shader.PropertyToID("_CornerBL");
+    private static readonly int CornerBRId = Shader.PropertyToID("_CornerBR");
+    private static readonly int CornerTLId = Shader.PropertyToID("_CornerTL");
+    private static readonly int CornerTRId = Shader.PropertyToID("_CornerTR");
+    private static readonly int DebugModeId = Shader.PropertyToID("_DebugMode");
 
     private Camera cam;
     private Material material;
@@ -77,6 +95,7 @@ public class ScreenSpaceCaustics : MonoBehaviour
     private bool ready;
     private float mapMin;
     private float mapSize;
+    private int currentPass = -1;
 
     private void Awake()
     {
@@ -100,6 +119,12 @@ public class ScreenSpaceCaustics : MonoBehaviour
             return;
         }
 
+        if (cam.orthographic)
+        {
+            Debug.LogWarning($"[ScreenSpaceCaustics] 相机「{cam.name}」是正交投影，视锥角方向退化为平行线，组件不生效", this);
+            return;
+        }
+
         occlusionActive = useOcclusion;
         if (occlusionActive)
         {
@@ -117,9 +142,6 @@ public class ScreenSpaceCaustics : MonoBehaviour
 
         quad = BuildQuad();
         buffer = new CommandBuffer { name = "ScreenSpaceCaustics" };
-        buffer.DrawMesh(quad, Matrix4x4.identity, material, 0, 0);
-
-        cam.depthTextureMode |= DepthTextureMode.Depth;
         cam.AddCommandBuffer(CameraEvent.AfterForwardOpaque, buffer);
         ready = true;
     }
@@ -136,11 +158,18 @@ public class ScreenSpaceCaustics : MonoBehaviour
         }
     }
 
+    // Unity 在渲染前读该标志，别处覆盖时这里每帧补回来
+    private void OnPreCull()
+    {
+        cam.depthTextureMode |= DepthTextureMode.Depth;
+    }
+
     private void Update()
     {
         if (!ready) return;
         SyncOcclusionToggle();
-        ApplyMaterial(); // 每帧刷新，便于运行时调参
+        UpdateBufferPass(debugView == DebugView.Off ? 0 : 1);
+        ApplyMaterial();
     }
 
     // 允许运行时勾掉/勾上遮挡做 A/B 对比；勾上但资产缺失时只警告一次
@@ -168,6 +197,14 @@ public class ScreenSpaceCaustics : MonoBehaviour
         occlusionActive = true;
     }
 
+    private void UpdateBufferPass(int pass)
+    {
+        if (pass == currentPass) return;
+        currentPass = pass;
+        buffer.Clear();
+        buffer.DrawMesh(quad, Matrix4x4.identity, material, 0, pass);
+    }
+
     private void ApplyMaterial()
     {
         material.SetTexture(CausticsMapId, causticsMap);
@@ -182,10 +219,35 @@ public class ScreenSpaceCaustics : MonoBehaviour
         material.SetFloat(NormalBiasId, normalBias);
         material.SetFloat(OcclusionBiasId, occlusionBias);
         material.SetFloat(OcclusionFadeId, occlusionFade);
+        material.SetFloat(DebugModeId, (float)debugView);
 
         // MapSize 为 0 时 shader 里整段遮挡判定被跳过（世界可能在 Y<0，不能用黑图代替"不遮挡"）
         material.SetVector(MapMinId, new Vector4(mapMin, 0f, mapMin, 0f));
         material.SetFloat(MapSizeId, occlusionActive ? mapSize : 0f);
+
+        UpdateFrustumCorners();
+    }
+
+    // 四个视锥角方向（世界空间、视空间 z = -1），shader 里乘深度即得世界坐标
+    private void UpdateFrustumCorners()
+    {
+        Matrix4x4 invProj = cam.projectionMatrix.inverse;
+        Matrix4x4 camToWorld = cam.cameraToWorldMatrix;
+        Vector3 origin = camToWorld.GetColumn(3);
+
+        material.SetVector(CamPosId, origin);
+        material.SetVector(CornerBLId, Corner(invProj, camToWorld, origin, -1f, -1f));
+        material.SetVector(CornerBRId, Corner(invProj, camToWorld, origin, 1f, -1f));
+        material.SetVector(CornerTLId, Corner(invProj, camToWorld, origin, -1f, 1f));
+        material.SetVector(CornerTRId, Corner(invProj, camToWorld, origin, 1f, 1f));
+    }
+
+    private static Vector4 Corner(Matrix4x4 invProj, Matrix4x4 camToWorld, Vector3 origin, float ndcX, float ndcY)
+    {
+        Vector4 p = invProj * new Vector4(ndcX, ndcY, 1f, 1f);
+        Vector3 view = new Vector3(p.x, p.y, p.z) / p.w;
+        view /= -view.z; // 归一到视空间 z = -1，这样乘 eyeDepth 就落在正确距离
+        return camToWorld.MultiplyPoint3x4(view) - origin;
     }
 
     private void OnDestroy()
