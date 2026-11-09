@@ -362,9 +362,10 @@ public class EntityPlayerManager : ClientSubManager
             if (view.anim != null)
             {
                 view.anim.Init(null);
-                // 武器由实体配表固定，显示位置之后完全由动画状态驱动
-                var config = ConfigManager.EntityConfig.GetByCategory(info.type);
-                view.anim.SetWeapon(config.weaponId, config.weaponDisplay);
+                // 武器编号取实体配表、显示类型取武器表；显示位置之后完全由动画状态驱动
+                int weaponId = ConfigManager.EntityConfig.GetByCategory(info.type).weaponId;
+                if (weaponId >= 0) view.anim.SetWeapon(weaponId, ConfigManager.WeaponConfig.Get(weaponId).weaponDisplay);
+                else Debug.LogError($"[动画] 实体 {info.type} 有动画却没有配武器编号：武器显示类型取自 weapon.csv");
             }
 
             // 客户端表现刚体：dynamic + 关重力，逐帧 MovePosition 喂位姿；只有 dynamic 才与场景静态碰撞体做穿透解算

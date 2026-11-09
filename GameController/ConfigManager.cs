@@ -30,6 +30,7 @@ public class ConfigManager : MonoBehaviour
 
         int battleFury = BattleFuryLayerConfig.Load(ReadTable(dir, BattleFuryLayerConfig.FileName));
         int entity = EntityConfig.Load(ReadTable(dir, EntityConfig.FileName));
+        int weapon = WeaponConfig.Load(ReadTable(dir, WeaponConfig.FileName));
         int skill = SkillConfig.Load(ReadTable(dir, SkillConfig.FileName));
         int effect = EffectConfig.Load(ReadTable(dir, EffectConfig.FileName));
         int expCharacter = ExpCharacterConfig.Load(ReadTable(dir, ExpCharacterConfig.FileName));
@@ -42,7 +43,7 @@ public class ConfigManager : MonoBehaviour
         int settingTips = SettingTipsConfig.Load(ReadTable(dir, SettingTipsConfig.FileName));
         int quickMessage = QuickMessageConfig.Load(ReadTable(dir, QuickMessageConfig.FileName));
 
-        Debug.Log($"[配表] {dir} 加载完成 | battle_fury_layer {battleFury} | entity {entity} | skill {skill} | effect {effect} | " +
+        Debug.Log($"[配表] {dir} 加载完成 | battle_fury_layer {battleFury} | entity {entity} | weapon {weapon} | skill {skill} | effect {effect} | " +
                   $"exp_character {expCharacter} | exp_player {expPlayer} | revive_time {revive} | global_variables {global} | notice {notice} | attr_range {attrRange} | setting_tips {settingTips} | quick_message {quickMessage} | terrain_generation {terrainGen}");
     }
 
@@ -433,7 +434,7 @@ public class ConfigManager : MonoBehaviour
     public struct EntityConfig
     {
         public const string FileName = "entity.csv";
-        private const int ColumnCount = 19;
+        private const int ColumnCount = 17;
         public static readonly Dictionary<EntityType, EntityConfig> content = new();
 
         public EntityCategory category;
@@ -452,9 +453,7 @@ public class ConfigManager : MonoBehaviour
         public int quality;           // 0:无 / 1:B / 2:A / 3:S，直接对应 RoleHead 的 m_quality 页序
         public bool showHealthBar;    // 客户端是否为该实体创建头顶血条
         public EndureType endureLevel; // 第16列：默认霸体等级，实体霸体等级的下限（留空 = 无霸体）
-        public int weaponId;                       // 第17列：固定武器编号（一维），留空 = -1
-        public EntityAnim.CharcterAnimType animType;      // 第18列：攻击动画用哪类武器
-        public EntityAnim.WeaponDisplayType weaponDisplay; // 第19列：武器收起时的挂法
+        public int weaponId;           // 第17列：固定武器编号（= weapon.csv 主键 / WeaponPrefabs 下标），留空 = -1
 
         public EntityConfig(string[] rowData)
         {
@@ -475,8 +474,6 @@ public class ConfigManager : MonoBehaviour
             showHealthBar = ParseShowHealthBar(rowData, 14);
             endureLevel = ParseEndureLevel(rowData, 15);
             weaponId = ParseWeaponId(rowData, 16);
-            animType = ParseAnimType(rowData, 17);
-            weaponDisplay = ParseWeaponDisplay(rowData, 18);
         }
 
         public static int Load(ConfigTable table)
@@ -543,6 +540,37 @@ public class ConfigManager : MonoBehaviour
             attr.critDamage += critDamageAdd;
             return attr;
         }
+    }
+    #endregion
+
+    #region 武器表
+    // 一维武器表：主键 = 武器编号（即 AssetsManager.WeaponPrefabs 下标），动画类型与显示类型挂在武器上
+    public struct WeaponConfig
+    {
+        public const string FileName = "weapon.csv";
+        private const int ColumnCount = 4;
+        public static readonly Dictionary<int, WeaponConfig> content = new();
+
+        public int key;
+        public string name;
+        public EntityAnim.CharcterAnimType animType;        // 第3列：该武器的攻击动画走哪套动作集
+        public EntityAnim.WeaponDisplayType weaponDisplay;  // 第4列：收起时挂在哪
+
+        public WeaponConfig(string[] rowData)
+        {
+            key = ParseInt(rowData, 0);
+            name = ParseString(rowData, 1);
+            animType = ParseAnimType(rowData, 2);
+            weaponDisplay = ParseWeaponDisplay(rowData, 3);
+        }
+
+        public static int Load(ConfigTable table)
+        {
+            table.RequireColumnCount(ColumnCount);
+            return Fill(table, content, row => new WeaponConfig(row), row => row.key);
+        }
+
+        public static WeaponConfig Get(int key) => GetRequired(content, key, FileName);
     }
     #endregion
 

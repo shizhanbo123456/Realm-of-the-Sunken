@@ -135,10 +135,16 @@ public class HomePreviewManager : ClientSubManager
             return go;
         }
         anim.Init(null);
-        // 动画类型与武器都取实体配表，与战斗客户端同口径
-        var config = ConfigManager.EntityConfig.GetByCategory(type);
-        anim.SetType(config.animType);
-        anim.SetWeapon(config.weaponId, config.weaponDisplay);
+        // 武器编号取实体配表，动作集与武器显示类型取武器表，与战斗客户端同口径
+        int weaponId = ConfigManager.EntityConfig.GetByCategory(type).weaponId;
+        if (weaponId < 0)
+        {
+            Debug.LogError($"[展示] {type} 没有配武器编号：动作集与武器显示类型都取自 weapon.csv");
+            return go;
+        }
+        var weapon = ConfigManager.WeaponConfig.Get(weaponId);
+        anim.SetType(weapon.animType);
+        anim.SetWeapon(weaponId, weapon.weaponDisplay);
         return go;
     }
 

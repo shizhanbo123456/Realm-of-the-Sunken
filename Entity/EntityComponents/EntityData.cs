@@ -126,15 +126,17 @@ public abstract class EntityData : MonoBehaviour
         ModelInfo = GetComponentInChildren<EntityModelInfo>();
         if (ModelInfo == null) Debug.LogError($"实体缺少 EntityModelInfo：{name}（{type}，id={id}）");
 
-        // 动画类型与武器：都取实体配表（预制体上不再配）
+        // 动画类型与武器显示类型都挂在武器上：entity.csv 只给武器编号（预制体上不再配）
         if (anim != null) anim.Init(this);
         if (anim != null)
         {
-            if (Tool.InfoManager != null)
+            if (weaponId < 0)
+                Debug.LogError($"{name}（{type}）有动画却没有配武器编号：动作集与武器显示类型都取自 weapon.csv");
+            else
             {
-                var config = Tool.InfoManager.GetEntityConfig(type);
-                anim.SetType(config.animType);
-                anim.SetWeapon(config.weaponId, config.weaponDisplay);
+                var weapon = ConfigManager.WeaponConfig.Get(weaponId);
+                anim.SetType(weapon.animType);
+                anim.SetWeapon(weaponId, weapon.weaponDisplay);
             }
             anim.DoSpawn();
         }
