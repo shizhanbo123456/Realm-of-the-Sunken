@@ -15,6 +15,7 @@ public class EntityAnim : MonoBehaviour
     private const string key_doAttack = "Attack";
     private const string key_attackId = "AttackId";
     private const string key_hit = "Hit";
+    private const string key_doHit = "DoHit";
     public enum CharcterAnimType
     {
         Spear=0,
@@ -423,7 +424,8 @@ public class EntityAnim : MonoBehaviour
     }
     public void DoHit(bool longHit)
     {
-        SetIntParam(ref paramPack.hit, longHit?1:0, key_hit);
+        SetIntParam(ref paramPack.hit, longHit?1:0, key_hit); // 长短受击选择：值未变时不重写，靠 trigger 负责重播
+        SetTriggerAll(key_doHit);
     }
     #endregion
 }
