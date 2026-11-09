@@ -62,6 +62,15 @@ public class ScreenSpaceCaustics : MonoBehaviour
     [Tooltip("遮挡过渡带宽度（米），太小会出硬边")]
     [Min(0.01f)] public float occlusionFade = 1f;
 
+    [Tooltip("光线来向（世界空间，从表面指向光源）：越倾斜，障碍投出的阴影越长")]
+    public Vector3 lightDirection = new Vector3(0.3f, 1f, 0.2f);
+
+    [Tooltip("沿光线查找遮挡的最远距离（米）")]
+    [Min(1f)] public float shadowMaxDistance = 25f;
+
+    [Tooltip("沿光线步进的采样次数，越大阴影边缘越准、开销越高")]
+    [Range(1f, 24f)] public float shadowSteps = 8f;
+
     [Header("调试")]
     [Tooltip("排查用：临时覆盖屏幕显示深度/法线/世界坐标，正常运行时保持 Off")]
     public DebugView debugView = DebugView.Off;
@@ -98,6 +107,9 @@ public class ScreenSpaceCaustics : MonoBehaviour
     private static readonly int DepthFlipVId = Shader.PropertyToID("_DepthFlipV");
     private static readonly int RayFlipVId = Shader.PropertyToID("_RayFlipV");
     private static readonly int NormalFlipId = Shader.PropertyToID("_NormalFlip");
+    private static readonly int LightDirId = Shader.PropertyToID("_LightDir");
+    private static readonly int ShadowMaxDistId = Shader.PropertyToID("_ShadowMaxDist");
+    private static readonly int ShadowStepsId = Shader.PropertyToID("_ShadowSteps");
 
     private Camera cam;
     private Material material;
@@ -138,6 +150,12 @@ public class ScreenSpaceCaustics : MonoBehaviour
         {
             Debug.LogWarning($"[ScreenSpaceCaustics] 相机「{cam.name}」是正交投影，视锥角方向退化为平行线，组件不生效", this);
             return;
+        }
+
+        if (lightDirection.sqrMagnitude < 0.0001f)
+        {
+            Debug.LogWarning("[ScreenSpaceCaustics] lightDirection 是零向量，已按垂直向上处理", this);
+            lightDirection = Vector3.up;
         }
 
         occlusionActive = useOcclusion;
@@ -238,6 +256,9 @@ public class ScreenSpaceCaustics : MonoBehaviour
         material.SetFloat(DepthFlipVId, flipDepthV ? 1f : 0f);
         material.SetFloat(RayFlipVId, flipRayV ? 1f : 0f);
         material.SetFloat(NormalFlipId, flipNormal ? -1f : 1f);
+        material.SetVector(LightDirId, lightDirection.normalized);
+        material.SetFloat(ShadowMaxDistId, shadowMaxDistance);
+        material.SetFloat(ShadowStepsId, Mathf.Round(shadowSteps));
 
         // MapSize 为 0 时 shader 里整段遮挡判定被跳过（世界可能在 Y<0，不能用黑图代替"不遮挡"）
         material.SetVector(MapMinId, new Vector4(mapMin, 0f, mapMin, 0f));
