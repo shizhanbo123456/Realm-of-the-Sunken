@@ -16,6 +16,9 @@ namespace TerrainGen.EditorTools
         const string EffectsFolder = "Assets/Resources/Effects";
         const string ResourcesFolder = "Assets/Resources";
 
+        // 相机清屏用的哨兵值：既区别于真实高度（可能为负），也能被 shader 原样写出
+        const float NoGeometryValue = -10000f;
+
         // root 必须是 SpawnColliderOnly(stripMeshes: false) 铺出来的完整地形
         public static bool Bake(Transform root, float groundHeight, out string message)
         {
@@ -82,7 +85,7 @@ namespace TerrainGen.EditorTools
                 cam.nearClipPlane = 0.1f;
                 cam.farClipPlane = maxY + 2f - minY + 2f;
                 cam.clearFlags = CameraClearFlags.SolidColor;
-                cam.backgroundColor = new Color(0f, 0f, 0f, 1f);
+                cam.backgroundColor = new Color(NoGeometryValue, 0f, 0f, 1f); // 空列用哨兵值，避免和"几何在 Y<0"混淆
                 cam.cullingMask = ~0;
                 cam.allowHDR = false;
                 cam.allowMSAA = false;
@@ -108,7 +111,7 @@ namespace TerrainGen.EditorTools
                 }
             }
 
-            // RFloat → 半浮点；值为 0 的列说明没有渲染到几何，按地面高度填（等于不遮挡）
+            // RFloat → 半浮点；空列（渲染不到几何、值为哨兵）按地面高度填，等于不遮挡
             var raw = readback.GetRawTextureData<float>();
             var half = new ushort[raw.Length];
             float readMin = float.MaxValue;
@@ -116,7 +119,7 @@ namespace TerrainGen.EditorTools
             for (int i = 0; i < raw.Length; i++)
             {
                 float v = raw[i];
-                if (v <= 0f) v = groundHeight;
+                if (v <= NoGeometryValue + 1f) v = groundHeight;
                 if (v < readMin) readMin = v;
                 if (v > readMax) readMax = v;
                 half[i] = Mathf.FloatToHalf(v);
