@@ -3,13 +3,14 @@ using UnityEngine;
 
 namespace TerrainGen.EditorTools
 {
-    // 把整张地图「每一列最高表面高度」烘成一张 R16 高度图，供全屏焦散做「上方是否被挡住」判定
+    // 从正上方用正交相机把整张地图渲染一遍，得到每一列的顶面高度，供全屏焦散做遮挡判定
     public static class CausticsOcclusionBaker
     {
         public const int Resolution = 2048;
         public const string AssetPath = "Assets/Resources/Effects/Caustics/CausticsOcclusion.asset";
         public const string ResourcePath = "Effects/Caustics/CausticsOcclusion";
 
+        const string ShaderName = "Hidden/Caustics/HeightBake";
         const string FolderPath = "Assets/Resources/Effects/Caustics";
         const string EffectsFolder = "Assets/Resources/Effects";
         const string ResourcesFolder = "Assets/Resources";
@@ -25,41 +26,78 @@ namespace TerrainGen.EditorTools
                 return false;
             }
 
-            float cellsPerMeter = Resolution / mapSize;
-
-            // 先铺满地面高度：没有物件的列（虚空、空地）按地面算，等于不遮挡
-            var heights = new float[Resolution * Resolution];
-            for (int i = 0; i < heights.Length; i++) heights[i] = groundHeight;
-
-            MeshRenderer[] renderers = root.GetComponentsInChildren<MeshRenderer>(true);
-            float highest = groundHeight;
-
-            for (int r = 0; r < renderers.Length; r++)
+            Shader shader = Shader.Find(ShaderName);
+            if (shader == null)
             {
-                Bounds bounds = renderers[r].bounds;
-                int x0 = Mathf.Clamp(Mathf.FloorToInt((bounds.min.x - mapMin) * cellsPerMeter), 0, Resolution - 1);
-                int x1 = Mathf.Clamp(Mathf.FloorToInt((bounds.max.x - mapMin) * cellsPerMeter), 0, Resolution - 1);
-                int z0 = Mathf.Clamp(Mathf.FloorToInt((bounds.min.z - mapMin) * cellsPerMeter), 0, Resolution - 1);
-                int z1 = Mathf.Clamp(Mathf.FloorToInt((bounds.max.z - mapMin) * cellsPerMeter), 0, Resolution - 1);
-
-                float top = bounds.max.y;
-                if (top > highest) highest = top;
-
-                // 行号对应世界 Z，列号对应世界 X，与 shader 里 (xz - MapMin) / MapSize 的取值一致
-                for (int z = z0; z <= z1; z++)
-                {
-                    int row = z * Resolution;
-                    for (int x = x0; x <= x1; x++)
-                    {
-                        if (top > heights[row + x]) heights[row + x] = top;
-                    }
-                }
+                message = $"烘焙失败：找不到 shader「{ShaderName}」";
+                return false;
             }
 
-            var half = new ushort[heights.Length];
-            for (int i = 0; i < heights.Length; i++) half[i] = Mathf.FloatToHalf(heights[i]);
+            Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0)
+            {
+                message = "烘焙失败：临时地形里没有任何 Renderer";
+                return false;
+            }
 
-            // RHalf 存世界高度（16 位半浮点）：R16 是归一化整数，塞半浮点位模式会读成 值/65535
+            float maxY = groundHeight;
+            float minY = groundHeight;
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Bounds bounds = renderers[i].bounds;
+                if (bounds.max.y > maxY) maxY = bounds.max.y;
+                if (bounds.min.y < minY) minY = bounds.min.y;
+            }
+
+            var rt = new RenderTexture(Resolution, Resolution, 24, RenderTextureFormat.RFloat, RenderTextureReadWrite.Linear);
+            rt.Create();
+
+            var camGo = new GameObject("CausticsHeightBakeCamera");
+            Texture2D readback = new Texture2D(Resolution, Resolution, TextureFormat.RFloat, false, true);
+            try
+            {
+                Camera cam = camGo.AddComponent<Camera>();
+                cam.orthographic = true;
+                cam.orthographicSize = mapSize * 0.5f;
+                cam.transform.position = new Vector3(mapMin + mapSize * 0.5f, maxY + 2f, mapMin + mapSize * 0.5f);
+                cam.transform.rotation = Quaternion.Euler(90f, 0f, 0f); // 俯视：屏幕 x→世界X，屏幕 y→世界Z
+                cam.nearClipPlane = 0.1f;
+                cam.farClipPlane = maxY + 2f - minY + 2f;
+                cam.clearFlags = CameraClearFlags.SolidColor;
+                cam.backgroundColor = new Color(0f, 0f, 0f, 1f);
+                cam.cullingMask = ~0;
+                cam.allowHDR = false;
+                cam.allowMSAA = false;
+                cam.depthTextureMode = DepthTextureMode.None;
+                cam.targetTexture = rt;
+                cam.SetReplacementShader(shader, "");
+
+                cam.Render();
+
+                RenderTexture.active = rt;
+                readback.ReadPixels(new Rect(0, 0, Resolution, Resolution), 0, 0);
+                readback.Apply();
+                RenderTexture.active = null;
+            }
+            finally
+            {
+                Object.DestroyImmediate(camGo);
+                rt.Release();
+                Object.DestroyImmediate(rt);
+            }
+
+            // RFloat → 半浮点；值为 0 的列说明没有几何，按地面高度填（等于不遮挡）
+            var raw = readback.GetRawTextureData<float>();
+            var half = new ushort[raw.Length];
+            for (int i = 0; i < raw.Length; i++)
+            {
+                float v = raw[i];
+                if (v <= 0f) v = groundHeight;
+                half[i] = Mathf.FloatToHalf(v);
+            }
+            Object.DestroyImmediate(readback);
+
+            // RHalf 存世界高度：R16 是归一化整数，塞半浮点位模式会被读成 值/65535
             var texture = new Texture2D(Resolution, Resolution, TextureFormat.RHalf, false, true)
             {
                 name = "CausticsOcclusion",
@@ -80,7 +118,7 @@ namespace TerrainGen.EditorTools
             AssetDatabase.CreateAsset(texture, AssetPath);
             AssetDatabase.SaveAssets();
 
-            message = $"焦散遮挡图已烘焙：{Resolution}×{Resolution}，覆盖 {mapSize:0.#}m，最高面 {highest:0.##}m，参与物件 {renderers.Length} 个";
+            message = $"焦散遮挡图已烘焙（俯视渲染）：{Resolution}×{Resolution}，覆盖 {mapSize:0.#}m，高度 {minY:0.##}~{maxY:0.##}m，参与渲染物件 {renderers.Length} 个";
             return true;
         }
     }
