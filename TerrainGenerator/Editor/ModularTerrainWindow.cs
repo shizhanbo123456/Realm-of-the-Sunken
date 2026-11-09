@@ -375,49 +375,39 @@ namespace TerrainGen.EditorTools
             Log(summary);
         }
 
-        // 烘焦散遮挡图：流程同 NavMesh 烘焙，铺满整图后把每个物体的包围盒顶面写进高度图
+        // 烘焦散遮挡图：流程同 NavMesh 烘焙，铺满整图后俯视正交渲染一遍真实几何
         void BakeCausticsOcclusion()
         {
             report.Clear();
 
             if (Application.isPlaying)
             {
-                summary = "烘焙终止：请退出播放模式再烘焦散遮挡图。";
-                summaryIsError = true;
-                Log(summary);
+                ReportCaustics("烘焙终止：请退出播放模式再烘焦散遮挡图。", true);
                 return;
             }
 
             if (!TryCheckSceneClean(out string blocked))
             {
-                summary = "烘焙终止：场景里还有其它网格或碰撞体，先清空场景再烘。\n" + blocked;
-                summaryIsError = true;
-                Log(summary);
+                ReportCaustics("烘焙终止：场景里还有其它网格或碰撞体，先清空场景再烘。\n" + blocked, true);
                 return;
             }
 
             if (!EnsureConfig(out string configError))
             {
-                summary = "烘焙失败：" + configError;
-                summaryIsError = true;
-                Log(summary);
+                ReportCaustics("烘焙失败：" + configError, true);
                 return;
             }
 
             if (kit == null)
             {
-                summary = "烘焙失败：未指定素材表";
-                summaryIsError = true;
-                Log(summary);
+                ReportCaustics("烘焙失败：未指定素材表", true);
                 return;
             }
 
             TerrainPlanData data = TerrainGenerator.BuildData(settings, kit);
             if (data == null)
             {
-                summary = "烘焙失败：无法构建摆放数据，检查生成参数与素材表";
-                summaryIsError = true;
-                Log(summary);
+                ReportCaustics("烘焙失败：无法构建摆放数据，检查生成参数与素材表", true);
                 return;
             }
 
@@ -436,9 +426,16 @@ namespace TerrainGen.EditorTools
                 DestroyImmediate(root); // 烘完立刻清掉临时地形，场景回到干净状态
             }
 
-            summary = message;
-            summaryIsError = !ok;
-            Log(summary);
+            ReportCaustics(message, !ok);
+        }
+
+        // 焦散烘焙结果只走 Console：面板里的文字既复制不了也不好找
+        void ReportCaustics(string msg, bool error)
+        {
+            summary = msg;
+            summaryIsError = error;
+            if (error) Debug.LogError(msg);
+            else Debug.Log(msg);
         }
 
         bool TryBakeNavMesh(Transform root, TerrainPlanData data, out string message)
