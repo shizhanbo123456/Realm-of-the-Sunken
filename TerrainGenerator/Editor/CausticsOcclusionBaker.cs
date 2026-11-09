@@ -7,11 +7,12 @@ namespace TerrainGen.EditorTools
     public static class CausticsOcclusionBaker
     {
         public const int Resolution = 2048;
-        public const string AssetPath = "Assets/Resources/Caustics/CausticsOcclusion.asset";
-        public const string ResourcePath = "Caustics/CausticsOcclusion";
+        public const string AssetPath = "Assets/Resources/Effects/Caustics/CausticsOcclusion.asset";
+        public const string ResourcePath = "Effects/Caustics/CausticsOcclusion";
 
-        const string FolderPath = "Assets/Resources/Caustics";
-        const string ParentFolder = "Assets/Resources";
+        const string FolderPath = "Assets/Resources/Effects/Caustics";
+        const string EffectsFolder = "Assets/Resources/Effects";
+        const string ResourcesFolder = "Assets/Resources";
 
         // root 必须是 SpawnColliderOnly(stripMeshes: false) 铺出来的完整地形
         public static bool Bake(Transform root, float groundHeight, out string message)
@@ -70,8 +71,9 @@ namespace TerrainGen.EditorTools
 
             if (!AssetDatabase.IsValidFolder(FolderPath))
             {
-                if (!AssetDatabase.IsValidFolder(ParentFolder)) AssetDatabase.CreateFolder("Assets", "Resources");
-                AssetDatabase.CreateFolder(ParentFolder, "Caustics");
+                if (!AssetDatabase.IsValidFolder(ResourcesFolder)) AssetDatabase.CreateFolder("Assets", "Resources");
+                if (!AssetDatabase.IsValidFolder(EffectsFolder)) AssetDatabase.CreateFolder(ResourcesFolder, "Effects");
+                AssetDatabase.CreateFolder(EffectsFolder, "Caustics");
             }
 
             AssetDatabase.DeleteAsset(AssetPath);

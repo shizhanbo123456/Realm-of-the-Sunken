@@ -104,7 +104,7 @@ namespace TerrainGen.EditorTools
             {
                 if (GUILayout.Button("烘焙焦散遮挡图（要求空场景，按真实网格生成）", GUILayout.Height(24))) BakeCausticsOcclusion();
             }
-            EditorGUILayout.LabelField("产物 Assets/Resources/Caustics/CausticsOcclusion.asset，供相机上的 ScreenSpaceCaustics 判断屋顶下不铺焦散",
+            EditorGUILayout.LabelField("产物 Assets/Resources/Effects/Caustics/CausticsOcclusion.asset，供相机上的 ScreenSpaceCaustics 判断屋顶下不铺焦散",
                 EditorStyles.wordWrappedMiniLabel);
 
             scroll = EditorGUILayout.BeginScrollView(scroll, GUILayout.ExpandHeight(true));

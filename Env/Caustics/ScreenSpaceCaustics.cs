@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 public class ScreenSpaceCaustics : MonoBehaviour
 {
     public const string ShaderName = "Hidden/Caustics/ScreenProjection";
-    public const string OcclusionResourcePath = "Caustics/CausticsOcclusion";
+    public const string OcclusionResourcePath = "Effects/Caustics/CausticsOcclusion";
 
     [Header("贴图")]
     [Tooltip("焦散网纹：Assets/Files/Shaders/Caustics/T_Caustics")]
