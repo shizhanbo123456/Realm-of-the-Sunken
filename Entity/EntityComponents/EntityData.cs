@@ -801,6 +801,16 @@ public abstract class EntityData : MonoBehaviour
         if (anim == null) { grounded = true; return; } // 无动画实体永远在地面
         if (rb == null) return;
         if (!rb.useGravity) return; // 关重力期间强制在地面，不做地面检测
+        // 起跳后 0.2s 内一律算空中：起跳当帧速度还没写进刚体、脚下探针仍踩地面
+        if (anim.InJumpAirGrace)
+        {
+            if (grounded)
+            {
+                grounded = false;
+                anim.InAir(true);
+            }
+            return;
+        }
         // 出生动画期间状态机归 Spawn 子状态机接管，且出生点允许悬空 —— 此期间不写 InAir
         if (anim.CurrentState == EntityAnim.AnimState.Spawn) return;
 

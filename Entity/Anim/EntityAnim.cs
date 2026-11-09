@@ -423,6 +423,12 @@ public class EntityAnim : MonoBehaviour
     #endregion
 
     #region//动画控制
+    private const float JumpAirGraceSeconds = 0.2f; // 起跳后强制算空中的时长
+    private float lastJumpTime = float.NegativeInfinity;
+
+    public void MarkJumpTime() => lastJumpTime = Time.time;
+    public bool InJumpAirGrace => Time.time - lastJumpTime < JumpAirGraceSeconds;
+
     public void DoSpawn()
     {
         SetTriggerAll(key_spawn);
