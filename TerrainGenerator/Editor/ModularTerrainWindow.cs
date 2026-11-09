@@ -99,6 +99,14 @@ namespace TerrainGen.EditorTools
             EditorGUILayout.LabelField("0 = 用项目 NavMeshAreas 里的 minRegionArea；大于 0 时按该面积换算成体素² 覆盖",
                 EditorStyles.wordWrappedMiniLabel);
 
+            EditorGUILayout.Space(4);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("烘焙焦散遮挡图（要求空场景，按真实网格生成）", GUILayout.Height(24))) BakeCausticsOcclusion();
+            }
+            EditorGUILayout.LabelField("产物 Assets/Resources/Caustics/CausticsOcclusion.asset，供相机上的 ScreenSpaceCaustics 判断屋顶下不铺焦散",
+                EditorStyles.wordWrappedMiniLabel);
+
             scroll = EditorGUILayout.BeginScrollView(scroll, GUILayout.ExpandHeight(true));
 
             showSettings = EditorGUILayout.Foldout(showSettings, "生成参数", true);
@@ -356,6 +364,72 @@ namespace TerrainGen.EditorTools
             {
                 TerrainAssembler.SpawnColliderOnly(data, kit, root.transform, stripMeshes: false);
                 ok = TryBakeNavMesh(root.transform, data, out message);
+            }
+            finally
+            {
+                DestroyImmediate(root); // 烘完立刻清掉临时地形，场景回到干净状态
+            }
+
+            summary = message;
+            summaryIsError = !ok;
+            Log(summary);
+        }
+
+        // 烘焦散遮挡图：流程同 NavMesh 烘焙，铺满整图后把每个物体的包围盒顶面写进高度图
+        void BakeCausticsOcclusion()
+        {
+            report.Clear();
+
+            if (Application.isPlaying)
+            {
+                summary = "烘焙终止：请退出播放模式再烘焦散遮挡图。";
+                summaryIsError = true;
+                Log(summary);
+                return;
+            }
+
+            if (!TryCheckSceneClean(out string blocked))
+            {
+                summary = "烘焙终止：场景里还有其它网格或碰撞体，先清空场景再烘。\n" + blocked;
+                summaryIsError = true;
+                Log(summary);
+                return;
+            }
+
+            if (!EnsureConfig(out string configError))
+            {
+                summary = "烘焙失败：" + configError;
+                summaryIsError = true;
+                Log(summary);
+                return;
+            }
+
+            if (kit == null)
+            {
+                summary = "烘焙失败：未指定素材表";
+                summaryIsError = true;
+                Log(summary);
+                return;
+            }
+
+            TerrainPlanData data = TerrainGenerator.BuildData(settings, kit);
+            if (data == null)
+            {
+                summary = "烘焙失败：无法构建摆放数据，检查生成参数与素材表";
+                summaryIsError = true;
+                Log(summary);
+                return;
+            }
+
+            var root = new GameObject("CausticsBakeRoot");
+            root.transform.position = Vector3.zero;
+
+            bool ok;
+            string message;
+            try
+            {
+                TerrainAssembler.SpawnColliderOnly(data, kit, root.transform, stripMeshes: false);
+                ok = CausticsOcclusionBaker.Bake(root.transform, data.groundHeight, out message);
             }
             finally
             {
