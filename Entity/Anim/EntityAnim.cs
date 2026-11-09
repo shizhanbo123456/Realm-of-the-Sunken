@@ -262,13 +262,17 @@ public class EntityAnim : MonoBehaviour
         weaponVisuals.Add(instance);
     }
 
-    // 收起：在锚点骨骼下建挂点，位置取锚点算出的世界位置；带偏移的锚点只给位置，父节点取同一基准骨骼
+    // 收起：挂点必须建在骨骼下（武器要跟着人物动画动）；位置与朝向取锚点算出的世界值
     private void AttachToAnchor(GameObject prefab, EntityAnchor anchor)
     {
         EntityAnchorInfo info = anchor.GetTransform(modelInfo, this);
-        Transform parent = info.transform != null ? info.transform : GetBoneTransform(HumanBodyBones.Hips);
+        if (info.transform == null)
+        {
+            Debug.LogError($"{gameObject.name} 的 {anchor} 锚点没有关联骨骼，武器不会跟随动画");
+            return;
+        }
         Transform mount = new GameObject($"{name}_WeaponMount_{anchor}").transform;
-        mount.SetParent(parent, false);
+        mount.SetParent(info.transform, false);
         mount.position = info.position;
         mount.rotation = info.rotation;
 

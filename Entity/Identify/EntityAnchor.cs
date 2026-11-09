@@ -56,9 +56,9 @@ public static class EntityAnchorExtensions
                 case EntityAnchor.LeftFoot: return anim.GetBoneTransform(HumanBodyBones.LeftFoot).ToAnchorInfo(model.transform.rotation);
                 case EntityAnchor.RightFoot: return anim.GetBoneTransform(HumanBodyBones.RightFoot).ToAnchorInfo(model.transform.rotation);
                 case EntityAnchor.Chest: return anim.GetBoneTransform(HumanBodyBones.Chest).ToAnchorInfo(model.transform.rotation);
-                case EntityAnchor.WeaponHipLeft:return anim.GetBoneTransform(HumanBodyBones.Hips).ToAnchorInfo(model.transform.rotation)+(-model.xRange.x*model.transform.right);
-                case EntityAnchor.WeaponHipRight:return anim.GetBoneTransform(HumanBodyBones.Hips).ToAnchorInfo(model.transform.rotation)+model.xRange.x*model.transform.right;
-                case EntityAnchor.WeaponBack:return anim.GetBoneTransform(HumanBodyBones.Hips).ToAnchorInfo(model.transform.rotation);
+                case EntityAnchor.WeaponHipLeft: return WeaponMount(anim.GetBoneTransform(HumanBodyBones.Hips), model, new Vector3(-HalfWidth(model) - 0.03f, -0.02f, -0.04f), WeaponHipTilt);
+                case EntityAnchor.WeaponHipRight: return WeaponMount(anim.GetBoneTransform(HumanBodyBones.Hips), model, new Vector3(HalfWidth(model) + 0.03f, -0.02f, -0.04f), WeaponHipTilt);
+                case EntityAnchor.WeaponBack: return WeaponMount(anim.GetBoneTransform(HumanBodyBones.Chest), model, new Vector3(0f, -0.05f, model.zRange.x - 0.08f), WeaponBackTilt);
 
                 case EntityAnchor.Bar: 
                     {
@@ -83,6 +83,24 @@ public static class EntityAnchorExtensions
             case EntityAnchor.Camera: return model.transform.ToAnchorInfo() + (model.yRange.y * 0.5f + 0.5f) * Vector3.up;
         }
         throw new System.Exception("Unknown anchor: " + anchor);
+    }
+    // 武器挂点：父节点必须是骨骼（武器要跟着人物动画动），位置 = 骨骼位置 + 实体空间偏移，朝向 = 实体朝向 × 固定倾斜
+    // 背上的长枪（武器 z+ = 矛头）：先把矛头转到竖直，再向角色右侧倾 30°
+    private static readonly Quaternion WeaponBackTilt = Quaternion.Euler(0f, 0f, -30f) * Quaternion.Euler(-90f, 0f, 0f);
+    // 腰间的刀（武器 z+ = 刀锋）：先下压 30°，再转 180° 朝后 → 刀锋指向后下方
+    private static readonly Quaternion WeaponHipTilt = Quaternion.Euler(0f, 180f, 0f) * Quaternion.Euler(30f, 0f, 0f);
+
+    private static float HalfWidth(EntityModelInfo model) => (model.xRange.y - model.xRange.x) * 0.5f;
+
+    private static EntityAnchorInfo WeaponMount(Transform bone, EntityModelInfo model, Vector3 localOffset, Quaternion tilt)
+    {
+        Quaternion entityRotation = model.transform.rotation;
+        return new EntityAnchorInfo()
+        {
+            transform = bone,
+            position = bone.position + entityRotation * localOffset,
+            rotation = entityRotation * tilt,
+        };
     }
     // 骨骼锚点专用：旋转取骨骼所属实体（模型根），不取骨骼自身动画旋转
     private static EntityAnchorInfo ToAnchorInfo(this Transform transform, Quaternion entityRotation, Vector3 offset = default)
