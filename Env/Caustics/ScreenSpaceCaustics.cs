@@ -8,16 +8,6 @@ public class ScreenSpaceCaustics : MonoBehaviour
     public const string ShaderName = "Hidden/Caustics/ScreenProjection";
     public const string OcclusionResourcePath = "Effects/Caustics/CausticsOcclusion";
 
-    public enum DebugView
-    {
-        Off = 0,
-        Depth = 1,   // 深度原始值：应能看到远近层次；整屏全白 = 深度纹理没读到
-        Normal = 2,  // 重建的世界法线
-        WorldXZ = 3, // 世界 XZ 棋盘：应贴合地面透视
-        Split = 4,   // 四象限对照：左下都不翻 / 右下只翻角方向 / 左上只翻深度 uv / 右上都翻
-        Occlusion = 6, // 遮挡判据：亮 = 该处顶面高出本像素（应被遮挡），整屏红 = 遮挡被关闭
-    }
-
     [Header("贴图")]
     [Tooltip("焦散网纹：Assets/Files/Shaders/Caustics/T_Caustics")]
     public Texture causticsMap;
@@ -62,28 +52,6 @@ public class ScreenSpaceCaustics : MonoBehaviour
     [Tooltip("遮挡过渡带宽度（米），太小会出硬边")]
     [Min(0.01f)] public float occlusionFade = 1f;
 
-    [Tooltip("光线来向（世界空间，从表面指向光源）：越倾斜，障碍投出的阴影越长")]
-    public Vector3 lightDirection = new Vector3(0.3f, 1f, 0.2f);
-
-    [Tooltip("沿光线查找遮挡的最远距离（米）")]
-    [Min(1f)] public float shadowMaxDistance = 25f;
-
-    [Tooltip("沿光线步进的采样次数，越大阴影边缘越准、开销越高")]
-    [Range(1f, 24f)] public float shadowSteps = 8f;
-
-    [Header("调试")]
-    [Tooltip("排查用：临时覆盖屏幕显示深度/法线/世界坐标，正常运行时保持 Off")]
-    public DebugView debugView = DebugView.Off;
-
-    [Tooltip("深度图上下翻转：D3D 渲到中间 RT 时深度是上下颠倒存的，实测本工程必须开")]
-    public bool flipDepthV = true;
-
-    [Tooltip("角方向上下翻转，必须与 flipDepthV 相反；两者同向时地面会被镜像到地平线以上")]
-    public bool flipRayV = false;
-
-    [Tooltip("排查用：法线整体取反。若打开后朝上的面才亮、地面才有焦散，说明重建法线方向反了")]
-    public bool flipNormal = false;
-
     private static readonly int CausticsMapId = Shader.PropertyToID("_CausticsMap");
     private static readonly int FlowMapId = Shader.PropertyToID("_FlowMap");
     private static readonly int OcclusionMapId = Shader.PropertyToID("_OcclusionMap");
@@ -103,13 +71,6 @@ public class ScreenSpaceCaustics : MonoBehaviour
     private static readonly int CornerBRId = Shader.PropertyToID("_CornerBR");
     private static readonly int CornerTLId = Shader.PropertyToID("_CornerTL");
     private static readonly int CornerTRId = Shader.PropertyToID("_CornerTR");
-    private static readonly int DebugModeId = Shader.PropertyToID("_DebugMode");
-    private static readonly int DepthFlipVId = Shader.PropertyToID("_DepthFlipV");
-    private static readonly int RayFlipVId = Shader.PropertyToID("_RayFlipV");
-    private static readonly int NormalFlipId = Shader.PropertyToID("_NormalFlip");
-    private static readonly int LightDirId = Shader.PropertyToID("_LightDir");
-    private static readonly int ShadowMaxDistId = Shader.PropertyToID("_ShadowMaxDist");
-    private static readonly int ShadowStepsId = Shader.PropertyToID("_ShadowSteps");
 
     private Camera cam;
     private Material material;
@@ -121,8 +82,6 @@ public class ScreenSpaceCaustics : MonoBehaviour
     private bool ready;
     private float mapMin;
     private float mapSize;
-    private int currentPass = -1;
-    private bool cornerLogged;
 
     private void Awake()
     {
@@ -152,12 +111,6 @@ public class ScreenSpaceCaustics : MonoBehaviour
             return;
         }
 
-        if (lightDirection.sqrMagnitude < 0.0001f)
-        {
-            Debug.LogWarning("[ScreenSpaceCaustics] lightDirection 是零向量，已按垂直向上处理", this);
-            lightDirection = Vector3.up;
-        }
-
         occlusionActive = useOcclusion;
         if (occlusionActive)
         {
@@ -175,6 +128,7 @@ public class ScreenSpaceCaustics : MonoBehaviour
 
         quad = BuildQuad();
         buffer = new CommandBuffer { name = "ScreenSpaceCaustics" };
+        buffer.DrawMesh(quad, Matrix4x4.identity, material, 0, 0);
         cam.AddCommandBuffer(CameraEvent.AfterForwardOpaque, buffer);
         ready = true;
     }
@@ -201,7 +155,6 @@ public class ScreenSpaceCaustics : MonoBehaviour
     {
         if (!ready) return;
         SyncOcclusionToggle();
-        UpdateBufferPass(debugView == DebugView.Off ? 0 : 1);
         ApplyMaterial();
     }
 
@@ -230,14 +183,6 @@ public class ScreenSpaceCaustics : MonoBehaviour
         occlusionActive = true;
     }
 
-    private void UpdateBufferPass(int pass)
-    {
-        if (pass == currentPass) return;
-        currentPass = pass;
-        buffer.Clear();
-        buffer.DrawMesh(quad, Matrix4x4.identity, material, 0, pass);
-    }
-
     private void ApplyMaterial()
     {
         material.SetTexture(CausticsMapId, causticsMap);
@@ -252,15 +197,8 @@ public class ScreenSpaceCaustics : MonoBehaviour
         material.SetFloat(NormalBiasId, normalBias);
         material.SetFloat(OcclusionBiasId, occlusionBias);
         material.SetFloat(OcclusionFadeId, occlusionFade);
-        material.SetFloat(DebugModeId, (float)debugView);
-        material.SetFloat(DepthFlipVId, flipDepthV ? 1f : 0f);
-        material.SetFloat(RayFlipVId, flipRayV ? 1f : 0f);
-        material.SetFloat(NormalFlipId, flipNormal ? -1f : 1f);
-        material.SetVector(LightDirId, lightDirection.normalized);
-        material.SetFloat(ShadowMaxDistId, shadowMaxDistance);
-        material.SetFloat(ShadowStepsId, Mathf.Round(shadowSteps));
 
-        // MapSize 为 0 时 shader 里整段遮挡判定被跳过（世界可能在 Y<0，不能用黑图代替"不遮挡"）
+        // MapSize 为 0 时 shader 里整段遮挡判定被跳过
         material.SetVector(MapMinId, new Vector4(mapMin, 0f, mapMin, 0f));
         material.SetFloat(MapSizeId, occlusionActive ? mapSize : 0f);
 
@@ -274,22 +212,11 @@ public class ScreenSpaceCaustics : MonoBehaviour
         Matrix4x4 camToWorld = cam.cameraToWorldMatrix;
         Vector3 origin = camToWorld.GetColumn(3);
 
-        Vector3 bl = Corner(invProj, camToWorld, origin, -1f, -1f);
-        Vector3 br = Corner(invProj, camToWorld, origin, 1f, -1f);
-        Vector3 tl = Corner(invProj, camToWorld, origin, -1f, 1f);
-        Vector3 tr = Corner(invProj, camToWorld, origin, 1f, 1f);
-
         material.SetVector(CamPosId, origin);
-        material.SetVector(CornerBLId, bl);
-        material.SetVector(CornerBRId, br);
-        material.SetVector(CornerTLId, tl);
-        material.SetVector(CornerTRId, tr);
-
-        if (!cornerLogged)
-        {
-            cornerLogged = true;
-            Debug.Log($"[ScreenSpaceCaustics] camPos={origin} forward={cam.transform.forward} BL={bl} TR={tr}");
-        }
+        material.SetVector(CornerBLId, Corner(invProj, camToWorld, origin, -1f, -1f));
+        material.SetVector(CornerBRId, Corner(invProj, camToWorld, origin, 1f, -1f));
+        material.SetVector(CornerTLId, Corner(invProj, camToWorld, origin, -1f, 1f));
+        material.SetVector(CornerTRId, Corner(invProj, camToWorld, origin, 1f, 1f));
     }
 
     private static Vector3 Corner(Matrix4x4 invProj, Matrix4x4 camToWorld, Vector3 origin, float ndcX, float ndcY)
