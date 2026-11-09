@@ -254,12 +254,11 @@ public class Tool : MonoBehaviour
             return 1;
         }
 
-        // 与 EntityModelInfo.BuildCapsuleCollider 同一算式：半径/高度为 0 时碰撞体失效
+        // 半径是固定值，只校验高度：yRange 没录入时高度为 0，碰撞体失效
         float height = modelInfo.yRange.y - modelInfo.yRange.x;
-        float radius = ((modelInfo.xRange.y - modelInfo.xRange.x) + (modelInfo.zRange.y - modelInfo.zRange.x)) * 0.25f;
-        if (height <= 0f || radius <= 0f)
+        if (height <= 0f)
         {
-            Debug.LogError($"[启动自检] {name} 的 EntityModelInfo 包围范围未录入或已退化（height={height:0.###} / radius={radius:0.###}）：胶囊碰撞体尺寸无效，实体很可能打不中");
+            Debug.LogError($"[启动自检] {name} 的 EntityModelInfo 高度范围未录入（yRange={modelInfo.yRange}）：胶囊碰撞体高度为 0，实体很可能打不中");
             e++;
         }
 

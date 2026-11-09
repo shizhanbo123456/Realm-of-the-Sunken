@@ -9,7 +9,8 @@ public class EntityModelInfo:MonoBehaviour
     public CapsuleCollider BuildCapsuleCollider()
     {
         float height = yRange.y - yRange.x;
-        float radius = ((xRange.y - xRange.x) + (zRange.y - zRange.x)) * 0.25f;
+        // 半径全实体统一写死（Config.entity_capsule_radius），不再由包围盒推算
+        float radius = Config.entity_capsule_radius;
         Vector3 center = new Vector3(
             (xRange.x + xRange.y) * 0.5f,
             (yRange.x + yRange.y) * 0.5f,

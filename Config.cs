@@ -8,6 +8,9 @@ public static class Config
     public const int attack_character_count = 6;
     public const int defense_character_count = 6;
 
+    // 实体胶囊碰撞体半径：所有实体统一写死，不随模型体型变化（只有高度按包围盒 + 骨骼动态收紧）
+    public const float entity_capsule_radius = 0.22f;
+
     // 角色等级上限 = exp_character.csv 覆盖到的最高等级、战斗期等级上限 = global_variables，配表加行即生效
     public static int save_max_level => ConfigManager.ExpCharacterConfig.MaxLevel;
     public static int battle_max_level => ConfigManager.GlobalVariableConfig.battle_max_level;
