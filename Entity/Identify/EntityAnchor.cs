@@ -85,9 +85,10 @@ public static class EntityAnchorExtensions
         throw new System.Exception("Unknown anchor: " + anchor);
     }
     // 武器挂点：父节点必须是骨骼（武器要跟着人物动画动），位置 = 骨骼位置 + 实体空间偏移，朝向 = 实体朝向 × 固定倾斜
-    // 背上的长枪（武器 z+ = 矛头）：先把矛头转到竖直，再向角色右侧倾 30°
-    private static readonly Quaternion WeaponBackTilt = Quaternion.Euler(0f, 0f, -30f) * Quaternion.Euler(-90f, 0f, 0f);
-    // 腰间的刀（武器 z+ = 刀锋）：先下压 30°，再转 180° 朝后 → 刀锋指向后下方
+    // 武器预制体统一：z+ = 矛头/刀锋，刀刃竖直（刀面法线 = 局部 X）
+    // 背上的长枪：矛头竖直并向右倾 30°；刀面法线朝后 → 刀面与背平行（不砍进背里）
+    private static readonly Quaternion WeaponBackTilt = Quaternion.Euler(0f, 0f, -30f) * Quaternion.LookRotation(Vector3.up, Vector3.left);
+    // 腰间的刀：先下压 30°，再转 180° 朝后 → 刀锋指向后下方，刀面贴着腰侧
     private static readonly Quaternion WeaponHipTilt = Quaternion.Euler(0f, 180f, 0f) * Quaternion.Euler(30f, 0f, 0f);
 
     private static float HalfWidth(EntityModelInfo model) => (model.xRange.y - model.xRange.x) * 0.5f;
