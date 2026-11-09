@@ -111,13 +111,26 @@ namespace TerrainGen.EditorTools
             // RFloat → 半浮点；值为 0 的列说明没有渲染到几何，按地面高度填（等于不遮挡）
             var raw = readback.GetRawTextureData<float>();
             var half = new ushort[raw.Length];
+            float readMin = float.MaxValue;
+            float readMax = float.MinValue;
             for (int i = 0; i < raw.Length; i++)
             {
                 float v = raw[i];
                 if (v <= 0f) v = groundHeight;
+                if (v < readMin) readMin = v;
+                if (v > readMax) readMax = v;
                 half[i] = Mathf.FloatToHalf(v);
             }
+
+            // 渲染没生效时（替换 shader 没编译 / 相机没渲染到东西）回读全是 0 或纯色，这里直接判定失败
+            if (readMax <= minY + 0.5f)
+            {
+                UnityEngine.Object.DestroyImmediate(readback);
+                message = $"烘焙失败：回读高度只有 {readMin:0.##}~{readMax:0.##}m，替换 shader「{ShaderName}」可能没生效";
+                return false;
+            }
             UnityEngine.Object.DestroyImmediate(readback);
+            Debug.Log($"[焦散遮挡图] 回读高度 {readMin:0.##}~{readMax:0.##}m（场景高度 {minY:0.##}~{maxY:0.##}m）");
 
             // RHalf 存世界高度：R16 是归一化整数，塞半浮点位模式会被读成 值/65535
             var texture = new Texture2D(Resolution, Resolution, TextureFormat.RHalf, false, true)
