@@ -107,11 +107,12 @@ public abstract class EntityData : MonoBehaviour
         level = this.level;
         this.camp = camp;
         baseAttribute = Tool.InfoManager != null ? Tool.InfoManager.GetAttribute(type, level) : new EntityAttribute();
-        var config = Tool.InfoManager != null ? Tool.InfoManager.GetEntityConfig(type) : null;
-        // 霸体下限：entity.csv「霸体等级」列
-        defaultEndure = config != null ? config.endureLevel : EndureType.None;
-        // 固定武器编号：entity.csv「武器编号」列
-        weaponId = config != null ? config.weaponId : -1;
+        if (Tool.InfoManager != null)
+        {
+            var config = Tool.InfoManager.GetEntityConfig(type);
+            defaultEndure = config.endureLevel; // entity.csv「霸体等级」列：霸体下限
+            weaponId = config.weaponId;         // entity.csv「武器编号」列：实体固定武器
+        }
         // 克隆即满血：base 的 health 是"生命值上限"，同一个字段克隆到 floating 后就承载"当前生命值"（复活走重建实体，同样落在这里）
         floatingAttribute = baseAttribute.Clone();
         effectController = new EntityEffectController();
@@ -129,8 +130,9 @@ public abstract class EntityData : MonoBehaviour
         if (anim != null) anim.Init(this);
         if (anim != null)
         {
-            if (config != null)
+            if (Tool.InfoManager != null)
             {
+                var config = Tool.InfoManager.GetEntityConfig(type);
                 anim.SetType(config.animType);
                 anim.SetWeapon(config.weaponId, config.weaponDisplay);
             }

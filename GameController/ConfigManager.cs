@@ -694,6 +694,8 @@ public class ConfigManager : MonoBehaviour
             iconId = ParseInt(rowData, 12);
             if (iconId < 0)
                 throw new FormatException($"图标 id 不能为负数：{iconId}");
+            if (superArmorOverride.HasValue && (superArmorOverride.Value < 0 || superArmorOverride.Value > 1))
+                throw new FormatException($"第 7 列的霸体等级覆盖 {superArmorOverride.Value} 超出 0~1（0:无霸体 / 1:霸体）");
             if (vfxKind.HasValue != vfxIndex.HasValue)
                 throw new FormatException("特效类型与特效下标必须同时填写或同时留空");
             if (vfxIndex.HasValue && vfxIndex.Value < 0)
