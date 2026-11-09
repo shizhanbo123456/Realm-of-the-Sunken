@@ -16,6 +16,14 @@ public class ScreenSpaceCaustics : MonoBehaviour
         WorldXZ = 3, // 世界 XZ 棋盘：应贴合地面透视
     }
 
+    // 相机渲到中间 RT 时 D3D 翻转投影，深度行号和视锥角方向会错位（表现为焦散镜像、抬升速度翻倍）
+    public enum FlipMode
+    {
+        Auto = 0,  // 按 _ProjectionParams.x 自动判断
+        Flip = 1,  // 强制翻转
+        NoFlip = -1, // 强制不翻转
+    }
+
     [Header("贴图")]
     [Tooltip("焦散网纹：Assets/Files/Shaders/Caustics/T_Caustics")]
     public Texture causticsMap;
@@ -64,6 +72,9 @@ public class ScreenSpaceCaustics : MonoBehaviour
     [Tooltip("排查用：临时覆盖屏幕显示深度/法线/世界坐标，正常运行时保持 Off")]
     public DebugView debugView = DebugView.Off;
 
+    [Tooltip("焦散相对几何上下错位时切到 Flip / NoFlip 手动确认（Auto 按平台自动判断）")]
+    public FlipMode flipMode = FlipMode.Auto;
+
     private static readonly int CausticsMapId = Shader.PropertyToID("_CausticsMap");
     private static readonly int FlowMapId = Shader.PropertyToID("_FlowMap");
     private static readonly int OcclusionMapId = Shader.PropertyToID("_OcclusionMap");
@@ -84,6 +95,7 @@ public class ScreenSpaceCaustics : MonoBehaviour
     private static readonly int CornerTLId = Shader.PropertyToID("_CornerTL");
     private static readonly int CornerTRId = Shader.PropertyToID("_CornerTR");
     private static readonly int DebugModeId = Shader.PropertyToID("_DebugMode");
+    private static readonly int FlipVId = Shader.PropertyToID("_FlipV");
 
     private Camera cam;
     private Material material;
@@ -220,6 +232,7 @@ public class ScreenSpaceCaustics : MonoBehaviour
         material.SetFloat(OcclusionBiasId, occlusionBias);
         material.SetFloat(OcclusionFadeId, occlusionFade);
         material.SetFloat(DebugModeId, (float)debugView);
+        material.SetFloat(FlipVId, (float)(int)flipMode);
 
         // MapSize 为 0 时 shader 里整段遮挡判定被跳过（世界可能在 Y<0，不能用黑图代替"不遮挡"）
         material.SetVector(MapMinId, new Vector4(mapMin, 0f, mapMin, 0f));
