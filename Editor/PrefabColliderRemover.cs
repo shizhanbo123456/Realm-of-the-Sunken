@@ -3,7 +3,7 @@ using UnityEngine;
 
 public static class PrefabColliderRemover
 {
-    private const string MenuPath = "预制体预处理/移除所有碰撞体";
+    private const string MenuPath = "Tools/预制体预处理/移除所有碰撞体";
 
     [MenuItem(MenuPath, false, 100)]
     private static void RemoveColliders()
