@@ -971,13 +971,14 @@ public partial class BattleManager : EnsBehaviour
         if (skillId < 0) return;
         if (!PlayerEntityId.TryGetValue(clientId, out var entityId)) return;
         if (!EntityContainer.Entities.TryGetObject(entityId, out var entity)) return;
-        if (KeyboardBlocked(entity)) return; // AI 接管：技能由意图/释放指定技能驱动，不吃键盘
         // 连招窗口内的普攻：不重新起手，直接让动画接下一段（下一段的攻击帧自己会再结算一次技能）
+        // 必须放在所有输入阻断之前：窗口内设 Combo 不接受任何阻断（AI 接管、攻击动画期间一律放行）
         if (skillId == Config.unarmed_punch && entity.anim != null && entity.anim.AllowCombo)
         {
             entity.anim.DoCombo();
             return;
         }
+        if (KeyboardBlocked(entity)) return; // AI 接管：技能由意图/释放指定技能驱动，不吃键盘
         if (entity.InputBlocked(InputBlockOp.Attack)) return; // 攻击动画等期间的输入阻断
         var result = entity.skillController.TryUseSkill(skillId);
         if (result != EntitySkillController.UseResult.Success) NotifySkillUseFailed(entity, result);
