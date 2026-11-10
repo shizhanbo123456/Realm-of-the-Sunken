@@ -9,6 +9,7 @@ public partial class BattleManager
     private Ticker zombieSpawnTicker;
     private static readonly List<Vector3> s_playerPosScratch = new();
     private static readonly List<Vector3> s_coralPosScratch = new();
+    private static readonly List<ushort> s_coralIdScratch = new();
 
     private float neutralStatueRespawnTime = -1f;
 
@@ -137,11 +138,30 @@ public partial class BattleManager
     {
         if (!coralSpawnTicker) return;
 
+        DestroyFarCorals(); // 先清掉离所有存活玩家都超过 coral_kill_distance 的，再补刷
+
         // 场上珊瑚数超过阈值用慢速档的次数，否则用快速档
         int times = EntityContainer.Corals.Count > ConfigManager.GlobalVariableConfig.coral_spawn_rate_rate
             ? ConfigManager.GlobalVariableConfig.coral_spawn_rate_slow
             : ConfigManager.GlobalVariableConfig.coral_spawn_rate_fast;
         for (int i = 0; i < times; i++) TrySpawnOneCoral();
+    }
+
+    // 离最近存活玩家超过 coral_kill_distance 的珊瑚直接移除：不掉武器、不回血、不计分
+    private void DestroyFarCorals()
+    {
+        CollectAlivePlayerPositions();
+        if (s_playerPosScratch.Count == 0) return; // 没有存活玩家就没有"最近玩家"，不清场
+
+        float killDistance = ConfigManager.GlobalVariableConfig.coral_kill_distance;
+        s_coralIdScratch.Clear();
+        foreach (var entity in EntityContainer.Corals)
+        {
+            if (entity == null || !entity.Alive) continue;
+            if (IsAnyPlayerWithin(entity.transform.position, killDistance)) continue;
+            s_coralIdScratch.Add(entity.id); // 先收集 id：销毁会改容器，不能在遍历中删
+        }
+        for (int i = 0; i < s_coralIdScratch.Count; i++) DestroyEntity(s_coralIdScratch[i]);
     }
 
     private void TrySpawnOneCoral()

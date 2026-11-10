@@ -892,6 +892,7 @@ public class ConfigManager : MonoBehaviour
         public static float coral_spawn_spacing;        // 新珊瑚与已有珊瑚的最小间距（米）
         public static float coral_spawn_range_min;      // 刷新点与所选玩家的最小距离（米）
         public static float coral_spawn_range_max;      // 刷新点与所选玩家的最大距离（米）
+        public static float coral_kill_distance;        // 珊瑚与最近存活玩家的最大允许距离（米），超出即销毁
         public static int coral_spawn_rate_fast;        // 每批尝试次数：场上珊瑚数未超阈值时
         public static int coral_spawn_rate_slow;        // 每批尝试次数：场上珊瑚数超过阈值时
         public static int coral_spawn_rate_rate;        // 珊瑚切换慢速的数量阈值（超过即用慢速次数）
@@ -1091,6 +1092,9 @@ public class ConfigManager : MonoBehaviour
                 case "coral_spawn_attempt_interval":
                     coral_spawn_attempt_interval = Positive(Float(row), row.key);
                     break;
+                case "coral_kill_distance":
+                    coral_kill_distance = Positive(Float(row), row.key);
+                    break;
                 case "coral_spawn_rate_fast":
                     coral_spawn_rate_fast = Positive(Int(row), row.key);
                     break;
@@ -1253,6 +1257,10 @@ public class ConfigManager : MonoBehaviour
             if (coral_spawn_attempt_interval <= 0f || coral_spawn_rate_fast <= 0 || coral_spawn_rate_slow <= 0 || coral_spawn_rate_rate <= 0)
                 throw new FormatException(
                     $"[配表] {FileName} 缺少珊瑚刷新节奏参数行（coral_spawn_attempt_interval/coral_spawn_rate_fast/coral_spawn_rate_slow/coral_spawn_rate_rate）");
+            // 缺行按 0 会清光全场珊瑚；不大于刷新外径则新珊瑚下一批就被自己清掉，两种都先拦下
+            if (coral_kill_distance <= coral_spawn_range_max)
+                throw new FormatException(
+                    $"[配表] {FileName} 的 coral_kill_distance 必须大于 coral_spawn_range 上限（当前 {coral_kill_distance} vs {coral_spawn_range_max}）");
             if (zombie_spawn_attempt_interval <= 0f || zombie_refresh_rate_fast <= 0 || zombie_refresh_rate_slow <= 0)
                 throw new FormatException(
                     $"[配表] {FileName} 缺少僵尸刷新节奏参数行（zombie_spawn_attempt_interval/zombie_refresh_rate_fast/zombie_refresh_rate_slow）");
