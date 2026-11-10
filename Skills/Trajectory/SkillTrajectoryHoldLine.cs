@@ -1,10 +1,10 @@
 using System;
 using UnityEngine;
 
-// 驻留直线：驻留段沿飞行方向以 0.01m/s 缓慢爬行（切向不能为零），随后匀速直线飞到终点
+// 驻留直线：驻留段沿飞行方向以 1m/s 缓慢爬行（切向不能为零），随后匀速直线飞到终点
 public class SkillTrajectoryHoldLine : BulletTrajectory
 {
-    private const float CreepSpeed = 0.01f;
+    private const float CreepSpeed = 1f;
 
     private readonly Vector3 start;
     private readonly Vector3 end;
