@@ -145,6 +145,7 @@ public class HomePreviewManager : ClientSubManager
         var weapon = ConfigManager.WeaponConfig.Get(weaponId);
         anim.SetType(weapon.animType);
         anim.SetWeapon(weaponId, weapon.weaponDisplay);
+        anim.DoSpawn(); // 登场动画：首页与大厅建视图时各播一次，与战斗内 EntityData 的口径一致
         return go;
     }
 

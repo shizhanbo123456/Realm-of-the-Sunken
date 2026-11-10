@@ -58,6 +58,7 @@ public class EntityAnim : MonoBehaviour
         Hide,   // 不显示
         Show,   // 收起：长枪背在背上，刀收在腰间
         Hand,   // 拿在手上
+        DontSet//不设置
     }
     public enum WeaponDisplayType
     {
@@ -195,6 +196,7 @@ public class EntityAnim : MonoBehaviour
     // 每次进入新动画状态时由 AnimEvent 调用
     public void SetWeaponPos(WeaponPos pos)
     {
+        if (pos == WeaponPos.DontSet) return; // 该片段不参与武器显示，保持上一个状态
         if (weaponPos == pos) return;
         weaponPos = pos;
         RefreshWeaponVisuals();
