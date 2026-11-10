@@ -68,7 +68,7 @@ public class InputManager : MonoBehaviour
             Tool.NetworkManager.SendInput(new CSPlayerInput() { pressed = pressed });
     }
 
-    // 普攻：处于连招窗口时只推进动画（Combo 触发，不经过攻击阻断），否则正常发起普攻
+    // 普攻：连招窗口内本地立刻接下一段，同时照常上行，服务器也要推进动画（伤害在服务器的攻击帧上结算）
     private void CastUnarmed()
     {
         if (Tool.ClientLogicManager == null) return;
@@ -76,11 +76,7 @@ public class InputManager : MonoBehaviour
         if (loading != null && loading.HasSession)
         {
             var view = Tool.ClientLogicManager.EntityPlayers.GetView(loading.OwnEntityId);
-            if (view != null && view.anim != null && view.anim.AllowCombo)
-            {
-                view.anim.DoCombo();
-                return;
-            }
+            if (view != null && view.anim != null && view.anim.AllowCombo) view.anim.DoCombo();
         }
         Tool.ClientLogicManager.SkillVfx.CastUnarmed();
     }
