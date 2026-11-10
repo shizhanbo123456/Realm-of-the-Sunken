@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Ros.Transport
 {
     // 服务器 → 客户端：本人持有技能。full = 全量替换（开局 / 重连补发），false = 增量新增（掉落 / GM）
-    // 线上技能 id 按 1 字节下发（id 上界见 SkillType，最大 132），内存里仍是 int 便于配表对齐
+    // 线上技能 id 按 1 字节下发（id 上界见 SkillType，最大 131），内存里仍是 int 便于配表对齐
     public class SCSkillSync
     {
         public bool full;

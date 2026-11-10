@@ -98,11 +98,8 @@ public sealed class AiIntentRelay : DecisionMachine, IBehaviorHost
         }
 
         bool close = target != null && FlatDistance(target.transform.position) <= Config.unarmed_smash_range;
-        int punch = Random.Range(0, 2) == 0 ? Config.unarmed_punch_left : Config.unarmed_punch_right;
-        int other = punch == Config.unarmed_punch_left ? Config.unarmed_punch_right : Config.unarmed_punch_left;
         if (close && TryUseSkill(Config.unarmed_attack_smash)) return true;
-        if (TryUseSkill(punch)) return true;
-        return TryUseSkill(other);
+        return TryUseSkill(Config.unarmed_punch);
     }
 
     private int ComparePriority(int a, int b)

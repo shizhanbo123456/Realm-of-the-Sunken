@@ -4,28 +4,19 @@ using UnityEngine;
 
 namespace Ros.Skill
 {
-    // 空手攻击：左拳 / 右拳 / 原地砸击（近战无弹道，砸击带范围魔法表现）
+    // 空手攻击：直拳 / 原地崩拳（近战无弹道，崩拳带范围魔法表现）
     public static class SkillPoolUnarmed
     {
         public static void RegisterAll()
         {
-            SkillManager.Register(new SkillPunchLeft());
-            SkillManager.Register(new SkillPunchRight());
+            SkillManager.Register(new SkillPunch());
             SkillManager.Register(new SkillPunchSmash());
         }
     }
 
-    public class SkillPunchLeft : SkillBase
+    public class SkillPunch : SkillBase
     {
-        public override int Id => (int)SkillType.SkillPunchLeft;
-
-        protected override void OnCast(EntityData caster)
-            => StrikeSphere(caster, HandPos(caster, leftHand: true).position, MeleeRadius, BuildAttack(caster));
-    }
-
-    public class SkillPunchRight : SkillBase
-    {
-        public override int Id => (int)SkillType.SkillPunchRight;
+        public override int Id => (int)SkillType.SkillPunch;
 
         protected override void OnCast(EntityData caster)
             => StrikeSphere(caster, HandPos(caster).position, MeleeRadius, BuildAttack(caster));

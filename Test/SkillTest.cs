@@ -110,8 +110,8 @@ public class SkillTest : MonoBehaviour
         // 分页边界取各段枚举首项，段长调整时跟着走，不再手写 id
         tabStarts.Add(IndexOfRange((int)SkillType.SkillFanIceCone));
         tabStarts.Add(IndexOfRange((int)SkillType.SkillRockShield));
-        tabStarts.Add(IndexOfRange((int)SkillType.SkillZombieClawR));
-        tabStarts.Add(IndexOfRange((int)SkillType.SkillPunchLeft));
+        tabStarts.Add(IndexOfRange((int)SkillType.SkillZombieClaw));
+        tabStarts.Add(IndexOfRange((int)SkillType.SkillPunch));
     }
 
     private int IndexOfRange(int minId)

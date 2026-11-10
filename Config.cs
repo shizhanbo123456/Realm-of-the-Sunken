@@ -188,8 +188,7 @@ public static class Config
 
     #region 通用
     public const int entity_id_max = 30000;
-    public const int unarmed_punch_left = (int)SkillType.SkillPunchLeft;
-    public const int unarmed_punch_right = (int)SkillType.SkillPunchRight;
+    public const int unarmed_punch = (int)SkillType.SkillPunch;
     public const int unarmed_attack_smash = (int)SkillType.SkillPunchSmash;
     public const float unarmed_smash_range = 1f; // 贴身才用崩拳，远了用直拳，避免崩拳够不到还空放
 

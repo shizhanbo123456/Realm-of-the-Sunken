@@ -5,15 +5,13 @@ using UnityEngine;
 
 namespace Ros.Skill
 {
-    // 非玩家单位：普通僵尸爪击×2 / 精英僵尸爪击×2+嘶吼 / 防御塔孢子喷射×2 / 中立雕像孢子喷发
+    // 非玩家单位：腐爪 / 裂骨爪 + 嘶吼 / 防御塔孢子喷射×2 / 中立雕像孢子喷发
     public static class SkillPoolNpc
     {
         public static void RegisterAll()
         {
-            SkillManager.Register(new SkillZombieClawR());
-            SkillManager.Register(new SkillZombieClawL());
-            SkillManager.Register(new SkillEliteZombieClawR());
-            SkillManager.Register(new SkillEliteZombieClawL());
+            SkillManager.Register(new SkillZombieClaw());
+            SkillManager.Register(new SkillEliteZombieClaw());
             SkillManager.Register(new SkillEliteZombieScream());
             SkillManager.Register(new SkillCrystalStatueSporeA());
             SkillManager.Register(new SkillCrystalStatueSporeBlaze());
@@ -22,36 +20,20 @@ namespace Ros.Skill
     }
 
     #region 僵尸
-    public class SkillZombieClawR : SkillBase
+    public class SkillZombieClaw : SkillBase
     {
-        public override int Id => (int)SkillType.SkillZombieClawR;
+        public override int Id => (int)SkillType.SkillZombieClaw;
 
         protected override void OnCast(EntityData caster)
             => StrikeSphere(caster, HandPos(caster).position, MeleeRadius, BuildAttack(caster));
     }
 
-    public class SkillZombieClawL : SkillBase
+    public class SkillEliteZombieClaw : SkillBase
     {
-        public override int Id => (int)SkillType.SkillZombieClawL;
-
-        protected override void OnCast(EntityData caster)
-            => StrikeSphere(caster, HandPos(caster, leftHand: true).position, MeleeRadius, BuildAttack(caster));
-    }
-
-    public class SkillEliteZombieClawR : SkillBase
-    {
-        public override int Id => (int)SkillType.SkillEliteZombieClawR;
+        public override int Id => (int)SkillType.SkillEliteZombieClaw;
 
         protected override void OnCast(EntityData caster)
             => StrikeSphere(caster, HandPos(caster).position, MeleeRadius, BuildAttack(caster));
-    }
-
-    public class SkillEliteZombieClawL : SkillBase
-    {
-        public override int Id => (int)SkillType.SkillEliteZombieClawL;
-
-        protected override void OnCast(EntityData caster)
-            => StrikeSphere(caster, HandPos(caster, leftHand: true).position, MeleeRadius, BuildAttack(caster));
     }
 
     // 血嚎：自身与同阵营射程内的单位挂增益，范围读第 14 列
@@ -101,7 +83,7 @@ namespace Ros.Skill
         }
     }
 
-    // 灵火喷吐：塔带灵火时的普攻，子弹打敌人脚部，到点追加一次原地灵火爆炸（与 132 崩拳同一个 RM[6]）
+    // 灵火喷吐：塔带灵火时的普攻，子弹打敌人脚部，到点追加一次原地灵火爆炸（与 131 崩拳同一个 RM[6]）
     // 第 11 列 = 子弹倍率|灵火倍率，第 9 列 = 子弹尺寸|灵火尺寸
     public class SkillCrystalStatueSporeBlaze : SkillBase
     {

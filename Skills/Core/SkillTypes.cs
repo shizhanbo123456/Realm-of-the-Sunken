@@ -1,7 +1,7 @@
 ﻿namespace Ros.Skill
 {
     // 技能 id 唯一来源：段首显式锚定，段内按枚举顺序自动递增，全工程引用技能 id 一律读这里
-    // 段区间：刀 0~10 / 长枪 11~18 / 枪械 19~33 / 魔法球 34~49 / 防守方 60~77 / 僵尸 90~94 / 防御塔 110 / 中立雕像 113 / 空手 130~132
+    // 段区间：刀 0~10 / 长枪 11~18 / 枪械 19~33 / 魔法球 34~49 / 防守方 60~77 / 僵尸 90~92 / 防御塔 110 / 中立雕像 113 / 空手 130~131
     // 段间留空供插入，段内必须连续：Config.GetRandomWeaponSkillId 依赖武器技能段 0~49 整段随机
     public enum SkillType
     {
@@ -83,11 +83,9 @@
         SkillPaleDarkCast,
         SkillFogCast,
 
-        // ===== 僵尸 90~94 =====
-        SkillZombieClawR = 90,
-        SkillZombieClawL,
-        SkillEliteZombieClawR,
-        SkillEliteZombieClawL,
+        // ===== 僵尸 90~92 =====
+        SkillZombieClaw = 90,
+        SkillEliteZombieClaw,
         SkillEliteZombieScream,
 
         // ===== 防御塔 110~111 =====
@@ -97,9 +95,8 @@
         // ===== 中立雕像 113 =====
         SkillNeutralStatueSpore = 113,
 
-        // ===== 空手攻击 130~132 =====
-        SkillPunchLeft = 130,
-        SkillPunchRight,
+        // ===== 空手攻击 130~131 =====
+        SkillPunch = 130,
         SkillPunchSmash,
     }
 }
