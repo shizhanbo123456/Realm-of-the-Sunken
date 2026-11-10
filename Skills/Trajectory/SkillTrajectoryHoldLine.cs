@@ -1,11 +1,15 @@
 using System;
 using UnityEngine;
 
-// 驻留直线：先在起点停留 hold 秒，再匀速直线飞到终点；总时长 = hold + flight
+// 驻留直线：驻留段沿飞行方向以 0.01m/s 缓慢爬行（切向不能为零），随后匀速直线飞到终点
 public class SkillTrajectoryHoldLine : BulletTrajectory
 {
+    private const float CreepSpeed = 0.01f;
+
     private readonly Vector3 start;
     private readonly Vector3 end;
+    private readonly Vector3 creep;
+    private readonly float hold;
     private readonly float holdFactor;
 
     public SkillTrajectoryHoldLine(Vector3 start, Vector3 end, float hold, float flight)
@@ -14,6 +18,8 @@ public class SkillTrajectoryHoldLine : BulletTrajectory
         if (flight <= 0f) throw new ArgumentOutOfRangeException(nameof(flight), flight, "飞行时长必须 > 0");
         this.start = start;
         this.end = end;
+        this.hold = hold;
+        creep = (end - start).normalized * CreepSpeed; // 起终点重合时 normalized 返回零向量，不会出 NaN
         Duration = hold + flight;
         holdFactor = hold / Duration;
     }
@@ -21,8 +27,8 @@ public class SkillTrajectoryHoldLine : BulletTrajectory
     public override Vector3 Lerp(float factor)
     {
         float f = Mathf.Clamp01(factor);
-        if (f <= holdFactor) return start;
-        return Vector3.LerpUnclamped(start, end, (f - holdFactor) / (1f - holdFactor));
+        if (f <= holdFactor) return start + creep * (f * Duration);
+        return Vector3.LerpUnclamped(start + creep * hold, end, (f - holdFactor) / (1f - holdFactor));
     }
 
     public override Vector3 Start => start;

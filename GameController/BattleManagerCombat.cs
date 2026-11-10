@@ -83,7 +83,7 @@ public partial class BattleManager
         float inv = lifeTime > 0f ? 1f / lifeTime : 0f;
         Vector3 cur = trajectory.Lerp(Mathf.Clamp01(age * inv));
         Vector3 dir = trajectory.Lerp(Mathf.Clamp01((age + 0.02f) * inv)) - cur;
-        return dir.sqrMagnitude > 1e-6f ? Quaternion.LookRotation(dir) : Quaternion.identity;
+        return dir.sqrMagnitude > 1e-12f ? Quaternion.LookRotation(dir) : Quaternion.identity;
     }
 
     private void TryHitBullet(Bullet b, float now, float age, Vector3 pos, Vector3 prevPos, Quaternion rot, Quaternion prevRot)

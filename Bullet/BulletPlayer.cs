@@ -40,11 +40,11 @@ public class BulletPlayer : MonoBehaviour
             transform.rotation = Camera.main.transform.rotation;
         }
     }
-    // 轨迹不动时（定点、蓄力驻留）前进方向为零，LookAt 会每帧报错，直接保持当前朝向
+    // 轨迹完全不动时（定点子弹）前进方向为零向量，LookAt 会每帧报错；阈值取得极小，慢速爬行仍能定朝向
     private void FaceAhead(float factor)
     {
         Vector3 ahead = trajectory.Lerp(factor + 0.02f);
-        if ((ahead - transform.position).sqrMagnitude > 1e-6f) transform.LookAt(ahead);
+        if ((ahead - transform.position).sqrMagnitude > 1e-12f) transform.LookAt(ahead);
     }
     public static void Create(GameObject vfx, BulletTrajectory trajectory, float lifeTime = 0f, RotationMode rotation = RotationMode.Constant)
     {
