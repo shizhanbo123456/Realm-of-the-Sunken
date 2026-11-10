@@ -53,6 +53,8 @@ public class AssetsManager : MonoBehaviour
     public List<GameObject> MagicCircleVFX = new();
     public List<GameObject> BuffVFX = new();
     public List<GameObject> HitVFX = new();
+    public List<GameObject> SlashVFX = new();
+    public List<GameObject> ProjectionVFX = new();
     #endregion
 
     #region 武器（悬浮武器模型，SelectedWeaponPrefabCreator 生成到 Assets/Files/Prefabs/Weapons）
