@@ -16,6 +16,7 @@ public class EntityAnim : MonoBehaviour
     private const string key_attackId = "AttackId";
     private const string key_hit = "Hit";
     private const string key_doHit = "DoHit";
+    private const string key_combo = "Combo";
     public enum CharcterAnimType
     {
         Spear=0,
@@ -37,20 +38,20 @@ public class EntityAnim : MonoBehaviour
     }
     public enum AttackType
     {
-        Combo=0,
-        Attack_Hand=10,
-        Attack_Weapon=11,
-        Attack_AirDrop=20,
-        Attack_AirFront=21,
-        Kick=30,
-        Scream=31,
-        Mega_Short=40,
-        Mega_Middle=41,
-        Mega_Long=42,
-        Weapon_A=50,
-        Weapon_B=51,
-        Weapon_C=52,
-        Weapon_D=53,
+        Combo=0,//普通攻击
+        Attack_Hand=10,//空手挥打
+        Attack_Weapon=11,//武器挥打
+        Attack_AirDrop =20,//跳起来抱摔
+        Attack_AirFront=21,//跳起来投掷
+        Kick=30,//无特效
+        Scream=31,//吼叫
+        Mega_Short=40,//法术动作(短)
+        Mega_Middle=41,//法术动作(中)
+        Mega_Long =42,//法术动作(长)
+        Weapon_A =50,//武器动作A
+        Weapon_B=51,//武器动作B
+        Weapon_C =52,//武器动作C
+        Weapon_D =53,//武器动作D
     }
     public enum WeaponPos
     {
@@ -458,6 +459,11 @@ public class EntityAnim : MonoBehaviour
         SetIntParam(ref paramPack.attackId, (int)attack, key_attackId);
         SetTriggerAll(key_doAttack);
     }
+
+    // 当前动画状态是否开连招窗口：由 AnimEvent 在每次状态进入时写入
+    public bool AllowCombo { get; private set; }
+    public void SetAllowCombo(bool value) => AllowCombo = value;
+    public void DoCombo() => SetTriggerAll(key_combo);
     public void DoHit(bool longHit)
     {
         SetIntParam(ref paramPack.hit, longHit?1:0, key_hit); // 长短受击选择：值未变时不重写，靠 trigger 负责重播

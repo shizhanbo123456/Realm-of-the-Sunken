@@ -68,10 +68,20 @@ public class InputManager : MonoBehaviour
             Tool.NetworkManager.SendInput(new CSPlayerInput() { pressed = pressed });
     }
 
-    // 普攻：移动与静止共用同一个技能
+    // 普攻：处于连招窗口时只推进动画（Combo 触发，不经过攻击阻断），否则正常发起普攻
     private void CastUnarmed()
     {
         if (Tool.ClientLogicManager == null) return;
+        var loading = ClientLoadingManager.Current;
+        if (loading != null && loading.HasSession)
+        {
+            var view = Tool.ClientLogicManager.EntityPlayers.GetView(loading.OwnEntityId);
+            if (view != null && view.anim != null && view.anim.AllowCombo)
+            {
+                view.anim.DoCombo();
+                return;
+            }
+        }
         Tool.ClientLogicManager.SkillVfx.CastUnarmed();
     }
 
