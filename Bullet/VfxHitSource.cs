@@ -38,6 +38,8 @@ public static class VfxHitSource
             case SkillVfxKind.MagicCircle: prefab = At(mgr.MagicCircleVFX, index); break;
             case SkillVfxKind.Buff:       prefab = At(mgr.BuffVFX, index); break;
             case SkillVfxKind.Weapon:     mgr.TryGetWeaponPrefab(index, out prefab); break;
+            case SkillVfxKind.Slash:      prefab = At(mgr.SlashVFX, index); break;
+            case SkillVfxKind.Projection: prefab = At(mgr.ProjectionVFX, index); break;
         }
         return prefab != null ? prefab.GetComponent<BulletVfxInfo>() : null;
     }

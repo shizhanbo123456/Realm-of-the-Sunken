@@ -6,7 +6,8 @@ using UnityEngine;
 
 namespace Ros.Skill
 {
-    public enum SkillVfxKind { None, Bullet, RangeMagic, MagicCircle, Shield, Buff, Weapon }
+    // 键值会被 effect.csv 第 11 列以整数引用，新类别只能追加在末尾
+    public enum SkillVfxKind { None, Bullet, RangeMagic, MagicCircle, Shield, Buff, Weapon, Slash, Projection }
 
     public abstract class SkillBase
     {

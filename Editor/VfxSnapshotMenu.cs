@@ -13,7 +13,7 @@ public static class VfxSnapshotMenu
     private const float Gap = 1f;
     private const int TestPerCategory = 3;
 
-    private static readonly string[] CategoryNames = { "Bullet", "Shield", "RangeMagic", "MagicCircle", "Buff" };
+    private static readonly string[] CategoryNames = { "Bullet", "Shield", "RangeMagic", "MagicCircle", "Buff", "Slash", "Projection" };
 
     private struct Item
     {
@@ -102,7 +102,7 @@ public static class VfxSnapshotMenu
     private static void BuildQueue(AssetsManager mgr, int perCategory)
     {
         items.Clear();
-        var lists = new[] { mgr.BulletVFX, mgr.ShieldVFX, mgr.RangeMagicVFX, mgr.MagicCircleVFX, mgr.BuffVFX };
+        var lists = new[] { mgr.BulletVFX, mgr.ShieldVFX, mgr.RangeMagicVFX, mgr.MagicCircleVFX, mgr.BuffVFX, mgr.SlashVFX, mgr.ProjectionVFX };
         var empty = new List<string>();
         for (int c = 0; c < lists.Length; c++)
         {

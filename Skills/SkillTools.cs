@@ -179,6 +179,12 @@ namespace Ros.Skill.Utils
                 case SkillVfxKind.MagicCircle:
                     Tool.VfxManager.PlayMagicCircleVFX(index, pos, duration, scale);
                     break;
+                case SkillVfxKind.Slash:
+                    Tool.VfxManager.PlaySlashVFX(index, pos, Quaternion.identity, duration, scale);
+                    break;
+                case SkillVfxKind.Projection:
+                    Tool.VfxManager.PlayProjectionVFX(index, pos, Quaternion.identity, duration, scale);
+                    break;
             }
         }
 
@@ -204,6 +210,12 @@ namespace Ros.Skill.Utils
                     break;
                 case SkillVfxKind.MagicCircle:
                     Tool.VfxManager.PlayMagicCircleVFX(index, trajectory, life, scale);
+                    break;
+                case SkillVfxKind.Slash when index >= 0:
+                    Tool.VfxManager.PlaySlashVFX(index, trajectory, 0f, BulletPlayer.RotationMode.Tangent, scale);
+                    break;
+                case SkillVfxKind.Projection when index >= 0:
+                    Tool.VfxManager.PlayProjectionVFX(index, trajectory, 0f, BulletPlayer.RotationMode.Tangent, scale);
                     break;
             }
         }

@@ -43,6 +43,18 @@ public class VfxManager : MonoBehaviour
         var list = Tool.AssetsManager != null ? Tool.AssetsManager.HitVFX : null;
         return GetVFX(list, index);
     }
+
+    public GameObject GetSlashVfx(int index)
+    {
+        var list = Tool.AssetsManager != null ? Tool.AssetsManager.SlashVFX : null;
+        return GetVFX(list, index);
+    }
+
+    public GameObject GetProjectionVfx(int index)
+    {
+        var list = Tool.AssetsManager != null ? Tool.AssetsManager.ProjectionVFX : null;
+        return GetVFX(list, index);
+    }
     #endregion
 
     #region 通用播放原语（已持有模板 GameObject 时使用）
@@ -167,6 +179,28 @@ public class VfxManager : MonoBehaviour
     public GameObject PlayHitVFX(int index, Vector3 pos, float lifeTime, float scale = 0f)
     {
         return Play(GetHitVfx(index), pos, Quaternion.identity, lifeTime, scale);
+    }
+
+    public GameObject PlaySlashVFX(int index, BulletTrajectory trajectory, float lifeTime = 0f,
+        BulletPlayer.RotationMode rotation = BulletPlayer.RotationMode.Tangent, float scale = 0f)
+    {
+        return Play(GetSlashVfx(index), trajectory, lifeTime, rotation, scale);
+    }
+
+    public GameObject PlaySlashVFX(int index, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
+    {
+        return Play(GetSlashVfx(index), pos, rot, lifeTime, scale);
+    }
+
+    public GameObject PlayProjectionVFX(int index, BulletTrajectory trajectory, float lifeTime = 0f,
+        BulletPlayer.RotationMode rotation = BulletPlayer.RotationMode.Tangent, float scale = 0f)
+    {
+        return Play(GetProjectionVfx(index), trajectory, lifeTime, rotation, scale);
+    }
+
+    public GameObject PlayProjectionVFX(int index, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
+    {
+        return Play(GetProjectionVfx(index), pos, rot, lifeTime, scale);
     }
     #endregion
 

@@ -311,6 +311,8 @@ public class Tool : MonoBehaviour
         e += CheckList("AssetsManager.MagicCircleVFX", m.MagicCircleVFX, vfx_magic_circle_count);
         e += CheckList("AssetsManager.BuffVFX", m.BuffVFX, vfx_buff_count);
         e += CheckList("AssetsManager.HitVFX", m.HitVFX, vfx_hit_count);
+        e += CheckList("AssetsManager.SlashVFX", m.SlashVFX, vfx_slash_count);
+        e += CheckList("AssetsManager.ProjectionVFX", m.ProjectionVFX, vfx_projection_count);
 
         e += CheckList("AssetsManager.WeaponPrefabs", m.WeaponPrefabs, weapon_count);
 
@@ -339,6 +341,8 @@ public class Tool : MonoBehaviour
     private const int vfx_magic_circle_count = 10;
     private const int vfx_buff_count = 31;
     private const int vfx_hit_count = 2;          // 下标 0 = buff/DoT 类（实体中心），1 = 直接伤害（命中点高度 + 实体所在列）
+    private const int vfx_slash_count = 19;       // Assets/Files/Prefabs/VFX/Slashes
+    private const int vfx_projection_count = 50;  // Assets/Files/Prefabs/VFX/Projection：10 种样式 × 5 颜色
     private const int weapon_count = 14;          // 武器预制体一维列表长度
 
     private static int CheckObject(string label, UnityEngine.Object obj)
