@@ -12,11 +12,13 @@ namespace Ros.Skill
     {
         public abstract int Id { get; }
 
-        // 射程读 skill.csv 第 17 列：既是弹道瞄准距离，也是 AI 的作战距离；留空 = 0 = 无射程
+        // 射程读 skill.csv 第 16 列：既是技能能影响到的距离，也是索敌半径与 AI 的作战距离；0 = 只影响自身
         public float CastRange => ConfigManager.SkillConfig.Get(Id).castRange;
-        // 索敌口径读 skill.csv 第 13/14 列：夹角 <=0.1 = 不索敌，>179.9 = 不限方向，半径 >9999 = 不限距离
+        // 索敌口径读 skill.csv 第 13 列：夹角 <=0.1 = 不索敌，>179.9 = 不限方向；半径一律取射程
         protected float TargetSector => ConfigManager.SkillConfig.Get(Id).targetSector;
-        protected float TargetRadius => ConfigManager.SkillConfig.Get(Id).targetRadius;
+        protected float TargetRadius => CastRange;
+        // 第 18 列：释放瞬间是否自动转向射程内最近的敌人
+        private bool AutoTarget => ConfigManager.SkillConfig.Get(Id).autoTarget;
         // 攻击动画读 skill.csv 第 12 列，-1 = 无动画（按下立刻施放）
         protected bool HasCastAnim => (int)CastAnim != -1;
         protected EntityAnim.AttackType CastAnim => (EntityAnim.AttackType)ConfigManager.SkillConfig.Get(Id).attackAnim;
@@ -42,6 +44,7 @@ namespace Ros.Skill
         public void BeginCast(EntityData entity, int skillId)
         {
             BroadcastSpecial(skillId); // 每次施放请求只播报一次，不走 CastNow（多段攻击帧会重复）
+            if (AutoTarget) FaceNearestEnemy(entity); // 转向必须在算落点之前：不索敌的技能靠朝向决定弹道
             if (!HasCastAnim || entity.anim == null)
             {
                 OnCast(entity);
@@ -49,6 +52,14 @@ namespace Ros.Skill
             }
             entity.anim.onAttack = _ => OnCast(entity); // 不置空回调：多段攻击帧逐次结算技能
             entity.anim.DoAttack(CastAnim);
+        }
+
+        // 自动索敌：转向射程内最近的敌人（不限方向），转向后落点照常按新朝向算；范围内没敌人就保持原朝向
+        private void FaceNearestEnemy(EntityData caster)
+        {
+            if (TargetRadius <= 0f) return; // 射程 0 = 只影响自身，没有可供瞄准的方向
+            EntityData target = BattleManager.EntityContainer.GetNearestEnemy(caster, TargetRadius);
+            if (target != null) caster.FaceTowards(target.transform.position);
         }
 
         // 发一个波次包：头由基类填，payload 由技能自己按读端同样的顺序写
@@ -65,7 +76,7 @@ namespace Ros.Skill
             else PlayWave(context); // 单机测试场景没有网络，直接本地播一遍表现
         }
 
-        // 配表第 15 列：特殊技能施放时向全客户端播报，客户端据此弹战斗界面的重要事件 banner
+        // 配表第 14 列：特殊技能施放时向全客户端播报，客户端据此弹战斗界面的重要事件 banner
         private void BroadcastSpecial(int skillId)
         {
             if (!BattleManager.AtServer || Tool.NetworkManager == null) return;
@@ -99,20 +110,22 @@ namespace Ros.Skill
             => TargetSelect.GetNearestEnemy(entity, TargetRadius, TargetSector);
 
         // 落点口径（见《03-技能与Buff总表》三章）：不索敌 = 朝面向、水平距离取射程、与起点同高；
-        // 索敌 = 朝目标体中心、水平距离仍取射程、高度取体中心
+        // 索敌 = 朝目标体中心、水平距离仍取射程、高度取体中心。
+        // 距离一律从施法者自身位置起算，终点到身体的距离恒 = 射程，不受发射锚点在体心/身前/手上影响
         protected Vector3 Aim(EntityData caster, Vector3 origin)
         {
             if (CastRange <= 0f)
-                throw new FormatException($"[配表] skill.csv 技能 {Id} 需要瞄准点，但第 17 列没有配射程");
+                throw new FormatException($"[配表] skill.csv 技能 {Id} 需要瞄准点，但第 16 列没有配射程");
+            Vector3 pos = caster.transform.position;
             Vector3 forward = caster.transform.forward;
             EntityData target = ResolveTarget(caster);
             if (target == null)
-                return new Vector3(origin.x + forward.x * CastRange, origin.y, origin.z + forward.z * CastRange);
+                return new Vector3(pos.x + forward.x * CastRange, origin.y, pos.z + forward.z * CastRange);
             Vector3 body = TargetSelect.BodyPos(target);
-            Vector3 flat = body - caster.transform.position;
+            Vector3 flat = body - pos;
             flat.y = 0f;
             Vector3 dir = flat.sqrMagnitude > 0.0001f ? flat.normalized : forward;
-            return new Vector3(origin.x + dir.x * CastRange, body.y, origin.z + dir.z * CastRange);
+            return new Vector3(pos.x + dir.x * CastRange, body.y, pos.z + dir.z * CastRange);
         }
 
         // 按配表半径收集场内敌对目标（半径 >9999 = 不限距离）；center 由技能决定
@@ -127,7 +140,7 @@ namespace Ros.Skill
         protected static EntityData FindEntity(ushort id) => BattleManager.GetEntity(id);
 
         // 击退力度默认读 skill.csv，个别技能可显式覆盖；伤害范围由命中球决定，不在攻击数据里
-        // 破霸体读第 18 列，伤害倍率读第 11 列：代码不再传这两项
+        // 破霸体读第 17 列，伤害倍率读第 11 列：代码不再传这两项
         protected AttackData BuildAttack(EntityData entity,
             Action<EntityEffectController> addEffect = null,
             Action<EntityData> onHit = null, float? knockback = null)

@@ -200,10 +200,10 @@ public static class Config
     public static float anim_move_speed_down => ConfigManager.GlobalVariableConfig.buff_speed_down;
     public static float anim_move_speed_mire => ConfigManager.GlobalVariableConfig.buff_mire_speed_rate;
 
-    // 技能索敌阈值（索敌夹角与半径逐技能读 skill.csv，这里只定义约定的边界）
+    // 技能索敌阈值（索敌夹角与射程逐技能读 skill.csv，射程同时就是索敌半径）
     public const float skill_target_no_sector = 0.1f;        // 夹角 <= 此值 = 完全不索敌
     public const float skill_target_full_sector = 179.9f;    // 夹角 > 此值 = 不限方向（360°）
-    public const float skill_target_unlimited_radius = 9999f; // 半径 > 此值 = 不限距离
+    public const float skill_target_unlimited_radius = 9999f; // 射程 > 此值 = 不限距离
 
     public const float buff_vfx_life_time = 3600f;
 

@@ -243,18 +243,20 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
         Tool.BattleManager.ReportStatus(Owner, (int)Current.ReportState, Mathf.RoundToInt(HealthRatio * 100f));
     }
 
-    // 攻击距离取技能栏第一个有射程的技能（栏内已按品质降序）
+    // 接敌距离 = 栏内此刻真能放的技能里最远的射程；全场技能只在还有库存时拉近距离，放完自动退回近战距离
     protected float AttackRange
     {
         get
         {
             var slots = skillBar.Slots;
+            float best = 0f;
             for (int i = 0; i < slots.Count; i++)
             {
+                if (!Owner.skillController.IsSkillReady(slots[i])) continue; // 冷却中/没库存的不参与，避免站着等它
                 if (!SkillManager.TryGet(slots[i], out var skill)) continue;
-                if (skill.CastRange > 0f) return skill.CastRange;
+                if (skill.CastRange > best) best = skill.CastRange;
             }
-            return DefaultAttackRange;
+            return best > 0f ? best : DefaultAttackRange;
         }
     }
 

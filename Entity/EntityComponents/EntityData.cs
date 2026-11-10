@@ -52,6 +52,9 @@ public abstract class EntityData : MonoBehaviour
 
     public virtual float YawSpeed => 0f;
 
+    // 立即转向某个世界坐标（技能自动索敌用）：默认不转，只有真有朝向概念的实体才覆盖
+    public virtual void FaceTowards(Vector3 worldPoint) { }
+
     // 飞行模式（仅玩家实体启用，见 PlayerEntityData.SetFlightMode）：重力关闭、免疫击飞/打断/位移，动画按地面状态播放
     public virtual bool FlightMode => false;
 

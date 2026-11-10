@@ -196,6 +196,18 @@ public class PlayerEntityData : EntityData
         transform.rotation = Quaternion.Euler(0f, moveState.yaw, 0f);
     }
 
+    // 自动索敌转向：必须同时写逻辑朝向，否则下一帧 OnTickMove 会用旧 yaw 把 transform 盖回去
+    public override void FaceTowards(Vector3 worldPoint)
+    {
+        EnsureMoveState();
+        Vector3 to = worldPoint - transform.position;
+        to.y = 0f;
+        if (to.sqrMagnitude < 0.0001f) return; // 目标与自己重合，方向无意义
+        moveState.yaw = Quaternion.LookRotation(to).eulerAngles.y;
+        moveState.yawSpeed = 0f;
+        transform.rotation = Quaternion.Euler(0f, moveState.yaw, 0f);
+    }
+
     // 俯视：即时转向输入方向（W=+Z、D=+X、W+D 即 45°）；转向被屏蔽时保持朝向，位移仍沿当前朝向
     private void TickTopDownYaw()
     {

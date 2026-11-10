@@ -115,6 +115,18 @@ public class ZombieEntityData : EntityData
         transform.rotation = Quaternion.Euler(0f, yaw, 0f);
     }
 
+    // 自动索敌转向：写逻辑 yaw 并即时对齐；状态机下一次 FaceTarget 会按自己的目标重算
+    public override void FaceTowards(Vector3 worldPoint)
+    {
+        Vector3 to = worldPoint - transform.position;
+        to.y = 0f;
+        if (to.sqrMagnitude < 0.0001f) return; // 目标与自己重合，方向无意义
+        EnsureYaw();
+        yaw = Quaternion.LookRotation(to).eulerAngles.y;
+        yawSpeed = 0f;
+        transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+    }
+
     private void EnsureYaw()
     {
         if (yawInitialized) return;

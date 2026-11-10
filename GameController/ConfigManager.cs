@@ -199,14 +199,14 @@ public class ConfigManager : MonoBehaviour
         return (EntityAnim.WeaponDisplayType)value;
     }
 
-    // 射程：留空 = 0（该技能不瞄准、不进 AI 作战距离），填了必须大于 0
+    // 射程：技能能影响到的距离，0 = 只影响自身（不瞄准、不进 AI 作战距离）；负数属错配
     public static float ParseCastRange(string[] rowData, int col)
     {
         string raw = Cell(rowData, col);
         if (raw.Length == 0) return 0f;
         float value = ParseFloat(rowData, col);
-        if (value <= 0f)
-            throw new FormatException($"[配表] 第 {col} 列的射程 {value} 必须大于 0（不需要射程就留空）");
+        if (value < 0f)
+            throw new FormatException($"[配表] 第 {col} 列的射程 {value} 不允许为负（无对外影响填 0）");
         return value;
     }
 
@@ -628,11 +628,11 @@ public class ConfigManager : MonoBehaviour
         public List<float> damageRates;  // 第11列：伤害倍率，空 = 全 1；1 项 = 所有段共用；多项 = 按段序
         public int attackAnim;           // 第12列：EntityAnim.AttackType 数值，空 = -1 = 无动画
         public float targetSector;       // 第13列：索敌扇形半角（度，实际扇区 = 该值×2）；<=0.1 = 不索敌；>179.9 = 不限方向
-        public float targetRadius;       // 第14列：索敌半径；>9999 = 不限距离；夹角 <=0.1 时可留空
-        public bool broadcast;           // 第15列：使用时是否全场播报，1 = 播报，空 = 不播报
-        public SkillScore scores;        // 第16列：定长 6 项，分号分隔
-        public float castRange;          // 第17列：射程（弹道瞄准距离 / AI 作战距离），留空 = 无射程
-        public bool breakEndure;         // 第18列：命中时是否破霸体（留空 / 0 = 不破）
+        public bool broadcast;           // 第14列：使用时是否全场播报，1 = 播报，空 = 不播报
+        public SkillScore scores;        // 第15列：定长 6 项，分号分隔
+        public float castRange;          // 第16列：技能能影响到的距离，兼作索敌半径；0 = 只影响自身
+        public bool breakEndure;         // 第17列：命中时是否破霸体（留空 / 0 = 不破）
+        public bool autoTarget;          // 第18列：释放瞬间是否自动转向射程内最近的敌人
 
         public SkillConfig(string[] rowData)
         {
@@ -650,15 +650,15 @@ public class ConfigManager : MonoBehaviour
             damageRates = ParseFloatList(rowData, 10);
             attackAnim = ParseAttackAnim(rowData, 11);
             targetSector = ParseFloat(rowData, 12);
-            targetRadius = ParseFloatOrNull(rowData, 13) ?? 0f;
-            broadcast = ParseBoolOrNull(rowData, 14) ?? false;
-            scores = ParseSkillScore(rowData, 15);
-            castRange = ParseCastRange(rowData, 16);
-            breakEndure = ParseBreakEndure(rowData, 17);
+            broadcast = ParseBoolOrNull(rowData, 13) ?? false;
+            scores = ParseSkillScore(rowData, 14);
+            castRange = ParseCastRange(rowData, 15);
+            breakEndure = ParseBreakEndure(rowData, 16);
+            autoTarget = ParseBoolOrNull(rowData, 17) ?? false;
             if (targetSector < 0f || targetSector > 180f)
                 throw new FormatException($"[配表] skill.csv 技能 {key} 的索敌范围夹角 {targetSector} 超出 [0,180]");
-            if (targetSector > Config.skill_target_no_sector && targetRadius <= 0f)
-                throw new FormatException($"[配表] skill.csv 技能 {key} 配了索敌夹角 {targetSector} 但索敌半径为空或非正数");
+            if (targetSector > Config.skill_target_no_sector && castRange <= 0f)
+                throw new FormatException($"[配表] skill.csv 技能 {key} 配了索敌夹角 {targetSector} 但射程为 0（索敌半径取射程）");
         }
 
         // 品质只有 B/A/S 三档，空 = 无品质（按最低计）

@@ -54,7 +54,7 @@ namespace Ros.Skill
             => StrikeSphere(caster, HandPos(caster, leftHand: true).position, MeleeRadius, BuildAttack(caster));
     }
 
-    // 血嚎：自身与同阵营半径内的单位挂增益，半径读第 16 列
+    // 血嚎：自身与同阵营射程内的单位挂增益，范围读第 16 列
     public class SkillEliteZombieScream : SkillBase
     {
         public override int Id => (int)SkillType.SkillEliteZombieScream;
