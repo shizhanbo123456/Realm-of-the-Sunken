@@ -124,6 +124,8 @@ public class EntityAnim : MonoBehaviour
             return;
         }
         mainAnimator = animators[0];
+        EnsureWeaponSocket();
+        CacheAnchorRestOffsets(); // 必须早于赋 controller：此时还是绑定姿势
         for (int i = 0; i < animators.Count; i++)
         {
             Animator animator = animators[i];
@@ -253,7 +255,8 @@ public class EntityAnim : MonoBehaviour
     // 手上：直接作为骨骼子物体，跟骨骼旋转一起动
     private void AttachToBone(GameObject prefab, EntityAnchor anchor)
     {
-        Transform bone = anchor.GetTransform(modelInfo, this).transform;
+        bool useBone = anchor == EntityAnchor.RightHand && weaponSocket != null && animData != null && animData.useWeaponBone;
+        Transform bone = useBone ? weaponSocket : anchor.GetTransform(modelInfo, this).transform;
         if (bone == null)
         {
             Debug.LogError($"{gameObject.name} 的 {anchor} 锚点取不到骨骼，武器无法显示");
@@ -265,8 +268,19 @@ public class EntityAnim : MonoBehaviour
 
         GameObject instance = Instantiate(prefab, mount);
         instance.transform.localPosition = Vector3.zero;
-        instance.transform.localRotation = Quaternion.identity;
+        instance.transform.localRotation = WeaponFix(anchor);
         weaponVisuals.Add(mount.gameObject);
+    }
+
+    // 手部标定：右手的 Y 把矛身转到骨骼 X 轴、Z 自转 180° 翻刃口；左手是右手的镜像
+    private static readonly Vector3 WeaponHandFixEuler = new Vector3(0f, 90f, 180f);
+    private static readonly Vector3 WeaponLeftHandFixEuler = new Vector3(0f, -90f, 180f);
+
+    private static Quaternion WeaponFix(EntityAnchor anchor)
+    {
+        if (anchor == EntityAnchor.RightHand) return Quaternion.Euler(WeaponHandFixEuler);
+        if (anchor == EntityAnchor.LeftHand) return Quaternion.Euler(WeaponLeftHandFixEuler);
+        return Quaternion.identity;
     }
 
     // 收起：挂点必须建在骨骼下（武器要跟着人物动画动）；位置与朝向取锚点算出的世界值
@@ -279,12 +293,16 @@ public class EntityAnim : MonoBehaviour
             return;
         }
         Transform mount = CreateMount(info.transform, anchor.ToString());
-        mount.position = info.position;
-        mount.rotation = info.rotation;
+        // 位置和朝向都换算到骨骼本地：偏移必须跟着骨盆转，否则胯一转武器还停在实体的左右两侧
+        Quaternion rest = anchor == EntityAnchor.WeaponBack ? chestRestOffset : hipsRestOffset;
+        Vector3 localOffset = Quaternion.Inverse(transform.rotation) * (info.position - info.transform.position);
+        mount.position = info.transform.position + (info.transform.rotation * rest) * localOffset;
+        Quaternion tilt = Quaternion.Inverse(transform.rotation) * info.rotation;
+        mount.localRotation = rest * tilt;
 
         GameObject instance = Instantiate(prefab, mount);
         instance.transform.localPosition = Vector3.zero;
-        instance.transform.localRotation = Quaternion.identity;
+        instance.transform.localRotation = WeaponFix(anchor);
         weaponVisuals.Add(mount.gameObject);
     }
 
@@ -354,6 +372,52 @@ public class EntityAnim : MonoBehaviour
     #endregion
 
     #region 骨骼相关
+    // 手上挂点：骨架本身没有武器槽，运行时在 hand_r 下建一个，位置由手势偏移决定
+    private Transform weaponSocket;
+
+    private void EnsureWeaponSocket()
+    {
+        if (animData == null || !animData.useWeaponBone) return;
+        if (mainAnimator == null || mainAnimator.avatar == null || !mainAnimator.avatar.isHuman) return;
+        Transform hand = mainAnimator.GetBoneTransform(HumanBodyBones.RightHand);
+        if (hand == null)
+        {
+            Debug.LogError($"{gameObject.name} 取不到 RightHand 骨骼，武器挂点建不出来");
+            return;
+        }
+        weaponSocket = hand.Find(socketName);
+        if (weaponSocket == null)
+        {
+            weaponSocket = new GameObject(socketName).transform;
+            weaponSocket.SetParent(hand, false);
+        }
+        Vector3 s = hand.lossyScale; // 骨骼本地单位换算成米：手的缩放是 100 时，本地 0.001 = 0.1 米
+        handInvScale = new Vector3(1f / s.x, 1f / s.y, 1f / s.z);
+    }
+
+    private const string socketName = "WeaponSocket";
+    private Vector3 handInvScale = Vector3.one;
+
+    private void LateUpdate()
+    {
+        if (weaponSocket == null) return;
+        weaponSocket.localPosition = Vector3.Scale(animData.weaponHandLocalOffset, handInvScale); // 逐帧写，方便运行时调偏移
+    }
+
+    // 绑定姿势下骨骼相对实体的朝向：把挂点倾斜换算成骨骼本地常量，姿势变化时不再漂
+    private Quaternion hipsRestOffset = Quaternion.identity;
+    private Quaternion chestRestOffset = Quaternion.identity;
+
+    private void CacheAnchorRestOffsets()
+    {
+        if (mainAnimator == null) return;
+        // 走同一套 GetBoneTransform：简化绑定缺 Chest 时会回退，跟 EntityAnchor 取的骨骼保持一致
+        Transform hips = GetBoneTransform(HumanBodyBones.Hips);
+        if (hips != null) hipsRestOffset = Quaternion.Inverse(hips.rotation) * transform.rotation;
+        Transform chest = GetBoneTransform(HumanBodyBones.Chest);
+        if (chest != null) chestRestOffset = Quaternion.Inverse(chest.rotation) * transform.rotation;
+    }
+
     private Dictionary<HumanBodyBones, Transform> boneCache = new();
     public Transform GetBoneTransform(HumanBodyBones humanBoneId)
     {

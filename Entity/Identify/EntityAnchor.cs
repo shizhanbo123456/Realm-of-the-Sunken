@@ -47,24 +47,25 @@ public static class EntityAnchorExtensions
     {
         if (anim != null)
         {
+            Quaternion entityRot = EntityRotation(model, anim);
             switch (anchor)
             {
-                case EntityAnchor.ModelRootPosition: return anim.GetBoneTransform(HumanBodyBones.Hips).ToAnchorInfo(model.transform.rotation);
-                case EntityAnchor.Head: return anim.GetBoneTransform(HumanBodyBones.Head).ToAnchorInfo(model.transform.rotation);
-                case EntityAnchor.LeftHand: return anim.GetBoneTransform(HumanBodyBones.LeftHand).ToAnchorInfo(model.transform.rotation);
-                case EntityAnchor.RightHand: return anim.GetBoneTransform(HumanBodyBones.RightHand).ToAnchorInfo(model.transform.rotation);
-                case EntityAnchor.LeftFoot: return anim.GetBoneTransform(HumanBodyBones.LeftFoot).ToAnchorInfo(model.transform.rotation);
-                case EntityAnchor.RightFoot: return anim.GetBoneTransform(HumanBodyBones.RightFoot).ToAnchorInfo(model.transform.rotation);
-                case EntityAnchor.Chest: return anim.GetBoneTransform(HumanBodyBones.Chest).ToAnchorInfo(model.transform.rotation);
-                case EntityAnchor.WeaponHipLeft: return WeaponMount(anim.GetBoneTransform(HumanBodyBones.Hips), model, new Vector3(-HalfWidth(model) - 0.03f, -0.02f, -0.04f), WeaponHipTilt);
-                case EntityAnchor.WeaponHipRight: return WeaponMount(anim.GetBoneTransform(HumanBodyBones.Hips), model, new Vector3(HalfWidth(model) + 0.03f, -0.02f, -0.04f), WeaponHipTilt);
-                case EntityAnchor.WeaponBack: return WeaponMount(anim.GetBoneTransform(HumanBodyBones.Chest), model, new Vector3(0f, -0.05f, model.zRange.x - 0.08f), WeaponBackTilt);
+                case EntityAnchor.ModelRootPosition: return anim.GetBoneTransform(HumanBodyBones.Hips).ToAnchorInfo(entityRot);
+                case EntityAnchor.Head: return anim.GetBoneTransform(HumanBodyBones.Head).ToAnchorInfo(entityRot);
+                case EntityAnchor.LeftHand: return anim.GetBoneTransform(HumanBodyBones.LeftHand).ToAnchorInfo(entityRot);
+                case EntityAnchor.RightHand: return anim.GetBoneTransform(HumanBodyBones.RightHand).ToAnchorInfo(entityRot);
+                case EntityAnchor.LeftFoot: return anim.GetBoneTransform(HumanBodyBones.LeftFoot).ToAnchorInfo(entityRot);
+                case EntityAnchor.RightFoot: return anim.GetBoneTransform(HumanBodyBones.RightFoot).ToAnchorInfo(entityRot);
+                case EntityAnchor.Chest: return anim.GetBoneTransform(HumanBodyBones.Chest).ToAnchorInfo(entityRot);
+                case EntityAnchor.WeaponHipLeft: return WeaponMount(anim.GetBoneTransform(HumanBodyBones.Hips), entityRot, new Vector3(-HalfWidth(model) - WeaponHipSideExtra, WeaponHipHeight, WeaponHipForward), WeaponHipTilt);
+                case EntityAnchor.WeaponHipRight: return WeaponMount(anim.GetBoneTransform(HumanBodyBones.Hips), entityRot, new Vector3(HalfWidth(model) + WeaponHipSideExtra, WeaponHipHeight, WeaponHipForward), WeaponHipTilt);
+                case EntityAnchor.WeaponBack: return WeaponMount(anim.GetBoneTransform(HumanBodyBones.Chest), entityRot, new Vector3(0f, -0.05f, model.zRange.x - 0.08f), WeaponBackTilt);
 
                 case EntityAnchor.Bar: 
                     {
                         var head = EntityAnchor.Head.GetTransform(model, anim);
                         var pos = new Vector3(model.transform.position.x, head.position.y + 0.5f, model.transform.position.z);
-                        return new EntityAnchorInfo() { position =  pos,rotation=model.transform.rotation};
+                        return new EntityAnchorInfo() { position =  pos,rotation=entityRot};
                     }
                 case EntityAnchor.UpCenter: return EntityAnchor.Chest.GetTransform(model, anim);
                 case EntityAnchor.UpFront: return EntityAnchor.Chest.GetTransform(model, anim) + (model.zRange.y+0.5f) * model.transform.forward;
@@ -93,9 +94,13 @@ public static class EntityAnchorExtensions
 
     private static float HalfWidth(EntityModelInfo model) => (model.xRange.y - model.xRange.x) * 0.5f;
 
-    private static EntityAnchorInfo WeaponMount(Transform bone, EntityModelInfo model, Vector3 localOffset, Quaternion tilt)
+    // 腰部挂点偏移（实体空间：x 侧向、y 高度、z 前后，单位米）
+    private const float WeaponHipSideExtra = -0.01f; // 相对模型半宽的额外侧移，越负越贴身
+    private const float WeaponHipHeight = -0.02f;
+    private const float WeaponHipForward = 0.03f;    // 负值在身后，正值往前
+
+    private static EntityAnchorInfo WeaponMount(Transform bone, Quaternion entityRotation, Vector3 localOffset, Quaternion tilt)
     {
-        Quaternion entityRotation = model.transform.rotation;
         return new EntityAnchorInfo()
         {
             transform = bone,
@@ -103,7 +108,13 @@ public static class EntityAnchorExtensions
             rotation = entityRotation * tilt,
         };
     }
-    // 骨骼锚点专用：旋转取骨骼所属实体（模型根），不取骨骼自身动画旋转
+
+    // 朝向取实体根而不是模型根：模型根常带 ±90° 的 FBX 校正旋转，用它会把挂点整体拧偏
+    private static Quaternion EntityRotation(EntityModelInfo model, EntityAnim anim)
+    {
+        return anim != null ? anim.transform.rotation : model.transform.rotation;
+    }
+    // 骨骼锚点专用：旋转取实体根，不取骨骼自身动画旋转
     private static EntityAnchorInfo ToAnchorInfo(this Transform transform, Quaternion entityRotation, Vector3 offset = default)
     {
         if(offset.sqrMagnitude<float.Epsilon)
