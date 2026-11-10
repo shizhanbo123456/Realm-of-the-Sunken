@@ -7,9 +7,11 @@ public class AnimAttackEvent : AnimEvent
     protected override bool UseGravity => AttackClipUseGravity;
     public override EndureType? Endure => EndureType.Super;
     public override EntityAnim.WeaponPos ShowWeapon => WeaponInHand ? EntityAnim.WeaponPos.Hand : EntityAnim.WeaponPos.Show;
+    public override bool AllowCombo => AllowComboAttack;
     [SerializeField] private EntityAnim.AttackType type;
     [SerializeField] private bool AttackClipUseGravity;
     [SerializeField] private bool WeaponInHand=true;
+    [SerializeField]private bool AllowComboAttack = false;
     [SerializeField] private AnimationCurve speedForward;//是位置，导数才是速度
     [SerializeField] private AnimationCurve speedUpward;//是位置，导数才是速度
     [SerializeField][Range(0,1)] private float threshold;
