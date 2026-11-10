@@ -153,7 +153,12 @@ public class HomePreviewManager : ClientSubManager
                 int last = list.Count - 1;
                 go = list[last];
                 list.RemoveAt(last);
-                if (go != null) go.transform.SetPositionAndRotation(anchor.position, anchor.rotation);
+                if (go != null)
+                {
+                    var drop = go.GetComponent<SpawnDrop>();
+                    if (drop != null) drop.SnapToTarget(); // 复用者若还在下落，先落地再改锚点
+                    go.transform.SetPositionAndRotation(anchor.position, anchor.rotation);
+                }
             }
             else
             {
@@ -200,6 +205,10 @@ public class HomePreviewManager : ClientSubManager
         anim.SetType(weapon.animType);
         anim.SetWeapon(weaponId, weapon.weaponDisplay);
         anim.DoSpawn(); // 登场动画：首页与大厅建视图时各播一次，与战斗内 EntityData 的口径一致
+        // 登场下落：从锚点上方匀速落到锚点，高度与时长取 global_variables
+        go.AddComponent<SpawnDrop>().Play(anchor.position,
+            ConfigManager.GlobalVariableConfig.arranger_spawn_offset,
+            ConfigManager.GlobalVariableConfig.arranger_spawn_fall_duration);
         return go;
     }
 

@@ -931,6 +931,8 @@ public class ConfigManager : MonoBehaviour
         public static float sync_precision_minimap_xz;           // 小地图：位置精度（米）
         public static int sync_max_buff_count;                   // 单实体最多下发的 buff 条数
         public static int max_entity_health;                     // 实体生命值上限
+        public static float arranger_spawn_offset;               // 首页/大厅人物出生高度偏移（米，向上）
+        public static float arranger_spawn_fall_duration;        // 首页/大厅人物出生下落时长（秒，匀速）
 
         public string key;
         public string description;
@@ -1195,6 +1197,12 @@ public class ConfigManager : MonoBehaviour
                     break;
                 case "max_entity_health":
                     max_entity_health = Positive(Int(row), row.key);
+                    break;
+                case "arranger_spawn_offset":
+                    arranger_spawn_offset = NonNegative(Float(row), row.key);
+                    break;
+                case "arranger_spawn_fall_duration":
+                    arranger_spawn_fall_duration = Positive(Float(row), row.key);
                     break;
                 default:
                     throw new FormatException($"[配表] {FileName} 的行「{row.key}」没有对应的静态字段");
