@@ -85,8 +85,8 @@ public sealed class AiIntentRelay : DecisionMachine, IBehaviorHost
         });
     }
 
-    // 出手顺序：持有表按品质降序、同品质 id 降序；全不可用退空手三连（远直拳近崩拳）
-    private bool TryCastAny(EntityData target)
+    // 出手顺序：持有表按品质降序、同品质 id 降序；全不可用退普攻
+    private bool TryCastAny()
     {
         var held = Owner.skillController.GetSkillIds();
         castOrder.Clear();
@@ -97,8 +97,6 @@ public sealed class AiIntentRelay : DecisionMachine, IBehaviorHost
             if (TryUseSkill(castOrder[i])) return true;
         }
 
-        bool close = target != null && FlatDistance(target.transform.position) <= Config.unarmed_smash_range;
-        if (close && TryUseSkill(Config.unarmed_attack_smash)) return true;
         return TryUseSkill(Config.unarmed_punch);
     }
 
@@ -140,7 +138,7 @@ public sealed class AiIntentRelay : DecisionMachine, IBehaviorHost
     bool IBehaviorHost.TryAttack(EntityData target)
     {
         if (Owner.InputBlocked(InputBlockOp.Attack)) return false;
-        return TryCastAny(target);
+        return TryCastAny();
     }
 
     bool IBehaviorHost.IsActing => Owner.anim != null && Owner.anim.CurrentState == EntityAnim.AnimState.Attack;

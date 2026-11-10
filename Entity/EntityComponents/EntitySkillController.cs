@@ -30,9 +30,8 @@ public class EntitySkillController
         slotBarEnabled = false;
         slotCapacity = 0;
         recharge.Clear();
-        // 空手两式人人天生可用且不消耗（store = -1），登记只为查询口径与其它技能一致
+        // 普攻人人天生可用且不消耗（store = -1），登记只为查询口径与其它技能一致
         recharge.AddSkill(Config.unarmed_punch);
-        recharge.AddSkill(Config.unarmed_attack_smash);
     }
 
     #region 技能列表管理
@@ -206,11 +205,10 @@ public class EntitySkillController
         return recharge.GetStore(skillId) != 0;
     }
 
-    // 全角色通用技能：不在实体技能列表也可直接释放（空手两式，人人天生可用）
+    // 全角色通用技能：不在实体技能列表也可直接释放（普攻，人人天生可用）
     private static bool IsUniversalSkill(int skillId)
     {
-        return skillId == Config.unarmed_punch
-            || skillId == Config.unarmed_attack_smash;
+        return skillId == Config.unarmed_punch;
     }
     #endregion
 
@@ -267,13 +265,12 @@ public class EntitySkillController
         RefreshAdvancing();
     }
 
-    // 只有栏内技能吃"卸下冻结"，空手两式始终推进
+    // 只有栏内技能吃"卸下冻结"，普攻始终推进
     private void RefreshAdvancing()
     {
         advancingBuffer.Clear();
         advancingBuffer.AddRange(slotSkills);
         advancingBuffer.Add(Config.unarmed_punch);
-        advancingBuffer.Add(Config.unarmed_attack_smash);
         recharge.SetAdvancing(advancingBuffer);
     }
     #endregion

@@ -68,13 +68,11 @@ public class InputManager : MonoBehaviour
             Tool.NetworkManager.SendInput(new CSPlayerInput() { pressed = pressed });
     }
 
-    // 空手攻击：移动中随机左右拳，静止原地砸击（与服务器原口径一致，判断放客户端）
+    // 普攻：移动与静止共用同一个技能
     private void CastUnarmed()
     {
         if (Tool.ClientLogicManager == null) return;
-        bool topDown = Tool.CameraController != null && Tool.CameraController.Mode == CameraViewMode.TopDown;
-        bool moving = topDown ? (wHeld || aHeld || sHeld || dHeld) : wHeld;
-        Tool.ClientLogicManager.SkillVfx.CastUnarmed(moving);
+        Tool.ClientLogicManager.SkillVfx.CastUnarmed();
     }
 
     // 进入屏蔽的那一帧把按住态全部抬起，告诉服务器按键已松开

@@ -48,13 +48,9 @@ public class RobotSkillBar
             if (TryCast(slots[i])) return true;
         }
 
-        // 空手直拳同样取配表射程，够不到就交给决策层继续前压
+        // 普攻同样取配表射程，够不到就交给决策层继续前压
         if (dist > ConfigManager.SkillConfig.Get(Config.unarmed_punch).castRange) return false;
-
-        // 远了只出直拳：崩拳够不到，宁可站着等冷却也不空放
-        return dist <= Config.unarmed_smash_range
-            ? TryCast(Config.unarmed_attack_smash) || TryCast(Config.unarmed_punch)
-            : TryCast(Config.unarmed_punch);
+        return TryCast(Config.unarmed_punch);
     }
 
     // 只影响自身的技能（射程 0）不看距离，其余必须覆盖当前距离

@@ -91,6 +91,7 @@ namespace Ros.Skill
 
         #region 框架工具（起点 / 落点 / 攻击结算）
         private static readonly EntityData[] s_hitBuffer = new EntityData[50];
+        private static readonly HashSet<int> s_weaponHitWarned = new();
 
         protected static EntityAnchorInfo HandPos(EntityData entity, bool leftHand = false)
         {
@@ -249,11 +250,35 @@ namespace Ros.Skill
 
         // 无特效近战的球形判定：伤害倍率同样只认 skill.csv 第 11 列（单段取第 0 项，空 = 1）
         protected void StrikeSphere(EntityData entity, Vector3 center, float radius, AttackData attack)
+            => HitSphere(entity, attack, center, radius, ConfigDamageRate());
+
+        // 武器普攻：命中球取当前武器预制体，球心 = 手骨 + 角色朝向偏移；瞬时判定
+        protected void StrikeWeapon(EntityData entity, AttackData attack)
+        {
+            int weapon = WeaponOf(entity);
+            var hits = VfxHitSource.GetHits(SkillVfxKind.Weapon, weapon);
+            if (hits.Length == 0)
+            {
+                if (s_weaponHitWarned.Add(weapon))
+                    Debug.LogError($"[武器] 武器 {weapon} 没有命中球，普攻不造成伤害（每个武器只报一次）");
+                return;
+            }
+            float scale = VfxScale();
+            EntityAnchorInfo hand = HandPos(entity);
+            Quaternion rotation = entity.transform.rotation;
+            float rate = ConfigDamageRate();
+            for (int i = 0; i < hits.Length; i++)
+            {
+                Vector3 center = hand.position + rotation * (hits[i].center * scale);
+                HitSphere(entity, attack, center, hits[i].radius * scale, rate);
+            }
+        }
+
+        private void HitSphere(EntityData entity, AttackData attack, Vector3 center, float radius, float rate)
         {
 #if UNITY_EDITOR
             DamageRangeDebugHost.Sphere(center, radius); // 调试：可视化本次球形伤害判定范围（渐隐渲染）
 #endif
-            float rate = ConfigDamageRate();
             int count = EntityPhysics.OverlapCircleXZ(center, radius, s_hitBuffer);
             for (int i = 0; i < count; i++)
             {

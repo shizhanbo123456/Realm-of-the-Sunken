@@ -25,7 +25,7 @@ namespace Ros.Skill
         public override int Id => (int)SkillType.SkillZombieClaw;
 
         protected override void OnCast(EntityData caster)
-            => StrikeSphere(caster, HandPos(caster).position, MeleeRadius, BuildAttack(caster));
+            => StrikeWeapon(caster, BuildAttack(caster));
     }
 
     public class SkillEliteZombieClaw : SkillBase
@@ -33,7 +33,7 @@ namespace Ros.Skill
         public override int Id => (int)SkillType.SkillEliteZombieClaw;
 
         protected override void OnCast(EntityData caster)
-            => StrikeSphere(caster, HandPos(caster).position, MeleeRadius, BuildAttack(caster));
+            => StrikeWeapon(caster, BuildAttack(caster));
     }
 
     // 血嚎：自身与同阵营射程内的单位挂增益，范围读第 14 列

@@ -101,13 +101,12 @@ public class ClientSkillManager : ClientSubManager
         if (Tool.NetworkManager != null) Tool.NetworkManager.SendSkillCastInput(skillId);
     }
 
-    // 空手攻击（J）：移动中直拳，静止原地崩拳
-    public void CastUnarmed(bool moving)
+    // 普攻（J）：移动与静止共用一个技能
+    public void CastUnarmed()
     {
         var loading = ClientLoadingManager.Current;
         if (loading == null || !loading.HasSession || loading.OwnEntityId == 0) return; // 无战斗实体（观战/未开局）不发
-        int skillId = moving ? Config.unarmed_punch : Config.unarmed_attack_smash;
-        if (Tool.NetworkManager != null) Tool.NetworkManager.SendSkillCastInput(skillId);
+        if (Tool.NetworkManager != null) Tool.NetworkManager.SendSkillCastInput(Config.unarmed_punch);
     }
     #endregion
 
