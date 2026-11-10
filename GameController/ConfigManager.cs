@@ -628,11 +628,11 @@ public class ConfigManager : MonoBehaviour
         public List<float> damageRates;  // 第11列：伤害倍率，空 = 全 1；1 项 = 所有段共用；多项 = 按段序
         public int attackAnim;           // 第12列：EntityAnim.AttackType 数值，空 = -1 = 无动画
         public float targetSector;       // 第13列：索敌扇形半角（度，实际扇区 = 该值×2）；<=0.1 = 不索敌；>179.9 = 不限方向
-        public bool broadcast;           // 第14列：使用时是否全场播报，1 = 播报，空 = 不播报
+        public float castRange;          // 第14列：技能能影响到的距离，兼作索敌半径；0 = 只影响自身
         public SkillScore scores;        // 第15列：定长 6 项，分号分隔
-        public float castRange;          // 第16列：技能能影响到的距离，兼作索敌半径；0 = 只影响自身
-        public bool breakEndure;         // 第17列：命中时是否破霸体（留空 / 0 = 不破）
-        public bool autoTarget;          // 第18列：释放瞬间是否自动转向射程内最近的敌人
+        public bool breakEndure;         // 第16列：命中时是否破霸体（留空 / 0 = 不破）
+        public bool autoTarget;          // 第17列：释放瞬间是否自动转向射程内最近的敌人
+        public bool broadcast;           // 第18列：使用时是否全场播报，1 = 播报，空 = 不播报
 
         public SkillConfig(string[] rowData)
         {
@@ -650,11 +650,11 @@ public class ConfigManager : MonoBehaviour
             damageRates = ParseFloatList(rowData, 10);
             attackAnim = ParseAttackAnim(rowData, 11);
             targetSector = ParseFloat(rowData, 12);
-            broadcast = ParseBoolOrNull(rowData, 13) ?? false;
+            castRange = ParseCastRange(rowData, 13);
             scores = ParseSkillScore(rowData, 14);
-            castRange = ParseCastRange(rowData, 15);
-            breakEndure = ParseBreakEndure(rowData, 16);
-            autoTarget = ParseBoolOrNull(rowData, 17) ?? false;
+            breakEndure = ParseBreakEndure(rowData, 15);
+            autoTarget = ParseBoolOrNull(rowData, 16) ?? false;
+            broadcast = ParseBoolOrNull(rowData, 17) ?? false;
             if (targetSector < 0f || targetSector > 180f)
                 throw new FormatException($"[配表] skill.csv 技能 {key} 的索敌范围夹角 {targetSector} 超出 [0,180]");
             if (targetSector > Config.skill_target_no_sector && castRange <= 0f)

@@ -12,12 +12,12 @@ namespace Ros.Skill
     {
         public abstract int Id { get; }
 
-        // 射程读 skill.csv 第 16 列：既是技能能影响到的距离，也是索敌半径与 AI 的作战距离；0 = 只影响自身
+        // 射程读 skill.csv 第 14 列：既是技能能影响到的距离，也是索敌半径与 AI 的作战距离；0 = 只影响自身
         public float CastRange => ConfigManager.SkillConfig.Get(Id).castRange;
         // 索敌口径读 skill.csv 第 13 列：夹角 <=0.1 = 不索敌，>179.9 = 不限方向；半径一律取射程
         protected float TargetSector => ConfigManager.SkillConfig.Get(Id).targetSector;
         protected float TargetRadius => CastRange;
-        // 第 18 列：释放瞬间是否自动转向射程内最近的敌人
+        // 第 17 列：释放瞬间是否自动转向射程内最近的敌人
         private bool AutoTarget => ConfigManager.SkillConfig.Get(Id).autoTarget;
         // 攻击动画读 skill.csv 第 12 列，-1 = 无动画（按下立刻施放）
         protected bool HasCastAnim => (int)CastAnim != -1;
@@ -76,7 +76,7 @@ namespace Ros.Skill
             else PlayWave(context); // 单机测试场景没有网络，直接本地播一遍表现
         }
 
-        // 配表第 14 列：特殊技能施放时向全客户端播报，客户端据此弹战斗界面的重要事件 banner
+        // 配表第 18 列：特殊技能施放时向全客户端播报，客户端据此弹战斗界面的重要事件 banner
         private void BroadcastSpecial(int skillId)
         {
             if (!BattleManager.AtServer || Tool.NetworkManager == null) return;
@@ -115,7 +115,7 @@ namespace Ros.Skill
         protected Vector3 Aim(EntityData caster, Vector3 origin)
         {
             if (CastRange <= 0f)
-                throw new FormatException($"[配表] skill.csv 技能 {Id} 需要瞄准点，但第 16 列没有配射程");
+                throw new FormatException($"[配表] skill.csv 技能 {Id} 需要瞄准点，但第 14 列没有配射程");
             Vector3 pos = caster.transform.position;
             Vector3 forward = caster.transform.forward;
             EntityData target = ResolveTarget(caster);
@@ -140,7 +140,7 @@ namespace Ros.Skill
         protected static EntityData FindEntity(ushort id) => BattleManager.GetEntity(id);
 
         // 击退力度默认读 skill.csv，个别技能可显式覆盖；伤害范围由命中球决定，不在攻击数据里
-        // 破霸体读第 17 列，伤害倍率读第 11 列：代码不再传这两项
+        // 破霸体读第 16 列，伤害倍率读第 11 列：代码不再传这两项
         protected AttackData BuildAttack(EntityData entity,
             Action<EntityEffectController> addEffect = null,
             Action<EntityData> onHit = null, float? knockback = null)

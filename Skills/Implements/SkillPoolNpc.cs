@@ -54,7 +54,7 @@ namespace Ros.Skill
             => StrikeSphere(caster, HandPos(caster, leftHand: true).position, MeleeRadius, BuildAttack(caster));
     }
 
-    // 血嚎：自身与同阵营射程内的单位挂增益，范围读第 16 列
+    // 血嚎：自身与同阵营射程内的单位挂增益，范围读第 14 列
     public class SkillEliteZombieScream : SkillBase
     {
         public override int Id => (int)SkillType.SkillEliteZombieScream;
@@ -102,7 +102,7 @@ namespace Ros.Skill
     }
 
     // 灵火喷吐：塔带灵火时的普攻，子弹打敌人脚部，到点追加一次原地灵火爆炸（与 132 崩拳同一个 RM[6]）
-    // 第 13 列 = 子弹倍率|灵火倍率，第 11 列 = 子弹尺寸|灵火尺寸
+    // 第 11 列 = 子弹倍率|灵火倍率，第 9 列 = 子弹尺寸|灵火尺寸
     public class SkillCrystalStatueSporeBlaze : SkillBase
     {
         public override int Id => (int)SkillType.SkillCrystalStatueSporeBlaze;
@@ -127,7 +127,7 @@ namespace Ros.Skill
             SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
         }
 
-        // 子弹到点的灵火爆炸：伤害取第 13 列第 2 项，两端同一时刻同一点位各自创建
+        // 子弹到点的灵火爆炸：伤害取第 11 列第 2 项，两端同一时刻同一点位各自创建
         private void Burst(EntityData caster, Vector3 at)
         {
             Timer.AddTimer(0, _ =>
