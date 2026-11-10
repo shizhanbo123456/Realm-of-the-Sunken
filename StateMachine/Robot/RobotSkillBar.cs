@@ -38,12 +38,20 @@ public class RobotSkillBar
     }
 
     // 栏内从高到低 → 空手三连；全不可用返回 false（调用方原地站立）
-    // 空手按与目标的距离选：远了出直拳（够得到），贴身才出崩拳，避免崩拳够不着却原地空放
+    // 够不着目标一律不出招（射程读配表），避免射程外空放白扣库存；射程 0 = 只影响自身，与距离无关
     public bool TryCastAny(EntityData target)
     {
-        for (int i = 0; i < slots.Count; i++) if (TryCast(slots[i])) return true;
+        float dist = target != null ? FlatDistance(target) : 0f;
+        for (int i = 0; i < slots.Count; i++)
+        {
+            if (!CanReach(slots[i], dist)) continue;
+            if (TryCast(slots[i])) return true;
+        }
 
-        bool close = target != null && FlatDistance(target) <= Config.unarmed_smash_range;
+        // 空手直拳同样取配表射程，够不到就交给决策层继续前压
+        if (dist > ConfigManager.SkillConfig.Get(Config.unarmed_punch_left).castRange) return false;
+
+        bool close = dist <= Config.unarmed_smash_range;
         int punch = Random.Range(0, 2) == 0 ? Config.unarmed_punch_left : Config.unarmed_punch_right;
         int otherPunch = punch == Config.unarmed_punch_left ? Config.unarmed_punch_right : Config.unarmed_punch_left;
 
@@ -51,6 +59,13 @@ public class RobotSkillBar
         return close
             ? TryCast(Config.unarmed_attack_smash) || TryCast(punch) || TryCast(otherPunch)
             : TryCast(punch) || TryCast(otherPunch);
+    }
+
+    // 只影响自身的技能（射程 0）不看距离，其余必须覆盖当前距离
+    private static bool CanReach(int skillId, float dist)
+    {
+        if (!SkillManager.TryGet(skillId, out var skill)) return false;
+        return skill.CastRange <= 0f || dist <= skill.CastRange;
     }
 
     private float FlatDistance(EntityData target)

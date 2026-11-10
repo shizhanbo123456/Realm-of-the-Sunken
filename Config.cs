@@ -86,8 +86,6 @@ public static class Config
     public const float ai_chase_limit = 40f;
     // 索敌半径必须比追击上限小一段：两者相等时「刚索到就已超限」会让搜索/追击每拍互踢
     public const float ai_acquire_margin = 5f;
-    // 战斗态退出距离 = 接敌距离 × 此系数：进出用同一距离会在边界反复切换
-    public const float ai_combat_exit_scale = 1.25f;
     public const float ai_combat_retreat_ratio = 0.3f;
     public const float ai_escort_retreat_ratio = 0.15f;
     public const float ai_rally_retreat_ratio = 0.2f;

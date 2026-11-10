@@ -187,8 +187,8 @@ public partial class RobotAi
             float dist = robot.FlatDistanceTo(target);
             if (activityRadius > 0f && dist > activityRadius) return robot.ConsumePendingOr(returnState);
 
-            // 追与停用不同阈值：接敌距离停下、退出距离才重新前压，避免在边界反复走停
-            if (dist > robot.AttackRange * Config.ai_combat_exit_scale) { robot.RequestMove(target.transform.position); return null; }
+            // 射程按「当前还有库存的技能」算：够得着才出招，够不着就前压，绝不在射程外空放
+            if (dist > robot.AttackRange) { robot.RequestMove(target.transform.position); return null; }
 
             robot.RequestAttack(target);
             return null;
