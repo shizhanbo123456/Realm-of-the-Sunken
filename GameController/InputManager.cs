@@ -68,16 +68,10 @@ public class InputManager : MonoBehaviour
             Tool.NetworkManager.SendInput(new CSPlayerInput() { pressed = pressed });
     }
 
-    // 普攻：连招窗口内本地立刻接下一段，同时照常上行，服务器也要推进动画（伤害在服务器的攻击帧上结算）
+    // 普攻：与技能键一致，只上行，动画状态与参数全部由服务器下发
     private void CastUnarmed()
     {
         if (Tool.ClientLogicManager == null) return;
-        var loading = ClientLoadingManager.Current;
-        if (loading != null && loading.HasSession)
-        {
-            var view = Tool.ClientLogicManager.EntityPlayers.GetView(loading.OwnEntityId);
-            if (view != null && view.anim != null && view.anim.AllowCombo) view.anim.DoCombo();
-        }
         Tool.ClientLogicManager.SkillVfx.CastUnarmed();
     }
 
