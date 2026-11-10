@@ -24,7 +24,7 @@ public class BulletPlayer : MonoBehaviour
         this.rotation = rotation;
         if (rotation == RotationMode.Identity) transform.rotation = Quaternion.identity;
         else if (rotation == RotationMode.CompleteTangent) transform.LookAt(trajectory.End);
-        else if (rotation == RotationMode.Tangent) transform.LookAt(trajectory.Lerp(0.02f)); // 立即应用初始切向，否则首帧是预制体默认朝向、下一帧才转正
+        else if (rotation == RotationMode.Tangent) FaceAhead(0f); // 立即应用初始切向，否则首帧是预制体默认朝向、下一帧才转正
         else if (rotation == RotationMode.Camera && Camera.main != null) transform.rotation = Camera.main.transform.rotation;
     }
     private void Update()
@@ -33,12 +33,18 @@ public class BulletPlayer : MonoBehaviour
         transform.position = trajectory.Lerp(f);
         if (rotation == RotationMode.Tangent)
         {
-            transform.LookAt(trajectory.Lerp(f + 0.02f));
+            FaceAhead(f);
         }
         else if (rotation == RotationMode.Camera)
         {
             transform.rotation = Camera.main.transform.rotation;
         }
+    }
+    // 轨迹不动时（定点、蓄力驻留）前进方向为零，LookAt 会每帧报错，直接保持当前朝向
+    private void FaceAhead(float factor)
+    {
+        Vector3 ahead = trajectory.Lerp(factor + 0.02f);
+        if ((ahead - transform.position).sqrMagnitude > 1e-6f) transform.LookAt(ahead);
     }
     public static void Create(GameObject vfx, BulletTrajectory trajectory, float lifeTime = 0f, RotationMode rotation = RotationMode.Constant)
     {

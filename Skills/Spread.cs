@@ -64,5 +64,49 @@ namespace Ros.Skill
             Vector3 dest = Mathf.Abs(angleDeg) < 0.01f ? aim : SpreadStyle.RotateTargetAroundDirection(origin, aim, angleDeg);
             emit(new SkillTrajectoryLine(origin, dest, bulletLife));
         }
+
+        // 蓄力瞄准：子弹散布在发射球面中间带上，驻留 hold 后全部射向同一点
+        public static void ChargeAim(Vector3 center, Vector3 aim, int seed, float radius, int shots, float hold,
+            float flight, Action<BulletTrajectory> emit)
+        {
+            ValidateCharge(radius, shots, hold, flight);
+            Vector3[] points = ChargePoints(center, seed, radius, shots);
+            for (int i = 0; i < shots; i++)
+                emit(new SkillTrajectoryHoldLine(points[i], aim, hold, flight));
+        }
+
+        // 蓄力扫射：落点 = 目标 + 各自的球面偏移，所有弹道互相平行
+        public static void ChargeSweep(Vector3 center, Vector3 aim, int seed, float radius, int shots, float hold,
+            float flight, Action<BulletTrajectory> emit)
+        {
+            ValidateCharge(radius, shots, hold, flight);
+            Vector3[] points = ChargePoints(center, seed, radius, shots);
+            Vector3 delta = aim - center;
+            for (int i = 0; i < shots; i++)
+                emit(new SkillTrajectoryHoldLine(points[i], points[i] + delta, hold, flight));
+        }
+
+        private static void ValidateCharge(float radius, int shots, float hold, float flight)
+        {
+            if (shots <= 0) throw new ArgumentOutOfRangeException(nameof(shots), shots, "发数必须 > 0");
+            if (radius <= 0f) throw new ArgumentOutOfRangeException(nameof(radius), radius, "球半径必须 > 0");
+            if (hold < 0f) throw new ArgumentOutOfRangeException(nameof(hold), hold, "驻留时长不能为负");
+            if (flight <= 0f) throw new ArgumentOutOfRangeException(nameof(flight), flight, "飞行时长必须 > 0");
+        }
+
+        // 球面均匀取点，只保留 |dy| <= radius/2 的中间带（cos 在 [-0.5,0.5] 上均匀才是面均匀）
+        private static Vector3[] ChargePoints(Vector3 center, int seed, float radius, int shots)
+        {
+            var points = new Vector3[shots];
+            var rng = SkillSeed.Rng(seed);
+            for (int i = 0; i < shots; i++)
+            {
+                float cos = ((float)rng.NextDouble() * 2f - 1f) * 0.5f;
+                float sin = Mathf.Sqrt(1f - cos * cos);
+                float theta = (float)rng.NextDouble() * (Mathf.PI * 2f);
+                points[i] = center + new Vector3(Mathf.Cos(theta) * sin, cos, Mathf.Sin(theta) * sin) * radius;
+            }
+            return points;
+        }
     }
 }
