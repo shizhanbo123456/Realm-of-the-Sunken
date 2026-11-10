@@ -255,8 +255,9 @@ public class EntityAnim : MonoBehaviour
     // 手上：直接作为骨骼子物体，跟骨骼旋转一起动
     private void AttachToBone(GameObject prefab, EntityAnchor anchor)
     {
-        bool useBone = anchor == EntityAnchor.RightHand && weaponSocket != null && animData != null && animData.useWeaponBone;
-        Transform bone = useBone ? weaponSocket : anchor.GetTransform(modelInfo, this).transform;
+        Transform socket = anchor == EntityAnchor.RightHand ? weaponSocketR : anchor == EntityAnchor.LeftHand ? weaponSocketL : null;
+        bool useBone = socket != null && animData != null && animData.useWeaponBone;
+        Transform bone = useBone ? socket : anchor.GetTransform(modelInfo, this).transform;
         if (bone == null)
         {
             Debug.LogError($"{gameObject.name} 的 {anchor} 锚点取不到骨骼，武器无法显示");
@@ -372,36 +373,48 @@ public class EntityAnim : MonoBehaviour
     #endregion
 
     #region 骨骼相关
-    // 手上挂点：骨架本身没有武器槽，运行时在 hand_r 下建一个，位置由手势偏移决定
-    private Transform weaponSocket;
+    // 手上挂点：骨架本身没有武器槽，运行时在左右手骨骼下各建一个，位置由各自的偏移决定
+    private Transform weaponSocketR;
+    private Transform weaponSocketL;
+    private Vector3 handInvScaleR = Vector3.one;
+    private Vector3 handInvScaleL = Vector3.one;
+
+    private const string socketNameR = "WeaponSocket_R";
+    private const string socketNameL = "WeaponSocket_L";
 
     private void EnsureWeaponSocket()
     {
         if (animData == null || !animData.useWeaponBone) return;
         if (mainAnimator == null || mainAnimator.avatar == null || !mainAnimator.avatar.isHuman) return;
-        Transform hand = mainAnimator.GetBoneTransform(HumanBodyBones.RightHand);
-        if (hand == null)
-        {
-            Debug.LogError($"{gameObject.name} 取不到 RightHand 骨骼，武器挂点建不出来");
-            return;
-        }
-        weaponSocket = hand.Find(socketName);
-        if (weaponSocket == null)
-        {
-            weaponSocket = new GameObject(socketName).transform;
-            weaponSocket.SetParent(hand, false);
-        }
-        Vector3 s = hand.lossyScale; // 骨骼本地单位换算成米：手的缩放是 100 时，本地 0.001 = 0.1 米
-        handInvScale = new Vector3(1f / s.x, 1f / s.y, 1f / s.z);
+        weaponSocketR = CreateSocket(HumanBodyBones.RightHand, socketNameR, out handInvScaleR);
+        weaponSocketL = CreateSocket(HumanBodyBones.LeftHand, socketNameL, out handInvScaleL);
     }
 
-    private const string socketName = "WeaponSocket";
-    private Vector3 handInvScale = Vector3.one;
+    private Transform CreateSocket(HumanBodyBones boneId, string name, out Vector3 invScale)
+    {
+        invScale = Vector3.one;
+        Transform hand = mainAnimator.GetBoneTransform(boneId);
+        if (hand == null)
+        {
+            Debug.LogError($"{gameObject.name} 取不到 {boneId} 骨骼，{name} 建不出来");
+            return null;
+        }
+        Vector3 s = hand.lossyScale; // 骨骼本地单位换算成米：手的缩放是 100 时，本地 0.001 = 0.1 米
+        invScale = new Vector3(1f / s.x, 1f / s.y, 1f / s.z);
+        Transform socket = hand.Find(name);
+        if (socket == null)
+        {
+            socket = new GameObject(name).transform;
+            socket.SetParent(hand, false);
+        }
+        return socket;
+    }
 
     private void LateUpdate()
     {
-        if (weaponSocket == null) return;
-        weaponSocket.localPosition = Vector3.Scale(animData.weaponHandLocalOffset, handInvScale); // 逐帧写，方便运行时调偏移
+        // 逐帧写，方便运行时调偏移
+        if (weaponSocketR != null) weaponSocketR.localPosition = Vector3.Scale(animData.weaponHandLocalOffset, handInvScaleR);
+        if (weaponSocketL != null) weaponSocketL.localPosition = Vector3.Scale(animData.weaponLeftHandLocalOffset, handInvScaleL);
     }
 
     // 绑定姿势下骨骼相对实体的朝向：把挂点倾斜换算成骨骼本地常量，姿势变化时不再漂
