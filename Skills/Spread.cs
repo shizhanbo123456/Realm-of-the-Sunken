@@ -108,5 +108,44 @@ namespace Ros.Skill
             }
             return points;
         }
+
+        // 正弦扇形扫射：落点按扇形均分（俯视仍是扇面），每发沿高度上下正弦振荡，按打乱的顺序逐发发射
+        public static void SineFan(Vector3 origin, Vector3 aim, int seed, float spreadDeg, int shots, float interval,
+            float amplitude, float cycles, float bulletLife, Action<BulletTrajectory> emit)
+        {
+            if (shots <= 0) throw new ArgumentOutOfRangeException(nameof(shots), shots, "发数必须 > 0");
+            if (interval < 0f) throw new ArgumentOutOfRangeException(nameof(interval), interval, "发射间隔不能为负");
+            if (spreadDeg < 0f) throw new ArgumentOutOfRangeException(nameof(spreadDeg), spreadDeg, "散布角不能为负");
+            if (amplitude < 0f) throw new ArgumentOutOfRangeException(nameof(amplitude), amplitude, "振幅不能为负");
+            if (cycles <= 0f) throw new ArgumentOutOfRangeException(nameof(cycles), cycles, "周期数必须 > 0");
+
+            Vector3[] dests = SpreadStyle.FanDests(origin, aim, shots, spreadDeg);
+            int[] order = Shuffled(seed, shots);
+            for (int shot = 0; shot < shots; shot++)
+            {
+                int index = order[shot];
+                // 相位按扇面序号错开：相邻角度的子弹不在同一高度，整体读成一道扫过扇面的波
+                var trajectory = new SkillTrajectorySineLine(origin, dests[index], bulletLife, amplitude, cycles,
+                    index * Mathf.PI * 2f / shots);
+                if (shot == 0) emit(trajectory);
+                else Timer.AddTimer(shot, _ => emit(trajectory), interval * shot, 1, false);
+            }
+        }
+
+        // Fisher-Yates：发射顺序由种子决定，与落点序号解耦
+        private static int[] Shuffled(int seed, int count)
+        {
+            var order = new int[count];
+            for (int i = 0; i < count; i++) order[i] = i;
+            var rng = SkillSeed.Rng(seed);
+            for (int i = count - 1; i > 0; i--)
+            {
+                int j = rng.Next(i + 1);
+                int swap = order[i];
+                order[i] = order[j];
+                order[j] = swap;
+            }
+            return order;
+        }
     }
 }
