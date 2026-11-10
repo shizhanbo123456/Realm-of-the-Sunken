@@ -455,6 +455,24 @@ public sealed class AiLuaApi
         if (skills == null || index < 0 || index >= skills.HeldSkills.Count) return -1;
         return skills.HeldSkills[index];
     }
+
+    // 技能配表（skill.csv）静态信息：id / 名称 / 品质 / 射程 / 夹角 / 自动索敌 / CD / 存储上限；未配置返回空串
+    // 射程 = 技能能影响到的距离，Lua 据此判断当前能否打到目标
+    public string skill_info(int skillId)
+    {
+        if (!ConfigManager.SkillConfig.content.TryGetValue(skillId, out var cfg)) return "";
+
+        var builder = new StringBuilder();
+        builder.Append("id=").Append(cfg.key)
+            .Append(" 名称=").Append(cfg.name)
+            .Append(" 品质=").Append(string.IsNullOrEmpty(cfg.quality) ? "无" : cfg.quality)
+            .Append(" 射程=").Append(cfg.castRange.ToString("0.##"))
+            .Append(" 夹角=").Append(cfg.targetSector.ToString("0.##"))
+            .Append(" 自动索敌=").Append(cfg.autoTarget ? 1 : 0)
+            .Append(" CD=").Append(cfg.cd.ToString("0.##"))
+            .Append(" 存储上限=").Append(cfg.storeLimit);
+        return builder.ToString();
+    }
     #endregion
 
     #region 读：守护点与昼夜
