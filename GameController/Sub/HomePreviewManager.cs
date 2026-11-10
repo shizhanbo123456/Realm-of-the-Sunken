@@ -4,7 +4,15 @@ using UnityEngine;
 // 首页/大厅的场景展示：复制对应的 Arranger 预制体（含场景与锚点），摆所选角色并摆相机
 public class HomePreviewManager : ClientSubManager
 {
-    private readonly List<GameObject> views = new();
+    private struct ViewEntry
+    {
+        public EntityType type;
+        public GameObject go;
+    }
+
+    private readonly List<ViewEntry> views = new();                 // 场上现有视图
+    private readonly List<(EntityType type, Transform anchor)> slots = new(); // 本次期望摆位
+    private readonly Dictionary<EntityType, List<GameObject>> pool = new();   // 复用池：类型 → 可用视图
     private HomeDisplayArranger homeStage;
     private LobbyDisplayArranger lobbyStage;
     private GameObject attackerView;
@@ -15,9 +23,12 @@ public class HomePreviewManager : ClientSubManager
     {
         var stage = HomeStage();
         if (stage == null) return;
-        ClearViews();
-        attackerView = AddView(EntityType.Attack(attackIndex), stage.AttackerAnchor);
-        defenserView = AddView(EntityType.Defense(defenseIndex), stage.DefenserAnchor);
+        slots.Clear();
+        slots.Add((EntityType.Attack(attackIndex), stage.AttackerAnchor));
+        slots.Add((EntityType.Defense(defenseIndex), stage.DefenserAnchor));
+        var got = Apply();
+        attackerView = got.Length > 0 ? got[0] : null;
+        defenserView = got.Length > 1 ? got[1] : null;
     }
 
     // 首页选角：相机留在 CameraPos，原地转向该阵营角色的胸口锚点
@@ -46,9 +57,10 @@ public class HomePreviewManager : ClientSubManager
     {
         var stage = LobbyStage();
         if (stage == null) return;
-        ClearViews();
-        FillAnchors(stage.AttackerAnchors, attackerIndices, true);
-        FillAnchors(stage.DefenserAnchors, defenserIndices, false);
+        slots.Clear();
+        FillSlots(stage.AttackerAnchors, attackerIndices, true);
+        FillSlots(stage.DefenserAnchors, defenserIndices, false);
+        Apply();
     }
 
     public void ResetLobbyView()
@@ -108,12 +120,55 @@ public class HomePreviewManager : ClientSubManager
         lobbyStage = null;
     }
 
-    private void FillAnchors(List<Transform> anchors, IReadOnlyList<int> indices, bool attack)
+    private void FillSlots(List<Transform> anchors, IReadOnlyList<int> indices, bool attack)
     {
         if (anchors == null || indices == null) return;
         int count = Mathf.Min(anchors.Count, indices.Count);
         for (int i = 0; i < count; i++)
-            AddView(attack ? EntityType.Attack(indices[i]) : EntityType.Defense(indices[i]), anchors[i]);
+            slots.Add((attack ? EntityType.Attack(indices[i]) : EntityType.Defense(indices[i]), anchors[i]));
+    }
+
+    // 增量刷新：同类型视图复用（只挪锚点、不重建），多出来的销毁，缺的才新建（新建才播登场动画）
+    private GameObject[] Apply()
+    {
+        foreach (var list in pool.Values) list.Clear();
+        for (int i = 0; i < views.Count; i++)
+        {
+            if (!pool.TryGetValue(views[i].type, out var list))
+            {
+                list = new List<GameObject>();
+                pool[views[i].type] = list;
+            }
+            list.Add(views[i].go);
+        }
+        views.Clear();
+
+        var result = new GameObject[slots.Count];
+        for (int i = 0; i < slots.Count; i++)
+        {
+            var (type, anchor) = slots[i];
+            GameObject go = null;
+            if (pool.TryGetValue(type, out var list) && list.Count > 0)
+            {
+                int last = list.Count - 1;
+                go = list[last];
+                list.RemoveAt(last);
+                if (go != null) go.transform.SetPositionAndRotation(anchor.position, anchor.rotation);
+            }
+            else
+            {
+                go = AddView(type, anchor);
+            }
+            if (go == null) continue;
+            views.Add(new ViewEntry { type = type, go = go });
+            result[i] = go;
+        }
+
+        // 未匹配上的旧视图全部销毁
+        foreach (var list in pool.Values)
+            for (int i = 0; i < list.Count; i++)
+                if (list[i] != null) UnityEngine.Object.Destroy(list[i]);
+        return result;
     }
 
     // 角色模型：复制预制体并按战斗客户端的口径初始化动画（无 EntityData，攻击帧回调不传）
@@ -126,7 +181,6 @@ public class HomePreviewManager : ClientSubManager
             return null;
         }
         var go = UnityEngine.Object.Instantiate(prefab, anchor.position, anchor.rotation);
-        views.Add(go);
 
         var anim = go.GetComponentInChildren<EntityAnim>();
         if (anim == null)
@@ -162,9 +216,11 @@ public class HomePreviewManager : ClientSubManager
     {
         for (int i = 0; i < views.Count; i++)
         {
-            if (views[i] != null) UnityEngine.Object.Destroy(views[i]);
+            if (views[i].go != null) UnityEngine.Object.Destroy(views[i].go);
         }
         views.Clear();
+        pool.Clear();
+        slots.Clear();
         attackerView = null;
         defenserView = null;
     }
