@@ -132,8 +132,7 @@ public class ClientSkillManager : ClientSubManager
             _ => -1,
         };
         if (saveIndex < 0 || Tool.InfoManager == null || Tool.SaveManager == null) return 0;
-        return Mathf.Max(0, Tool.InfoManager.GetPlayerCharacterInfo(saveIndex)
-            .GetAttribute(Tool.SaveManager.GetCharacterLevel(saveIndex)).weaponSlotCount);
+        return Mathf.Max(0, Tool.InfoManager.GetPlayerCharacterInfo(saveIndex).GetAttribute().weaponSlotCount);
     }
     #endregion
 }

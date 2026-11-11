@@ -9,10 +9,6 @@ public struct SettlementResult
     public float remainTime;
     public int expGain;
     public float guardStatueHealth;
-    public int playerLevelBefore;
-    public int playerLevelAfter;
-    public int characterLevelBefore;
-    public int characterLevelAfter;
 }
 
 public class SettlementManager : ClientSubManager
@@ -45,13 +41,6 @@ public class SettlementManager : ClientSubManager
     #region//Local
     private SettlementResult BuildSettlementResult(SCScoreInfo info)
     {
-        var sm = Tool.SaveManager;
-        int charIndex = GetLocalCharacterIndex();
-        int playerLvBefore = sm != null ? sm.playerLevel : 1;
-        int charLvBefore = charIndex >= 0 && sm != null ? sm.GetCharacterLevel(charIndex) : 1;
-        SettleExp(info);
-        int playerLvAfter = sm != null ? sm.playerLevel : 1;
-        int charLvAfter = charIndex >= 0 && sm != null ? sm.GetCharacterLevel(charIndex) : 1;
         return new SettlementResult
         {
             gameState = info.gameState,
@@ -61,29 +50,7 @@ public class SettlementManager : ClientSubManager
             remainTime = info.remainTime,
             expGain = info.expGain,
             guardStatueHealth = info.guardStatueHealth,
-            playerLevelBefore = playerLvBefore,
-            playerLevelAfter = playerLvAfter,
-            characterLevelBefore = charLvBefore,
-            characterLevelAfter = charLvAfter,
         };
-    }
-
-    private static int GetLocalCharacterIndex()
-    {
-        var loading = ClientLoadingManager.Current;
-        if (loading == null || !loading.HasSession) return -1;
-        return loading.Camp == EntityCamp.Attack
-            ? loading.CharacterType.value
-            : Config.attack_character_count + loading.CharacterType.value;
-    }
-
-    private static void SettleExp(SCScoreInfo info)
-    {
-        if (Tool.SaveManager == null || info.expGain <= 0) return;
-        Tool.SaveManager.AddPlayerExp(info.expGain);
-        int index = GetLocalCharacterIndex();
-        if (index < 0) return;
-        Tool.SaveManager.AddCharacterExp(index, info.expGain);
     }
     #endregion
 }

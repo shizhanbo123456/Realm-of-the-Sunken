@@ -12,9 +12,9 @@ public class InfoManager : MonoBehaviour
     public int ground_layer;
 
     #region 属性（数据源：StreamingAssets/ConfigData/entity.csv）
-    public EntityAttribute GetAttribute(EntityType type, int level)
+    public EntityAttribute GetAttribute(EntityType type)
     {
-        return ConfigManager.EntityConfig.GetByCategory(type).GetAttribute(level);
+        return ConfigManager.EntityConfig.GetByCategory(type).GetAttribute();
     }
 
     public ConfigManager.EntityConfig GetEntityConfig(EntityType type)

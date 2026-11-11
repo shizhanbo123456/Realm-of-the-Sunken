@@ -107,9 +107,8 @@ public abstract class EntityData : MonoBehaviour
         this.id = id;
         this.type = type;
         this.level = Mathf.Min(level, Config.battle_max_level); // 战斗期等级上限
-        level = this.level;
         this.camp = camp;
-        baseAttribute = Tool.InfoManager != null ? Tool.InfoManager.GetAttribute(type, level) : new EntityAttribute();
+        baseAttribute = Tool.InfoManager != null ? Tool.InfoManager.GetAttribute(type) : new EntityAttribute();
         if (Tool.InfoManager != null)
         {
             var config = Tool.InfoManager.GetEntityConfig(type);

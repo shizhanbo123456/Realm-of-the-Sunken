@@ -457,11 +457,6 @@ public class GmPanel
     {
         GmEnum.Screen_Terrain_ShowRadius or
         GmEnum.Screen_Fog or
-        GmEnum.Save_PlayerLevel_AddExp or
-        GmEnum.Save_PlayerLevel_ReduceExp or
-        GmEnum.Save_PlayerLevel_AddLevel or
-        GmEnum.Save_PlayerLevel_ReduceLevel or
-        GmEnum.Save_CharacterLevel or
         GmEnum.Other_Settlement or
         GmEnum.Other_Debug or
         GmEnum.Other_Collect_MeshFaces or
@@ -478,21 +473,6 @@ public class GmPanel
                 break;
             case GmEnum.Screen_Fog:
                 ToggleFog();
-                break;
-            case GmEnum.Save_PlayerLevel_AddExp:
-                ModifyPlayerExp(ReadInt(start));
-                break;
-            case GmEnum.Save_PlayerLevel_ReduceExp:
-                ModifyPlayerExp(-ReadInt(start));
-                break;
-            case GmEnum.Save_PlayerLevel_AddLevel:
-                ModifyPlayerLevel(ReadInt(start));
-                break;
-            case GmEnum.Save_PlayerLevel_ReduceLevel:
-                ModifyPlayerLevel(-ReadInt(start));
-                break;
-            case GmEnum.Save_CharacterLevel:
-                SetCharacterLevel(ReadDropdownValue(start, typeof(GmCharacter)), ReadInt(start + 1));
                 break;
             case GmEnum.Other_Debug:
                 RefreshDataRows(start, end); // 重算 FPS / 实体数量 / 延迟 / 客户端时间
@@ -681,28 +661,6 @@ public class GmPanel
     {
         var env = Tool.EnvironmentManager;
         if (env != null) env.SetFogEnabled(!env.fogEnabled);
-    }
-
-    private static void ModifyPlayerExp(int delta)
-    {
-        var sm = Tool.SaveManager;
-        if (sm == null || delta == 0) return;
-        if (delta > 0) sm.AddPlayerExp(delta); // 正向走存档的升级结算
-        else sm.playerExp = Mathf.Max(0, sm.playerExp + delta);
-    }
-
-    private static void ModifyPlayerLevel(int delta)
-    {
-        var sm = Tool.SaveManager;
-        if (sm == null || delta == 0) return;
-        sm.playerLevel = Mathf.Clamp(sm.playerLevel + delta, 1, Config.player_max_level);
-    }
-
-    private static void SetCharacterLevel(int index, int level)
-    {
-        var sm = Tool.SaveManager;
-        if (sm == null || index < 0 || index >= sm.characterLevels.Count) return;
-        sm.characterLevels[index] = Mathf.Clamp(level, 1, Config.save_max_level);
     }
     #endregion
 }

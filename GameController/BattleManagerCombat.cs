@@ -304,7 +304,7 @@ public partial class BattleManager
         if (!PlayerInfoList.TryGetValue(clientId, out var info)) return;
         bool isAttack = camp == PlayerCampType.Attack;
         EntityType characterType = isAttack ? info.attackCharacter : info.defenseCharacter;
-        int level = isAttack ? info.attackLevel : info.defenseLevel;
+        int level = 1; // 玩家等级改为局内成长，复活沿用同一入口
 
         // 复活点：与开局出生共用同一个出生点（不去重）
         Vector3 pos = isAttack ? TerrainSpawns.AttackSpawn : TerrainSpawns.DefenseSpawn;

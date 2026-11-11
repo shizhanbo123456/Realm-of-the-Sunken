@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Ros.Skill;
 
@@ -239,34 +239,6 @@ namespace Ros.Gm
             layoutStyle.Add(GmEnum.Screen_Fog, new()
             {
                 new Button(string.Empty, "显隐雾气")
-            });
-
-            // ===== 存档 =====
-            layoutStyle.Add(GmEnum.Save_PlayerLevel_AddExp, new()
-            {
-                new InputInt("经验"),
-                new Button(string.Empty, "增加")
-            });
-            layoutStyle.Add(GmEnum.Save_PlayerLevel_ReduceExp, new()
-            {
-                new InputInt("经验"),
-                new Button(string.Empty, "减少")
-            });
-            layoutStyle.Add(GmEnum.Save_PlayerLevel_AddLevel, new()
-            {
-                new InputInt("等级"),
-                new Button(string.Empty, "增加")
-            });
-            layoutStyle.Add(GmEnum.Save_PlayerLevel_ReduceLevel, new()
-            {
-                new InputInt("等级"),
-                new Button(string.Empty, "减少")
-            });
-            layoutStyle.Add(GmEnum.Save_CharacterLevel, new()
-            {
-                new Dropdown("角色", typeof(GmCharacter)),
-                new InputInt("等级"),
-                new Button(string.Empty, "设置")
             });
 
             // ===== 其它 =====

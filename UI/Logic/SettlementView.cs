@@ -44,10 +44,6 @@ public class SettlementView
             remainTime = 120f,
             expGain = 800,
             guardStatueHealth = 40f,
-            playerLevelBefore = 5,
-            playerLevelAfter = 6,
-            characterLevelBefore = 3,
-            characterLevelAfter = 4,
         };
         Show(demo, EntityCamp.Attack, false);
     }
@@ -116,12 +112,6 @@ public class SettlementView
         rows.Add(camp == EntityCamp.Attack
             ? $"对防守点伤害：{(int)r.expGain}"
             : $"防守点剩余血量：{(int)r.guardStatueHealth}");
-        rows.Add($"获得的角色经验：+{r.expGain}");
-        rows.Add($"获得的玩家经验：+{r.expGain}");
-        if (r.characterLevelAfter > r.characterLevelBefore)
-            rows.Add($"角色升级：{r.characterLevelBefore} → {r.characterLevelAfter}");
-        if (r.playerLevelAfter > r.playerLevelBefore)
-            rows.Add($"玩家升级：{r.playerLevelBefore} → {r.playerLevelAfter}");
 
         var list = detail.m_resultList;
         list.itemRenderer = RenderRow;

@@ -3,9 +3,7 @@ namespace Ros.Transport
     public class CSLobbyPlayerInfo
     {
         public EntityType attackCharacter;
-        public int attackLevel = 1;
         public EntityType defenseCharacter;
-        public int defenseLevel = 1;
         public string name = "";
     }
 
@@ -16,9 +14,7 @@ namespace Ros.Transport
             if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
             if (value == null) return true;
             if (!EntityTypeSerializer.Serialize(value.attackCharacter, result, ref indexStart)) return false;
-            if (!IntSerializer.Serialize(value.attackLevel, result, ref indexStart)) return false;
             if (!EntityTypeSerializer.Serialize(value.defenseCharacter, result, ref indexStart)) return false;
-            if (!IntSerializer.Serialize(value.defenseLevel, result, ref indexStart)) return false;
             return StringSerializer.Serialize(value.name, result, ref indexStart);
         }
 
@@ -28,9 +24,7 @@ namespace Ros.Transport
             var info = new CSLobbyPlayerInfo()
             {
                 attackCharacter = EntityTypeSerializer.Deserialize(data, ref indexStart, invalidIndex),
-                attackLevel = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
                 defenseCharacter = EntityTypeSerializer.Deserialize(data, ref indexStart, invalidIndex),
-                defenseLevel = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
                 name = StringSerializer.Deserialize(data, ref indexStart, invalidIndex),
             };
             return info;

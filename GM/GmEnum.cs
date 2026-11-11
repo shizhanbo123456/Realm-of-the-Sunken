@@ -1,4 +1,4 @@
-namespace Ros.Gm
+﻿namespace Ros.Gm
 {
     public enum GmEnum
     {
@@ -74,22 +74,6 @@ namespace Ros.Gm
         [GmLabel("画面-雾气")]
         [GmStatus(GmStatusType.Offline | GmStatusType.Lobby | GmStatusType.Battle)]
         Screen_Fog,
-
-        [GmLabel("存档-玩家等级-增加经验")]
-        [GmStatus(GmStatusType.Offline | GmStatusType.Lobby | GmStatusType.Battle)]
-        Save_PlayerLevel_AddExp,
-        [GmLabel("存档-玩家等级-减少经验")]
-        [GmStatus(GmStatusType.Offline | GmStatusType.Lobby | GmStatusType.Battle)]
-        Save_PlayerLevel_ReduceExp,
-        [GmLabel("存档-玩家等级-增加等级")]
-        [GmStatus(GmStatusType.Offline | GmStatusType.Lobby | GmStatusType.Battle)]
-        Save_PlayerLevel_AddLevel,
-        [GmLabel("存档-玩家等级-减少等级")]
-        [GmStatus(GmStatusType.Offline | GmStatusType.Lobby | GmStatusType.Battle)]
-        Save_PlayerLevel_ReduceLevel,
-        [GmLabel("存档-角色等级")]
-        [GmStatus(GmStatusType.Offline | GmStatusType.Lobby | GmStatusType.Battle)]
-        Save_CharacterLevel,
 
         [GmLabel("其它-结算界面")]
         [GmStatus(GmStatusType.Offline | GmStatusType.Lobby | GmStatusType.Battle)]

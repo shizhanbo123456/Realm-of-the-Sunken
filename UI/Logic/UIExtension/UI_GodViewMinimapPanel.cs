@@ -421,7 +421,6 @@ namespace Ros.UI.Main
             {
                 m_roleHead.m_headIcon.texture = hasIcon ? new NTexture(icons[index]) : null;
                 m_roleHead.m_show_default_icon.selectedIndex = hasIcon ? 0 : 1;
-                m_roleHead.m_quality.selectedIndex = ConfigManager.EntityConfig.GetByCategory(info.type).quality;
                 m_roleHead.m_level.selectedIndex = Mathf.Clamp(info.level - 1, 0, 4); // 头像控制器只有 5 档
             }
             if (m_entity_name != null) m_entity_name.text = info.name;

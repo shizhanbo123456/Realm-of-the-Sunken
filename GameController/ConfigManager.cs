@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -33,8 +33,6 @@ public class ConfigManager : MonoBehaviour
         int weapon = WeaponConfig.Load(ReadTable(dir, WeaponConfig.FileName));
         int skill = SkillConfig.Load(ReadTable(dir, SkillConfig.FileName));
         int effect = EffectConfig.Load(ReadTable(dir, EffectConfig.FileName));
-        int expCharacter = ExpCharacterConfig.Load(ReadTable(dir, ExpCharacterConfig.FileName));
-        int expPlayer = ExpPlayerConfig.Load(ReadTable(dir, ExpPlayerConfig.FileName));
         int revive = ReviveTimeConfig.Load(ReadTable(dir, ReviveTimeConfig.FileName));
         int global = GlobalVariableConfig.Load(ReadTable(dir, GlobalVariableConfig.FileName));
         int terrainGen = TerrainGenerationConfig.Load(ReadTable(dir, TerrainGenerationConfig.FileName));
@@ -44,7 +42,7 @@ public class ConfigManager : MonoBehaviour
         int quickMessage = QuickMessageConfig.Load(ReadTable(dir, QuickMessageConfig.FileName));
 
         Debug.Log($"[配表] {dir} 加载完成 | battle_fury_layer {battleFury} | entity {entity} | weapon {weapon} | skill {skill} | effect {effect} | " +
-                  $"exp_character {expCharacter} | exp_player {expPlayer} | revive_time {revive} | global_variables {global} | notice {notice} | attr_range {attrRange} | setting_tips {settingTips} | quick_message {quickMessage} | terrain_generation {terrainGen}");
+                  $"revive_time {revive} | global_variables {global} | notice {notice} | attr_range {attrRange} | setting_tips {settingTips} | quick_message {quickMessage} | terrain_generation {terrainGen}");
     }
 
     #region 文件读取与拆分
@@ -130,24 +128,6 @@ public class ConfigManager : MonoBehaviour
         if (!Enum.IsDefined(typeof(EntityCategory), raw))
             throw new FormatException($"第 {col} 列的实体类型 {raw} 未在 EntityCategory 中定义");
         return (EntityCategory)raw;
-    }
-
-    // 升级路线只允许 LevelUpType 的 0~3（生命/攻击/暴击率/暴击伤害）
-    public static int ParseUpgrade(string[] rowData, int col)
-    {
-        int value = ParseInt(rowData, col);
-        if (value < 0 || value > 3)
-            throw new FormatException($"第 {col} 列的升级类型 {value} 超出 0~3");
-        return value;
-    }
-
-    // 品质档 0~3（无/B/A/S），与 RoleHead 的 m_quality 页序一致
-    public static int ParseQuality(string[] rowData, int col)
-    {
-        int value = ParseInt(rowData, col);
-        if (value < 0 || value > 3)
-            throw new FormatException($"第 {col} 列的角色品质 {value} 超出 0~3（0:无 / 1:B / 2:A / 3:S）");
-        return value;
     }
 
     // 显示血条：留空 / 0 = 不显示，1 = 显示，其它值属配表错配直接抛
@@ -430,11 +410,11 @@ public class ConfigManager : MonoBehaviour
     }
     #endregion
 
-    #region 角色信息表：0 实体类型 / 1 副键 / 2 姓名 / 3 生命 / 4 攻击 …… 12 初始技能列表 / 13 品质 / 14 显示血条 / 15 霸体等级
+    #region 角色信息表：0 实体类型 / 1 副键 / 2 姓名 / 3 生命 / 4 攻击 …… 9 初始技能列表 / 10 显示血条 / 11 霸体等级 / 12 武器编号 / 13 被击败卡牌掉落权重（暂不解析）
     public struct EntityConfig
     {
         public const string FileName = "entity.csv";
-        private const int ColumnCount = 17;
+        private const int ColumnCount = 14;
         public static readonly Dictionary<EntityType, EntityConfig> content = new();
 
         public EntityCategory category;
@@ -446,14 +426,10 @@ public class ConfigManager : MonoBehaviour
         public int critDamage;
         public float viewDistance;
         public int weaponSlotCount;
-        public int upgradeA;
-        public int upgradeB;
-        public int unlockLevel;
         public List<int> initialSkills;
-        public int quality;           // 0:无 / 1:B / 2:A / 3:S，直接对应 RoleHead 的 m_quality 页序
         public bool showHealthBar;    // 客户端是否为该实体创建头顶血条
-        public EndureType endureLevel; // 第16列：默认霸体等级，实体霸体等级的下限（留空 = 无霸体）
-        public int weaponId;           // 第17列：固定武器编号（= weapon.csv 主键 / WeaponPrefabs 下标），留空 = -1
+        public EndureType endureLevel; // 第12列：默认霸体等级，实体霸体等级的下限（留空 = 无霸体）
+        public int weaponId;           // 第13列：固定武器编号（= weapon.csv 主键 / WeaponPrefabs 下标），留空 = -1
 
         public EntityConfig(string[] rowData)
         {
@@ -466,14 +442,10 @@ public class ConfigManager : MonoBehaviour
             critDamage = ParseInt(rowData, 6);
             viewDistance = ParseFloat(rowData, 7);
             weaponSlotCount = ParseInt(rowData, 8);
-            upgradeA = ParseUpgrade(rowData, 9);
-            upgradeB = ParseUpgrade(rowData, 10);
-            unlockLevel = ParseInt(rowData, 11);
-            initialSkills = ParseIntList(rowData, 12);
-            quality = ParseQuality(rowData, 13);
-            showHealthBar = ParseShowHealthBar(rowData, 14);
-            endureLevel = ParseEndureLevel(rowData, 15);
-            weaponId = ParseWeaponId(rowData, 16);
+            initialSkills = ParseIntList(rowData, 9);
+            showHealthBar = ParseShowHealthBar(rowData, 10);
+            endureLevel = ParseEndureLevel(rowData, 11);
+            weaponId = ParseWeaponId(rowData, 12);
         }
 
         public static int Load(ConfigTable table)
@@ -508,9 +480,9 @@ public class ConfigManager : MonoBehaviour
             }
         }
 
-        public EntityAttribute GetAttribute(int level)
+        public EntityAttribute GetAttribute()
         {
-            var attr = new EntityAttribute
+            return new EntityAttribute
             {
                 health = health,
                 attack = attack,
@@ -519,26 +491,6 @@ public class ConfigManager : MonoBehaviour
                 viewDistance = viewDistance,
                 weaponSlotCount = weaponSlotCount,
             };
-
-            level = Mathf.Max(1, level);
-            float healthRatio = 0f;
-            float attackRatio = 0f;
-            int critRateAdd = 0;
-            int critDamageAdd = 0;
-            // 四项每级同涨：boosted 取高增益，其余三项取常规增益；系数按 1 级基础值线性累加
-            for (int lv = 2; lv <= level; lv++)
-            {
-                int boosted = (lv - 2) % 2 == 0 ? upgradeA : upgradeB;
-                healthRatio += boosted == 0 ? GlobalVariableConfig.attr_growth_health : GlobalVariableConfig.attr_growth_health_common;
-                attackRatio += boosted == 1 ? GlobalVariableConfig.attr_growth_attack : GlobalVariableConfig.attr_growth_attack_common;
-                critRateAdd += boosted == 2 ? GlobalVariableConfig.attr_growth_critRate : GlobalVariableConfig.attr_growth_critRate_common;
-                critDamageAdd += boosted == 3 ? GlobalVariableConfig.attr_growth_critDamage : GlobalVariableConfig.attr_growth_critDamage_common;
-            }
-            attr.health += health * healthRatio;
-            attr.attack += (int)(attack * attackRatio);
-            attr.critRate += critRateAdd;
-            attr.critDamage += critDamageAdd;
-            return attr;
         }
     }
     #endregion
@@ -740,74 +692,6 @@ public class ConfigManager : MonoBehaviour
     }
     #endregion
 
-    #region 角色经验表
-    public struct ExpCharacterConfig
-    {
-        public const string FileName = "exp_character.csv";
-        private const int ColumnCount = 2;
-        public static readonly Dictionary<int, ExpCharacterConfig> content = new();
-        public static int MaxLevel { get; private set; } // 配表覆盖到的最高等级 = 角色等级上限
-
-        public int key;
-        public int exp;
-
-        public ExpCharacterConfig(string[] rowData)
-        {
-            key = ParseInt(rowData, 0);
-            exp = ParseInt(rowData, 1);
-        }
-
-        public static int Load(ConfigTable table)
-        {
-            table.RequireColumnCount(ColumnCount);
-            int count = Fill(table, content, row => new ExpCharacterConfig(row), row => row.key);
-            MaxLevel = 0;
-            foreach (int key in content.Keys)
-            {
-                if (key > MaxLevel) MaxLevel = key;
-            }
-            if (MaxLevel <= 0) throw new FormatException($"[配表] {FileName} 没有任何等级行，角色等级上限推不出来");
-            return count;
-        }
-
-        public static ExpCharacterConfig Get(int key) => GetRequired(content, key, FileName);
-    }
-    #endregion
-
-    #region 玩家经验表
-    public struct ExpPlayerConfig
-    {
-        public const string FileName = "exp_player.csv";
-        private const int ColumnCount = 2;
-        public static readonly Dictionary<int, ExpPlayerConfig> content = new();
-        public static int MaxLevel { get; private set; } // 配表覆盖到的最高等级 = 玩家等级上限
-
-        public int key;
-        public int exp;
-
-        public ExpPlayerConfig(string[] rowData)
-        {
-            key = ParseInt(rowData, 0);
-            exp = ParseInt(rowData, 1);
-        }
-
-        public static int Load(ConfigTable table)
-        {
-            table.RequireColumnCount(ColumnCount);
-            int count = Fill(table, content, row => new ExpPlayerConfig(row), row => row.key);
-            MaxLevel = 0;
-            foreach (int key in content.Keys)
-            {
-                if (key > MaxLevel) MaxLevel = key;
-            }
-            if (MaxLevel <= 0) throw new FormatException($"[配表] {FileName} 没有任何等级行，玩家等级上限推不出来");
-            return count;
-        }
-
-        public static ExpPlayerConfig Get(int key) => GetRequired(content, key, FileName);
-    }
-    #endregion
-
     #region 复活时间表
     public struct ReviveTimeConfig
     {
@@ -858,14 +742,6 @@ public class ConfigManager : MonoBehaviour
         public static int night_duration;               // 默认晚上时长
         public static int distance_of_bar_default_size; // 实体血条为设计大小时的距离
         public static int distance_of_label_default_size; // 飘字为设计大小时的距离
-        public static float attr_growth_health;         // 升级增益系数：生命
-        public static float attr_growth_attack;         // 升级增益系数：攻击
-        public static int attr_growth_critRate;         // 升级增益：暴击率，每级加点（百分点）
-        public static int attr_growth_critDamage;       // 升级增益：暴击伤害，每级加点（百分点）
-        public static float attr_growth_health_common;  // 升级常规增益系数：生命
-        public static float attr_growth_attack_common;  // 升级常规增益系数：攻击
-        public static int attr_growth_critRate_common;  // 升级常规增益：暴击率，每级加点（百分点）
-        public static int attr_growth_critDamage_common; // 升级常规增益：暴击伤害，每级加点（百分点）
         public static int battle_max_level;             // 战斗期等级上限（生成实体时钳制）
         public static float status_auto_cast_interval_crystal; // 水晶雕像自动施法间隔
         public static float status_auto_cast_interval_neutral; // 中立雕像自动施法间隔
@@ -987,30 +863,6 @@ public class ConfigManager : MonoBehaviour
                     distance_of_label_default_size = Int(row);
                     if (distance_of_label_default_size <= 0) // 飘字 scale 以它为分子
                         throw new FormatException($"[配表] {FileName} 的 distance_of_label_default_size 必须大于 0");
-                    break;
-                case "attr_growth_health":
-                    attr_growth_health = NonNegative(Float(row), row.key);
-                    break;
-                case "attr_growth_attack":
-                    attr_growth_attack = NonNegative(Float(row), row.key);
-                    break;
-                case "attr_growth_critRate":
-                    attr_growth_critRate = NonNegative(Int(row), row.key);
-                    break;
-                case "attr_growth_critDamage":
-                    attr_growth_critDamage = NonNegative(Int(row), row.key);
-                    break;
-                case "attr_growth_health_common":
-                    attr_growth_health_common = NonNegative(Float(row), row.key);
-                    break;
-                case "attr_growth_attack_common":
-                    attr_growth_attack_common = NonNegative(Float(row), row.key);
-                    break;
-                case "attr_growth_critRate_common":
-                    attr_growth_critRate_common = NonNegative(Int(row), row.key);
-                    break;
-                case "attr_growth_critDamage_common":
-                    attr_growth_critDamage_common = NonNegative(Int(row), row.key);
                     break;
                 case "battle_max_level":
                     battle_max_level = Int(row);

@@ -408,8 +408,6 @@ public partial class BattleManager : EnsBehaviour
         int robotClientId = nextAIToken++;
         var info = new CSLobbyPlayerInfo()
         {
-            attackLevel = 1,
-            defenseLevel = 1,
             // 名字由令牌推导：重建时令牌源归位，编号稳定且不与真人令牌冲突
             name = $"AI玩家{robotClientId - ROBOT_TOKEN_BASE + 1}",
         };
@@ -1077,7 +1075,7 @@ public partial class BattleManager : EnsBehaviour
             }
             bool isAttack = campType == PlayerCampType.Attack;
             EntityType characterType = isAttack ? pair.Value.attackCharacter : pair.Value.defenseCharacter;
-            int level = isAttack ? pair.Value.attackLevel : pair.Value.defenseLevel;
+            int level = 1; // 玩家等级改为局内成长，建档时统一从 1 级起
             Vector3 spawnPos = isAttack ? GetAttackSpawnPos() : GetDefenseSpawnPos();
             EntityCamp camp = isAttack ? EntityCamp.Attack : EntityCamp.Defense;
 

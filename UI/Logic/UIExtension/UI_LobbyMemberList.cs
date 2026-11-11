@@ -221,23 +221,12 @@ namespace Ros.UI.Main
                 var head = (UI_RoleHead)obj;
                 var member = seats[i];
                 head.m_roleName.text = nameOf != null ? nameOf(member.clientId) : $"玩家{member.clientId}";
-                head.m_level.selectedIndex = 0; // 成员条目不展示等级
-                head.m_lock.selectedIndex = 0;
                 head.m_confirm.selectedIndex = member.ready ? 1 : 0; // 准备勾选
-                head.m_quality.selectedIndex = MemberQuality(camp, member.characterIndex);
                 bool hasIcon = member.characterIndex >= 0 && icons != null
                     && member.characterIndex < icons.Count && icons[member.characterIndex] != null;
                 head.m_headIcon.texture = hasIcon ? new NTexture(icons[member.characterIndex]) : null;
             };
             list.numItems = seats.Count;
-        }
-
-        // 成员品质档：未选角色（characterIndex < 0）按 0 档，不读表
-        private static int MemberQuality(int camp, int characterIndex)
-        {
-            if (characterIndex < 0) return 0;
-            var type = camp == (int)PlayerCampType.Attack ? EntityType.Attack(characterIndex) : EntityType.Defense(characterIndex);
-            return ConfigManager.EntityConfig.Get(type).quality;
         }
     }
 }
