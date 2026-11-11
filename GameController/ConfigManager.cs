@@ -811,6 +811,21 @@ public class ConfigManager : MonoBehaviour
         public static float arranger_spawn_offset;               // 首页/大厅人物出生高度偏移（米，向上）
         public static float arranger_spawn_fall_duration;        // 首页/大厅人物出生下落时长（秒，匀速）
 
+        // 卡牌词条每级系数：词条实际数值 = 系数 × 玩家该词条的累计等级
+        public static int card_coef_luck_boost;                  // 幸运
+        public static float card_coef_health_boost;              // 生命上限（百分比）
+        public static int card_coef_attack_boost;                // 攻击力（固定值）
+        public static int card_coef_crit_rate_boost;             // 暴击率（百分点）
+        public static int card_coef_crit_damage_boost;           // 暴击伤害（百分点）
+        public static float card_coef_damage_vs_player;          // 对玩家增伤（百分比）
+        public static float card_coef_damage_vs_coral;           // 对珊瑚增伤（百分比）
+        public static float card_coef_damage_vs_building;        // 对防御塔/守护点增伤（百分比）
+        public static int card_coef_tower_attack_boost;          // 己方防御塔攻击（固定值）
+        public static float card_coef_guard_reduction_boost;     // 己方守护点减伤（百分比）
+        public static float card_coef_instant_heal_boost;        // 一次性回复生命（百分比）
+        public static float card_coef_damage_below_half_hp;      // 生命低于一半时的增伤（百分比）
+        public static float card_coef_damage_vs_higher_hp;       // 对生命比例高于自己的目标增伤（百分比）
+
         public string key;
         public string description;
         public string value;
@@ -1059,6 +1074,45 @@ public class ConfigManager : MonoBehaviour
                     break;
                 case "arranger_spawn_fall_duration":
                     arranger_spawn_fall_duration = Positive(Float(row), row.key);
+                    break;
+                case "card_coef_luck_boost":
+                    card_coef_luck_boost = NonNegative(Int(row), row.key);
+                    break;
+                case "card_coef_health_boost":
+                    card_coef_health_boost = NonNegative(Float(row), row.key);
+                    break;
+                case "card_coef_attack_boost":
+                    card_coef_attack_boost = NonNegative(Int(row), row.key);
+                    break;
+                case "card_coef_crit_rate_boost":
+                    card_coef_crit_rate_boost = NonNegative(Int(row), row.key);
+                    break;
+                case "card_coef_crit_damage_boost":
+                    card_coef_crit_damage_boost = NonNegative(Int(row), row.key);
+                    break;
+                case "card_coef_damage_vs_player":
+                    card_coef_damage_vs_player = NonNegative(Float(row), row.key);
+                    break;
+                case "card_coef_damage_vs_coral":
+                    card_coef_damage_vs_coral = NonNegative(Float(row), row.key);
+                    break;
+                case "card_coef_damage_vs_building":
+                    card_coef_damage_vs_building = NonNegative(Float(row), row.key);
+                    break;
+                case "card_coef_tower_attack_boost":
+                    card_coef_tower_attack_boost = NonNegative(Int(row), row.key);
+                    break;
+                case "card_coef_guard_reduction_boost":
+                    card_coef_guard_reduction_boost = NonNegative(Float(row), row.key);
+                    break;
+                case "card_coef_instant_heal_boost":
+                    card_coef_instant_heal_boost = NonNegative(Float(row), row.key);
+                    break;
+                case "card_coef_damage_below_half_hp":
+                    card_coef_damage_below_half_hp = NonNegative(Float(row), row.key);
+                    break;
+                case "card_coef_damage_vs_higher_hp":
+                    card_coef_damage_vs_higher_hp = NonNegative(Float(row), row.key);
                     break;
                 default:
                     throw new FormatException($"[配表] {FileName} 的行「{row.key}」没有对应的静态字段");
