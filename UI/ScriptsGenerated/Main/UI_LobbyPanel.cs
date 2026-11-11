@@ -7,11 +7,11 @@ namespace Ros.UI.Main
 {
     public partial class UI_LobbyPanel : GComponent
     {
-        public UI_LobbyMemberList m_mainView;
+        public UI_LobbCampOperation m_btn_joinDefense;
+        public UI_LobbCampOperation m_btn_joinAttack;
         public GButton m_btn_prepare;
         public GButton m_btn_exit;
-        public GList m_attacker_member_list;
-        public GList m_defenser_member_list;
+        public GTextField m_spectate_current_member_count;
         public const string URL = "ui://q68vr2bftwqeh8";
 
         public static UI_LobbyPanel CreateInstance()
@@ -23,11 +23,11 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
-            m_mainView = (UI_LobbyMemberList)GetChildAt(0);
-            m_btn_prepare = (GButton)GetChildAt(1);
-            m_btn_exit = (GButton)GetChildAt(2);
-            m_attacker_member_list = (GList)GetChildAt(3);
-            m_defenser_member_list = (GList)GetChildAt(4);
+            m_btn_joinDefense = (UI_LobbCampOperation)GetChildAt(0);
+            m_btn_joinAttack = (UI_LobbCampOperation)GetChildAt(1);
+            m_btn_prepare = (GButton)GetChildAt(3);
+            m_btn_exit = (GButton)GetChildAt(4);
+            m_spectate_current_member_count = (GTextField)GetChildAt(6);
         }
     }
 }

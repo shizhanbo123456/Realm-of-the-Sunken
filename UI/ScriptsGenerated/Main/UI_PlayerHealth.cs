@@ -9,7 +9,6 @@ namespace Ros.UI.Main
     {
         public GImage m_bar_fill_health;
         public GTextField m_label_health;
-        public UI_avaterMask m_avater_mask;
         public UI_buffList m_buffList;
         public const string URL = "ui://q68vr2bfjtpbhg";
 
@@ -24,8 +23,7 @@ namespace Ros.UI.Main
 
             m_bar_fill_health = (GImage)GetChildAt(1);
             m_label_health = (GTextField)GetChildAt(2);
-            m_avater_mask = (UI_avaterMask)GetChildAt(4);
-            m_buffList = (UI_buffList)GetChildAt(6);
+            m_buffList = (UI_buffList)GetChildAt(3);
         }
     }
 }

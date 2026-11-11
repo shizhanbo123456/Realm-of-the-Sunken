@@ -1,13 +1,22 @@
 using System.Collections.Generic;
 using Ros.Transport;
 using Ros.UI.Main;
+using UnityEngine;
 
+// 组队大厅：两块阵营操作（加入/退出 + AI 数量）+ 准备/退出 + 观战人数；成员头像列表在新版 UI 里已去掉
 public class LobbyPage : PageBase
 {
     private readonly UI_LobbyPanel panel;
-    private readonly List<UI_LobbyMemberList.Member> roomMembers = new(); // 回显缓冲，避免每次广播重新分配
-    private readonly List<int> attackerIndices = new();                   // 场景摆位：真人攻方所选角色
-    private readonly List<int> defenserIndices = new();                   // 场景摆位：真人守方所选角色
+
+    private readonly List<int> attackerIndices = new(); // 场景摆位：真人攻方所选角色
+    private readonly List<int> defenserIndices = new();  // 场景摆位：真人守方所选角色
+
+    private PlayerCampType myCamp = PlayerCampType.Spectator;
+    private bool myReady;
+    private int attackAI;
+    private int defenseAI;
+    private int humanAttack;
+    private int humanDefense;
 
     public LobbyPage(UI_LobbyPanel panel) : base(panel)
     {
@@ -19,17 +28,18 @@ public class LobbyPage : PageBase
 
     public override void Construct()
     {
-        // 主视图管三阵营块，头像列表与准备/退出按钮在页面这一层：一起交给它接线，名字解析、状态上报、断开连接都留在页面这边
-        panel.m_mainView.Build(panel.m_attacker_member_list, panel.m_defenser_member_list,
-            panel.m_btn_prepare, panel.m_btn_exit,
-            NetworkManager.GetLobbyMemberName, SendRoomState, DoExitWorld);
+        // m_quit_mode：0 = 未加入（显示加入）/ 1 = 已加入（显示退出）
+        WireCamp(panel.m_btn_joinAttack, PlayerCampType.Attack);
+        WireCamp(panel.m_btn_joinDefense, PlayerCampType.Defense);
+        panel.m_btn_prepare.onClick.Add(ToggleReady);
+        panel.m_btn_exit.onClick.Add(OnExitClicked);
     }
 
     public override void Enter(ShowParam param)
     {
         base.Enter(param);
         EventManager.AddEvent<SCLobbyInfo>(ClientEvent.OnLobbyInfoUpdate, OnLobbyInfoUpdate);
-        // 有缓存立即回显（服务器只在事件时广播，错过就没了）；无缓存清空展示，不留 FGUI 默认内容
+        // 有缓存立即回显（服务器只在事件时广播，错过就没了）
         ApplyLobbyInfo(NetworkManager.LatestLobbyInfo);
         // 大厅展示真人成员所选角色的场景模型（战斗页 Enter 时会隐藏，故返回大厅需重建）
         if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
@@ -43,42 +53,144 @@ public class LobbyPage : PageBase
     }
 
     #region//Local
+    private void WireCamp(UI_LobbCampOperation block, PlayerCampType camp)
+    {
+        block.m_join.onClick.Add(() => JoinCamp(camp));
+        block.m_quit.onClick.Add(() => JoinCamp(PlayerCampType.Spectator));
+        block.m_add_ai.onClick.Add(() => ChangeAICount(camp, +1));
+        block.m_remove_ai.onClick.Add(() => ChangeAICount(camp, -1));
+    }
+
     private void OnLobbyInfoUpdate(SCLobbyInfo info) => ApplyLobbyInfo(info);
 
-    // 协议包 → 主视图需要的成员表（负 clientId 为 AI，勾选与名额判定各自处理）
     private void ApplyLobbyInfo(SCLobbyInfo info)
     {
-        roomMembers.Clear();
         attackerIndices.Clear();
         defenserIndices.Clear();
+        humanAttack = 0;
+        humanDefense = 0;
+        myCamp = PlayerCampType.Spectator;
+        myReady = false;
+
         if (info?.members != null)
         {
             for (int i = 0; i < info.members.Count; i++)
             {
                 var member = info.members[i];
                 if (member == null) continue;
-                roomMembers.Add(new UI_LobbyMemberList.Member(member.clientId, member.camp, member.characterIndex, member.ready));
                 // 场景只摆真人所选角色：AI 与未选角色不占锚点
-                if (member.clientId < 0 || member.characterIndex < 0) continue;
-                if (member.camp == (int)PlayerCampType.Attack) attackerIndices.Add(member.characterIndex);
-                else if (member.camp == (int)PlayerCampType.Defense) defenserIndices.Add(member.characterIndex);
+                if (member.clientId >= 0 && member.characterIndex >= 0)
+                {
+                    if (member.camp == (int)PlayerCampType.Attack) { attackerIndices.Add(member.characterIndex); humanAttack++; }
+                    else if (member.camp == (int)PlayerCampType.Defense) { defenserIndices.Add(member.characterIndex); humanDefense++; }
+                }
+                if (member.clientId != NetworkManager.LocalToken) continue;
+                myCamp = (PlayerCampType)member.camp;
+                myReady = member.ready;
             }
         }
-        panel.m_mainView.Apply(roomMembers,
-            info != null ? info.attackAICount : 0,
-            info != null ? info.defenseAICount : 0,
-            NetworkManager.LocalToken);
+
+        attackAI = info != null ? info.attackAICount : 0;
+        defenseAI = info != null ? info.defenseAICount : 0;
+
+        RefreshCampBlock(panel.m_btn_joinAttack, PlayerCampType.Attack, attackAI);
+        RefreshCampBlock(panel.m_btn_joinDefense, PlayerCampType.Defense, defenseAI);
+        panel.m_btn_prepare.title = myReady ? "取消准备" : "准备";
+        panel.m_spectate_current_member_count.text = SpectateCount(info).ToString();
+
         if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
             Tool.ClientLogicManager.HomePreview.RefreshLobby(attackerIndices, defenserIndices);
     }
 
-    private void SendRoomState(int camp, bool ready, int attackAI, int defenseAI)
+    private void RefreshCampBlock(UI_LobbCampOperation block, PlayerCampType camp, int aiCount)
+    {
+        block.m_quit_mode.selectedIndex = myCamp == camp ? 1 : 0;
+        block.m_label_AI_count.text = $"x{aiCount}";
+    }
+
+    private static int SpectateCount(SCLobbyInfo info)
+    {
+        int count = 0;
+        if (info?.members == null) return 0;
+        for (int i = 0; i < info.members.Count; i++)
+        {
+            var member = info.members[i];
+            if (member != null && member.camp == (int)PlayerCampType.Spectator) count++;
+        }
+        return count;
+    }
+
+    private void JoinCamp(PlayerCampType camp)
+    {
+        if (BlockedByReady()) return;
+        if (camp != myCamp && !HasHumanSeat(camp)) return;
+        myCamp = camp;
+        RaiseState();
+    }
+
+    // 真人名额（不含 AI）：观战不限，按服务器上次广播的成员列表预判，最终以服务器为准
+    private bool HasHumanSeat(PlayerCampType camp)
+    {
+        if (camp == PlayerCampType.Spectator) return true;
+        bool attack = camp == PlayerCampType.Attack;
+        int limit = attack
+            ? ConfigManager.GlobalVariableConfig.player_limit_attacker
+            : ConfigManager.GlobalVariableConfig.player_limit_defenser;
+        int count = attack ? humanAttack : humanDefense;
+        if (count < limit) return true;
+        if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(attack ? "进攻方人数已满" : "防守方人数已满");
+        return false;
+    }
+
+    private void ChangeAICount(PlayerCampType camp, int delta)
+    {
+        if (camp == PlayerCampType.Spectator || BlockedByReady()) return;
+        bool defense = camp == PlayerCampType.Defense;
+        int limit = defense
+            ? ConfigManager.GlobalVariableConfig.player_limit_defenser_AI
+            : ConfigManager.GlobalVariableConfig.player_limit_attacker_AI;
+        int current = defense ? defenseAI : attackAI;
+        if (delta > 0 && current >= limit)
+        {
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(defense ? "防守方 AI 已达上限" : "进攻方 AI 已达上限");
+            return;
+        }
+        int next = Mathf.Clamp(current + delta, 0, limit);
+        if (defense) defenseAI = next;
+        else attackAI = next;
+        RefreshCampBlock(defense ? panel.m_btn_joinDefense : panel.m_btn_joinAttack, camp, next);
+        RaiseState();
+    }
+
+    // 已准备（含开战倒计时中）不允许改阵营与 AI 数量：服务器只在准备状态变化时重算开局条件
+    private bool BlockedByReady()
+    {
+        if (!myReady) return false;
+        if (Tool.UIManager != null) Tool.UIManager.ShowFlyText("请先取消准备");
+        return true;
+    }
+
+    private void ToggleReady()
+    {
+        myReady = !myReady;
+        panel.m_btn_prepare.title = myReady ? "取消准备" : "准备";
+        RaiseState();
+    }
+
+    private void OnExitClicked()
+    {
+        // 断开不可逆，先弹二次确认
+        if (Tool.UIManager != null) Tool.UIManager.ShowConfirm("确定断开与服务器的连接？", DoExitWorld);
+        else DoExitWorld();
+    }
+
+    private void RaiseState()
     {
         if (Tool.NetworkManager == null) return;
         Tool.NetworkManager.SendLobbyUpdate(new CSLobbyUpdate()
         {
-            camp = camp,
-            ready = ready,
+            camp = (int)myCamp,
+            ready = myReady,
             attackAICount = attackAI,
             defenseAICount = defenseAI,
         });

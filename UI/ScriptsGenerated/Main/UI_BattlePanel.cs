@@ -16,6 +16,7 @@ namespace Ros.UI.Main
         public UI_EventBanner m_eventBanner;
         public GImage m_regeneration_progressbar;
         public GComboBox m_onlookComboBox;
+        public GList m_list_selectCard;
         public UI_BattleBarPanel m_barPanel;
         public UI_BattleInfoPanel m_batleInfoPanel;
         public UI_SettingsPanel m_settings_panel;
@@ -24,6 +25,7 @@ namespace Ros.UI.Main
         public UI_QuickMessagePanel m_quickMessagePanel;
         public UI_GodViewMinimapPanel m_godViewPanel;
         public UI_LargeMinimapPanel m_largeMinimapPanel;
+        public UI_SelectCardPanel m_selectCardPanel;
         public Transition m_showBanner;
         public Transition m_showHit;
         public const string URL = "ui://q68vr2bfjtpbhd";
@@ -46,14 +48,16 @@ namespace Ros.UI.Main
             m_eventBanner = (UI_EventBanner)GetChildAt(5);
             m_regeneration_progressbar = (GImage)GetChildAt(7);
             m_onlookComboBox = (GComboBox)GetChildAt(11);
-            m_barPanel = (UI_BattleBarPanel)GetChildAt(13);
-            m_batleInfoPanel = (UI_BattleInfoPanel)GetChildAt(14);
-            m_settings_panel = (UI_SettingsPanel)GetChildAt(15);
-            m_important_event_banner = (UI_ImportantEventBanner)GetChildAt(16);
-            m_skillSelectPanel = (UI_SkillSelectPanel)GetChildAt(17);
-            m_quickMessagePanel = (UI_QuickMessagePanel)GetChildAt(18);
-            m_godViewPanel = (UI_GodViewMinimapPanel)GetChildAt(19);
-            m_largeMinimapPanel = (UI_LargeMinimapPanel)GetChildAt(20);
+            m_list_selectCard = (GList)GetChildAt(13);
+            m_barPanel = (UI_BattleBarPanel)GetChildAt(14);
+            m_batleInfoPanel = (UI_BattleInfoPanel)GetChildAt(15);
+            m_settings_panel = (UI_SettingsPanel)GetChildAt(16);
+            m_important_event_banner = (UI_ImportantEventBanner)GetChildAt(17);
+            m_skillSelectPanel = (UI_SkillSelectPanel)GetChildAt(18);
+            m_quickMessagePanel = (UI_QuickMessagePanel)GetChildAt(19);
+            m_godViewPanel = (UI_GodViewMinimapPanel)GetChildAt(20);
+            m_largeMinimapPanel = (UI_LargeMinimapPanel)GetChildAt(21);
+            m_selectCardPanel = (UI_SelectCardPanel)GetChildAt(22);
             m_showBanner = GetTransitionAt(0);
             m_showHit = GetTransitionAt(1);
         }

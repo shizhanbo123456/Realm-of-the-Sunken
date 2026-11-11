@@ -20,8 +20,8 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
-            m_input_ipaddress = (UI_InputField)GetChildAt(1);
-            m_btn_connect = (GButton)GetChildAt(3);
+            m_input_ipaddress = (UI_InputField)GetChildAt(0);
+            m_btn_connect = (GButton)GetChildAt(2);
         }
     }
 }

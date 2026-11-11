@@ -19,7 +19,7 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
-            m_content = (GTextInput)GetChildAt(1);
+            m_content = (GTextInput)GetChildAt(0);
         }
     }
 }

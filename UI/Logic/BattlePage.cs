@@ -569,20 +569,7 @@ public class BattlePage : PageBase
         var vitals = ResolveVitals(info);
         bar.m_bar_fill_health.fillAmount = vitals.maxHealth > 0 ? Mathf.Clamp01((float)vitals.health / vitals.maxHealth) : 0f;
         if (bar.m_label_health != null) bar.m_label_health.text = $"{vitals.health}/{vitals.maxHealth}";
-        RefreshLocalAvatar(info.camp);
         if (info.hasBuffs) RefreshBuffList(bar.m_buffList.m_list, localBuffs, info.buffs);
-    }
-
-    // 头像 = 本地玩家所选角色的头像（阵营由本地实体首个显示包确定）
-    private void RefreshLocalAvatar(EntityCamp camp)
-    {
-        var bar = panel.m_PlayerBar;
-        if (bar == null || bar.m_avater_mask == null) return;
-        var icons = Tool.AssetsManager == null ? null
-            : camp == EntityCamp.Defense ? Tool.AssetsManager.DefenseCharacterIcons : Tool.AssetsManager.AttackCharacterIcons;
-        int index = camp == EntityCamp.Defense ? ClientSelection.selectedDefenseIndex : ClientSelection.selectedAttackIndex;
-        bool hasIcon = icons != null && index >= 0 && index < icons.Count && icons[index] != null;
-        bar.m_avater_mask.m_content.texture = hasIcon ? new NTexture(icons[index]) : null;
     }
 
     private void OnScoreUpdate(SCScoreInfo info)
