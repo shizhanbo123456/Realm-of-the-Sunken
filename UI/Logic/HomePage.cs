@@ -8,6 +8,7 @@ public class HomePage : PageBase
 {
     private static readonly string[] StatKeys = { "生命", "攻击", "暴击", "暴伤", "视野", "技能槽" };
     private static readonly string[] AttrSuffixes = { "", "", "%", "%", "m", "" }; // 与 StatKeys 一一对应
+    private const int AttrBarSegments = 10; // 属性条格数（UI_AttrItem.m_progressBar 里的 UI_AttrValueItem 数量）
     private static readonly string[] GuideMenuTitles = { "技能", "Buff" };
 
     private readonly UI_HomePanel panel;
@@ -266,8 +267,23 @@ public class HomePage : PageBase
             var item = (UI_AttrItem)obj;
             item.m_attrName.text = StatKeys[i];
             item.m_attrValue.text = values[i] + AttrSuffixes[i];
+            FillAttrBar(item.m_progressBar, i, values[i]);
         };
         panel.m_character_attr_panel.m_attrList.numItems = StatKeys.Length;
+    }
+
+    // 属性条 = 固定 10 格：按 attr_range.csv 的区间把数值映射成点亮格数（非零至少亮 1 格）
+    private static void FillAttrBar(GList bar, int attrIndex, int value)
+    {
+        if (bar == null) return;
+        var range = ConfigManager.AttrRangeConfig.Get(attrIndex);
+        int filled = Mathf.Clamp(Mathf.CeilToInt(range.Ratio(value) * AttrBarSegments), 0, AttrBarSegments);
+
+        bar.itemRenderer = (i, obj) =>
+        {
+            if (obj is UI_AttrValueItem cell && cell.m_filled != null) cell.m_filled.selectedIndex = i < filled ? 1 : 0;
+        };
+        bar.numItems = AttrBarSegments;
     }
 
     private void RefreshCharacterInfo()
