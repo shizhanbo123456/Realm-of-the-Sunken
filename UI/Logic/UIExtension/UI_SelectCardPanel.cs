@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using FairyGUI;
 using UnityEngine;
@@ -33,7 +33,7 @@ namespace Ros.UI.Main
             if (m_discard != null) m_discard.onClick.Set(Discard);
         }
 
-        public void Open(List<CardRoll> cards, CardTier tier)
+        public void Open(List<CardRoll> cards, CardTier tier, int luck)
         {
             rolls.Clear();
             if (cards != null) rolls.AddRange(cards);
@@ -43,6 +43,7 @@ namespace Ros.UI.Main
             visible = true;
             touchable = true;
             if (m_discard_description != null) m_discard_description.text = $"弃卡换经验 +{DiscardExp(tier)}";
+            if (m_current_luck != null) m_current_luck.text = $"幸运 {luck}";
 
             if (m_list != null)
             {

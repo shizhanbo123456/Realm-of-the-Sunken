@@ -11,6 +11,7 @@ namespace Ros.UI.Main
         public GButton m_btn_close;
         public GButton m_discard;
         public GTextField m_discard_description;
+        public GTextField m_current_luck;
         public const string URL = "ui://q68vr2bflwt1pz";
 
         public static UI_SelectCardPanel CreateInstance()
@@ -26,6 +27,7 @@ namespace Ros.UI.Main
             m_btn_close = (GButton)GetChildAt(2);
             m_discard = (GButton)GetChildAt(3);
             m_discard_description = (GTextField)GetChildAt(4);
+            m_current_luck = (GTextField)GetChildAt(6);
         }
     }
 }

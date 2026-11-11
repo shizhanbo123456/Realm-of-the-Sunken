@@ -997,12 +997,16 @@ public class BattlePage : PageBase
     private readonly List<int> pendingTiers = new();   // 有次数的档位（渲染用，避免每帧分配）
     private readonly int[] cardPending = new int[CardCatalog.TierCount];
     private int cardLuck;             // 幸运：只影响档位内能刷出多深的卡
+    private int cardLevel = 1;        // 局内等级（左上角等级 + 经验条）
+    private int cardExp;              // 当前等级内已积累的经验
     private CardTier currentCardTier; // 最近一次打开的档位（弃卡按它上报）
 
     // 服务器只下发「幸运 + 每档有多少次」，抽到什么在这里算
     private void OnPlayerProgress(SCPlayerProgress info)
     {
         cardLuck = info.luck;
+        cardLevel = info.level;
+        cardExp = info.exp;
         cardPending[0] = info.silver;
         cardPending[1] = info.gold;
         cardPending[2] = info.holo;
@@ -1012,6 +1016,18 @@ public class BattlePage : PageBase
             panel.m_selectCardPanel.CloseImmediately();
 
         RefreshCardButtons();
+        RefreshProgressHud();
+    }
+
+    // 左上角等级 / 经验条：等级上限取自 character_upgrade_exp.csv，满级显示 MAX
+    private void RefreshProgressHud()
+    {
+        var bar = panel.m_PlayerBar;
+        if (bar == null) return;
+        int need = ConfigManager.CharacterExpConfig.NeedExp(cardLevel + 1);
+        if (bar.m_label_current_label != null) bar.m_label_current_label.text = $"Lv.{cardLevel}";
+        if (bar.m_bar_fill_exp != null) bar.m_bar_fill_exp.fillAmount = need > 0 ? Mathf.Clamp01((float)cardExp / need) : 1f;
+        if (bar.m_label_exp != null) bar.m_label_exp.text = need > 0 ? $"{cardExp}/{need}" : "MAX";
     }
 
     private void RefreshCardButtons()
@@ -1045,7 +1061,7 @@ public class BattlePage : PageBase
             return;
         }
         currentCardTier = tier;
-        panel.m_selectCardPanel.Open(rolls, tier);
+        panel.m_selectCardPanel.Open(rolls, tier, cardLuck);
     }
 
     // card_option.csv 的阵营限制：0 = 进攻方，1 = 防守方
@@ -1073,7 +1089,10 @@ public class BattlePage : PageBase
         for (int i = 0; i < cardPending.Length; i++) cardPending[i] = 0;
         pendingTiers.Clear();
         cardLuck = 0;
+        cardLevel = 1;
+        cardExp = 0;
         currentCardTier = CardTier.Silver;
+        RefreshProgressHud();
         if (panel.m_list_selectCard != null) panel.m_list_selectCard.numItems = 0;
     }
     #endregion
