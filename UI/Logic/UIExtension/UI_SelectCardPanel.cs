@@ -16,6 +16,7 @@ namespace Ros.UI.Main
         private Action onDiscard;
         private Action onClose;
         private CardTier openedTier;
+        private int closeToken; // 关闭动画途中又打开时作废旧动画，避免把新面板收掉
 
         public bool IsOpen { get; private set; }
 
@@ -50,6 +51,7 @@ namespace Ros.UI.Main
             }
 
             // 面板淡入 + 卡片逐张入场：让"卡牌出现"这件事在快节奏战斗里也能被看见
+            closeToken++;
             alpha = 0f;
             GTween.To(0f, 1f, PanelFadeDuration).OnUpdate(t => alpha = t.value.x);
         }
@@ -68,7 +70,9 @@ namespace Ros.UI.Main
                     if (m_list.GetChildAt(i) is UI_Card card && card.m_hide != null) card.m_hide.Play(null, 1, i * 0.04f);
                 }
             }
-            GTween.To(1f, 0f, PanelFadeDuration).SetDelay(0.10f).OnUpdate(t => alpha = t.value.x).OnComplete(HideImmediately);
+            int token = ++closeToken;
+            GTween.To(1f, 0f, PanelFadeDuration).SetDelay(0.10f).OnUpdate(t => alpha = t.value.x)
+                .OnComplete(() => { if (token == closeToken) HideImmediately(); });
         }
 
         // 立即收起（进/出战斗重置用，不播动画）
