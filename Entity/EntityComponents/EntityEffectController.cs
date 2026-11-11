@@ -100,13 +100,19 @@ public class EntityEffectController
         public int level;
         public float shieldValue;               // 护盾剩余值（仅护盾类，每层独立）
         public ushort sourceId;                 // 施加者 id（DoT 击杀归属）
-        public EntityAttribute sourceAttribute; // 施加者属性快照（施加时的独立克隆，不随后续变化）
+        public DamageStat sourceStat;           // 施加者出伤快照（值类型，施加时的独立拷贝）
         public float endTime;                   // 本层结束时间戳（永久 = float.MaxValue）
         public float nextTickTime;              // 本层下次生效时刻
         public bool isNegative;
     }
 
     public EntityData owner;
+
+    // Buff 对属性的增量（只记增量，实际属性由 RuntimeEntityAttributes 汇总）
+    public float BuffAttack { get; private set; }
+    public float BuffCritRate { get; private set; }
+    public float BuffCritDamage { get; private set; }
+    public float BuffViewDistance { get; private set; }
 
     private readonly Dictionary<EffectType, List<EffectLayer>> effects = new();
     private readonly List<EffectType> iterateKeys = new();
@@ -135,6 +141,7 @@ public class EntityEffectController
         nextSerial = 1;
         if (owner != null) owner.buffDirty = true;
         RefreshState();
+        RecomputeAttributes();
     }
 
     #region//增删查（简易统一入口）
@@ -399,14 +406,13 @@ public class EntityEffectController
     private void HealOwner(float amount)
     {
         if (owner == null || !owner.Alive) return;
-        owner.floatingAttribute.health = Mathf.Min(owner.baseAttribute.health, owner.floatingAttribute.health + amount);
-        owner.healthDirty = true;
+        owner.attributes.Heal(amount);
     }
 
     // 施加者快照里的攻击；无施加者时为 0
     private static float SourcePower(EffectLayer layer)
     {
-        return layer.sourceAttribute != null ? layer.sourceAttribute.attack : 0f;
+        return layer.sourceStat.attack;
     }
 
     private static EntityData FindEntity(ushort entityId)
@@ -508,7 +514,7 @@ public class EntityEffectController
     private static void ApplySource(ref EffectLayer layer, EntityData source)
     {
         layer.sourceId = source != null ? source.id : (ushort)0;
-        layer.sourceAttribute = source != null && source.floatingAttribute != null ? source.floatingAttribute.Clone() : null;
+        layer.sourceStat = source != null && source.attributes != null ? source.attributes.SnapshotDamage() : default;
     }
 
     private bool WriteBackLayer(EffectType type, EffectLayer layer)
@@ -573,7 +579,7 @@ public class EntityEffectController
     }
 
     // Health / WeaponSlotCount 不允许被 Buff 修改，走到这里属效果配置错误
-    private static float UnsupportedAttrField(EntityAttributeDelta.Field field)
+    private static float UnsupportedAttrField(AttrField field)
     {
         Debug.LogError($"[Buff] 属性通道不支持 {field}（该属性不可被 Buff 修改）");
         return 0f;
@@ -619,11 +625,14 @@ public class EntityEffectController
         if (animChanged && owner != null) owner.SetAnimPaused(pauseAnim);
     }
 
+    // Buff 只产出对属性的增量（相对基础值），实际属性由 RuntimeEntityAttributes 汇总
     private void RecomputeAttributes()
     {
-        if (owner == null) return;
-        float currentHealth = owner.floatingAttribute.health;
-        var attr = owner.baseAttribute.Clone(); // 此刻 attr.health 是"生命值上限"
+        BuffAttack = 0f;
+        BuffCritRate = 0f;
+        BuffCritDamage = 0f;
+        BuffViewDistance = 0f;
+        if (owner == null || owner.attributes == null) return;
         foreach (var pair in effects)
         {
             if (pair.Value.Count == 0) continue;
@@ -631,33 +640,35 @@ public class EntityEffectController
             if (pair.Key == EffectType.ZombieScreamBoost)
             {
                 int screamLevel = SumLevel(pair.Value);
-                attr.ApplyDelta(new EntityAttributeDelta(EntityAttributeDelta.Field.Attack,
-                    owner.baseAttribute.attack * Config.buff_scream_attack_ratio * screamLevel));
-                attr.ApplyDelta(new EntityAttributeDelta(EntityAttributeDelta.Field.CritRate,
-                    Config.buff_scream_crit_rate_points * screamLevel));
+                BuffAttack += owner.attributes.BaseAttack * Config.buff_scream_attack_ratio * screamLevel;
+                BuffCritRate += Config.buff_scream_crit_rate_points * screamLevel;
                 continue;
             }
             if (!pair.Key.IsAttribute()) continue;
             for (int i = 0; i < pair.Value.Count; i++)
             {
-                attr.ApplyDelta(new EntityAttributeDelta(FieldFromType(pair.Key), AttributeDeltaOf(pair.Key, pair.Value[i].level)));
+                float amount = AttributeDeltaOf(pair.Key, pair.Value[i].level);
+                switch (FieldFromType(pair.Key))
+                {
+                    case AttrField.Attack: BuffAttack += amount; break;
+                    case AttrField.CritRate: BuffCritRate += amount; break;
+                    case AttrField.CritDamage: BuffCritDamage += amount; break;
+                    case AttrField.ViewDistance: BuffViewDistance += amount; break;
+                }
             }
         }
-        // 夹取上限读 base：生命值上限只由 base 承担（升级时定一次）。当前也无可达的生命类 Buff（不存在 AttrHealth）
-        attr.health = Mathf.Clamp(currentHealth, 0f, owner.baseAttribute.health);
-        owner.floatingAttribute = attr;
     }
 
-    // 属性增减幅度内部定死：暴击率 / 暴伤按固定点数逐级线性叠加，攻击 / 视野按初始值比例
+    // 属性增减幅度内部定死：暴击率 / 暴伤按固定点数逐级线性叠加，攻击 / 视野按基础值比例
     private float AttributeDeltaOf(EffectType type, int level)
     {
         var field = FieldFromType(type);
         float amount = field switch
         {
-            EntityAttributeDelta.Field.CritRate => Config.buff_crit_rate_points * level,
-            EntityAttributeDelta.Field.CritDamage => Config.buff_crit_damage_points * level,
-            EntityAttributeDelta.Field.Attack => owner.baseAttribute.attack * Config.buff_attr_ratio * level,
-            EntityAttributeDelta.Field.ViewDistance => owner.baseAttribute.viewDistance * Config.buff_attr_ratio * level,
+            AttrField.CritRate => Config.buff_crit_rate_points * level,
+            AttrField.CritDamage => Config.buff_crit_damage_points * level,
+            AttrField.Attack => owner.attributes.BaseAttack * Config.buff_attr_ratio * level,
+            AttrField.ViewDistance => owner.attributes.BaseViewDistance * Config.buff_attr_ratio * level,
             _ => UnsupportedAttrField(field),
         };
         return type.IsNegative() ? -amount : amount;
@@ -666,24 +677,24 @@ public class EntityEffectController
     // 护盾每层初始值 = 被施加者生命值上限 × 系数 × 该层等级
     private float ShieldValueOf(int level)
     {
-        return owner != null ? owner.baseAttribute.health * Config.shield_health_ratio * level : 0f;
+        return owner != null ? owner.attributes.MaxHealth * Config.shield_health_ratio * level : 0f;
     }
 
-    private static EntityAttributeDelta.Field FieldFromType(EffectType type)
+    private static AttrField FieldFromType(EffectType type)
     {
         switch (type)
         {
             case EffectType.AttrAttackBoost:
-            case EffectType.AttrAttackDecrease: return EntityAttributeDelta.Field.Attack;
+            case EffectType.AttrAttackDecrease: return AttrField.Attack;
             case EffectType.AttrCritRateBoost:
-            case EffectType.AttrCritRateDecrease: return EntityAttributeDelta.Field.CritRate;
+            case EffectType.AttrCritRateDecrease: return AttrField.CritRate;
             case EffectType.AttrCritDamageBoost:
-            case EffectType.AttrCritDamageDecrease: return EntityAttributeDelta.Field.CritDamage;
+            case EffectType.AttrCritDamageDecrease: return AttrField.CritDamage;
             case EffectType.AttrViewDistanceBoost:
-            case EffectType.AttrViewDistanceDecrease: return EntityAttributeDelta.Field.ViewDistance;
+            case EffectType.AttrViewDistanceDecrease: return AttrField.ViewDistance;
             default:
                 Debug.LogError($"[Buff] 未处理的属性 Buff 类型：{type}，已按攻击兜底");
-                return EntityAttributeDelta.Field.Attack; // 兜底不可达；新增 Attr* 时必须同时加进 IsAttribute 与本映射，否则会静默加错属性
+                return AttrField.Attack; // 兜底不可达；新增 Attr* 时必须同时加进 IsAttribute 与本映射，否则会静默加错属性
         }
     }
 

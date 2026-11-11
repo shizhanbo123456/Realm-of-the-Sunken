@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class InfoManager : MonoBehaviour
 {
@@ -12,11 +12,6 @@ public class InfoManager : MonoBehaviour
     public int ground_layer;
 
     #region 属性（数据源：StreamingAssets/ConfigData/entity.csv）
-    public EntityAttribute GetAttribute(EntityType type)
-    {
-        return ConfigManager.EntityConfig.GetByCategory(type).GetAttribute();
-    }
-
     public ConfigManager.EntityConfig GetEntityConfig(EntityType type)
     {
         return ConfigManager.EntityConfig.GetByCategory(type);

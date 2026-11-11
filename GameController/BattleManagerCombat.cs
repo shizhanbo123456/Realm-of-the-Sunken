@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Ros.Transport;
 using TerrainGen;
 using UnityEngine;
@@ -117,7 +117,7 @@ public partial class BattleManager
                     (spec.interval <= 0f || now - lastHit < spec.interval)) continue;
                 b.lastHitTime[e.id] = now;
 
-                int damage = attack.GetDamage(out CombatLabelType type, spec.rates != null ? spec.rates[h] : 1f);
+                int damage = attack.GetDamage(e, out CombatLabelType type, spec.rates != null ? spec.rates[h] : 1f);
                 // 击飞方向取上一帧的命中球心：高速弹一帧穿过目标时，用当前位置算方向会反转
                 Vector3 floatPos = new Vector3(e.transform.position.x, prevCenter.y, e.transform.position.z);
                 e.ProcessHit(attack, damage, type, prevCenter, floatPos);
@@ -236,7 +236,7 @@ public partial class BattleManager
             ? ConfigManager.GlobalVariableConfig.coral_small_regeneration
             : ConfigManager.GlobalVariableConfig.coral_large_regeneration;
         if (heal <= 0f) return;
-        player.floatingAttribute.health = Mathf.Min(player.baseAttribute.health, player.floatingAttribute.health + heal);
+        player.attributes.Heal(heal);
         player.healthDirty = true;
     }
 
@@ -437,9 +437,9 @@ public partial class BattleManager
     // 满血 0、打空 100：血量归零单独判，避免浮点误差把最后一格停在 99
     private static int ProgressOf(EntityData statue)
     {
-        float max = statue.baseAttribute.health;
+        float max = statue.attributes.MaxHealth;
         if (max <= 0f) return 0;
-        float health = statue.floatingAttribute.health;
+        float health = statue.attributes.Health;
         if (health <= 0f) return 100;
         return Mathf.Clamp((int)(100f * (1f - health / max)), 0, 100);
     }

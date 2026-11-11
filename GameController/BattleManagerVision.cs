@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Ros.Transport;
 using UnityEngine;
 using UnityEngine.Profiling;
@@ -244,7 +244,7 @@ public partial class BattleManager
     private static float VisionRadius(EntityData entity)
     {
         if (entity == null) return 0f;
-        return Mathf.Max(0f, entity.floatingAttribute.viewDistance);
+        return Mathf.Max(0f, entity.attributes.ViewDistance);
     }
 
     private static bool IsMarkedOnMinimap(EntityData entity)

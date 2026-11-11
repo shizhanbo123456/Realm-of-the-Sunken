@@ -29,9 +29,8 @@ public abstract class EntityData : MonoBehaviour
 
     public bool robotControlled;
 
-    public EntityAttribute baseAttribute;
-
-    public EntityAttribute floatingAttribute;
+    // 实际属性：基础 + 词条 + Buff 实时聚合，当前生命也由它持有
+    public RuntimeEntityAttributes attributes;
 
     public EntityEffectController effectController;
 
@@ -74,7 +73,7 @@ public abstract class EntityData : MonoBehaviour
 
     public static void ClearKilled() => KilledEntities.Clear();
 
-    public bool Alive => floatingAttribute.health > 0f;
+    public bool Alive => attributes.Alive;
 
     protected virtual void OnDamageApplied(float finalDamage, EntityData attacker) { }
 
@@ -108,15 +107,13 @@ public abstract class EntityData : MonoBehaviour
         this.type = type;
         this.level = Mathf.Min(level, Config.battle_max_level); // 战斗期等级上限
         this.camp = camp;
-        baseAttribute = Tool.InfoManager != null ? Tool.InfoManager.GetAttribute(type) : new EntityAttribute();
+        attributes = new RuntimeEntityAttributes(this, type);
         if (Tool.InfoManager != null)
         {
             var config = Tool.InfoManager.GetEntityConfig(type);
             defaultEndure = config.endureLevel; // entity.csv「霸体等级」列：霸体下限
             weaponId = config.weaponId;         // entity.csv「武器编号」列：实体固定武器
         }
-        // 克隆即满血：base 的 health 是"生命值上限"，同一个字段克隆到 floating 后就承载"当前生命值"（复活走重建实体，同样落在这里）
-        floatingAttribute = baseAttribute.Clone();
         effectController = new EntityEffectController();
         effectController.Init(this);
         skillController = new EntitySkillController();
@@ -152,6 +149,7 @@ public abstract class EntityData : MonoBehaviour
 
     public virtual void OnUpdate()
     {
+        attributes.Update(); // 生命上限每帧重算，变化即按比例换算当前生命并同步客户端
         if (effectController != null) effectController.OnUpdate();
     }
 
@@ -576,9 +574,11 @@ public abstract class EntityData : MonoBehaviour
             finalDamage *= 1f - effectController.GetDamageReduceRate();
             if (!fixedDamage) finalDamage *= effectController.GetInDamageMultiplier();
         }
+        // 守护点减伤：读己方（防守方）玩家的「壁垒」词条总和
+        if (type.category == EntityCategory.GuardStatue && Tool.BattleManager != null)
+            finalDamage *= 1f - Mathf.Clamp01(Tool.BattleManager.GetCampCardBonus(camp).guardReduction);
         finalDamage = Mathf.Max(0f, finalDamage);
-        floatingAttribute.health = Mathf.Max(0f, floatingAttribute.health - finalDamage);
-        healthDirty = true;
+        attributes.ApplyDamage(finalDamage);
         if (Tool.BattleManager != null) Tool.BattleManager.CheckLowHealthShield(this, damageType); // 瘟疫使者：扣血后按血线挂盾
         // 撞盾的命中一律显示护盾页；闪避自带类型；其余 0 伤害改判失效
         CombatLabelType shownType = damageType;
@@ -599,7 +599,7 @@ public abstract class EntityData : MonoBehaviour
             float reflect = effectController.GetReflectDamage(finalDamage); // 反弹按实际受伤（扣盾/减伤后）
             if (reflect > 0f) attacker.OnDamaged(reflect, this, fixedDamage: true, canReflect: false, damageType: CombatLabelType.Reflect);
         }
-        if (floatingAttribute.health <= 0f) MarkAsKilled();
+        if (!attributes.Alive) MarkAsKilled();
     }
 
     private void SendCombatLabelEvent(float shownAmount, CombatLabelType labelType, Vector3? hitPos)
@@ -625,8 +625,8 @@ public abstract class EntityData : MonoBehaviour
         if (effectController != null) effectController.Clear();
     }
 
-    // 显示同步脏标记：health 只在当前生命值变化时置脏（上限全程不变）、buff 只在增删时置脏、skill 只在持有列表变化时置脏、
-    // transform 记待发次数：0 = 位置/朝向/速度有变化，<2 时每轮下发并 +1，满 2 停发（停下后仍会多发一个包）
+    // 显示同步脏标记：health 在当前生命值或生命上限变化时置脏（词条改上限要立刻同步）、buff 只在增删时置脏、
+    // skill 只在持有列表变化时置脏、transform 记待发次数：0 = 位置/朝向/速度有变化，<2 时每轮下发并 +1，满 2 停发
     public bool healthDirty;
     public bool buffDirty;
     public bool skillDirty;
@@ -699,8 +699,8 @@ public abstract class EntityData : MonoBehaviour
         }
         if (withHealth)
         {
-            info.health = (int)floatingAttribute.health;   // 当前生命值
-            info.maxHealth = (int)baseAttribute.health;    // 生命值上限（全程不变，随 health 包顺带携带）
+            info.health = Mathf.RoundToInt(attributes.Health);
+            info.maxHealth = Mathf.RoundToInt(attributes.MaxHealth); // 上限随词条变化，跟生命值一起下发
         }
         if (withBuffs && effectController != null) effectController.FillDisplayInfo(info);
         return info;
@@ -709,8 +709,7 @@ public abstract class EntityData : MonoBehaviour
     public void Kill()
     {
         if (!Alive) return;
-        floatingAttribute.health = 0f;
-        healthDirty = true;
+        attributes.Kill();
         MarkAsKilled();
     }
 

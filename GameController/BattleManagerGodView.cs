@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Ros.Transport;
 using UnityEngine;
 
@@ -116,8 +116,8 @@ public partial class BattleManager
             camp = entity.camp,
             level = entity.level,
             name = ResolveGodViewName(entity),
-            health = Mathf.Max(0, (int)entity.floatingAttribute.health),
-            maxHealth = (int)entity.baseAttribute.health,
+            health = Mathf.Max(0, (int)entity.attributes.Health),
+            maxHealth = (int)entity.attributes.MaxHealth,
         };
         if (entity.skillController != null) entity.skillController.FillGodViewSkills(info);
         FillGodViewBuffs(entity, info);

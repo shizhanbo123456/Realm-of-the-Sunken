@@ -1,4 +1,5 @@
-﻿[System.Serializable]
+﻿// 基础属性容器：只承载 entity.csv 的六项基础值（首页属性表展示用）；实际属性见 RuntimeEntityAttributes
+[System.Serializable]
 public class EntityAttribute
 {
     public float health = 1000f;
@@ -7,52 +8,14 @@ public class EntityAttribute
     public int critDamage = 100; // 整数百分比：100 = 与不暴击相同，200 = 翻倍
     public float viewDistance = 80f;
     public int weaponSlotCount = 3;
-
-    public EntityAttribute Clone()
-    {
-        return new EntityAttribute()
-        {
-            health = health,
-            attack = attack,
-            critRate = critRate,
-            critDamage = critDamage,
-            viewDistance = viewDistance,
-            weaponSlotCount = weaponSlotCount,
-        };
-    }
-
-    public void ApplyDelta(EntityAttributeDelta delta)
-    {
-        switch (delta.field)
-        {
-            case EntityAttributeDelta.Field.Health: health += delta.value; break; // 此刻 health 还是"上限"语义
-            case EntityAttributeDelta.Field.Attack: attack += (int)delta.value; break;
-            case EntityAttributeDelta.Field.CritRate: critRate += (int)delta.value; break;
-            case EntityAttributeDelta.Field.CritDamage: critDamage += (int)delta.value; break;
-            case EntityAttributeDelta.Field.ViewDistance: viewDistance += delta.value; break;
-            case EntityAttributeDelta.Field.WeaponSlotCount: weaponSlotCount += (int)delta.value; break;
-        }
-    }
 }
 
-[System.Serializable]
-public class EntityAttributeDelta
+public enum AttrField
 {
-    public enum Field
-    {
-        Health,
-        Attack, CritRate, CritDamage,
-        ViewDistance, WeaponSlotCount,
-    }
-
-    public Field field;
-    public float value;
-
-    public EntityAttributeDelta() { }
-
-    public EntityAttributeDelta(Field field, float value)
-    {
-        this.field = field;
-        this.value = value;
-    }
+    Health,
+    Attack,
+    CritRate,
+    CritDamage,
+    ViewDistance,
+    WeaponSlotCount,
 }

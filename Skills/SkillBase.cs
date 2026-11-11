@@ -285,7 +285,7 @@ namespace Ros.Skill
                 var target = s_hitBuffer[i];
                 if (target == null || !target.Alive) continue;
                 if (target.id == entity.id || !EntityCampUtil.IsHostile(entity.type.category, target.camp)) continue;
-                int damage = attack.GetDamage(out CombatLabelType type, rate);
+                int damage = attack.GetDamage(target, out CombatLabelType type, rate);
                 target.ProcessHit(attack, damage, type, center); // 击飞方向取判定球心 → 目标
                 if (attack.addEffectEvent != null && target.effectController != null)
                 {

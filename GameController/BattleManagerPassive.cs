@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class BattleManager
@@ -35,7 +35,7 @@ public partial class BattleManager
     {
         if (victim == null || damage <= 0f) return damage;
         if (victim.type != EntityType.Defense(Config.defense_index_count_eye)) return damage;
-        float cap = victim.baseAttribute.health * Config.count_eye_damage_cap_ratio;
+        float cap = victim.attributes.MaxHealth * Config.count_eye_damage_cap_ratio;
         return damage > cap ? cap : damage;
     }
 
@@ -47,8 +47,8 @@ public partial class BattleManager
         // 只有命中类伤害参与判定，buff 伤害（DoT / 反伤 / 瘟疫引爆）不触发
         if (damageType != CombatLabelType.Normal && damageType != CombatLabelType.Crit) return;
 
-        float health = victim.floatingAttribute.health;
-        if (health <= 0f || health >= victim.baseAttribute.health * Config.plague_shield_trigger_ratio) return;
+        float health = victim.attributes.Health;
+        if (health <= 0f || health >= victim.attributes.MaxHealth * Config.plague_shield_trigger_ratio) return;
 
         int key = EntityOwnerClient.TryGetValue(victim.id, out int owner) ? owner : 100000 + victim.id;
         if (plagueGuardReadyTime.TryGetValue(key, out float readyTime) && Time.time < readyTime) return;
@@ -56,7 +56,7 @@ public partial class BattleManager
         plagueGuardReadyTime[key] = Time.time + Config.plague_shield_cooldown;
         if (victim.effectController != null)
             victim.effectController.AddEffect(EffectType.Shield, Config.plague_shield_level, Config.plague_shield_duration);
-        victim.floatingAttribute.health = Mathf.Min(victim.baseAttribute.health, health + Config.plague_shield_heal);
+        victim.attributes.Heal(Config.plague_shield_heal);
         victim.healthDirty = true;
     }
     #endregion

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 // 僵尸：无目标在出生点附近游荡；有目标按距离分档——超追距放弃、远处嘶吼、贴身停下爪击
 public class ZombieStateMachine : DecisionMachine, IBehaviorHost
@@ -85,8 +85,8 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
     {
         get
         {
-            float view = Owner.floatingAttribute.viewDistance > 0f
-                ? Owner.floatingAttribute.viewDistance
+            float view = Owner.attributes.ViewDistance > 0f
+                ? Owner.attributes.ViewDistance
                 : Config.zombie_acquire_range;
             return Mathf.Min(view, Config.zombie_max_chase_distance - Config.zombie_acquire_margin);
         }

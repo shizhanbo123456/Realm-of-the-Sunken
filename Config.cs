@@ -11,6 +11,10 @@ public static class Config
     // 实体胶囊碰撞体半径：所有实体统一写死，不随模型体型变化（只有高度按包围盒 + 骨骼动态收紧）
     public const float entity_capsule_radius = 0.22f;
 
+    // 局内等级压制：每级 ±5% 增伤/减伤，等级差最多计 3 级（对所有伤害生效，含 PVE）
+    public const float level_suppress_per_level = 0.05f;
+    public const int level_suppress_max_diff = 3;
+
     // 战斗期等级上限 = global_variables，配表加行即生效
     public static int battle_max_level => ConfigManager.GlobalVariableConfig.battle_max_level;
     #endregion

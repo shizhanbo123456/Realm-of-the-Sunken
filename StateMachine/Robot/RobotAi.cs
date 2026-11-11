@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Ros.Skill;
 using Ros.Transport;
 using UnityEngine;
@@ -102,12 +102,12 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
     {
         get
         {
-            float cap = Owner.baseAttribute.health;
-            return cap > 0f ? Owner.floatingAttribute.health / cap : 0f;
+            float cap = Owner.attributes.MaxHealth;
+            return cap > 0f ? Owner.attributes.Health / cap : 0f;
         }
     }
 
-    protected float ViewDistance => Owner.floatingAttribute.viewDistance;
+    protected float ViewDistance => Owner.attributes.ViewDistance;
 
     // 静止一段时间说明目的地走不到
     private void UpdateStuckSample()

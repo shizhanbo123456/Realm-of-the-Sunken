@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using Ros.Transport;
 using TerrainGen;
@@ -804,8 +804,8 @@ public partial class BattleManager : EnsBehaviour
         {
             var self = GetEntityOfClient(clientId);
             if (self == null || !self.Alive) return;
-            float cap = self.baseAttribute.health;
-            int healthPercent = cap > 0f ? Mathf.RoundToInt(self.floatingAttribute.health / cap * 100f) : 0;
+            float cap = self.attributes.MaxHealth;
+            int healthPercent = cap > 0f ? Mathf.RoundToInt(self.attributes.Health / cap * 100f) : 0;
             ReportStatus(self, (int)EntityReportState.None, healthPercent);
             return;
         }
@@ -936,7 +936,7 @@ public partial class BattleManager : EnsBehaviour
         float remaining = 0f;
         foreach (var guardStatue in EntityContainer.GuardStatues)
         {
-            if (guardStatue != null) remaining += guardStatue.floatingAttribute.health;
+            if (guardStatue != null) remaining += guardStatue.attributes.Health;
         }
         return remaining;
     }
@@ -997,7 +997,7 @@ public partial class BattleManager : EnsBehaviour
     {
         if (entity == null || entity.skillController == null) return;
         if (RobotClients.Contains(clientId)) return;
-        entity.skillController.EnableSlotBar(entity.baseAttribute.weaponSlotCount);
+        entity.skillController.EnableSlotBar(entity.attributes.WeaponSlotCount);
     }
 
     // 相机模式决定 WASD 的解释口径（俯视 = 四向），由客户端在切模式时同步
@@ -1154,6 +1154,7 @@ public partial class BattleManager : EnsBehaviour
         foreach (var e in stale) DestroyEntity(e.id);
         PlayerEntityId.Clear();
         EntityOwnerClient.Clear();
+        ResetCards(); // 词条是玩家级数据，跨局不保留
         zombieCount = 0;
         RemoveOfflineSessions(); // 掉线者不再有重连意义，回大厅前清出成员表
 

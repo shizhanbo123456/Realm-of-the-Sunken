@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 // 人机技能栏：只做选栏与出招顺序；冷却与库存由实体的 EntitySkillController 记账
@@ -14,7 +14,7 @@ public class RobotSkillBar
         this.machine = machine;
     }
 
-    public int Capacity => owner.baseAttribute.weaponSlotCount;
+    public int Capacity => owner.attributes.WeaponSlotCount;
 
     public IReadOnlyList<int> Slots => slots;
 
