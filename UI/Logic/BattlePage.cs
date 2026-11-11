@@ -74,6 +74,9 @@ public class BattlePage : PageBase
             (i, obj) => ((UI_buffItem)obj).Fill(localBuffs[i].type, localBuffs[i].level, ShowBuffTip, HideBuffTip);
         panel.m_skillSelectPanel.Build(OnSkillSelectCommitted);
         panel.m_skillSelectPanel.Close();
+        panel.m_selectCardPanel.Build(OnCardSelected, OnCardDiscarded, null); // 关闭 = 保留待抽次数
+        panel.m_selectCardPanel.CloseImmediately();
+        panel.m_list_selectCard.itemRenderer = RenderCardButton;
         panel.m_largeMinimapPanel.visible = false;
         panel.m_largeMinimapPanel.touchable = false;
         panel.m_largeMinimapPanel.m_panel.m_close.onClick.Set(panel.m_largeMinimapPanel.Close);
@@ -222,6 +225,7 @@ public class BattlePage : PageBase
         EventManager.AddEvent<SCCampAliveCount>(ClientEvent.OnCampAliveCount, OnCampAliveCount);
         EventManager.AddEvent<SCDefensePointProgress>(ClientEvent.OnDefensePointProgress, OnDefensePointProgress);
         EventManager.AddEvent(ClientEvent.OnSkillBarRefresh, OnSkillBarRefresh);
+        EventManager.AddEvent<SCPlayerProgress>(ClientEvent.OnPlayerProgress, OnPlayerProgress);
         if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated += OnCameraUpdated;
 
         localPlayerCamp = -1;
@@ -248,6 +252,8 @@ public class BattlePage : PageBase
         panel.m_largeMinimapPanel.Close();
         panel.m_godViewPanel.Close();
         panel.m_skillSelectPanel.Close();
+        panel.m_selectCardPanel.CloseImmediately();
+        ResetCardState();
         Skills?.ResetBattle();
         BuildSkillSlots();
         RefreshTimeIcon();
@@ -270,6 +276,7 @@ public class BattlePage : PageBase
         EventManager.RemoveEvent<SCCampAliveCount>(ClientEvent.OnCampAliveCount, OnCampAliveCount);
         EventManager.RemoveEvent<SCDefensePointProgress>(ClientEvent.OnDefensePointProgress, OnDefensePointProgress);
         EventManager.RemoveEvent(ClientEvent.OnSkillBarRefresh, OnSkillBarRefresh);
+        EventManager.RemoveEvent<SCPlayerProgress>(ClientEvent.OnPlayerProgress, OnPlayerProgress);
         if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated -= OnCameraUpdated;
         spectatorMode = false;
         localPlayerAlive = true;
@@ -279,6 +286,8 @@ public class BattlePage : PageBase
         panel.m_largeMinimapPanel.Close();
         panel.m_godViewPanel.Close();
         panel.m_skillSelectPanel.Close();
+        panel.m_selectCardPanel.CloseImmediately();
+        ResetCardState();
         HideAllTips();
         HideImportantBanner();
         // 离开战斗界面即销毁地形场景（Culler 与内容根一起销毁，点位数据一并复位）
@@ -981,6 +990,91 @@ public class BattlePage : PageBase
     private static void DoExit()
     {
         if (Tool.NetworkManager != null) Tool.NetworkManager.ExitWorld();
+    }
+    #endregion
+
+    #region 抽卡（悬浮按钮 → 抽卡界面 → 选/弃）
+    private readonly List<int> pendingTiers = new();   // 有次数的档位（渲染用，避免每帧分配）
+    private readonly int[] cardPending = new int[CardCatalog.TierCount];
+    private int cardLuck;             // 幸运：只影响档位内能刷出多深的卡
+    private CardTier currentCardTier; // 最近一次打开的档位（弃卡按它上报）
+
+    // 服务器只下发「幸运 + 每档有多少次」，抽到什么在这里算
+    private void OnPlayerProgress(SCPlayerProgress info)
+    {
+        cardLuck = info.luck;
+        cardPending[0] = info.silver;
+        cardPending[1] = info.gold;
+        cardPending[2] = info.holo;
+
+        // 面板开着但这一档已经被抽完（例如弃卡后服务器结算）→ 收起，避免显示过期卡面
+        if (panel.m_selectCardPanel.IsOpen && cardPending[(int)panel.m_selectCardPanel.OpenedTier] <= 0)
+            panel.m_selectCardPanel.CloseImmediately();
+
+        RefreshCardButtons();
+    }
+
+    private void RefreshCardButtons()
+    {
+        pendingTiers.Clear();
+        for (int tier = 0; tier < cardPending.Length; tier++)
+        {
+            if (cardPending[tier] > 0) pendingTiers.Add(tier);
+        }
+        if (panel.m_list_selectCard != null) panel.m_list_selectCard.numItems = pendingTiers.Count;
+    }
+
+    private void RenderCardButton(int index, GObject obj)
+    {
+        if (obj is not UI_btn_SelectCard btn || index >= pendingTiers.Count) return;
+        int tier = pendingTiers[index];
+        if (btn.m_level != null) btn.m_level.selectedIndex = tier;
+        if (btn.m_label_num != null) btn.m_label_num.text = $"×{cardPending[tier]}";
+        btn.onClick.Set(() => OpenCardPanel((CardTier)tier));
+    }
+
+    // 点悬浮按钮：随机抽 3 张（排除已持有技能），交给抽卡界面展示
+    private void OpenCardPanel(CardTier tier)
+    {
+        if (cardPending[(int)tier] <= 0) return;
+        var held = Skills != null ? new List<int>(Skills.HeldSkills) : null;
+        var rolls = CardCatalog.Roll(tier, cardLuck, CardCampForRoll(), 3, held);
+        if (rolls.Count == 0)
+        {
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText("该档暂无可抽的卡");
+            return;
+        }
+        currentCardTier = tier;
+        panel.m_selectCardPanel.Open(rolls, tier);
+    }
+
+    // card_option.csv 的阵营限制：0 = 进攻方，1 = 防守方
+    private int CardCampForRoll() => localPlayerCamp == (int)EntityCamp.Defense ? 1 : 0;
+
+    private void OnCardSelected(CardRoll roll)
+    {
+        if (Tool.NetworkManager == null) return;
+        Tool.NetworkManager.SendSelectCard(new CSSelectCard
+        {
+            tier = (byte)roll.tier,
+            cardId = roll.cardId,
+            skillId = roll.IsSkill ? roll.skillId : -1,
+        });
+    }
+
+    private void OnCardDiscarded()
+    {
+        if (Tool.NetworkManager == null) return;
+        Tool.NetworkManager.SendDiscardCard(new CSDiscardCard { tier = (byte)currentCardTier });
+    }
+
+    private void ResetCardState()
+    {
+        for (int i = 0; i < cardPending.Length; i++) cardPending[i] = 0;
+        pendingTiers.Clear();
+        cardLuck = 0;
+        currentCardTier = CardTier.Silver;
+        if (panel.m_list_selectCard != null) panel.m_list_selectCard.numItems = 0;
     }
     #endregion
 }

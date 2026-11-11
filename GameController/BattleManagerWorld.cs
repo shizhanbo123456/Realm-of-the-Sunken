@@ -36,6 +36,8 @@ public partial class BattleManager
 
         // 中立雕像（中立争抢单位）：开局不刷，开战后按延迟计时刷新；之后由被打死的时机重排
         neutralStatueRespawnTime = Time.time + Config.neutral_statue_first_spawn_delay;
+
+        CaptureGuardTotalHealth(); // 守护点总血量在此刻定死，经验增幅按已扣除比例算
     }
 
     private void SpawnZombie()

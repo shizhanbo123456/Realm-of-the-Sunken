@@ -1075,7 +1075,7 @@ public partial class BattleManager : EnsBehaviour
             }
             bool isAttack = campType == PlayerCampType.Attack;
             EntityType characterType = isAttack ? pair.Value.attackCharacter : pair.Value.defenseCharacter;
-            int level = 1; // 玩家等级改为局内成长，建档时统一从 1 级起
+            int level = GetPlayerLevel(clientId); // 局内等级：开局从 1 级起，复活沿用
             Vector3 spawnPos = isAttack ? GetAttackSpawnPos() : GetDefenseSpawnPos();
             EntityCamp camp = isAttack ? EntityCamp.Attack : EntityCamp.Defense;
 
@@ -1122,6 +1122,7 @@ public partial class BattleManager : EnsBehaviour
             Tool.NetworkManager.SendBattleStart(clientId);
             SendSkillSyncFull(clientId); // 必须在 BattleStart 之后：客户端进战斗页会先清空技能表
         }
+        SendProgressToAll(); // 开局把等级/幸运/待抽次数（全 0）推一次，客户端据此建立按钮列表
         Debug.Log($"战斗开始：人类 {PlayerInfoList.Count - RobotClients.Count}，AI {RobotClients.Count}");
     }
 

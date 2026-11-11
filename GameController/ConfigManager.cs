@@ -40,9 +40,13 @@ public class ConfigManager : MonoBehaviour
         int attrRange = AttrRangeConfig.Load(ReadTable(dir, AttrRangeConfig.FileName));
         int settingTips = SettingTipsConfig.Load(ReadTable(dir, SettingTipsConfig.FileName));
         int quickMessage = QuickMessageConfig.Load(ReadTable(dir, QuickMessageConfig.FileName));
+        int cardOption = CardOptionConfig.Load(ReadTable(dir, CardOptionConfig.FileName));
+        int cardUpgrade = CardGainUpgradeConfig.Load(ReadTable(dir, CardGainUpgradeConfig.FileName));
+        int characterExp = CharacterExpConfig.Load(ReadTable(dir, CharacterExpConfig.FileName));
 
         Debug.Log($"[配表] {dir} 加载完成 | battle_fury_layer {battleFury} | entity {entity} | weapon {weapon} | skill {skill} | effect {effect} | " +
-                  $"revive_time {revive} | global_variables {global} | notice {notice} | attr_range {attrRange} | setting_tips {settingTips} | quick_message {quickMessage} | terrain_generation {terrainGen}");
+                  $"revive_time {revive} | global_variables {global} | notice {notice} | attr_range {attrRange} | setting_tips {settingTips} | quick_message {quickMessage} | terrain_generation {terrainGen} | " +
+                  $"card_option {cardOption} | card_gain_upgrade {cardUpgrade} | character_exp {characterExp}");
     }
 
     #region 文件读取与拆分
@@ -242,6 +246,29 @@ public class ConfigManager : MonoBehaviour
         };
     }
 
+    // 定长分号列表：如卡牌掉落权重「6;3;1」，留空 = 全 0
+    public static int[] ParseSemicolonInts(string[] rowData, int col, int count)
+    {
+        var result = new int[count];
+        string raw = Cell(rowData, col);
+        if (raw.Length == 0) return result;
+
+        string[] tokens = raw.Split(';');
+        if (tokens.Length != count)
+            throw new FormatException($"第 {col} 列需要 {count} 个分号分隔的整数：「{raw}」");
+        for (int i = 0; i < count; i++)
+        {
+            if (!int.TryParse(tokens[i].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out result[i]))
+                throw new FormatException($"第 {col} 列含非法整数：「{tokens[i]}」");
+            if (result[i] < 0)
+                throw new FormatException($"第 {col} 列不允许负数：「{tokens[i]}」");
+        }
+        return result;
+    }
+
+    // 布尔列：1 = true / 0 = false，留空按 false
+    public static bool ParseBool01(string[] rowData, int col) => ParseBoolOrNull(rowData, col) ?? false;
+
     public static List<int> ParseIntList(string[] rowData, int col)
     {
         var result = new List<int>();
@@ -410,11 +437,11 @@ public class ConfigManager : MonoBehaviour
     }
     #endregion
 
-    #region 角色信息表：0 实体类型 / 1 副键 / 2 姓名 / 3 生命 / 4 攻击 …… 9 初始技能列表 / 10 显示血条 / 11 霸体等级 / 12 武器编号 / 13 被击败卡牌掉落权重（暂不解析）
+    #region 角色信息表：0 实体类型 / 1 副键 / 2 姓名 / 3 生命 / 4 攻击 …… 12 武器编号 / 13 卡牌掉落权重 / 14 掉落经验 / 15 掉落生效范围
     public struct EntityConfig
     {
         public const string FileName = "entity.csv";
-        private const int ColumnCount = 14;
+        private const int ColumnCount = 16;
         public static readonly Dictionary<EntityType, EntityConfig> content = new();
 
         public EntityCategory category;
@@ -430,6 +457,9 @@ public class ConfigManager : MonoBehaviour
         public bool showHealthBar;    // 客户端是否为该实体创建头顶血条
         public EndureType endureLevel; // 第12列：默认霸体等级，实体霸体等级的下限（留空 = 无霸体）
         public int weaponId;           // 第13列：固定武器编号（= weapon.csv 主键 / WeaponPrefabs 下标），留空 = -1
+        public int[] cardDropWeights;  // 第14列：白银;黄金;炫彩 掉落权重，全 0 = 不掉卡
+        public int expDrop;            // 第15列：被击败时给归属方的经验
+        public bool dropToCamp;        // 第16列：掉落生效范围，1 = 击杀方全阵营，0 = 仅击杀者
 
         public EntityConfig(string[] rowData)
         {
@@ -446,6 +476,9 @@ public class ConfigManager : MonoBehaviour
             showHealthBar = ParseShowHealthBar(rowData, 10);
             endureLevel = ParseEndureLevel(rowData, 11);
             weaponId = ParseWeaponId(rowData, 12);
+            cardDropWeights = ParseSemicolonInts(rowData, 13, 3);
+            expDrop = ParseInt(rowData, 14);
+            dropToCamp = ParseBool01(rowData, 15);
         }
 
         public static int Load(ConfigTable table)
@@ -491,6 +524,171 @@ public class ConfigManager : MonoBehaviour
                 viewDistance = viewDistance,
                 weaponSlotCount = weaponSlotCount,
             };
+        }
+    }
+    #endregion
+
+    #region 卡牌内容表：0 主键 / 1 标题 / 2 描述 / 3 权重 / 4 白银幸运区间 / 5 黄金幸运区间 / 6 炫彩幸运区间 / 7 阵营限制 / 8 类型 / 9 值（词条等级）
+    // 幸运区间格：「下界;上界」= 仅当玩家幸运落在闭区间内该卡才进本档卡池；「-1」= 本档不掉
+    public struct LuckRange
+    {
+        public bool valid;
+        public int min;
+        public int max;
+
+        public bool Contains(int luck) => valid && luck >= min && luck <= max;
+    }
+
+    public struct CardOptionConfig
+    {
+        public const string FileName = "card/card_option.csv";
+        private const int ColumnCount = 10;
+        public static readonly Dictionary<int, CardOptionConfig> content = new();
+
+        public int key;
+        public string title;
+        public string description;
+        public int weight;
+        public LuckRange silver;
+        public LuckRange gold;
+        public LuckRange holo;
+        public int camp;    // -1 = 不限阵营，0 = 仅进攻方，1 = 仅防守方
+        public string type;
+        public int value;   // 词条等级 / 技能卡为 0（真实技能 id 由客户端抽出后上报）
+
+        public CardOptionConfig(string[] rowData)
+        {
+            key = ParseInt(rowData, 0);
+            title = ParseString(rowData, 1);
+            description = ParseString(rowData, 2);
+            weight = ParseInt(rowData, 3);
+            if (weight <= 0) throw new FormatException($"卡牌 {key} 的权重必须大于 0");
+            silver = ParseLuckRange(rowData, 4, key);
+            gold = ParseLuckRange(rowData, 5, key);
+            holo = ParseLuckRange(rowData, 6, key);
+            camp = ParseIntOrNull(rowData, 7) ?? -1;
+            if (camp < -1 || camp > 1) throw new FormatException($"卡牌 {key} 的阵营限制只允许 空 / 0 / 1");
+            type = ParseString(rowData, 8);
+            if (type.Length == 0) throw new FormatException($"卡牌 {key} 缺少类型（类型列为代码用的词条键，必填）");
+            value = ParseInt(rowData, 9);
+        }
+
+        public LuckRange RangeOf(int tier)
+        {
+            return tier switch
+            {
+                0 => silver,
+                1 => gold,
+                2 => holo,
+                _ => throw new ArgumentOutOfRangeException(nameof(tier), tier, "卡牌档位只有 0 白银 / 1 黄金 / 2 炫彩"),
+            };
+        }
+
+        private static LuckRange ParseLuckRange(string[] rowData, int col, int key)
+        {
+            string raw = Cell(rowData, col);
+            if (raw.Length == 0 || raw.Trim() == "-1") return default;
+
+            string[] tokens = raw.Split(';');
+            if (tokens.Length != 2)
+                throw new FormatException($"卡牌 {key} 第 {col} 列需要「下界;上界」或「-1」：「{raw}」");
+            return new LuckRange
+            {
+                valid = true,
+                min = ParseIntToken(tokens[0], col, key),
+                max = ParseIntToken(tokens[1], col, key),
+            };
+        }
+
+        private static int ParseIntToken(string token, int col, int key)
+        {
+            if (!int.TryParse(token.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int value))
+                throw new FormatException($"卡牌 {key} 第 {col} 列含非法整数：「{token}」");
+            return value;
+        }
+
+        public static int Load(ConfigTable table)
+        {
+            table.RequireColumnCount(ColumnCount);
+            return Fill(table, content, row => new CardOptionConfig(row), row => row.key);
+        }
+
+        public static CardOptionConfig Get(int key) => GetRequired(content, key, FileName);
+    }
+    #endregion
+
+    #region 升级卡牌掉落表：按升级后等级的个位数给三档权重
+    public struct CardGainUpgradeConfig
+    {
+        public const string FileName = "card/card_gain_upgrade.csv";
+        private const int ColumnCount = 5;
+        public static readonly Dictionary<int, CardGainUpgradeConfig> content = new();
+
+        public int key;
+        public int digit;
+        public int[] weights; // 白银;黄金;炫彩
+
+        public CardGainUpgradeConfig(string[] rowData)
+        {
+            key = ParseInt(rowData, 0);
+            digit = ParseInt(rowData, 1);
+            if (digit < 0 || digit > 9) throw new FormatException($"升级卡牌掉落 {key} 的个位数 {digit} 超出 0~9");
+            weights = new[]
+            {
+                ParseInt(rowData, 2),
+                ParseInt(rowData, 3),
+                ParseInt(rowData, 4),
+            };
+        }
+
+        public static int Load(ConfigTable table)
+        {
+            table.RequireColumnCount(ColumnCount);
+            return Fill(table, content, row => new CardGainUpgradeConfig(row), row => row.digit);
+        }
+
+        // 按升级后的等级取档位权重；本等级没配行返回 null（= 该次升级不掉卡）
+        public static int[] WeightsOf(int level)
+        {
+            return content.TryGetValue(level % 10, out var config) ? config.weights : null;
+        }
+    }
+    #endregion
+
+    #region 角色升级经验表：key = 等级，exp = 从该等级升到下一级所需经验
+    public struct CharacterExpConfig
+    {
+        public const string FileName = "character_upgrade_exp.csv";
+        private const int ColumnCount = 2;
+        public static readonly Dictionary<int, CharacterExpConfig> content = new();
+        public static int MaxLevel { get; private set; }
+
+        public int key;
+        public int exp;
+
+        public CharacterExpConfig(string[] rowData)
+        {
+            key = ParseInt(rowData, 0);
+            exp = ParseInt(rowData, 1);
+            if (key < 1) throw new FormatException($"角色升级经验表的等级必须从 1 起：{key}");
+        }
+
+        public static int Load(ConfigTable table)
+        {
+            table.RequireColumnCount(ColumnCount);
+            int count = Fill(table, content, row => new CharacterExpConfig(row), row => row.key);
+            MaxLevel = 1;
+            foreach (int level in content.Keys)
+            {
+                if (level > MaxLevel) MaxLevel = level;
+            }
+            return count;
+        }
+
+        // 升到 level 需要的经验；表里没配 = 已到上限
+        public static int NeedExp(int level)
+        {
+            return content.TryGetValue(level, out var config) ? config.exp : 0;
         }
     }
     #endregion
@@ -825,6 +1023,9 @@ public class ConfigManager : MonoBehaviour
         public static float card_coef_instant_heal_boost;        // 一次性回复生命（百分比）
         public static float card_coef_damage_below_half_hp;      // 生命低于一半时的增伤（百分比）
         public static float card_coef_damage_vs_higher_hp;       // 对生命比例高于自己的目标增伤（百分比）
+        public static int card_discard_exp_silver;               // 弃卡转经验：白银
+        public static int card_discard_exp_gold;                 // 弃卡转经验：黄金
+        public static int card_discard_exp_holo;                 // 弃卡转经验：炫彩
 
         public string key;
         public string description;
@@ -1113,6 +1314,15 @@ public class ConfigManager : MonoBehaviour
                     break;
                 case "card_coef_damage_vs_higher_hp":
                     card_coef_damage_vs_higher_hp = NonNegative(Float(row), row.key);
+                    break;
+                case "card_discard_exp_silver":
+                    card_discard_exp_silver = NonNegative(Int(row), row.key);
+                    break;
+                case "card_discard_exp_gold":
+                    card_discard_exp_gold = NonNegative(Int(row), row.key);
+                    break;
+                case "card_discard_exp_holo":
+                    card_discard_exp_holo = NonNegative(Int(row), row.key);
                     break;
                 default:
                     throw new FormatException($"[配表] {FileName} 的行「{row.key}」没有对应的静态字段");

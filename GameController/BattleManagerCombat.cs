@@ -144,6 +144,9 @@ public partial class BattleManager
 
     private void HandleDeath(EntityData entity)
     {
+        // 掉落必须在实体销毁前结算：经验与卡牌机会按 entity.csv 的掉落列发给归属方
+        GrantKillRewards(entity);
+
         // 击杀归属：击杀者由 lastAttacker 反查（归属已随死亡移除时算不出，例如同归于尽 → 不计）
         var killer = entity.lastAttacker;
         bool victimIsPlayer = entity.type.category == EntityCategory.Character_Attack ||
@@ -304,7 +307,7 @@ public partial class BattleManager
         if (!PlayerInfoList.TryGetValue(clientId, out var info)) return;
         bool isAttack = camp == PlayerCampType.Attack;
         EntityType characterType = isAttack ? info.attackCharacter : info.defenseCharacter;
-        int level = 1; // 玩家等级改为局内成长，复活沿用同一入口
+        int level = GetPlayerLevel(clientId); // 复活沿用局内等级，压制关系不因死亡丢失
 
         // 复活点：与开局出生共用同一个出生点（不去重）
         Vector3 pos = isAttack ? TerrainSpawns.AttackSpawn : TerrainSpawns.DefenseSpawn;

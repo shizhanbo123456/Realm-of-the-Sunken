@@ -258,6 +258,20 @@ public partial class NetworkManager : EnsBehaviour
         CallFuncRpc(ServerReceiveLobbyUpdateLocal, SendTo.RoomOwner, Delivery.Reliable, update, LocalToken);
     }
 
+    // 选卡：tier 决定消耗哪一档待抽次数，技能卡额外带上客户端抽到的技能 id
+    public void SendSelectCard(CSSelectCard card)
+    {
+        if (!CanSendWorldCommand) return;
+        CallFuncRpc(ServerReceiveSelectCardLocal, SendTo.RoomOwner, Delivery.Reliable, card, LocalToken);
+    }
+
+    // 弃卡：整组折算经验，服务器回推进度
+    public void SendDiscardCard(CSDiscardCard card)
+    {
+        if (!CanSendWorldCommand) return;
+        CallFuncRpc(ServerReceiveDiscardCardLocal, SendTo.RoomOwner, Delivery.Reliable, card, LocalToken);
+    }
+
     #region 加载期请求（客户端 → 服务器，逐步发送）
     public void SendLoadingAttackPlayerRequest()
     {
@@ -452,6 +466,13 @@ public partial class NetworkManager : EnsBehaviour
         CallFuncRpc(ClientReceiveSkillSyncLocal, to, Delivery.Reliable, info);
     }
 
+    // 局内进度：等级/经验/幸运/三档待抽次数，只发本人
+    public void SendPlayerProgress(int clientId, SCPlayerProgress info)
+    {
+        if (!TryGetSendTo(clientId, out var to)) return;
+        CallFuncRpc(ClientReceivePlayerProgressLocal, to, Delivery.Reliable, info);
+    }
+
     public void SendCombatLabel(int clientId, SCCombatLabel label)
     {
         if (!TryGetSendTo(clientId, out var to)) return;
@@ -625,6 +646,18 @@ public partial class NetworkManager : EnsBehaviour
     private void ServerReceiveLobbyUpdateLocal(CSLobbyUpdate update, int clientId)
     {
         if (Tool.BattleManager != null) Tool.BattleManager.ReceiveLobbyUpdate(clientId, update);
+    }
+
+    [Rpc]
+    private void ServerReceiveSelectCardLocal(CSSelectCard card, int clientId)
+    {
+        if (Tool.BattleManager != null) Tool.BattleManager.ApplyCard(clientId, card.tier, card.cardId, card.skillId);
+    }
+
+    [Rpc]
+    private void ServerReceiveDiscardCardLocal(CSDiscardCard card, int clientId)
+    {
+        if (Tool.BattleManager != null) Tool.BattleManager.DiscardCard(clientId, card.tier);
     }
 
     [Rpc]
@@ -836,7 +869,12 @@ public partial class NetworkManager : EnsBehaviour
         if (label == null) return;
         EventManager.TrigEvent(ClientEvent.OnCombatLabelDisplay, label);
     }
-
+    [Rpc]
+    private void ClientReceivePlayerProgressLocal(SCPlayerProgress info)
+    {
+        if (info == null) return;
+        EventManager.TrigEvent(ClientEvent.OnPlayerProgress, info);
+    }
     [Rpc]
     private void ClientReceiveScoreInfoLocal(SCScoreInfo info)
     {

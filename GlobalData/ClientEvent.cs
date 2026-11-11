@@ -18,6 +18,7 @@ public static class ClientEvent
     public const int OnDefensePointProgress = 10217; // param=SCDefensePointProgress 四个守护点的开采进度（0~100）
     public const int OnSkillBarRefresh = 10221; // 技能栏需要重渲染（持有表变化 / 选择面板应用 / 服务器快照到达）
     public const int OnLobbyInfoUpdate = 10222; // param=SCLobbyInfo 组队期房间成员/阵营/准备/AI 数量
+    public const int OnPlayerProgress = 10223; // param=SCPlayerProgress 本人等级/经验/幸运/三档待抽次数
     #endregion
 
     #region 实体表现（10230 段）
