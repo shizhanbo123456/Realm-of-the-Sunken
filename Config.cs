@@ -21,6 +21,26 @@ public static class Config
 
     #region 守护雕像（防守目标）
     public const int sage_statue_count = 3;
+
+    // 守护点下标（协议与战斗界面守护点面板一致）：0 主点 / 1~3 副点
+    public static EntityType GuardPointType(int index)
+    {
+        if (index < 0 || index > sage_statue_count)
+            throw new System.ArgumentOutOfRangeException(nameof(index), index, "守护点下标只有 0（主点）~ 3（副点）");
+        return index == 0 ? EntityType.KingStatue : EntityType.GuardStatue(index - 1);
+    }
+
+    // 守护点血量上限与名字都在这张表里（entity.csv「生命」「姓名」列）
+    public static ConfigManager.EntityConfig GuardPointConfig(int index) => ConfigManager.EntityConfig.GetByCategory(GuardPointType(index));
+
+    // 当前血量 → 被打掉的百分比（0~100）；血量为负说明守护点还没生成，按未受损算
+    public static int GuardPointDamagedPercent(int index, int health)
+    {
+        if (health < 0) return 0;
+        float max = GuardPointConfig(index).health;
+        if (max <= 0f) throw new System.FormatException($"[配表] entity.csv 守护点 {index} 的生命必须大于 0");
+        return Mathf.Clamp((int)(100f * (1f - health / max)), 0, 100);
+    }
     #endregion
 
     #region 资源与中立单位

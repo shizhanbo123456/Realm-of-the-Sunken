@@ -20,6 +20,8 @@ public class BattlePage : PageBase
     private readonly float labelDefaultSizeDistance = ConfigManager.GlobalVariableConfig.distance_of_label_default_size; // 飘字 scale=(1,1) 时的相机距离
     private UI_SkillTip skillTip;     // 技能悬浮提示（技能栏条目）
     private UI_BuffTip buffTip;       // buff 悬浮提示（任意 buff 图标）
+    private UI_QuickMessagePanel quickMessagePanel; // 快捷指令轮盘（挂在战斗信息面板里）
+    private GTextField levelLabel;    // 玩家栏等级数字（FGUI 侧未命名，按 n12 取）
     private int localPlayerCamp = -1; // 本地玩家阵营（随本地实体摘要更新；小地图敌我识别用）
     private bool spectatorMode;       // 纯观战方玩家（无战斗实体）
     private bool localPlayerAlive = true; // 本地玩家实体是否在场（死亡观战期间 false，显示观战下拉）
@@ -57,6 +59,9 @@ public class BattlePage : PageBase
     private static ushort OwnEntityId => HasSession ? Session.OwnEntityId : (ushort)0;
     private bool IsOwnEntity(int entityId) => HasSession && OwnEntityId == entityId;
 
+    // 技能栏挂在玩家栏里（UI_PlayerPanel.m_skill_list）
+    private UI_SkillList SkillBar => panel.m_playerPanel != null ? panel.m_playerPanel.m_skill_list : null;
+
     public BattlePage(UI_BattlePanel panel) : base(panel)
     {
         this.panel = panel;
@@ -64,14 +69,26 @@ public class BattlePage : PageBase
 
     public override void Construct()
     {
-        panel.m_batleInfoPanel.m_btn_setting.onClick.Add(ShowSettings);
-        panel.m_settings_panel.m_panrl.m_close.onClick.Add(HideSettings);
-        panel.m_settings_panel.m_btn_exit.onClick.Add(OnExitClicked); // 退出需二次确认（对局中退出不可逆）
+        var battleInfo = panel.m_BattleInfoPanel;
+        battleInfo.m_btn_settings.onClick.Add(ShowSettings);
+        battleInfo.m_btn_quick_message.onClick.Add(ToggleQuickMessage);
+
+        var settings = panel.m_SettingsPanel;
+        settings.m_panel.m_close.onClick.Add(HideSettings);
+        settings.m_settings_scroll_view.m_back_to_fight.onClick.Add(HideSettings);
+        settings.m_settings_scroll_view.m_exit.onClick.Add(OnExitClicked); // 退出需二次确认（对局中退出不可逆）
         BuildSettingTips();
-        panel.m_quickMessagePanel.Build();
+
+        // 快捷指令轮盘挂在战斗信息面板里，FGUI 侧还没命名
+        quickMessagePanel = battleInfo.GetChild("n5") as UI_QuickMessagePanel;
+        if (quickMessagePanel == null)
+            throw new System.FormatException("[战斗界面] BattleInfoPanel 的第 6 个子件不是快捷指令面板，检查 FGUI 结构");
+        quickMessagePanel.Build(SendQuickMessage);
+
         panel.m_showRegenerationBar.selectedIndex = 0; // 复活进度默认隐藏
-        panel.m_PlayerBar.m_buffList.m_list.itemRenderer =
+        panel.m_playerPanel.m_buffList.m_list.itemRenderer =
             (i, obj) => ((UI_buffItem)obj).Fill(localBuffs[i].type, localBuffs[i].level, ShowBuffTip, HideBuffTip);
+        levelLabel = panel.m_playerPanel.GetChild("n12") as GTextField; // 等级数字在 FGUI 侧还没命名
         panel.m_skillSelectPanel.Build(OnSkillSelectCommitted);
         panel.m_skillSelectPanel.Close();
         panel.m_selectCardPanel.Build(OnCardSelected, OnCardDiscarded, null); // 关闭 = 保留待抽次数
@@ -90,34 +107,36 @@ public class BattlePage : PageBase
     // 设置面板常驻战斗界面，开关只改显隐与点击拦截
     private void ShowSettings()
     {
-        panel.m_settings_panel.visible = true;
-        panel.m_settings_panel.touchable = true;
+        panel.m_SettingsPanel.visible = true;
+        panel.m_SettingsPanel.touchable = true;
     }
 
     private void HideSettings()
     {
-        panel.m_settings_panel.visible = false;
-        panel.m_settings_panel.touchable = false;
+        panel.m_SettingsPanel.visible = false;
+        panel.m_SettingsPanel.touchable = false;
     }
 
-    // 快捷消息面板：收起时按键展开；展开时按键发送并收起（按住 J 时附带相机瞄准点）
-    private void HideQuickMessage() => SetQuickMessageVisible(false);
-
-    private void SetQuickMessageVisible(bool visible)
+    // 快捷指令轮盘：点信息面板上的按钮开关；展开时按键 = 发送并收起（按住 J 时附带相机瞄准点）
+    private void ToggleQuickMessage()
     {
-        panel.m_quickMessagePanel.visible = visible;
-        panel.m_quickMessagePanel.touchable = visible; // 收起时不吃点击
+        if (quickMessagePanel == null) return;
+        if (quickMessagePanel.IsOpen) quickMessagePanel.Close();
+        else quickMessagePanel.Open();
     }
+
+    private void HideQuickMessage() => quickMessagePanel?.Close();
 
     private void HandleQuickMessageKey(int index)
     {
-        if (!panel.m_quickMessagePanel.visible)
+        if (quickMessagePanel == null) return;
+        if (!quickMessagePanel.IsOpen)
         {
-            SetQuickMessageVisible(true);
+            quickMessagePanel.Open();
             return;
         }
+        quickMessagePanel.Close();
         SendQuickMessage(index);
-        SetQuickMessageVisible(false);
     }
 
     private void SendQuickMessage(int index)
@@ -162,7 +181,7 @@ public class BattlePage : PageBase
         return false;
     }
 
-    // 说明来自 setting_tips：页签列表按配表行生成，点页签把该行内容填进说明列表的唯一条目
+    // 说明来自 setting_tips：规则页签按配表行生成，点页签把该行内容填进右上角的正文
     private void BuildSettingTips()
     {
         var keys = new List<int>(ConfigManager.SettingTipsConfig.content.Keys);
@@ -173,24 +192,19 @@ public class BattlePage : PageBase
             settingTabTexts.Add(ConfigManager.SettingTipsConfig.content[key].text.Replace(@"{\n}", "\n"));
         }
 
-        var tabs = panel.m_settings_panel.m_button_list;
+        var view = panel.m_SettingsPanel.m_settings_scroll_view;
+        var tabs = view.m_rule_buttons;
         tabs.itemRenderer = (i, obj) =>
         {
             var tab = obj.asButton;
-            tab.title = ConfigManager.SettingTipsConfig.content[settingTabKeys[i]].name; // 页签标题取配表「栏目名称」
+            // 页签标题写在条目自带的文本上（FGUI 里这个文本没命名）
+            var label = tab.GetChild("n3") as GTextField;
+            if (label != null) label.text = ConfigManager.SettingTipsConfig.content[settingTabKeys[i]].name;
             tab.selected = i == settingTab;
             int index = i;
             tab.onClick.Set(() => SelectSettingTab(index));
         };
-
-        var list = panel.m_settings_panel.m_content;
-        list.itemRenderer = (i, obj) =>
-        {
-            var label = (UI_SettingsRuleLabel)obj;
-            label.m_content.UBBEnabled = true; // 配表内容带 UBB 标记（加粗 / 颜色）
-            label.m_content.text = settingTabTexts[settingTab];
-            label.height = label.m_content.height; // 条目高度跟随文本，超框时靠列表拖动
-        };
+        view.m_rule_content.UBBEnabled = true; // 配表内容带 UBB 标记（加粗 / 颜色）
 
         tabs.numItems = settingTabKeys.Count;
         if (settingTabKeys.Count > 0) SelectSettingTab(0);
@@ -199,13 +213,11 @@ public class BattlePage : PageBase
     private void SelectSettingTab(int index)
     {
         settingTab = index;
-        var tabs = panel.m_settings_panel.m_button_list;
-        for (int i = 0; i < tabs.numChildren; i++)
-            tabs.GetChildAt(i).asButton.selected = i == index; // 页签选中态
+        var view = panel.m_SettingsPanel.m_settings_scroll_view;
+        for (int i = 0; i < view.m_rule_buttons.numChildren; i++)
+            view.m_rule_buttons.GetChildAt(i).asButton.selected = i == index; // 页签选中态
 
-        var list = panel.m_settings_panel.m_content;
-        list.numItems = 1; // 重设条目数触发重渲染，换成该页签的说明
-        if (list.scrollPane != null) list.scrollPane.posY = 0f; // 换栏回到顶部
+        view.m_rule_content.text = settingTabTexts[index];
     }
 
     public override void Enter(ShowParam param)
@@ -247,7 +259,7 @@ public class BattlePage : PageBase
         ClearEntityBars();
         HideAllTips();
         localBuffs.Clear();
-        panel.m_PlayerBar.m_buffList.m_list.numItems = 0;
+        panel.m_playerPanel.m_buffList.m_list.numItems = 0;
         panel.m_Minimap?.Reset(ConfigManager.GlobalVariableConfig.minimap_view_radius[0]); //每局回到默认档（首档），与服务器 ClearBattleState 对齐
         panel.m_largeMinimapPanel.Close();
         panel.m_godViewPanel.Close();
@@ -304,8 +316,8 @@ public class BattlePage : PageBase
             TickGodViewOpenKey();
         }
         //剩余时间（以快照校准的本地推演为准，重连/中途进入的起点由服务器补发）
-        if (HasSession && BattleTime != null && panel.m_batleInfoPanel.m_label_time_left != null)
-            panel.m_batleInfoPanel.m_label_time_left.text = FormatTime(Mathf.Max(0f, BattleTime.RemainTime));
+        if (HasSession && BattleTime != null && panel.m_BattleInfoPanel.m_time_left != null)
+            panel.m_BattleInfoPanel.m_time_left.text = FormatTime(Mathf.Max(0f, BattleTime.RemainTime));
         RefreshTimeIcon();
         TickMinimap();
         TickMinimapPanels(deltaTime);
@@ -317,7 +329,7 @@ public class BattlePage : PageBase
     // 冷却推演在 ClientSkillManager，这里只按节流重渲染冷却环与库存数
     private void TickLocalSkillCd(float deltaTime)
     {
-        if (spectatorMode || panel.m_skillList == null || !panel.m_skillList.IsBuilt) return;
+        if (spectatorMode || SkillBar == null || !SkillBar.IsBuilt) return;
         skillCdRefreshTimer -= deltaTime;
         if (skillCdRefreshTimer > 0f) return;
         skillCdRefreshTimer = 0.1f;
@@ -327,7 +339,7 @@ public class BattlePage : PageBase
     // 持有表变化 / 选择面板应用 / 消耗回执：下一帧立刻重画技能栏
     private void OnSkillBarRefresh()
     {
-        if (panel.m_skillList == null || !panel.m_skillList.IsBuilt) BuildSkillSlots(); // 首包到达时兜底搭栏
+        if (SkillBar == null || !SkillBar.IsBuilt) BuildSkillSlots(); // 首包到达时兜底搭栏
         skillCdRefreshTimer = 0f;
         panel.m_skillSelectPanel.RefreshHeld(Skills?.HeldSkills); // 打开期间新获得的技能要进列表
     }
@@ -493,16 +505,16 @@ public class BattlePage : PageBase
     {
         int count = Skills != null ? Skills.SlotCapacity : 0;
         if (count <= 0) count = 1; // 观战/属性取不到时至少露出一格
-        panel.m_skillList?.Build(count, ShowSkillTip, HideSkillTip);
+        SkillBar?.Build(count, ShowSkillTip, HideSkillTip);
         RefreshSkillBar();
     }
 
     // 只做取数：槽位技能、恢复进度、库存次数来自 ClientSkillManager，绘制归技能栏自身
     private void RefreshSkillBar()
     {
-        if (panel.m_skillList == null || !panel.m_skillList.IsBuilt) return;
+        if (SkillBar == null || !SkillBar.IsBuilt) return;
         skillSlots.Clear();
-        int count = panel.m_skillList.SlotCount;
+        int count = SkillBar.SlotCount;
         var recharge = Skills != null ? Skills.Recharge : null;
         for (int i = 0; i < count; i++)
         {
@@ -519,13 +531,13 @@ public class BattlePage : PageBase
                 unlimited || recharge == null ? 0 : recharge.GetStore(skillId),
                 unlimited));
         }
-        panel.m_skillList.Refresh(skillSlots);
+        SkillBar.Refresh(skillSlots);
     }
 
     #region 技能选择面板
     private void ToggleSkillSelect()
     {
-        if (spectatorMode || !HasSession || panel.m_skillList == null || !panel.m_skillList.IsBuilt) return;
+        if (spectatorMode || !HasSession || SkillBar == null || !SkillBar.IsBuilt) return;
         if (panel.m_skillSelectPanel.IsOpen) panel.m_skillSelectPanel.Commit(); // 关闭即应用，与关闭按钮同一路径
         else panel.m_skillSelectPanel.Open(Skills?.HeldSkills, Skills?.ActiveSkills, Skills != null ? Skills.SlotCapacity : 0);
     }
@@ -538,66 +550,119 @@ public class BattlePage : PageBase
     }
     #endregion
 
-    // 守护点进度只认 SCDefensePointProgress（服务器算好的 0~100 开采比例），不再从实体表现包里取血量
+    #region 守护点（主点 + 3 个副点）
+    private readonly int[] guardianHealth = { -1, -1, -1, -1 }; // 当前血量，-1 = 还没收到/还没生成
+
+    // 只认 SCDefensePointProgress 的当前血量；上限、名字读 entity.csv，百分比在客户端算
     private void OnDefensePointProgress(SCDefensePointProgress info)
     {
         if (info == null) return;
-        ApplyStatueProgress(panel.m_barPanel.m_progressMain, info.main);
-        ApplyStatueProgress(panel.m_barPanel.m_progressSub1, info.sub1);
-        ApplyStatueProgress(panel.m_barPanel.m_progressSub2, info.sub2);
-        ApplyStatueProgress(panel.m_barPanel.m_progressSub3, info.sub3);
-    }
-
-    private static void ApplyStatueProgress(UI_DefensivePointBar bar, int progress)
-    {
-        if (bar == null) return;
-        int clamped = Mathf.Clamp(progress, 0, 100);
-        bar.m_destroyed.selectedIndex = clamped >= 100 ? 1 : 0;
-        bar.m_fill.scale = new Vector2(clamped / 100f, bar.m_fill.scale.y);
+        guardianHealth[0] = info.mainHealth;
+        guardianHealth[1] = info.sub1Health;
+        guardianHealth[2] = info.sub2Health;
+        guardianHealth[3] = info.sub3Health;
+        RefreshGuardianPanels();
     }
 
     private void ResetGuardStatues()
     {
-        ResetStatue(panel.m_barPanel.m_progressMain);
-        ResetStatue(panel.m_barPanel.m_progressSub1);
-        ResetStatue(panel.m_barPanel.m_progressSub2);
-        ResetStatue(panel.m_barPanel.m_progressSub3);
+        for (int i = 0; i < guardianHealth.Length; i++) guardianHealth[i] = -1;
+        RefreshGuardianPanels(); // 复位成满血/未摧毁，等第一包覆盖
     }
 
-    private static void ResetStatue(UI_DefensivePointBar bar)
+    private void RefreshGuardianPanels()
+    {
+        var bars = panel.m_barPanel;
+        if (bars == null) return;
+        ApplyMainGuardian(bars.m_main, 0);
+        ApplySubGuardian(bars.m_sub1, 1);
+        ApplySubGuardian(bars.m_sub2, 2);
+        ApplySubGuardian(bars.m_sub3, 3);
+    }
+
+    private void ApplyMainGuardian(UI_MainGuardianPanel guardian, int index)
+    {
+        if (guardian == null) return;
+        float ratio = GuardRatio(index, out int health, out int max);
+        if (guardian.m_Name != null) guardian.m_Name.text = Config.GuardPointConfig(index).name;
+        if (guardian.m_health_label != null) guardian.m_health_label.text = $"{health}/{max}";
+        if (guardian.m_health_percentage != null) guardian.m_health_percentage.text = $"{Mathf.RoundToInt(ratio * 100f)}%";
+        // 守护层数 = 还没被打掉的副点数量
+        if (guardian.m_protection_layer_count != null) guardian.m_protection_layer_count.text = AliveSubCount().ToString();
+        SetGuardianBarFill(guardian.m_bar, ratio);
+    }
+
+    private void ApplySubGuardian(UI_SubGuardianPanel guardian, int index)
+    {
+        if (guardian == null) return;
+        float ratio = GuardRatio(index, out _, out _);
+        if (guardian.m_guardian_name != null) guardian.m_guardian_name.text = Config.GuardPointConfig(index).name;
+        if (guardian.m_health_percentage != null) guardian.m_health_percentage.text = $"{Mathf.RoundToInt(ratio * 100f)}%";
+        if (guardian.m_killed != null) guardian.m_killed.selectedIndex = ratio <= 0f ? 1 : 0;
+        SetGuardianBarFill(guardian.m_bar, ratio);
+    }
+
+    // 血量未知（守护点还没生成）按满血算，避免开局显示成空槽
+    private float GuardRatio(int index, out int health, out int max)
+    {
+        max = Mathf.Max(1, Mathf.RoundToInt(Config.GuardPointConfig(index).health));
+        health = guardianHealth[index] < 0 ? max : guardianHealth[index];
+        return Mathf.Clamp01((float)health / max);
+    }
+
+    private int AliveSubCount()
+    {
+        int alive = 0;
+        for (int i = 1; i < guardianHealth.Length; i++)
+            if (guardianHealth[i] != 0) alive++; // 0 = 已摧毁
+        return alive;
+    }
+
+    // 守护点血条没有 fillAmount，按横向缩放裁填充图（FGUI 里填充图没命名）
+    private static void SetGuardianBarFill(GComponent bar, float ratio)
     {
         if (bar == null) return;
-        bar.m_destroyed.selectedIndex = 0;
-        bar.m_fill.scale = new Vector2(0f, bar.m_fill.scale.y);
+        var fill = bar.GetChild("n0");
+        if (fill != null) fill.scale = new Vector2(ratio, fill.scale.y);
     }
+    #endregion
 
     private void UpdateLocalPlayerBar(SCEntityDisplayInfo info)
     {
-        var bar = panel.m_PlayerBar;
-        if (bar == null) return;
+        var playerPanel = panel.m_playerPanel;
+        if (playerPanel == null) return;
         var vitals = ResolveVitals(info);
-        bar.m_bar_fill_health.fillAmount = vitals.maxHealth > 0 ? Mathf.Clamp01((float)vitals.health / vitals.maxHealth) : 0f;
-        if (bar.m_label_health != null) bar.m_label_health.text = $"{vitals.health}/{vitals.maxHealth}";
-        if (info.hasBuffs) RefreshBuffList(bar.m_buffList.m_list, localBuffs, info.buffs);
+        if (playerPanel.m_bar_health != null && playerPanel.m_bar_health.m_fill != null)
+            playerPanel.m_bar_health.m_fill.fillAmount = vitals.maxHealth > 0 ? Mathf.Clamp01((float)vitals.health / vitals.maxHealth) : 0f;
+        if (playerPanel.m_label_health != null) playerPanel.m_label_health.text = $"{vitals.health}/{vitals.maxHealth}";
+        if (info.hasBuffs) RefreshBuffList(playerPanel.m_buffList.m_list, localBuffs, info.buffs);
     }
 
     private void OnScoreUpdate(SCScoreInfo info)
     {
         if (info == null) return;
-        if (panel.m_batleInfoPanel.m_label_time_left != null) panel.m_batleInfoPanel.m_label_time_left.text = FormatTime(Mathf.Max(0f, info.remainTime));
+        if (panel.m_BattleInfoPanel.m_time_left != null) panel.m_BattleInfoPanel.m_time_left.text = FormatTime(Mathf.Max(0f, info.remainTime));
     }
 
     private void OnCampAliveCount(SCCampAliveCount info) => RefreshCampAliveCount(info);
 
+    // 三方阵营信息：每行自带 c1 控制器（0 攻 / 1 守 / 2 观战），是不是自己阵营交给 is_in_tis_camp
     private void RefreshCampAliveCount(SCCampAliveCount info)
     {
         if (info == null) return;
-        if (panel.m_batleInfoPanel.m_attacker_member_count != null)
-            panel.m_batleInfoPanel.m_attacker_member_count.text = $"{info.attackerAlive}/{info.attackerTotal}";
-        if (panel.m_batleInfoPanel.m_defense_member_count != null)
-            panel.m_batleInfoPanel.m_defense_member_count.text = $"{info.defenseAlive}/{info.defenseTotal}";
-        if (panel.m_batleInfoPanel.m_spectater_member_count != null)
-            panel.m_batleInfoPanel.m_spectater_member_count.text = info.spectatorCount.ToString();
+        var camps = panel.m_CampInfoPanel;
+        if (camps == null) return;
+        ApplyCampCount(camps.m_camp_attack, info.attackerAlive);
+        ApplyCampCount(camps.m_camp_defense, info.defenseAlive);
+        ApplyCampCount(camps.m_camp_spectate, info.spectatorCount);
+    }
+
+    private void ApplyCampCount(UI_CampInfo row, int count)
+    {
+        if (row == null) return;
+        if (row.m_member_count != null) row.m_member_count.text = count.ToString();
+        if (row.m_is_in_tis_camp != null)
+            row.m_is_in_tis_camp.selectedIndex = row.m_c1 != null && row.m_c1.selectedIndex == localPlayerCamp ? 1 : 0;
     }
 
     private void OnMinimapUpdate(SCMinimapEntity e)
@@ -940,8 +1005,9 @@ public class BattlePage : PageBase
 
     private void RefreshTimeIcon()
     {
-        if (panel.m_batleInfoPanel.m_icon_day_night == null) return;
-        panel.m_batleInfoPanel.m_icon_day_night.rotation = 180f - EnvironmentManager.Time01 * 180f;
+        var dayNight = panel.m_BattleInfoPanel != null ? panel.m_BattleInfoPanel.m_display_day_night : null;
+        if (dayNight == null || dayNight.m_pointer == null) return;
+        dayNight.m_pointer.rotation = 180f - EnvironmentManager.Time01 * 180f;
     }
 
     private static string FormatTime(float seconds)
@@ -1022,12 +1088,13 @@ public class BattlePage : PageBase
     // 左上角等级 / 经验条：等级上限取自 character_upgrade_exp.csv，满级显示 MAX
     private void RefreshProgressHud()
     {
-        var bar = panel.m_PlayerBar;
-        if (bar == null) return;
+        var playerPanel = panel.m_playerPanel;
+        if (playerPanel == null) return;
         int need = ConfigManager.CharacterExpConfig.NeedExp(cardLevel + 1);
-        if (bar.m_label_current_label != null) bar.m_label_current_label.text = $"Lv.{cardLevel}";
-        if (bar.m_bar_fill_exp != null) bar.m_bar_fill_exp.fillAmount = need > 0 ? Mathf.Clamp01((float)cardExp / need) : 1f;
-        if (bar.m_label_exp != null) bar.m_label_exp.text = need > 0 ? $"{cardExp}/{need}" : "MAX";
+        if (levelLabel != null) levelLabel.text = cardLevel.ToString();
+        if (playerPanel.m_bar_exp != null && playerPanel.m_bar_exp.m_fill != null)
+            playerPanel.m_bar_exp.m_fill.fillAmount = need > 0 ? Mathf.Clamp01((float)cardExp / need) : 1f;
+        if (playerPanel.m_label_exp != null) playerPanel.m_label_exp.text = need > 0 ? $"{cardExp}/{need}" : "MAX";
     }
 
     private void RefreshCardButtons()

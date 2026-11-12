@@ -7,6 +7,7 @@ namespace Ros.UI.Main
 {
     public partial class UI_AttrItem : GComponent
     {
+        public GList m_progressBar;
         public GTextField m_attrName;
         public GTextField m_attrValue;
         public const string URL = "ui://q68vr2bftwqeh5";
@@ -20,6 +21,7 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
+            m_progressBar = (GList)GetChildAt(0);
             m_attrName = (GTextField)GetChildAt(1);
             m_attrValue = (GTextField)GetChildAt(2);
         }

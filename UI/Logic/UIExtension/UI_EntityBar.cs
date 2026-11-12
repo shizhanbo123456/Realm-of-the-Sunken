@@ -31,10 +31,9 @@ namespace Ros.UI.Main
             m_is_enemy.selectedIndex = IsEnemy(camp, myCamp) ? 1 : 0;
             if (m_entity_name != null) m_entity_name.text = entityName ?? "";
 
-            // 友/敌两条血条由 m_is_enemy 互斥显示，两条都写同一个比例
+            // 血条只有一条，敌我配色由 m_is_enemy 换色，比例直接写进填充图
             float ratio = maxHealth > 0 ? Mathf.Clamp01((float)health / maxHealth) : 0f;
-            m_bar_fill_health_partner.fillAmount = ratio;
-            m_bar_fill_health_enemy.fillAmount = ratio;
+            if (m_bar != null && m_bar.m_fill != null) m_bar.m_fill.fillAmount = ratio;
             if (m_label_health != null) m_label_health.text = $"{health}/{maxHealth}";
 
             if (buffData != null && m_buff_list != null && m_buff_list.m_list != null)

@@ -430,8 +430,7 @@ namespace Ros.UI.Main
         private void FillHealth(SCGodViewEntityDetail info)
         {
             float ratio = info.maxHealth > 0 ? Mathf.Clamp01((float)info.health / info.maxHealth) : 0f;
-            if (m_bar_fill_health_partner != null) m_bar_fill_health_partner.fillAmount = ratio;
-            if (m_bar_fill_health_enemy != null) m_bar_fill_health_enemy.fillAmount = ratio;
+            if (m_bar_health != null && m_bar_health.m_fill != null) m_bar_health.m_fill.fillAmount = ratio;
             if (m_label_health != null) m_label_health.text = $"{info.health}/{info.maxHealth}";
         }
 

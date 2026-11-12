@@ -380,8 +380,8 @@ public partial class BattleManager
         visionStates.Clear(); // 每局视野锚点与观战状态重置
         skillFailPromptTime.Clear();
         lastAttackerTotal = lastDefenseTotal = lastAttackerAlive = lastDefenseAlive = -1; // 每局重置，保证开局首帧必发
-        System.Array.Clear(defensePointProgress, 0, defensePointProgress.Length);
-        for (int i = 0; i < sentDefensePointProgress.Length; i++) sentDefensePointProgress[i] = -1; // 同上：开局必发一次
+        for (int i = 0; i < defensePointHealth.Length; i++) defensePointHealth[i] = -1; // 守护点未生成前血量未知
+        for (int i = 0; i < sentDefensePointHealth.Length; i++) sentDefensePointHealth[i] = -1; // 同上：开局必发一次
         plagueGuardReadyTime.Clear();
     }
 
@@ -389,12 +389,12 @@ public partial class BattleManager
     private void InvalidateBroadcastSnapshots()
     {
         lastAttackerTotal = lastDefenseTotal = lastAttackerAlive = lastDefenseAlive = lastSpectatorCount = -1;
-        for (int i = 0; i < sentDefensePointProgress.Length; i++) sentDefensePointProgress[i] = -1;
+        for (int i = 0; i < sentDefensePointHealth.Length; i++) sentDefensePointHealth[i] = -1;
     }
 
-    #region 守护点开采进度（0~100，与视野解耦，变更即广播）
-    private readonly int[] defensePointProgress = new int[4];       // 0 主点 / 1~3 副点
-    private readonly int[] sentDefensePointProgress = { -1, -1, -1, -1 };
+    #region 守护点当前血量（与视野解耦，变更即广播；上限与名字由客户端读 entity.csv）
+    private readonly int[] defensePointHealth = { -1, -1, -1, -1 }; // 0 主点 / 1~3 副点，-1 = 未生成
+    private readonly int[] sentDefensePointHealth = { -1, -1, -1, -1 };
 
     private void TickDefensePointProgress()
     {
@@ -403,31 +403,32 @@ public partial class BattleManager
             if (statue == null) continue;
             int index = DefensePointIndexOf(statue);
             if (index < 0) continue;
-            defensePointProgress[index] = ProgressOf(statue);
+            defensePointHealth[index] = HealthOf(statue);
         }
 
         bool changed = false;
-        for (int i = 0; i < defensePointProgress.Length; i++)
+        for (int i = 0; i < defensePointHealth.Length; i++)
         {
-            if (defensePointProgress[i] == sentDefensePointProgress[i]) continue;
-            sentDefensePointProgress[i] = defensePointProgress[i];
+            if (defensePointHealth[i] == sentDefensePointHealth[i]) continue;
+            sentDefensePointHealth[i] = defensePointHealth[i];
             changed = true;
         }
         if (!changed) return;
 
         Tool.NetworkManager.SendDefensePointProgress(new SCDefensePointProgress()
         {
-            main = defensePointProgress[0],
-            sub1 = defensePointProgress[1],
-            sub2 = defensePointProgress[2],
-            sub3 = defensePointProgress[3],
+            mainHealth = defensePointHealth[0],
+            sub1Health = defensePointHealth[1],
+            sub2Health = defensePointHealth[2],
+            sub3Health = defensePointHealth[3],
         });
     }
 
+    // 实体销毁后算不出血量，血量在这里定死 0
     private void MarkDefensePointDestroyed(EntityData statue)
     {
         int index = DefensePointIndexOf(statue);
-        if (index >= 0) defensePointProgress[index] = 100;
+        if (index >= 0) defensePointHealth[index] = 0;
     }
 
     private static int DefensePointIndexOf(EntityData statue)
@@ -437,15 +438,8 @@ public partial class BattleManager
         return statue.type.value >= 0 && statue.type.value < Config.sage_statue_count ? statue.type.value + 1 : -1;
     }
 
-    // 满血 0、打空 100：血量归零单独判，避免浮点误差把最后一格停在 99
-    private static int ProgressOf(EntityData statue)
-    {
-        float max = statue.attributes.MaxHealth;
-        if (max <= 0f) return 0;
-        float health = statue.attributes.Health;
-        if (health <= 0f) return 100;
-        return Mathf.Clamp((int)(100f * (1f - health / max)), 0, 100);
-    }
+    // 血量向下取整，客户端显示与进度条用同一个数
+    private static int HealthOf(EntityData statue) => Mathf.Max(0, Mathf.FloorToInt(statue.attributes.Health));
     #endregion
 
     #region 技能释放回执

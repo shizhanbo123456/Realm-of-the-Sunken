@@ -982,7 +982,7 @@ public sealed class AiCommandLine : ClientSubManager
             reply("错误：尚未收到守护点数据");
             return;
         }
-        reply($"主={guardProgress.main} 副1={guardProgress.sub1} 副2={guardProgress.sub2} 副3={guardProgress.sub3}（0~100 被打掉的百分比）");
+        reply($"主={guardProgress.mainHealth} 副1={guardProgress.sub1Health} 副2={guardProgress.sub2Health} 副3={guardProgress.sub3Health}（当前血量，上限读 entity.csv）");
     }
 
     private void SetCameraRender(string[] args, Action<string> reply)

@@ -5,22 +5,20 @@ using FairyGUI.Utils;
 
 namespace Ros.UI.Main
 {
-    public partial class UI_DefensivePointBar : GComponent
+    public partial class UI_BarEntity : GComponent
     {
-        public Controller m_destroyed;
         public GImage m_fill;
-        public const string URL = "ui://q68vr2bfrzmhih";
+        public const string URL = "ui://q68vr2bfsmy0rp";
 
-        public static UI_DefensivePointBar CreateInstance()
+        public static UI_BarEntity CreateInstance()
         {
-            return (UI_DefensivePointBar)UIPackage.CreateObject("Main", "DefensivePointBar");
+            return (UI_BarEntity)UIPackage.CreateObject("Main", "BarEntity");
         }
 
         public override void ConstructFromXML(XML xml)
         {
             base.ConstructFromXML(xml);
 
-            m_destroyed = GetControllerAt(0);
             m_fill = (GImage)GetChildAt(1);
         }
     }

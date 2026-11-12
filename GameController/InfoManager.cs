@@ -11,6 +11,39 @@ public class InfoManager : MonoBehaviour
 
     public int ground_layer;
 
+    #region 聊天配色（ChatItem 正文按 UBB 拼接：频道名 + 发送者 + 内容）
+    [Tooltip("频道标签（[全频道] / [阵营] / [附近] / [系统]）的文字颜色")]
+    public Color chat_channel_color = new Color(0.66f, 0.66f, 0.66f, 1f);
+
+    [Tooltip("进攻方玩家名的文字颜色")]
+    public Color chat_name_attack_color = new Color(0.98f, 0.38f, 0.42f, 1f);
+
+    [Tooltip("防守方玩家名的文字颜色")]
+    public Color chat_name_defense_color = new Color(0.23f, 0.66f, 1f, 1f);
+
+    [Tooltip("观战方玩家名的文字颜色")]
+    public Color chat_name_spectate_color = new Color(1f, 0.88f, 0.25f, 1f);
+
+    [Tooltip("聊天正文的文字颜色")]
+    public Color chat_content_color = Color.white;
+
+    public string ChatChannelColorHex => ColorUtility.ToHtmlStringRGB(chat_channel_color);
+
+    public string ChatContentColorHex => ColorUtility.ToHtmlStringRGB(chat_content_color);
+
+    // 发送者名颜色只按玩家阵营三分类取，中立不属于玩家阵营
+    public string ChatNameColorHex(int camp)
+    {
+        switch (camp)
+        {
+            case (int)PlayerCampType.Attack: return ColorUtility.ToHtmlStringRGB(chat_name_attack_color);
+            case (int)PlayerCampType.Defense: return ColorUtility.ToHtmlStringRGB(chat_name_defense_color);
+            case (int)PlayerCampType.Spectator: return ColorUtility.ToHtmlStringRGB(chat_name_spectate_color);
+            default: throw new System.ArgumentOutOfRangeException(nameof(camp), camp, "聊天发送者阵营只有 0 进攻 / 1 防守 / 2 观战");
+        }
+    }
+    #endregion
+
     #region 属性（数据源：StreamingAssets/ConfigData/entity.csv）
     public ConfigManager.EntityConfig GetEntityConfig(EntityType type)
     {

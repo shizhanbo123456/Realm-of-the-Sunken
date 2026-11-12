@@ -581,6 +581,13 @@ public partial class NetworkManager : EnsBehaviour
         CallFuncRpc(ClientReceiveChatLocal, SendTo.ExcludeSender, Delivery.Reliable, chat);
     }
 
+    // 聊天单播：附近频道按距离逐个下发
+    public void SendChat(int clientId, SCChat chat)
+    {
+        if (chat == null || !TryGetSendTo(clientId, out var to)) return;
+        CallFuncRpc(ClientReceiveChatLocal, to, Delivery.Reliable, chat);
+    }
+
     // 快捷消息下发：只发给同阵营的真人（人机在服务器侧直接消费）
     public void SendQuickMessage(int clientId, SCQuickMessage message)
     {

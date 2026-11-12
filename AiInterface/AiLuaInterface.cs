@@ -476,6 +476,7 @@ public sealed class AiLuaApi
     #endregion
 
     #region 读：守护点与昼夜
+    // 0~100 = 被打掉的血量百分比（AI 侧口径），-1 = 还没收到守护点数据
     public int guard_progress(int index)
     {
         var commands = AiCommandLine.Current;
@@ -483,10 +484,10 @@ public sealed class AiLuaApi
         var info = commands.GuardSnapshot;
         switch (index)
         {
-            case 0: return info.main;
-            case 1: return info.sub1;
-            case 2: return info.sub2;
-            case 3: return info.sub3;
+            case 0: return Config.GuardPointDamagedPercent(0, info.mainHealth);
+            case 1: return Config.GuardPointDamagedPercent(1, info.sub1Health);
+            case 2: return Config.GuardPointDamagedPercent(2, info.sub2Health);
+            case 3: return Config.GuardPointDamagedPercent(3, info.sub3Health);
             default: return -1;
         }
     }

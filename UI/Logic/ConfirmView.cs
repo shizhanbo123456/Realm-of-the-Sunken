@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FairyGUI;
 using Ros.UI.Main;
 using UnityEngine;
@@ -22,8 +22,8 @@ public class ConfirmView
         GRoot.inst.AddChild(panel);
         panel.visible = false;
 
-        panel.m_btn_confirm.onClick.Add(OnConfirmClicked);
-        panel.m_btn_cancel.onClick.Add(OnCancelClicked);
+        panel.m_confirm.onClick.Add(OnConfirmClicked);
+        panel.m_cancel.onClick.Add(OnCancelClicked);
     }
 
     public void Shutdown()

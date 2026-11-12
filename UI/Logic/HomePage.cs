@@ -78,7 +78,8 @@ public class HomePage : PageBase
 
         renamePanel.m_input.maxLength = ConfigManager.GlobalVariableConfig.name_length_max;
         renamePanel.m_confirm.onClick.Add(CommitRename);
-        renamePanel.m_panel.m_close.onClick.Set(CloseRename); // 关闭 = 放弃修改
+        renamePanel.m_panel.m_close.onClick.Set(CloseRename); // 关闭 / 取消 = 放弃修改
+        renamePanel.m_cancel.onClick.Set(CloseRename);
     }
 
     private void OpenRename()

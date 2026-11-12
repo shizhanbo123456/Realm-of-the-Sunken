@@ -757,7 +757,31 @@ public partial class BattleManager : EnsBehaviour
     public void ReceiveChat(int clientId, CSChat chat)
     {
         if (chat == null) return;
-        Tool.NetworkManager.SendChat(BuildChat(clientId, chat.channel, chat.content));
+        var message = BuildChat(clientId, chat.channel, chat.content);
+        if (chat.channel == (int)ChatChannel.Nearby)
+        {
+            SendNearbyChat(clientId, message);
+            return;
+        }
+        Tool.NetworkManager.SendChat(message);
+    }
+
+    // 附近频道：只发给「操控的实体」在发送者 chat_nearby_radius 米内的玩家；观战方没有实体，发不出也收不到
+    private void SendNearbyChat(int senderClientId, SCChat message)
+    {
+        EntityData sender = GetEntityOfClient(senderClientId);
+        if (sender == null) return;
+
+        float radius = ConfigManager.GlobalVariableConfig.chat_nearby_radius;
+        Vector3 from = sender.transform.position;
+        foreach (int targetClientId in PlayerInfoList.Keys)
+        {
+            if (targetClientId == senderClientId) continue; // 发送方本地已回显
+            EntityData target = GetEntityOfClient(targetClientId);
+            if (target == null) continue;                                    // 观战方 / 已无实体
+            if (!IsInRadius(from, target.transform.position, radius)) continue;
+            Tool.NetworkManager.SendChat(targetClientId, message);
+        }
     }
 
     // 组装一条完整聊天消息：发送方名字、阵营、角色头像都只有服务器知道

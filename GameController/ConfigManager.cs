@@ -936,6 +936,7 @@ public class ConfigManager : MonoBehaviour
         public static List<float> godView_scale;        // 上帝视角地图放大比例：区域边长 = terrain_size / 倍率，首档即默认档
         public static float godView_marker_scale;       // 上帝视角点位放大倍数（点位设计尺寸 × 此值）
         public static float entity_character_visiable_radius; // 角色在客户端场景显示的距离（与角色视野属性解耦）
+        public static float chat_nearby_radius;         // 「附近」频道广播半径（米）
         public static int day_duration;                 // 默认白天时长
         public static int night_duration;               // 默认晚上时长
         public static int distance_of_bar_default_size; // 实体血条为设计大小时的距离
@@ -1063,6 +1064,9 @@ public class ConfigManager : MonoBehaviour
                     break;
                 case "entity_character_visiable_radius":
                     entity_character_visiable_radius = Positive(Float(row), row.key);
+                    break;
+                case "chat_nearby_radius":
+                    chat_nearby_radius = Positive(Float(row), row.key);
                     break;
                 case "day_duration":
                     day_duration = Int(row);

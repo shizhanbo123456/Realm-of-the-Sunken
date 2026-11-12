@@ -10,6 +10,7 @@ namespace Ros.UI.Main
         public UI_panel_2 m_panel;
         public GTextInput m_input;
         public GButton m_confirm;
+        public GButton m_cancel;
         public const string URL = "ui://q68vr2bfpkovnp";
 
         public static UI_RemanePanel CreateInstance()
@@ -22,8 +23,9 @@ namespace Ros.UI.Main
             base.ConstructFromXML(xml);
 
             m_panel = (UI_panel_2)GetChildAt(1);
-            m_input = (GTextInput)GetChildAt(2);
-            m_confirm = (GButton)GetChildAt(4);
+            m_input = (GTextInput)GetChildAt(3);
+            m_confirm = (GButton)GetChildAt(5);
+            m_cancel = (GButton)GetChildAt(6);
         }
     }
 }
