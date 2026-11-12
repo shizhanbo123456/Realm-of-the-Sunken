@@ -47,11 +47,8 @@ MonoBehaviour:
   buildings:
   - {fileID: 166524, guid: 7205be990a371ef41842ce99131d7a18, type: 3}
   - {fileID: 155482, guid: b2a632f305b6f4049964a59c5af41bb9, type: 3}
-  - {fileID: 170448, guid: 13851e0b9a0affa4993005e263d61c63, type: 3}
   - {fileID: 196248, guid: 8826c161e959710488e80f441d3b7b0f, type: 3}
   - {fileID: 139000, guid: 89791fe3433fc8847bd630f5389dee26, type: 3}
-  - {fileID: 114204, guid: 7ed5110fcf74ebb4487e69de550c88da, type: 3}
-  - {fileID: 141208, guid: d88482874eba20042a448711bb5d1fd8, type: 3}
   decorations:
   - {fileID: 172694, guid: 8db281a96b827554ea5aa906cfda800b, type: 3}
   - {fileID: 174638, guid: bf76e5a459c1fb74c8b8f639e6124b45, type: 3}
