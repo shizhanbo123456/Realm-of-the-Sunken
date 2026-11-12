@@ -68,7 +68,7 @@ namespace Ros.UI.Main
             {
                 for (int i = 0; i < m_list.numChildren; i++)
                 {
-                    if (m_list.GetChildAt(i) is UI_Card card && card.m_hide != null) card.m_hide.Play(null, 1, i * 0.04f);
+                    if (m_list.GetChildAt(i) is UI_Card card && card.m_hide != null) card.m_hide.Play(1, i * 0.04f, null);
                 }
             }
             int token = ++closeToken;
@@ -135,18 +135,17 @@ namespace Ros.UI.Main
             }
 
             if (card.m_btn_select != null) card.m_btn_select.onClick.Set(() => Select(roll));
-            if (card.m_show != null) card.m_show.Play(null, 1, index * CardShowStagger);
+            if (card.m_show != null) card.m_show.Play(1, index * CardShowStagger, null);
         }
 
         // 弃卡折算的经验值与服务器口径一致（同一份配表）
         private static int DiscardExp(CardTier tier)
         {
-            var gv = ConfigManager.GlobalVariableConfig;
             return tier switch
             {
-                CardTier.Silver => gv.card_discard_exp_silver,
-                CardTier.Gold => gv.card_discard_exp_gold,
-                _ => gv.card_discard_exp_holo,
+                CardTier.Silver => ConfigManager.GlobalVariableConfig.card_discard_exp_silver,
+                CardTier.Gold => ConfigManager.GlobalVariableConfig.card_discard_exp_gold,
+                _ => ConfigManager.GlobalVariableConfig.card_discard_exp_holo,
             };
         }
     }

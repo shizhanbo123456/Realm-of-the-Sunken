@@ -29,6 +29,11 @@ public class UIManager : MonoBehaviour
     // 加载界面：独立子界面（不挂页面），默认隐藏，由外部 ShowLoading / HideLoading 控制
     private UI_LoadingPanel loading;
     private const int LoadingPageCount = 3; // m_page 档位数（0~2）
+
+    // 电视机助理：常驻表现层，表情与台词全部来自 assistant_expression.csv
+    private UI_RobotTV robotTv;
+    private const float RobotTvMargin = 18f;   // 距屏幕右、下边缘的实际像素
+
     private PageBase currentPage;
     private int lastScreenWidth, lastScreenHeight;
 
@@ -69,6 +74,7 @@ public class UIManager : MonoBehaviour
             loading.m_show_bar.selectedIndex = 0; // 未设置进度前不显示进度条
             loading.visible = false;
             GRoot.inst.AddChild(loading);
+
             Debug.Log($"[UIManager] 页面已创建：home={home != null}, lobby={lobby != null}, battle={battle != null}, chat={chat != null}");
 
             //注册回调/渲染器（Construct 里会设置 GList.itemRenderer，必须在设置 numItems 之前完成）
@@ -94,6 +100,12 @@ public class UIManager : MonoBehaviour
             EventManager.AddEvent(ClientEvent.OnRestartGame, OnRestartGame);
             EventManager.AddEvent(ClientEvent.OnExitWorld, OnExitWorld);
             EventManager.AddEvent<int>(ClientEvent.OnShowPrompt, OnShowPrompt);
+
+            // 助理放最后创建：加在 GRoot 最上层，且它的配表校验失败不会影响上面整段初始化
+            robotTv = UI_RobotTV.CreateInstance();
+            GRoot.inst.AddChild(robotTv);
+            robotTv.Construct();
+            ApplyRobotTvLayout();
         }
         catch (System.Exception e)
         {
@@ -113,6 +125,7 @@ public class UIManager : MonoBehaviour
         if (gm != null) gm.Shutdown();
         if (Confirm != null) Confirm.Shutdown();
         if (Settlement != null) Settlement.Shutdown();
+        if (robotTv != null) robotTv.Shutdown();
     }
 
     private void Update()
@@ -120,6 +133,7 @@ public class UIManager : MonoBehaviour
         if (Screen.width != lastScreenWidth || Screen.height != lastScreenHeight) ApplyResize();
         if (currentPage != null) currentPage.Tick(Time.deltaTime);
         if (gm != null) gm.Tick();
+        if (robotTv != null) robotTv.Tick(Time.deltaTime);
         TickFloating();
     }
 
@@ -141,6 +155,14 @@ public class UIManager : MonoBehaviour
             loading.SetXY((GRoot.inst.width - loading.width * scale) * 0.5f,
                 (GRoot.inst.height - loading.height * scale) * 0.5f);
         }
+        if (robotTv != null) ApplyRobotTvLayout();
+    }
+
+    // 助理固定贴屏幕右下角，缩放保持组件自身的 1:1
+    private void ApplyRobotTvLayout()
+    {
+        robotTv.SetXY(GRoot.inst.width - robotTv.width - RobotTvMargin,
+            GRoot.inst.height - robotTv.height - RobotTvMargin);
     }
 
     #region 加载界面
