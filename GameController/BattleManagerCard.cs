@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 // 玩家级词条与局内进度：词条等级累加后派生加成；等级/经验/幸运/待抽次数也挂在这里（玩家级，不在实体上）
@@ -196,7 +196,7 @@ public partial class BattleManager
 
             if (TryGetPlayerEntity(clientId, out var entity)) entity.level = p.level; // 压制按实体等级算
 
-            int[] weights = CardGainUpgradeConfig.WeightsOf(p.level); // 按升级后等级的个位数给档位
+            int[] weights = ConfigManager.CardGainUpgradeConfig.WeightsOf(p.level); // 按升级后等级的个位数给档位
             int tier = CardCatalog.RollTier(weights);
             if (tier >= 0) p.pending[tier]++;
         }

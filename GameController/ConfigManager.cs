@@ -43,10 +43,11 @@ public class ConfigManager : MonoBehaviour
         int cardOption = CardOptionConfig.Load(ReadTable(dir, CardOptionConfig.FileName));
         int cardUpgrade = CardGainUpgradeConfig.Load(ReadTable(dir, CardGainUpgradeConfig.FileName));
         int characterExp = CharacterExpConfig.Load(ReadTable(dir, CharacterExpConfig.FileName));
+        int assistantExpression = AssistantExpressionConfig.Load(ReadTable(dir, AssistantExpressionConfig.FileName));
 
         Debug.Log($"[配表] {dir} 加载完成 | battle_fury_layer {battleFury} | entity {entity} | weapon {weapon} | skill {skill} | effect {effect} | " +
                   $"revive_time {revive} | global_variables {global} | notice {notice} | attr_range {attrRange} | setting_tips {settingTips} | quick_message {quickMessage} | terrain_generation {terrainGen} | " +
-                  $"card_option {cardOption} | card_gain_upgrade {cardUpgrade} | character_exp {characterExp}");
+                  $"card_option {cardOption} | card_gain_upgrade {cardUpgrade} | character_exp {characterExp} | assistant_expression {assistantExpression}");
     }
 
     #region 文件读取与拆分
@@ -1864,6 +1865,57 @@ public class ConfigManager : MonoBehaviour
         }
 
         public static SettingTipsConfig Get(int key) => GetRequired(content, key, FileName);
+    }
+    #endregion
+
+    #region 电视机助理表情表：0 序号 / 1 触发事件 / 2 动画编号 / 3 每帧时长 / 4 随机权重（只写动画首行）/ 5 文本 / 6 图片档位
+    public struct AssistantExpressionConfig
+    {
+        public const string FileName = "assistant_expression.csv";
+        private const int ColumnCount = 7;
+
+        // 保留文件顺序：触发事件 + 动画编号 相同的连续行即该动画的顺序帧
+        public static readonly List<AssistantExpressionConfig> content = new();
+
+        public int seq;
+        public int trigger;        // 0 进入游戏 / 1 待机动画 / 2 按钮 / 3 待机
+        public int clipId;
+        public float frameDuration; // 每帧时长（秒）
+        public int weight;          // 动画被抽中的相对权重，0 表示该行不是动画首行
+        public string text;
+        public int image;           // 直接作为 FGUI 控制器 m_c1 的档位
+
+        public AssistantExpressionConfig(string[] rowData)
+        {
+            seq = ParseInt(rowData, 0);
+            trigger = ParseInt(rowData, 1);
+            clipId = ParseInt(rowData, 2);
+            frameDuration = ParseFloat(rowData, 3);
+            weight = ParseIntOrNull(rowData, 4) ?? 0;
+            text = ParseString(rowData, 5);
+            image = ParseInt(rowData, 6);
+        }
+
+        public static int Load(ConfigTable table)
+        {
+            table.RequireColumnCount(ColumnCount);
+            content.Clear();
+
+            for (int i = 0; i < table.rows.Count; i++)
+            {
+                string[] rowData = table.RequireRow(i);
+                try
+                {
+                    content.Add(new AssistantExpressionConfig(rowData));
+                }
+                catch (FormatException e)
+                {
+                    throw new FormatException($"[配表] {table.fileName} 第 {i + 2} 行：{e.Message}", e);
+                }
+            }
+
+            return content.Count;
+        }
     }
     #endregion
 }
