@@ -88,7 +88,7 @@ public static class CsvEncodingConverter
             return null;
         }
 
-        string[] files = Directory.GetFiles(ConfigDir, "*.csv", SearchOption.TopDirectoryOnly);
+        string[] files = Directory.GetFiles(ConfigDir, "*.csv", SearchOption.AllDirectories);
         if (files.Length == 0)
         {
             Debug.LogWarning($"[配表编码] {ConfigDir} 下没有 csv 文件");
