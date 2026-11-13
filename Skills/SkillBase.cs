@@ -21,9 +21,10 @@ namespace Ros.Skill
         protected float TargetRadius => CastRange;
         // 第 17 列：释放瞬间是否自动转向射程内最近的敌人
         private bool AutoTarget => SkillConfig.Get(Id).autoTarget ?? false;
-        // 攻击动画读 skill.csv 第 12 列，-1 = 无动画（按下立刻施放）
-        protected bool HasCastAnim => (int)CastAnim != -1;
-        protected EntityAnim.AttackType CastAnim => (EntityAnim.AttackType)SkillConfig.Get(Id).attackAnim;
+        // 攻击动画读 skill.csv 第 12 列，留空 = 无动画（按下立刻施放）
+        protected bool HasCastAnim => SkillConfig.Get(Id).attackAnim.HasValue;
+        // 只在 HasCastAnim 为真时读
+        protected EntityAnim.AttackType CastAnim => (EntityAnim.AttackType)SkillConfig.Get(Id).attackAnim.Value;
 
         // 武器不随技能变化：一律取实体固定武器（服务器与客户端各从自己的实体拿）
         protected static int WeaponOf(EntityData entity) => entity.weaponId;
