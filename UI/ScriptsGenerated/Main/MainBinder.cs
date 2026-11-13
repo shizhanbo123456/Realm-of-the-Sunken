@@ -71,6 +71,7 @@ namespace Ros.UI.Main
             UIObjectFactory.SetPackageItemExtension(UI_LoadingPanel.URL, typeof(UI_LoadingPanel));
             UIObjectFactory.SetPackageItemExtension(UI_PlayerInfo.URL, typeof(UI_PlayerInfo));
             UIObjectFactory.SetPackageItemExtension(UI_RemanePanel.URL, typeof(UI_RemanePanel));
+            UIObjectFactory.SetPackageItemExtension(UI_QuickMessagePointer.URL, typeof(UI_QuickMessagePointer));
             UIObjectFactory.SetPackageItemExtension(UI_RobotTVGraphic.URL, typeof(UI_RobotTVGraphic));
             UIObjectFactory.SetPackageItemExtension(UI_CardSkillDisplay.URL, typeof(UI_CardSkillDisplay));
             UIObjectFactory.SetPackageItemExtension(UI_QuickMessageButton.URL, typeof(UI_QuickMessageButton));

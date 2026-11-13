@@ -1777,13 +1777,14 @@ public class ConfigManager : MonoBehaviour
     public struct QuickMessageConfig
     {
         public const string FileName = "quick_message.csv";
-        private const int ColumnCount = 4;
+        private const int ColumnCount = 5;
         public static readonly Dictionary<int, QuickMessageConfig> content = new();
 
         public int key;
         public string name;
         public string uiText;
         public string chatText;
+        public float markerDuration; // 场景点位显示时长（秒），0 = 不生成点位
 
         public QuickMessageConfig(string[] rowData)
         {
@@ -1791,6 +1792,7 @@ public class ConfigManager : MonoBehaviour
             name = ParseString(rowData, 1);
             uiText = ParseString(rowData, 2);
             chatText = ParseString(rowData, 3);
+            markerDuration = ParseFloat(rowData, 4);
         }
 
         public static int Load(ConfigTable table)

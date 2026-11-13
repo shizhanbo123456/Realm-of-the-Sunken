@@ -21,6 +21,7 @@ public class BattlePage : PageBase
     private UI_SkillTip skillTip;     // 技能悬浮提示（技能栏条目）
     private UI_BuffTip buffTip;       // buff 悬浮提示（任意 buff 图标）
     private UI_QuickMessagePanel quickMessagePanel; // 快捷指令轮盘（挂在战斗信息面板里）
+    private readonly List<UI_QuickMessagePointer> quickMessagePointers = new(); // 快捷指令点位（挂在世界层）
     private GTextField levelLabel;    // 玩家栏等级数字（FGUI 侧未命名，按 n12 取）
     private int localPlayerCamp = -1; // 本地玩家阵营（随本地实体摘要更新；小地图敌我识别用）
     private bool spectatorMode;       // 纯观战方玩家（无战斗实体）
@@ -155,8 +156,7 @@ public class BattlePage : PageBase
     }
 
     // 相机屏幕中心射线与地面 y=0 的交点；取不到就按"无位置"发送
-    private static bool TryGetAimPoint(out Vector3 point)
-    {
+    private static bool TryGetAimPoint(out Vector3 point)    {
         point = default;
         var cam = Tool.CameraController != null ? Tool.CameraController.WorldCamera : null;
         if (cam == null) return false;
@@ -167,6 +167,60 @@ public class BattlePage : PageBase
         point = ray.origin + ray.direction * distance;
         return true;
     }
+
+    #region 快捷指令点位
+    // 收到同阵营的快捷指令：按配表「点位显示时长」生成一个场景点位，0 = 不生成（上报状况）
+    private void OnQuickMessagePointer(SCQuickMessage message)
+    {
+        if (message == null) return;
+        float duration = ConfigManager.QuickMessageConfig.Get(message.messageId).markerDuration;
+        if (duration <= 0f) return;
+
+        var pointer = UI_QuickMessagePointer.CreateInstance();
+        panel.m_world_element_container.AddChild(pointer); // 与血条/飘字同层
+        pointer.Bind(message, duration);
+        quickMessagePointers.Add(pointer);
+        PlaceQuickMessagePointer(pointer, UiScale); // 先落一次位，避免第一帧出现在容器左上角
+    }
+
+    private void TickQuickMessagePointers()
+    {
+        if (quickMessagePointers.Count == 0) return;
+        float now = Time.unscaledTime;
+        float uiScale = UiScale;
+        for (int i = quickMessagePointers.Count - 1; i >= 0; i--)
+        {
+            var pointer = quickMessagePointers[i];
+            if (pointer.Expired(now))
+            {
+                pointer.DestroySelf();
+                quickMessagePointers.RemoveAt(i);
+                continue;
+            }
+            PlaceQuickMessagePointer(pointer, uiScale);
+        }
+    }
+
+    // 随包没带位置时改用发送者实体当前位置；实体已消失则由点位自己停在最后已知位置
+    private void PlaceQuickMessagePointer(UI_QuickMessagePointer pointer, float uiScale)
+    {
+        Vector3 senderPos = Vector3.zero;
+        bool hasSenderPos = false;
+        if (HasSession)
+        {
+            int entityId = Session.GetEntityId(pointer.SenderClientId);
+            var players = Tool.ClientLogicManager != null ? Tool.ClientLogicManager.EntityPlayers : null;
+            if (entityId > 0 && players != null) hasSenderPos = players.TryGetEntityPosition((ushort)entityId, out senderPos);
+        }
+        pointer.Place(senderPos, hasSenderPos, uiScale);
+    }
+
+    private void ClearQuickMessagePointers()
+    {
+        foreach (var pointer in quickMessagePointers) pointer.DestroySelf();
+        quickMessagePointers.Clear();
+    }
+    #endregion
 
     private static bool AnyQuickMessageKeyDown(out int index)
     {
@@ -238,6 +292,7 @@ public class BattlePage : PageBase
         EventManager.AddEvent<SCDefensePointProgress>(ClientEvent.OnDefensePointProgress, OnDefensePointProgress);
         EventManager.AddEvent(ClientEvent.OnSkillBarRefresh, OnSkillBarRefresh);
         EventManager.AddEvent<SCPlayerProgress>(ClientEvent.OnPlayerProgress, OnPlayerProgress);
+        EventManager.AddEvent<SCQuickMessage>(ClientEvent.OnQuickMessage, OnQuickMessagePointer);
         if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated += OnCameraUpdated;
 
         localPlayerCamp = -1;
@@ -257,6 +312,7 @@ public class BattlePage : PageBase
         OnDefensePointProgress(NetworkManager.LatestDefensePointProgress); // 进入战斗先填一次缓存值，随后由变更包刷新
         reviveActive = false; // 复活条每局从收起状态开始，重新由 SCReviveInfo 驱动
         ClearEntityBars();
+        ClearQuickMessagePointers(); // 快捷指令点位只属于本局
         HideAllTips();
         localBuffs.Clear();
         panel.m_playerPanel.m_buffList.m_list.numItems = 0;
@@ -289,6 +345,7 @@ public class BattlePage : PageBase
         EventManager.RemoveEvent<SCDefensePointProgress>(ClientEvent.OnDefensePointProgress, OnDefensePointProgress);
         EventManager.RemoveEvent(ClientEvent.OnSkillBarRefresh, OnSkillBarRefresh);
         EventManager.RemoveEvent<SCPlayerProgress>(ClientEvent.OnPlayerProgress, OnPlayerProgress);
+        EventManager.RemoveEvent<SCQuickMessage>(ClientEvent.OnQuickMessage, OnQuickMessagePointer);
         if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated -= OnCameraUpdated;
         spectatorMode = false;
         localPlayerAlive = true;
@@ -302,6 +359,7 @@ public class BattlePage : PageBase
         ResetCardState();
         HideAllTips();
         HideImportantBanner();
+        ClearQuickMessagePointers();
         // 离开战斗界面即销毁地形场景（Culler 与内容根一起销毁，点位数据一并复位）
         if (Tool.ModularTerrainGenerator != null) Tool.ModularTerrainGenerator.Clear();
     }
@@ -324,6 +382,7 @@ public class BattlePage : PageBase
         TickSpectator(deltaTime);
         TickLocalSkillCd(deltaTime);
         TickReviveProgress(deltaTime);
+        TickQuickMessagePointers();
     }
 
     // 冷却推演在 ClientSkillManager，这里只按节流重渲染冷却环与库存数
