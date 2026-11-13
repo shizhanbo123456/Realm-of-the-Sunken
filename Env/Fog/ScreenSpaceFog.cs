@@ -34,14 +34,47 @@ public class ScreenSpaceFog : MonoBehaviour
     [Tooltip("低处的最大混合强度")]
     public float heightDensity = 0.8f;
 
-    [Header("外观")]
-    [Tooltip("雾色，场景颜色按雾浓度插值到它")]
-    public Color fogColor = new Color(0.251f, 0.322f, 0.349f);
+    [Header("雾色渐变")]
+    [Tooltip("朝天空 / 屏幕上方取的雾色，整体偏浅")]
+    public Color fogColorTop = new Color(0.36f, 0.45f, 0.49f);
+
+    [Tooltip("朝地面 / 屏幕下方取的雾色，整体偏深")]
+    public Color fogColorBottom = new Color(0.17f, 0.22f, 0.25f);
+
+    [Tooltip("屏幕边角处混向的雾色，通常更暗")]
+    public Color fogColorEdge = new Color(0.10f, 0.14f, 0.17f);
+
+    [Range(-1f, 1f)]
+    [Tooltip("上下渐变中心，世界仰角与屏幕上下共用")]
+    public float angleCenter = 0f;
+
+    [Range(0.05f, 1f)]
+    [Tooltip("渐变过渡柔和度，越小分界越硬")]
+    public float angleSoftness = 0.6f;
+
+    [Range(0f, 1f)]
+    [Tooltip("0 只按世界仰角取色，1 只按屏幕上下取色")]
+    public float screenAngleWeight = 0.5f;
+
+    [Range(0f, 0.95f)]
+    [Tooltip("屏幕半径超过此值才开始混边角色")]
+    public float edgeStart = 0.55f;
+
+    [Range(0f, 1f)]
+    [Tooltip("边角暗色的混合强度")]
+    public float edgeIntensity = 0.5f;
 
     [Tooltip("全屏雾 shader，添加组件时自动填入")]
     public Shader fogShader;
 
-    private static readonly int FogColorId = Shader.PropertyToID("_FogColor");
+    private static readonly int FogColorTopId = Shader.PropertyToID("_FogColorTop");
+    private static readonly int FogColorBottomId = Shader.PropertyToID("_FogColorBottom");
+    private static readonly int FogColorEdgeId = Shader.PropertyToID("_FogColorEdge");
+    private static readonly int AngleCenterId = Shader.PropertyToID("_AngleCenter");
+    private static readonly int AngleSoftnessId = Shader.PropertyToID("_AngleSoftness");
+    private static readonly int ScreenAngleWeightId = Shader.PropertyToID("_ScreenAngleWeight");
+    private static readonly int EdgeStartId = Shader.PropertyToID("_EdgeStart");
+    private static readonly int EdgeIntensityId = Shader.PropertyToID("_EdgeIntensity");
     private static readonly int DistanceStartId = Shader.PropertyToID("_DistanceStart");
     private static readonly int DistanceEndId = Shader.PropertyToID("_DistanceEnd");
     private static readonly int DistanceDensityId = Shader.PropertyToID("_DistanceDensity");
@@ -101,7 +134,14 @@ public class ScreenSpaceFog : MonoBehaviour
 
     private void ApplyMaterial()
     {
-        material.SetColor(FogColorId, fogColor);
+        material.SetColor(FogColorTopId, fogColorTop);
+        material.SetColor(FogColorBottomId, fogColorBottom);
+        material.SetColor(FogColorEdgeId, fogColorEdge);
+        material.SetFloat(AngleCenterId, angleCenter);
+        material.SetFloat(AngleSoftnessId, angleSoftness);
+        material.SetFloat(ScreenAngleWeightId, screenAngleWeight);
+        material.SetFloat(EdgeStartId, edgeStart);
+        material.SetFloat(EdgeIntensityId, edgeIntensity);
         material.SetFloat(DistanceStartId, distanceStart);
         material.SetFloat(DistanceEndId, Mathf.Max(distanceEnd, distanceStart + 1f));
         material.SetFloat(DistanceDensityId, distanceDensity);
