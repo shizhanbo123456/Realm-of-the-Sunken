@@ -9,6 +9,9 @@ public class HomePage : PageBase
     private static readonly string[] StatKeys = { "生命", "攻击", "暴击", "暴伤", "视野", "技能槽" };
     private static readonly string[] AttrSuffixes = { "", "", "%", "%", "m", "" }; // 与 StatKeys 一一对应
     private const int AttrBarSegments = 10; // 属性条格数（UI_AttrItem.m_progressBar 里的 UI_AttrValueItem 数量）
+    private const int AttrIndexHealth = 0;         // StatKeys 里生命的下标
+    private const int RangeKeyHealthAttack = 6;    // attr_range：进攻方生命（两阵营血量量级不同，分开取区间）
+    private const int RangeKeyHealthDefense = 7;   // attr_range：防守方生命
     private static readonly string[] GuideMenuTitles = { "技能", "Buff" };
 
     private readonly UI_HomePanel panel;
@@ -287,22 +290,30 @@ public class HomePage : PageBase
         int saveIndex = selectedSaveIndex;
         ConfigManager.EntityConfig info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
         int[] values = ToValues(info.GetAttribute());
+        bool defense = IsDefense(saveIndex);
 
         panel.m_character_attr_panel.m_attrList.itemRenderer = (i, obj) =>
         {
             var item = (UI_AttrItem)obj;
             item.m_attrName.text = StatKeys[i];
             item.m_attrValue.text = values[i] + AttrSuffixes[i];
-            FillAttrBar(item.m_progressBar, i, values[i]);
+            FillAttrBar(item.m_progressBar, RangeKey(i, defense), values[i]);
         };
         panel.m_character_attr_panel.m_attrList.numItems = StatKeys.Length;
     }
 
+    // 生命按阵营取各自区间，其余属性与 attr_range 行号一致
+    private static int RangeKey(int attrIndex, bool defense)
+    {
+        if (attrIndex != AttrIndexHealth) return attrIndex;
+        return defense ? RangeKeyHealthDefense : RangeKeyHealthAttack;
+    }
+
     // 属性条 = 固定 10 格：按 attr_range.csv 的区间把数值映射成点亮格数（非零至少亮 1 格）
-    private static void FillAttrBar(GList bar, int attrIndex, int value)
+    private static void FillAttrBar(GList bar, int rangeKey, int value)
     {
         if (bar == null) return;
-        var range = ConfigManager.AttrRangeConfig.Get(attrIndex);
+        var range = ConfigManager.AttrRangeConfig.Get(rangeKey);
         int filled = Mathf.Clamp(Mathf.CeilToInt(range.Ratio(value) * AttrBarSegments), 0, AttrBarSegments);
 
         bar.itemRenderer = (i, obj) =>
