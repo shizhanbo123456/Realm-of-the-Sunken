@@ -45,6 +45,7 @@ namespace Ros.UI.Main
             BuildClips();
             onClick.Add(OnTapped);
             constructed = true;
+            ClearText(); // 进入游戏立即清掉设计期残留文本，开场动画延迟期间保持干净
             pendingEnter = true;
             enterDelayTimer = EnterDelay;
         }
@@ -198,6 +199,13 @@ namespace Ros.UI.Main
                     Play(Pick(TriggerIdleAnim), Stage.IdleAnim);
                     break;
             }
+        }
+
+        // 进入游戏时立即清掉设计期残留文本：清空内容并隐藏，等开场动画首帧有文本再顶出
+        private void ClearText()
+        {
+            m_label.text = string.Empty;
+            m_label.alpha = 0f;
         }
 
         // 空文本不动上一条：让上一条的转场自己播完；有文本则立即顶掉并重播转场
