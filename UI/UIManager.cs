@@ -32,7 +32,9 @@ public class UIManager : MonoBehaviour
 
     // 电视机助理：常驻表现层，表情与台词全部来自 assistant_expression.csv
     private UI_RobotTV robotTv;
-    private const float RobotTvMargin = 18f;   // 距屏幕右、下边缘的实际像素
+    private const float RobotTvScale = 0.5f;
+    private const float RobotTvMarginX = 70f;  // 距屏幕右边缘
+    private const float RobotTvMarginY = 15f;  // 距屏幕下边缘
 
     private PageBase currentPage;
     private int lastScreenWidth, lastScreenHeight;
@@ -158,11 +160,12 @@ public class UIManager : MonoBehaviour
         if (robotTv != null) ApplyRobotTvLayout();
     }
 
-    // 助理固定贴屏幕右下角，缩放保持组件自身的 1:1
+    // 助理固定贴屏幕右下角，按缩放后的可见边缘留边距
     private void ApplyRobotTvLayout()
     {
-        robotTv.SetXY(GRoot.inst.width - robotTv.width - RobotTvMargin,
-            GRoot.inst.height - robotTv.height - RobotTvMargin);
+        robotTv.scale = new Vector2(RobotTvScale, RobotTvScale);
+        robotTv.SetXY(GRoot.inst.width - robotTv.width * RobotTvScale - RobotTvMarginX,
+            GRoot.inst.height - robotTv.height * RobotTvScale - RobotTvMarginY);
     }
 
     #region 加载界面
