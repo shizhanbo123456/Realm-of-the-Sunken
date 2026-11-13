@@ -20,6 +20,8 @@ public class ScreenSpaceFog : MonoBehaviour
     [Tooltip("距离最远处的最大混合强度")]
     public float distanceDensity = 0.85f;
 
+    [HideInInspector] public float distanceScale = 1f;
+
     [Header("高度雾")]
     [Tooltip("关闭后只剩距离雾")]
     public bool enableHeightFog = true;
@@ -142,8 +144,8 @@ public class ScreenSpaceFog : MonoBehaviour
         material.SetFloat(ScreenAngleWeightId, screenAngleWeight);
         material.SetFloat(EdgeStartId, edgeStart);
         material.SetFloat(EdgeIntensityId, edgeIntensity);
-        material.SetFloat(DistanceStartId, distanceStart);
-        material.SetFloat(DistanceEndId, Mathf.Max(distanceEnd, distanceStart + 1f));
+        material.SetFloat(DistanceStartId, distanceStart * distanceScale);
+        material.SetFloat(DistanceEndId, Mathf.Max(distanceEnd, distanceStart + 1f) * distanceScale);
         material.SetFloat(DistanceDensityId, distanceDensity);
         material.SetFloat(HeightLowId, heightLow);
         material.SetFloat(HeightHighId, Mathf.Max(heightHigh, heightLow + 1f));

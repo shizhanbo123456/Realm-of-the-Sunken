@@ -13,9 +13,6 @@ public class EnvironmentManager : MonoBehaviour
 
     public const float SunIntensityMax = 1.5f;
 
-    public const float FogDensityClear = 0.08f;
-    public const float FogDensityFogged = 0.5f;
-
     // 昼夜时长（秒）：白天 = 光照值 ≥ 0.5 区间总耗时，晚上 = 光照值 < 0.5 区间总耗时。
     // 不序列化：唯一来源是 global_variables 的 day_duration / night_duration（GM 可在运行时改写并随快照下发）
     [System.NonSerialized] public float dayDuration;
@@ -25,15 +22,15 @@ public class EnvironmentManager : MonoBehaviour
     [Tooltip("天空盒材质球：昼夜变化时线性调整其 " + SkyExposureProperty + "（午夜 0.28 ~ 正午 1.92）")]
     public Material skyboxMaterial;
 
-    [Header("雾气（Unity 内置雾）")]
-    [Tooltip("是否起雾：无雾 = Density 0.08，起雾 = Density 0.5；切换时按 fogTransitionDuration 秒线性过渡。（客户端由「迷雾」Buff 自动驱动，此处只是初始值）")]
+    [Header("雾气（距离雾）")]
+    [Tooltip("是否起雾：无雾 = 距离参数 1，起雾 = fogDistanceScale；切换时按 fogTransitionDuration 秒线性过渡。（客户端由「迷雾」Buff 自动驱动，此处只是初始值）")]
     public bool fogEnabled = false;
+
+    [Tooltip("起雾时 ScreenSpaceFog 距离参数的目标值，越小雾越近越浓")]
+    [Min(0.01f)] public float fogDistanceScale = 0.35f;
 
     [Tooltip("雾效开关的过渡时间（秒）")]
     [Min(0.01f)] public float fogTransitionDuration = 10f;
-
-    [Tooltip("雾色（RenderSettings.fogColor）在正午的颜色（8bit 64,82,89）；凌晨 / 傍晚（及夜间）线性衰减为黑")]
-    public Color fogAlbedoNoon = new Color(64f / 255f, 82f / 255f, 89f / 255f, 1f);
 
     [Header("太阳")]
     [Tooltip("太阳（平行光）：强度由昼夜时间驱动；朝向固定为场景默认角度，不随时间旋转")]
@@ -58,7 +55,9 @@ public class EnvironmentManager : MonoBehaviour
     private float lastNightDuration;
     private bool syncRequested;
 
-    private float fogDensityCurrent;
+    private float fogDistanceCurrent;
+    private ScreenSpaceFog cachedFog;
+    private bool fogComponentWarned;
     private int skyExposureId;
     private bool exposureWarningLogged;
 
@@ -69,10 +68,8 @@ public class EnvironmentManager : MonoBehaviour
         skyExposureId = Shader.PropertyToID(SkyExposureProperty);
         lastDayDuration = dayDuration;
         lastNightDuration = nightDuration;
-        fogDensityCurrent = fogEnabled ? FogDensityFogged : FogDensityClear;
-        // 内置雾常开，浓淡只由 fogDensity 表达（指数平方 = Unity 默认雾模式）
-        RenderSettings.fog = true;
-        RenderSettings.fogMode = FogMode.ExponentialSquared;
+        fogDistanceCurrent = fogEnabled ? fogDistanceScale : 1f;
+        RenderSettings.fog = false;
         ApplyVisual();
     }
 
@@ -96,7 +93,7 @@ public class EnvironmentManager : MonoBehaviour
         {
             // 非对局中不推进昼夜、不显示太阳（首页/大厅各有专用光照），但雾效开关的过渡仍要能走完
             ApplySunVisible();
-            ApplyFogDensity();
+            ApplyFogDistance();
             return;
         }
         Tick(Time.deltaTime);
@@ -185,8 +182,7 @@ public class EnvironmentManager : MonoBehaviour
         ApplySkyboxExposure();
         ApplySun();
         ApplySunVisible();
-        ApplyFogColor();
-        ApplyFogDensity();
+        ApplyFogDistance();
     }
 
     private void NotifyFlipped(bool wasDay)
@@ -226,23 +222,32 @@ public class EnvironmentManager : MonoBehaviour
         if (sun.enabled != visible) sun.enabled = visible;
     }
 
-    private void ApplyFogColor()
+    // 起雾时拉近距离雾起止距离，1 ↔ fogDistanceScale 按 fogTransitionDuration 秒过渡
+    private void ApplyFogDistance()
     {
-        Color target = fogAlbedoNoon * DayFactor;
-        target.a = 1f;
-        if (RenderSettings.fogColor != target) RenderSettings.fogColor = target;
-    }
+        if (BattleManager.AtServer) return;
 
-    // 雾浓淡：无雾 0.08 ↔ 起雾 0.5，按 fogTransitionDuration 秒线性过渡
-    private void ApplyFogDensity()
-    {
-        float target = fogEnabled ? FogDensityFogged : FogDensityClear;
-        if (!Mathf.Approximately(fogDensityCurrent, target))
+        float target = fogEnabled ? fogDistanceScale : 1f;
+        if (!Mathf.Approximately(fogDistanceCurrent, target))
         {
-            float speed = (FogDensityFogged - FogDensityClear) / Mathf.Max(0.01f, fogTransitionDuration);
-            fogDensityCurrent = Mathf.MoveTowards(fogDensityCurrent, target, speed * Time.deltaTime);
+            float speed = Mathf.Abs(fogDistanceScale - 1f) / Mathf.Max(0.01f, fogTransitionDuration);
+            fogDistanceCurrent = Mathf.MoveTowards(fogDistanceCurrent, target, speed * Time.deltaTime);
         }
-        if (!Mathf.Approximately(RenderSettings.fogDensity, fogDensityCurrent))
-            RenderSettings.fogDensity = fogDensityCurrent;
+
+        if (cachedFog == null)
+        {
+            Camera mainCam = Camera.main;
+            cachedFog = mainCam != null ? mainCam.GetComponent<ScreenSpaceFog>() : null;
+            if (cachedFog == null)
+            {
+                if (!fogComponentWarned)
+                {
+                    fogComponentWarned = true;
+                    Debug.LogError("[EnvironmentManager] MainCamera 上未挂 ScreenSpaceFog，雾气效果不生效", this);
+                }
+                return;
+            }
+        }
+        cachedFog.distanceScale = fogDistanceCurrent;
     }
 }
