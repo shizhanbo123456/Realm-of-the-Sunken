@@ -9,6 +9,8 @@ namespace Ros.UI.Main
     {
         public Controller m_current_selected_camp;
         public GList m_characterList;
+        public GButton m_tab_attacker;
+        public GButton m_tab_defenser;
         public const string URL = "ui://q68vr2bfl6m9nz";
 
         public static UI_CharacterSelectionPanel CreateInstance()
@@ -22,6 +24,8 @@ namespace Ros.UI.Main
 
             m_current_selected_camp = GetControllerAt(0);
             m_characterList = (GList)GetChildAt(0);
+            m_tab_attacker = (GButton)GetChildAt(1);
+            m_tab_defenser = (GButton)GetChildAt(2);
         }
     }
 }
