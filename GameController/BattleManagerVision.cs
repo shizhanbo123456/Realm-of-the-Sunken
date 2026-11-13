@@ -3,6 +3,7 @@ using Ros.Transport;
 using UnityEngine;
 using UnityEngine.Profiling;
 
+using Ros.Config;
 public partial class BattleManager
 {
     // 小地图同步的分段性能采样标签（仅用于 Profiler 定位，不影响任何逻辑）
@@ -156,7 +157,7 @@ public partial class BattleManager
         if (target == null) return false;
         if (!visionStates.TryGetValue(clientId, out var state)) return false;
         return IsInRadius(state.position, target.transform.position,
-            ConfigManager.GlobalVariableConfig.entity_character_visiable_radius);
+            GlobalVariable.F(global_variablesEnum.entity_character_visiable_radius));
     }
 
     // 场景表现可见性：角色模型只按固定显示距离下发（不分阵营），其它实体仍按视野属性
@@ -415,7 +416,7 @@ public partial class BattleManager
     //F 键切换雷达显示半径：在档位间循环并回应新值
     public void SwitchMinimapRadius(int clientId)
     {
-        var radii = ConfigManager.GlobalVariableConfig.minimap_view_radius;
+        var radii = GlobalVariable.L(global_variablesEnum.minimap_view_radius);
         if (radii == null || radii.Count == 0)
         {
             Debug.LogError("[配表] global_variables.csv 的 minimap_view_radius 至少要配一档半径");
@@ -436,7 +437,7 @@ public partial class BattleManager
     {
         if (minimapRadiusByClient.TryGetValue(clientId, out var r)) return r;
 
-        var radii = ConfigManager.GlobalVariableConfig.minimap_view_radius;
+        var radii = GlobalVariable.L(global_variablesEnum.minimap_view_radius);
         if (radii == null || radii.Count == 0)
         {
             Debug.LogError("[配表] global_variables.csv 的 minimap_view_radius 至少要配一档半径");
@@ -490,7 +491,7 @@ public partial class BattleManager
         }
         if (!effect.HasEffect(EffectType.MinimapLost))
         {
-            effect.AddEffect(EffectType.MinimapLost, 1, Config.minimap_lost_duration);
+            effect.AddEffect(EffectType.MinimapLost, 1, GlobalConfig.minimap_lost_duration);
         }
     }
     #endregion

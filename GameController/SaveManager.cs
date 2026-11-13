@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class SaveManager : MonoBehaviour
 {
@@ -72,9 +72,9 @@ public class SaveManager : MonoBehaviour
             return;
         }
 
-        ClientSelection.selectedAttackIndex = InRange(attackIndex, Config.attack_character_count);
-        ClientSelection.selectedDefenseIndex = InRange(defenseIndex, Config.defense_character_count);
-        ClientSelection.homeDisplayedSaveIndex = InRange(displayIndex, Config.attack_character_count + Config.defense_character_count);
+        ClientSelection.selectedAttackIndex = InRange(attackIndex, GlobalConfig.attack_character_count);
+        ClientSelection.selectedDefenseIndex = InRange(defenseIndex, GlobalConfig.defense_character_count);
+        ClientSelection.homeDisplayedSaveIndex = InRange(displayIndex, GlobalConfig.attack_character_count + GlobalConfig.defense_character_count);
     }
 
     // 存档里的选中下标超出当前角色数（配表改过）时退回 0

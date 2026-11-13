@@ -1,4 +1,4 @@
-using Ros.Transport;
+﻿using Ros.Transport;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -221,8 +221,8 @@ public partial class NetworkManager : EnsBehaviour
         // 双方角色各自选择并随 CSLobbyPlayerInfo 上报；阵营完全在房间内确定，服务器按最终阵营取对应一侧
         var info = new CSLobbyPlayerInfo()
         {
-            attackCharacter = EntityType.Attack(Mathf.Clamp(ClientSelection.selectedAttackIndex, 0, Config.attack_character_count - 1)),
-            defenseCharacter = EntityType.Defense(Mathf.Clamp(ClientSelection.selectedDefenseIndex, 0, Config.defense_character_count - 1)),
+            attackCharacter = EntityType.Attack(Mathf.Clamp(ClientSelection.selectedAttackIndex, 0, GlobalConfig.attack_character_count - 1)),
+            defenseCharacter = EntityType.Defense(Mathf.Clamp(ClientSelection.selectedDefenseIndex, 0, GlobalConfig.defense_character_count - 1)),
             name = ClientSelection.playerName,
         };
         CallFuncRpc(ServerReceivePlayerInfoLocal, SendTo.RoomOwner, Delivery.Reliable, info, LocalToken);

@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using FairyGUI;
 using UnityEngine;
 
+using Ros.Config;
 namespace Ros.UI.Main
 {
     // 电视机助理：表情、台词、节奏全部来自 assistant_expression.csv，这里只负责按帧切控制器档位与填文本
@@ -24,7 +25,7 @@ namespace Ros.UI.Main
 
         private class Clip
         {
-            public readonly List<ConfigManager.AssistantExpressionConfig> frames = new();
+            public readonly List<assistant_expression> frames = new();
             public int weight;
         }
 
@@ -94,7 +95,7 @@ namespace Ros.UI.Main
             clipMap.Clear();
             clipsByTrigger.Clear();
 
-            foreach (ConfigManager.AssistantExpressionConfig row in ConfigManager.AssistantExpressionConfig.content)
+            foreach (assistant_expression row in AssistantExpressionConfig.content)
             {
                 long key = ClipKey(row.trigger, row.clipId);
                 if (!clipMap.TryGetValue(key, out Clip clip))
@@ -111,12 +112,12 @@ namespace Ros.UI.Main
                 }
 
                 if (row.frameDuration <= 0f)
-                    throw new FormatException($"[助理表情] 触发事件 {row.trigger} 动画 {row.clipId} 的每帧时长必须大于 0（第 {row.seq} 条）");
+                    throw new FormatException($"[助理表情] 触发事件 {row.trigger} 动画 {row.clipId} 的每帧时长必须大于 0（第 {row.key} 条）");
                 if (row.image < 0 || row.image >= m_graphic.m_c1.pageCount)
-                    throw new FormatException($"[助理表情] 第 {row.seq} 条的图片档位 {row.image} 超出控制器 m_c1 的 0~{m_graphic.m_c1.pageCount - 1} 页");
+                    throw new FormatException($"[助理表情] 第 {row.key} 条的图片档位 {row.image} 超出控制器 m_c1 的 0~{m_graphic.m_c1.pageCount - 1} 页");
 
                 // 权重只认该动画第一个非零值；后续帧重复填同一个权重属冗余，忽略
-                if (clip.weight == 0) clip.weight = row.weight;
+                if (clip.weight == 0) clip.weight = row.weight ?? 0;
 
                 clip.frames.Add(row);
             }
@@ -126,8 +127,8 @@ namespace Ros.UI.Main
                 foreach (Clip clip in pair.Value)
                 {
                     if (clip.weight > 0) continue;
-                    ConfigManager.AssistantExpressionConfig head = clip.frames[0];
-                    throw new FormatException($"[助理表情] 触发事件 {pair.Key} 动画 {head.clipId} 没有随机权重（第 {head.seq} 条应为该动画首行）");
+                    assistant_expression head = clip.frames[0];
+                    throw new FormatException($"[助理表情] 触发事件 {pair.Key} 动画 {head.clipId} 没有随机权重（第 {head.key} 条应为该动画首行）");
                 }
             }
 
@@ -177,7 +178,7 @@ namespace Ros.UI.Main
                 return;
             }
 
-            ConfigManager.AssistantExpressionConfig frame = current.frames[frameIndex];
+            assistant_expression frame = current.frames[frameIndex];
             m_graphic.m_c1.selectedIndex = frame.image;
             ShowText(frame.text);
             frameTimer = frame.frameDuration;

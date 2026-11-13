@@ -1,9 +1,10 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Ros.Gm;
 using Ros.Transport;
 using TerrainGen;
 using UnityEngine;
 
+using Ros.Config;
 // GM 指令的服务器执行体：NetworkManager.ServerReceiveGmLocal → ExecuteGm，只处理"联网项"
 // 纯客户端项（雾气/地形/存档/调试/敌方对话/结算演示）在 GmPanel 本地做；无权限校验（开发工具）
 public partial class BattleManager
@@ -55,7 +56,7 @@ public partial class BattleManager
 
             // ===== 玩家 =====
             case GmEnum.Player_Teleport_ToCoordinate:
-                GmTeleport(clientId, new Vector3(gm.float1, Config.gm_teleport_height, gm.float2));
+                GmTeleport(clientId, new Vector3(gm.float1, GlobalConfig.gm_teleport_height, gm.float2));
                 break;
             case GmEnum.Player_Teleport_ToGuardPoint: GmTeleportToStatue(clientId, gm.int1); break;
             case GmEnum.Player_Revive: GmRevive(clientId); break;
@@ -188,12 +189,12 @@ public partial class BattleManager
         else gmInvincible.Remove(target.id);
     }
 
-    // 传送：直接落点（y = Config.gm_teleport_height），并清速度与位移，避免刚体/位移效果把角色拉回
+    // 传送：直接落点（y = GlobalConfig.gm_teleport_height），并清速度与位移，避免刚体/位移效果把角色拉回
     private void GmTeleport(int clientId, Vector3 pos)
     {
         var target = GetGmPlayerEntity(clientId);
         if (target == null) return;
-        pos.y = Config.gm_teleport_height;
+        pos.y = GlobalConfig.gm_teleport_height;
         target.transform.position = pos;
         if (target.rb != null)
         {
@@ -208,7 +209,7 @@ public partial class BattleManager
         foreach (var guardStatue in EntityContainer.GuardStatues)
         {
             if (guardStatue == null) continue;
-            bool match = guardStatueIndex >= Config.sage_statue_count
+            bool match = guardStatueIndex >= GlobalConfig.sage_statue_count
                 ? guardStatue.type == EntityType.KingStatue
                 : guardStatue.type.category == EntityCategory.GuardStatue && guardStatue.type.value == guardStatueIndex;
             if (!match) continue;
@@ -238,13 +239,13 @@ public partial class BattleManager
         switch (type)
         {
             case GmEntityType.Zombie:
-                GmSpawnAtPlayer(clientId, EntityType.Zombie(Random.Range(0, Config.zombie_variant_count)), GetZombieSpawnLevel(), EntityCamp.Defense);
+                GmSpawnAtPlayer(clientId, EntityType.Zombie(Random.Range(0, GlobalConfig.zombie_variant_count)), GetZombieSpawnLevel(), EntityCamp.Defense);
                 break;
             case GmEntityType.EliteZombie:
-                GmSpawnAtPlayer(clientId, EntityType.EliteZombie(Random.Range(0, Config.elite_zombie_variant_count)), GetZombieSpawnLevel(), EntityCamp.Defense);
+                GmSpawnAtPlayer(clientId, EntityType.EliteZombie(Random.Range(0, GlobalConfig.elite_zombie_variant_count)), GetZombieSpawnLevel(), EntityCamp.Defense);
                 break;
             case GmEntityType.Coral:
-                EntityType coral = Random.value < ConfigManager.GlobalVariableConfig.coral_spawn_as_large_chance ? EntityType.CoralLarge : EntityType.CoralSmall;
+                EntityType coral = Random.value < GlobalVariable.F(global_variablesEnum.coral_spawn_as_large_chance) ? EntityType.CoralLarge : EntityType.CoralSmall;
                 GmSpawnAtPlayer(clientId, coral, 1, EntityCamp.Neutral);
                 break;
             case GmEntityType.Neutral:

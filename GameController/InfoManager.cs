@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 
+using Ros.Config;
 public class InfoManager : MonoBehaviour
 {
     private void Awake()
@@ -45,18 +46,18 @@ public class InfoManager : MonoBehaviour
     #endregion
 
     #region 属性（数据源：StreamingAssets/ConfigData/entity.csv）
-    public ConfigManager.EntityConfig GetEntityConfig(EntityType type)
+    public entity GetEntityConfig(EntityType type)
     {
-        return ConfigManager.EntityConfig.GetByCategory(type);
+        return EntityConfig.GetByCategory(type);
     }
 
     // 全局角色下标：0~5 进攻方，6~11 防守方
-    public ConfigManager.EntityConfig GetPlayerCharacterInfo(int globalIndex)
+    public entity GetPlayerCharacterInfo(int globalIndex)
     {
-        if (globalIndex < Config.attack_character_count)
-            return ConfigManager.EntityConfig.Get(EntityType.Attack(globalIndex));
+        if (globalIndex < GlobalConfig.attack_character_count)
+            return EntityConfig.Get(EntityType.Attack(globalIndex));
 
-        return ConfigManager.EntityConfig.Get(EntityType.Defense(globalIndex - Config.attack_character_count));
+        return EntityConfig.Get(EntityType.Defense(globalIndex - GlobalConfig.attack_character_count));
     }
     #endregion
 }

@@ -1,8 +1,9 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using FairyGUI;
 using TerrainGen;
 using UnityEngine;
 
+using Ros.Config;
 namespace Ros.UI.Main
 {
     // 小地图展开（左 Alt）：整张地形图铺满 loader，把雷达当前收到的点位按整图换算铺上去，纯展示不可点
@@ -59,7 +60,7 @@ namespace Ros.UI.Main
         private void Place(UI_MinimapItem item, in UI_Minimap.Point point)
         {
             if (m_loader == null) return;
-            float mapSize = ConfigManager.GlobalVariableConfig.terrain_size;
+            float mapSize = GlobalVariable.RangeLength(global_variablesEnum.terrain_size);
             float ppmX = m_loader.width / mapSize;
             float ppmY = m_loader.height / mapSize;
             item.SetXY(m_loader.x + point.world.x * ppmX - item.width * 0.5f,

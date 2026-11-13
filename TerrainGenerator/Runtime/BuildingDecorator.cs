@@ -1,9 +1,10 @@
+﻿using Vector2Int = UnityEngine.Vector2Int;
 using System.Collections.Generic;
 using UnityEngine;
 
+using Ros.Config;
 namespace TerrainGen
 {
-    using Gen = ConfigManager.TerrainGenerationConfig;
 
     // 只按约定产出摆放数据：地面以 cell_size 见方、底面中心对齐格心；围墙沿 cell_size 边长、默认沿 Z 延伸
     public static class BuildingDecorator
@@ -12,12 +13,12 @@ namespace TerrainGen
         {
             if (kit == null) return 0;
 
-            float c = Gen.cell_size;
+            float c = TerrainGeneration.F(terrain_generationEnum.cell_size);
             // 0 号格中心的地图坐标；摆放数据直接存地图坐标，不以地形中心为原点
-            float mapMin = ConfigManager.GlobalVariableConfig.terrain_size_min;
+            float mapMin = GlobalVariable.RangeMin(global_variablesEnum.terrain_size);
             float ox = mapMin + c * 0.5f;
             float oz = mapMin + c * 0.5f;
-            float surface = Gen.ground_height;
+            float surface = TerrainGeneration.F(terrain_generationEnum.ground_height);
             int count = 0;
 
             // 地面：每格一块，底面中心对齐格子中心

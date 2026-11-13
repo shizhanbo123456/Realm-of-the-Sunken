@@ -1,9 +1,10 @@
+﻿using Vector2Int = UnityEngine.Vector2Int;
 using System.Collections.Generic;
 using UnityEngine;
 
+using Ros.Config;
 namespace TerrainGen
 {
-    using Gen = ConfigManager.TerrainGenerationConfig;
 
     // BSP 切出房间后用走廊连通：走廊从房间边缘的随机点进出，宽度随机，另加环路和去死角
     public class BuildingField
@@ -43,8 +44,8 @@ namespace TerrainGen
         public void Generate(int seed)
         {
             rng = new System.Random(seed);
-            SizeX = Mathf.Max(4, Gen.map_cells_xz);
-            SizeZ = Mathf.Max(4, Gen.map_cells_xz);
+            SizeX = Mathf.Max(4, TerrainGeneration.I(terrain_generationEnum.map_cells_xz));
+            SizeZ = Mathf.Max(4, TerrainGeneration.I(terrain_generationEnum.map_cells_xz));
 
             Layer = new int[SizeX, SizeZ];
             Region = new int[SizeX, SizeZ];
@@ -57,8 +58,8 @@ namespace TerrainGen
                     Region[x, z] = RegionVoid;
                 }
 
-            maxRoomCells = Mathf.Max(3, Gen.max_room_cells);
-            minRoomCells = Mathf.Max(2, Gen.min_room_cells);
+            maxRoomCells = Mathf.Max(3, TerrainGeneration.I(terrain_generationEnum.max_room_cells));
+            minRoomCells = Mathf.Max(2, TerrainGeneration.I(terrain_generationEnum.min_room_cells));
             if (maxRoomCells < minRoomCells)
             {
                 Debug.LogError($"[地形] maxRoomCells({maxRoomCells}) 小于 minRoomCells({minRoomCells})，已按最大值切分");
@@ -133,7 +134,7 @@ namespace TerrainGen
         {
             if (node.a == null)
             {
-                int m = Mathf.Clamp(Gen.room_margin, 0, Mathf.Max(0, (Mathf.Min(node.rect.width, node.rect.height) - 2) / 2));
+                int m = Mathf.Clamp(TerrainGeneration.I(terrain_generationEnum.room_margin), 0, Mathf.Max(0, (Mathf.Min(node.rect.width, node.rect.height) - 2) / 2));
                 var room = new RectInt(node.rect.x + m, node.rect.y + m, node.rect.width - m * 2, node.rect.height - m * 2);
                 if (room.width < 2 || room.height < 2)
                     room = new RectInt(node.rect.x, node.rect.y, node.rect.width, node.rect.height);
@@ -165,7 +166,7 @@ namespace TerrainGen
         {
             for (int i = 0; i < Rooms.Count; i++)
             {
-                if (rng.NextDouble() > Gen.notch_chance) continue;
+                if (rng.NextDouble() > TerrainGeneration.F(terrain_generationEnum.notch_chance)) continue;
                 RectInt room = Rooms[i];
                 int maxNotch = Mathf.Min(room.width, room.height) / 2;
                 if (maxNotch < 1) continue;
@@ -209,7 +210,7 @@ namespace TerrainGen
         void EnsureCycles()
         {
             if (Rooms.Count < 3) return;
-            int want = Mathf.Clamp(Gen.min_room_links, 1, 4);
+            int want = Mathf.Clamp(TerrainGeneration.I(terrain_generationEnum.min_room_links), 1, 4);
 
             for (int i = 0; i < Rooms.Count; i++)
             {
@@ -242,12 +243,12 @@ namespace TerrainGen
         // 额外连一些较近的房间，把树状走廊变成带环路的网，顺带消掉一部分尽头
         void AddExtraLinks()
         {
-            if (Gen.extra_link_chance <= 0f || Rooms.Count < 2) return;
+            if (TerrainGeneration.F(terrain_generationEnum.extra_link_chance) <= 0f || Rooms.Count < 2) return;
             int attempts = Mathf.CeilToInt(Rooms.Count * 0.8f);
             int reach = maxRoomCells * 2;
             for (int i = 0; i < attempts; i++)
             {
-                if (rng.NextDouble() > Gen.extra_link_chance) continue;
+                if (rng.NextDouble() > TerrainGeneration.F(terrain_generationEnum.extra_link_chance)) continue;
                 int a = rng.Next(Rooms.Count);
                 int b = rng.Next(Rooms.Count);
                 if (a == b) continue;
@@ -260,7 +261,7 @@ namespace TerrainGen
 
         void CarveCorridor(RectInt a, RectInt b)
         {
-            int width = Mathf.Clamp(rng.Next(1, Mathf.Max(1, Gen.corridor_max_width) + 1), 1, Mathf.Max(1, Gen.corridor_max_width));
+            int width = Mathf.Clamp(rng.Next(1, Mathf.Max(1, TerrainGeneration.I(terrain_generationEnum.corridor_max_width)) + 1), 1, Mathf.Max(1, TerrainGeneration.I(terrain_generationEnum.corridor_max_width)));
             Vector2Int pa = BorderPoint(a, b);
             Vector2Int pb = BorderPoint(b, a);
 
@@ -372,7 +373,7 @@ namespace TerrainGen
         // 单开口的房间，在完全没有开口的那条边上打一条支路接到已有走廊
         void PunchExtraOpenings()
         {
-            int want = Mathf.Clamp(Gen.min_room_links, 1, 4);
+            int want = Mathf.Clamp(TerrainGeneration.I(terrain_generationEnum.min_room_links), 1, 4);
             if (want < 2) return;
             int reach = maxRoomCells * 2;
             var sides = new int[4];
@@ -513,7 +514,7 @@ namespace TerrainGen
                 {
                     if (Region[x, z] != RegionCorridor) continue;
 
-                    if (!Gen.open_along_corridor)
+                    if (!TerrainGeneration.B(terrain_generationEnum.open_along_corridor))
                     {
                         int corridorNeighbors = 0;
                         for (int d = 0; d < 4; d++)
@@ -580,8 +581,8 @@ namespace TerrainGen
         {
             Points.Clear();
 
-            int radius = Mathf.Max(1, Gen.point_open_radius);
-            int margin = Mathf.Clamp(Gen.point_edge_margin, 0, Mathf.Min(SizeX, SizeZ) / 3);
+            int radius = Mathf.Max(1, TerrainGeneration.I(terrain_generationEnum.point_open_radius));
+            int margin = Mathf.Clamp(TerrainGeneration.I(terrain_generationEnum.point_edge_margin), 0, Mathf.Min(SizeX, SizeZ) / 3);
             int[,] dist = BuildOpenness();
             openDist = dist;
             openRadius = radius;
@@ -622,7 +623,7 @@ namespace TerrainGen
             Points.Add(new MapPoint(main, PointKind.MainGuard));
 
             // 副守护点：硬性约束离地图中心 <= 0.25 * 边长，在圆内用最远点采样互相拉开
-            int subCount = Mathf.Max(0, Gen.sub_guard_count);
+            int subCount = Mathf.Max(0, TerrainGeneration.I(terrain_generationEnum.sub_guard_count));
             if (subCount > 0)
             {
                 float maxR = Mathf.Max(SizeX, SizeZ) * 0.25f;
@@ -655,10 +656,10 @@ namespace TerrainGen
                 }
             }
 
-            int low = Mathf.Min(Gen.extra_point_min, Gen.extra_point_max);
-            int high = Mathf.Max(Gen.extra_point_min, Gen.extra_point_max);
+            int low = Mathf.Min(TerrainGeneration.I(terrain_generationEnum.extra_point_min), TerrainGeneration.I(terrain_generationEnum.extra_point_max));
+            int high = Mathf.Max(TerrainGeneration.I(terrain_generationEnum.extra_point_min), TerrainGeneration.I(terrain_generationEnum.extra_point_max));
             int extraCount = rng.Next(low, high + 1);
-            int gap = Mathf.Max(1, Gen.point_spacing);
+            int gap = Mathf.Max(1, TerrainGeneration.I(terrain_generationEnum.point_spacing));
             for (int i = 0; i < extraCount; i++)
             {
                 Vector2Int p = PickFarthest(pool, chosen, usedRooms, gap);
@@ -683,13 +684,13 @@ namespace TerrainGen
         // 每个守护点周围按角度均分选几个防御塔点位
         void SelectTowerPoints()
         {
-            int want = Mathf.Clamp(Gen.tower_count_per_guard, 0, 8);
+            int want = Mathf.Clamp(TerrainGeneration.I(terrain_generationEnum.tower_count_per_guard), 0, 8);
             if (want == 0 || openDist == null) return;
 
-            int minD = Mathf.Max(1, Gen.tower_min_distance);
-            int maxD = Mathf.Max(minD + 1, Gen.tower_max_distance);
-            int gap = Mathf.Max(1, Gen.tower_spacing);
-            int margin = Mathf.Clamp(Gen.point_edge_margin, 0, Mathf.Min(SizeX, SizeZ) / 3);
+            int minD = Mathf.Max(1, TerrainGeneration.I(terrain_generationEnum.tower_min_distance));
+            int maxD = Mathf.Max(minD + 1, TerrainGeneration.I(terrain_generationEnum.tower_max_distance));
+            int gap = Mathf.Max(1, TerrainGeneration.I(terrain_generationEnum.tower_spacing));
+            int margin = Mathf.Clamp(TerrainGeneration.I(terrain_generationEnum.point_edge_margin), 0, Mathf.Min(SizeX, SizeZ) / 3);
 
             var occupied = new List<Vector2Int>();
             foreach (MapPoint p in Points) occupied.Add(p.Cell);

@@ -1,8 +1,9 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using FairyGUI;
 using TerrainGen;
 using UnityEngine;
 
+using Ros.Config;
 namespace Ros.UI.Main
 {
     // 小地图表现：点位增删改、雷达换算、自身朝向、地形底图对位。
@@ -188,7 +189,7 @@ namespace Ros.UI.Main
             float now = Time.time;
             expiredIds.Clear();
             foreach (var kv in lastReceived)
-                if (now - kv.Value > Config.minimap_entity_timeout) expiredIds.Add(kv.Key);
+                if (now - kv.Value > GlobalConfig.minimap_entity_timeout) expiredIds.Add(kv.Key);
             foreach (var id in expiredIds) Remove(id);
         }
 
@@ -224,7 +225,7 @@ namespace Ros.UI.Main
             if (mapLoader == null || mapLoader.isDisposed || mapBase == null) return;
 
             float ppm = mapBase.width * 0.5f / viewRadius; // 像素/米
-            float mapSize = ConfigManager.GlobalVariableConfig.terrain_size;
+            float mapSize = GlobalVariable.RangeLength(global_variablesEnum.terrain_size);
             float size = mapSize * ppm;
             float maskX = m_mask != null ? m_mask.x : 0f; // Loader 挂在遮罩里，需换算成遮罩局部
             float maskY = m_mask != null ? m_mask.y : 0f;

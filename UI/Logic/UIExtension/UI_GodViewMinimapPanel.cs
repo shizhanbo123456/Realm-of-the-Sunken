@@ -1,10 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using FairyGUI;
 using Ros.Transport;
 using TerrainGen;
 using UnityEngine;
 
+using Ros.Config;
 namespace Ros.UI.Main
 {
     // 上帝视角（左 Ctrl）：显示区域 = 中心 + 边长（地形边长 / 倍率），可拖动；服务器只在收到请求时回包
@@ -303,14 +304,14 @@ namespace Ros.UI.Main
         #endregion
 
         #region 区域与底图
-        private float Edge => ConfigManager.GlobalVariableConfig.terrain_size / ConfigManager.GlobalVariableConfig.godView_scale[scaleIndex];
+        private float Edge => GlobalVariable.RangeLength(global_variablesEnum.terrain_size) / GlobalVariable.L(global_variablesEnum.godView_scale)[scaleIndex];
 
         private float PixelsPerMeter => Edge > 0f ? m_largeMinimapContainer.width / Edge : 0f;
 
         private Vector2 ClampCenter(Vector2 value)
         {
             float edge = Edge;
-            float size = ConfigManager.GlobalVariableConfig.terrain_size;
+            float size = GlobalVariable.RangeLength(global_variablesEnum.terrain_size);
             if (edge >= size) return new Vector2(size * 0.5f, size * 0.5f); // 区域不比地图小：居中
             float half = edge * 0.5f;
             return new Vector2(Mathf.Clamp(value.x, half, size - half), Mathf.Clamp(value.y, half, size - half));
@@ -323,7 +324,7 @@ namespace Ros.UI.Main
             EnsureMapImage();
             float ppm = PixelsPerMeter;
             if (ppm <= 0f) return;
-            float mapSize = ConfigManager.GlobalVariableConfig.terrain_size;
+            float mapSize = GlobalVariable.RangeLength(global_variablesEnum.terrain_size);
             float size = mapSize * ppm;
             var loader = m_largeMinimapContainer.m_loader;
             if (loader != null)
@@ -354,12 +355,12 @@ namespace Ros.UI.Main
             for (GObject o = m_largeMinimapContainer; o != null && o.parent != GRoot.inst; o = o.parent)
                 if (o.scale.x > 0.0001f) upper *= o.scale.x;
             float design = upper > 0.0001f ? 1f / upper : 1f;
-            itemScale = design * ConfigManager.GlobalVariableConfig.godView_marker_scale;
+            itemScale = design * GlobalVariable.F(global_variablesEnum.godView_marker_scale);
         }
 
         private void BuildScaleButtons()
         {
-            var scales = ConfigManager.GlobalVariableConfig.godView_scale;
+            var scales = GlobalVariable.L(global_variablesEnum.godView_scale);
             if (m_scaleButtonList == null) return;
             m_scaleButtonList.itemRenderer = (index, obj) =>
             {

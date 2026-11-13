@@ -1,9 +1,10 @@
+﻿using Vector2Int = UnityEngine.Vector2Int;
 using System.Collections.Generic;
 using UnityEngine;
 
+using Ros.Config;
 namespace TerrainGen
 {
-    using Gen = ConfigManager.TerrainGenerationConfig;
 
     // 建筑物/装饰/摆件/灌木按面积密度散落，之后是障碍、障碍装饰、漂浮装饰、鱼群，藤蔓贴外墙
     public static class PropPlacer
@@ -23,16 +24,16 @@ namespace TerrainGen
             var spots = new List<Spot>();
 
             // 0 号格中心的地图坐标；摆放数据直接存地图坐标，不以地形中心为原点
-            float mapMin = ConfigManager.GlobalVariableConfig.terrain_size_min;
-            float ox = mapMin + Gen.cell_size * 0.5f;
-            float oz = mapMin + Gen.cell_size * 0.5f;
+            float mapMin = GlobalVariable.RangeMin(global_variablesEnum.terrain_size);
+            float ox = mapMin + TerrainGeneration.F(terrain_generationEnum.cell_size) * 0.5f;
+            float oz = mapMin + TerrainGeneration.F(terrain_generationEnum.cell_size) * 0.5f;
 
             int count = 0;
             var reserved = new HashSet<long>();
-            count += Scatter(f, kit, items, TerrainItemKind.Building, kit.buildings, Gen.cells_per_building, false, false, ox, oz, rng, spots, cache, reserved);
-            count += Scatter(f, kit, items, TerrainItemKind.Decoration, kit.decorations, Gen.cells_per_decoration, false, Gen.random_prop_position, ox, oz, rng, spots, cache, null);
-            count += Scatter(f, kit, items, TerrainItemKind.Prop, kit.props, Gen.cells_per_prop, false, Gen.random_prop_position, ox, oz, rng, spots, cache, null);
-            count += Scatter(f, kit, items, TerrainItemKind.Bush, kit.bushes, Gen.cells_per_bush, true, Gen.random_prop_position, ox, oz, rng, spots, cache, null);
+            count += Scatter(f, kit, items, TerrainItemKind.Building, kit.buildings, TerrainGeneration.I(terrain_generationEnum.cells_per_building), false, false, ox, oz, rng, spots, cache, reserved);
+            count += Scatter(f, kit, items, TerrainItemKind.Decoration, kit.decorations, TerrainGeneration.I(terrain_generationEnum.cells_per_decoration), false, TerrainGeneration.B(terrain_generationEnum.random_prop_position), ox, oz, rng, spots, cache, null);
+            count += Scatter(f, kit, items, TerrainItemKind.Prop, kit.props, TerrainGeneration.I(terrain_generationEnum.cells_per_prop), false, TerrainGeneration.B(terrain_generationEnum.random_prop_position), ox, oz, rng, spots, cache, null);
+            count += Scatter(f, kit, items, TerrainItemKind.Bush, kit.bushes, TerrainGeneration.I(terrain_generationEnum.cells_per_bush), true, TerrainGeneration.B(terrain_generationEnum.random_prop_position), ox, oz, rng, spots, cache, null);
             count += PlaceVines(f, kit, items, ox, oz, rng);
 
             var obstacles = new List<Spot>();
@@ -80,11 +81,11 @@ namespace TerrainGen
                 if (!PrefabBounds.TryGet(prefab, cache, out Bounds b)) continue;
 
                 float radius = Mathf.Max(b.extents.x, b.extents.z);
-                float spread = randomSpot ? Mathf.Max(0f, Gen.cell_size * 0.5f - radius) : 0f;
+                float spread = randomSpot ? Mathf.Max(0f, TerrainGeneration.F(terrain_generationEnum.cell_size) * 0.5f - radius) : 0f;
                 float jx = spread > 0f ? (float)(rng.NextDouble() * 2.0 - 1.0) * spread : 0f;
                 float jz = spread > 0f ? (float)(rng.NextDouble() * 2.0 - 1.0) * spread : 0f;
-                var pos = new Vector3(cell.x * Gen.cell_size + ox + jx, Gen.ground_height - b.min.y, cell.y * Gen.cell_size + oz + jz);
-                if (Blocked(pos, radius, Gen.prop_gap_padding, spots)) continue;
+                var pos = new Vector3(cell.x * TerrainGeneration.F(terrain_generationEnum.cell_size) + ox + jx, TerrainGeneration.F(terrain_generationEnum.ground_height) - b.min.y, cell.y * TerrainGeneration.F(terrain_generationEnum.cell_size) + oz + jz);
+                if (Blocked(pos, radius, TerrainGeneration.F(terrain_generationEnum.prop_gap_padding), spots)) continue;
 
                 float yaw = freeYaw ? (float)rng.NextDouble() * 360f : rng.Next(4) * 90f;
                 if (Add(kit, items, kind, prefab, pos, yaw) == 0) continue;
@@ -111,9 +112,9 @@ namespace TerrainGen
         static int PlaceVines(BuildingField f, BuildingKitSet kit, List<TerrainItemData> items,
             float ox, float oz, System.Random rng)
         {
-            if (kit.vines == null || kit.vines.Count == 0 || Gen.vine_chance <= 0f) return 0;
+            if (kit.vines == null || kit.vines.Count == 0 || TerrainGeneration.F(terrain_generationEnum.vine_chance) <= 0f) return 0;
 
-            float c = Gen.cell_size;
+            float c = TerrainGeneration.F(terrain_generationEnum.cell_size);
             int made = 0;
 
             for (int x = 0; x < f.SizeX; x++)
@@ -131,7 +132,7 @@ namespace TerrainGen
                     for (int d = 0; d < 4; d++)
                     {
                         if (!f.IsOuterEdge(x, z, d)) continue;
-                        if (rng.NextDouble() >= Gen.vine_chance) continue;
+                        if (rng.NextDouble() >= TerrainGeneration.F(terrain_generationEnum.vine_chance)) continue;
 
                         GameObject prefab = kit.PickVine(group);
                         if (prefab == null) continue;
@@ -146,7 +147,7 @@ namespace TerrainGen
                             default: pos = new Vector3(x0, 0f, (z0 + z1) * 0.5f); break;
                         }
                         // 只在地块上半部分高度贴
-                        pos.y = Gen.ground_height * (0.5f + 0.5f * (float)rng.NextDouble());
+                        pos.y = TerrainGeneration.F(terrain_generationEnum.ground_height) * (0.5f + 0.5f * (float)rng.NextDouble());
 
                         if (Add(kit, items, TerrainItemKind.Vine, prefab, pos, yaw) > 0) made++;
                     }
@@ -159,7 +160,7 @@ namespace TerrainGen
         static int PlaceObstacles(BuildingField f, BuildingKitSet kit, List<TerrainItemData> items,
             float ox, float oz, System.Random rng, List<Spot> placed, HashSet<long> reserved, Dictionary<GameObject, Bounds> cache)
         {
-            if (kit.obstacles.Count == 0 || Gen.cells_per_obstacle <= 0) return 0;
+            if (kit.obstacles.Count == 0 || TerrainGeneration.I(terrain_generationEnum.cells_per_obstacle) <= 0) return 0;
 
             List<Vector2Int> voids = CollectVoidCells(f);
             if (voids.Count == 0)
@@ -168,8 +169,8 @@ namespace TerrainGen
                 return 0;
             }
 
-            int target = Mathf.Max(1, Mathf.RoundToInt(voids.Count / (float)Gen.cells_per_obstacle));
-            float half = Gen.cell_size * 0.5f;
+            int target = Mathf.Max(1, Mathf.RoundToInt(voids.Count / (float)TerrainGeneration.I(terrain_generationEnum.cells_per_obstacle)));
+            float half = TerrainGeneration.F(terrain_generationEnum.cell_size) * 0.5f;
             int made = 0;
 
             for (int i = 0; i < target * 40 + 200 && made < target; i++)
@@ -179,13 +180,13 @@ namespace TerrainGen
                 if (prefab == null) continue;
                 if (!PrefabBounds.TryGet(prefab, cache, out Bounds b)) continue;
 
-                float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * Gen.prop_scale_range;
+                float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * TerrainGeneration.F(terrain_generationEnum.prop_scale_range);
                 float radius = Mathf.Max(b.extents.x, b.extents.z) * scale;
-                float cx = cell.x * Gen.cell_size + ox + (float)(rng.NextDouble() * 2.0 - 1.0) * half;
-                float cz = cell.y * Gen.cell_size + oz + (float)(rng.NextDouble() * 2.0 - 1.0) * half;
+                float cx = cell.x * TerrainGeneration.F(terrain_generationEnum.cell_size) + ox + (float)(rng.NextDouble() * 2.0 - 1.0) * half;
+                float cz = cell.y * TerrainGeneration.F(terrain_generationEnum.cell_size) + oz + (float)(rng.NextDouble() * 2.0 - 1.0) * half;
                 var flat = new Vector2(cx, cz);
 
-                if (!TouchesVoid(f, cx, cz, radius, ox, oz, Gen.cell_size)) continue;
+                if (!TouchesVoid(f, cx, cz, radius, ox, oz, TerrainGeneration.F(terrain_generationEnum.cell_size))) continue;
 
                 bool mostlyOverlapped = false;
                 for (int k = 0; k < placed.Count; k++)
@@ -196,7 +197,7 @@ namespace TerrainGen
                     }
                 if (mostlyOverlapped) continue;
 
-                float baseY = Mathf.Lerp(Gen.obstacle_base_min_y, Gen.obstacle_base_max_y, (float)rng.NextDouble());
+                float baseY = Mathf.Lerp(TerrainGeneration.F(terrain_generationEnum.obstacle_base_min_y), TerrainGeneration.F(terrain_generationEnum.obstacle_base_max_y), (float)rng.NextDouble());
                 var pos = new Vector3(cx, baseY - b.min.y * scale, cz);
                 float yaw = (float)rng.NextDouble() * 360f;
                 if (Add(kit, items, TerrainItemKind.Obstacle, prefab, pos, yaw, scale) == 0) continue;
@@ -212,12 +213,12 @@ namespace TerrainGen
         static int PlaceObstacleDecor(BuildingField f, BuildingKitSet kit, List<TerrainItemData> items,
             float ox, float oz, System.Random rng)
         {
-            if (kit.obstacleDecorations.Count == 0 || Gen.cells_per_obstacle_decoration <= 0) return 0;
+            if (kit.obstacleDecorations.Count == 0 || TerrainGeneration.I(terrain_generationEnum.cells_per_obstacle_decoration) <= 0) return 0;
 
             List<Vector2Int> voids = CollectVoidCells(f);
             if (voids.Count == 0) return 0;
 
-            int target = Mathf.Max(1, Mathf.RoundToInt(voids.Count / (float)Gen.cells_per_obstacle_decoration));
+            int target = Mathf.Max(1, Mathf.RoundToInt(voids.Count / (float)TerrainGeneration.I(terrain_generationEnum.cells_per_obstacle_decoration)));
             int made = 0;
 
             for (int i = 0; i < target * 40 + 200 && made < target; i++)
@@ -226,11 +227,11 @@ namespace TerrainGen
                 GameObject prefab = kit.PickFrom(kit.obstacleDecorations, f.RegionGroup(cell.x, cell.y));
                 if (prefab == null) continue;
 
-                float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * Gen.prop_scale_range;
-                float spread = Gen.cell_size * 0.5f;
-                float cx = cell.x * Gen.cell_size + ox + (float)(rng.NextDouble() * 2.0 - 1.0) * spread;
-                float cz = cell.y * Gen.cell_size + oz + (float)(rng.NextDouble() * 2.0 - 1.0) * spread;
-                float y = (float)rng.NextDouble() * Gen.ground_height;
+                float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * TerrainGeneration.F(terrain_generationEnum.prop_scale_range);
+                float spread = TerrainGeneration.F(terrain_generationEnum.cell_size) * 0.5f;
+                float cx = cell.x * TerrainGeneration.F(terrain_generationEnum.cell_size) + ox + (float)(rng.NextDouble() * 2.0 - 1.0) * spread;
+                float cz = cell.y * TerrainGeneration.F(terrain_generationEnum.cell_size) + oz + (float)(rng.NextDouble() * 2.0 - 1.0) * spread;
+                float y = (float)rng.NextDouble() * TerrainGeneration.F(terrain_generationEnum.ground_height);
 
                 if (Add(kit, items, TerrainItemKind.ObstacleDecor, prefab, new Vector3(cx, y, cz),
                         (float)rng.NextDouble() * 360f, scale) > 0) made++;
@@ -243,10 +244,10 @@ namespace TerrainGen
         static int PlaceFloating(BuildingField f, BuildingKitSet kit, List<TerrainItemData> items,
             float ox, float oz, System.Random rng, HashSet<long> reserved)
         {
-            if (kit.floatingDecorations.Count == 0 || Gen.cells_per_floating_decoration <= 0) return 0;
+            if (kit.floatingDecorations.Count == 0 || TerrainGeneration.I(terrain_generationEnum.cells_per_floating_decoration) <= 0) return 0;
 
-            int target = Mathf.Max(1, Mathf.RoundToInt(f.SizeX * f.SizeZ / (float)Gen.cells_per_floating_decoration));
-            float c = Gen.cell_size;
+            int target = Mathf.Max(1, Mathf.RoundToInt(f.SizeX * f.SizeZ / (float)TerrainGeneration.I(terrain_generationEnum.cells_per_floating_decoration)));
+            float c = TerrainGeneration.F(terrain_generationEnum.cell_size);
             float halfW = f.SizeX * c * 0.5f;
             float halfD = f.SizeZ * c * 0.5f;
             float centerX = ox + (f.SizeX - 1) * 0.5f * c;
@@ -265,8 +266,8 @@ namespace TerrainGen
                 GameObject prefab = kit.PickFrom(kit.floatingDecorations, f.RegionGroup(gx, gz));
                 if (prefab == null) continue;
 
-                float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * Gen.prop_scale_range;
-                float y = Gen.ground_height + (float)rng.NextDouble() * Gen.floating_extra_height;
+                float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * TerrainGeneration.F(terrain_generationEnum.prop_scale_range);
+                float y = TerrainGeneration.F(terrain_generationEnum.ground_height) + (float)rng.NextDouble() * TerrainGeneration.F(terrain_generationEnum.floating_extra_height);
                 if (Add(kit, items, TerrainItemKind.Floating, prefab, new Vector3(cx, y, cz),
                         (float)rng.NextDouble() * 360f, scale) > 0) made++;
             }
@@ -278,10 +279,10 @@ namespace TerrainGen
         static int PlaceFish(BuildingField f, BuildingKitSet kit, List<TerrainItemData> items,
             float ox, float oz, System.Random rng, HashSet<long> reserved)
         {
-            if (kit.fishSchools.Count == 0 || Gen.cells_per_fish_school <= 0) return 0;
+            if (kit.fishSchools.Count == 0 || TerrainGeneration.I(terrain_generationEnum.cells_per_fish_school) <= 0) return 0;
 
-            int target = Mathf.Max(1, Mathf.RoundToInt(f.SizeX * f.SizeZ / (float)Gen.cells_per_fish_school));
-            float c = Gen.cell_size;
+            int target = Mathf.Max(1, Mathf.RoundToInt(f.SizeX * f.SizeZ / (float)TerrainGeneration.I(terrain_generationEnum.cells_per_fish_school)));
+            float c = TerrainGeneration.F(terrain_generationEnum.cell_size);
             float halfW = f.SizeX * c * 0.5f;
             float halfD = f.SizeZ * c * 0.5f;
             float centerX = ox + (f.SizeX - 1) * 0.5f * c;
@@ -300,7 +301,7 @@ namespace TerrainGen
                 GameObject prefab = kit.PickFrom(kit.fishSchools, f.RegionGroup(gx, gz));
                 if (prefab == null) continue;
 
-                float y = Gen.ground_height + (float)rng.NextDouble() * Gen.floating_extra_height;
+                float y = TerrainGeneration.F(terrain_generationEnum.ground_height) + (float)rng.NextDouble() * TerrainGeneration.F(terrain_generationEnum.floating_extra_height);
                 if (Add(kit, items, TerrainItemKind.Fish, prefab, new Vector3(cx, y, cz), 0f) > 0) made++;
             }
             return made;

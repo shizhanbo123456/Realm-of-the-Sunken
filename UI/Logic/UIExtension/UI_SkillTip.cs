@@ -1,6 +1,7 @@
-using FairyGUI;
+﻿using FairyGUI;
 using UnityEngine;
 
+using Ros.Config;
 namespace Ros.UI.Main
 {
     // 技能悬浮提示：名称/描述/冷却/库存 + 六项评分
@@ -10,7 +11,7 @@ namespace Ros.UI.Main
 
         public void Fill(int skillId)
         {
-            var cfg = ConfigManager.SkillConfig.Get(skillId);
+            var cfg = SkillConfig.Get(skillId);
             m_SkillName.text = cfg.name;
             m_skillDes.text = cfg.description;
             m_label_cd.text = $"{cfg.cd:0.#}s";

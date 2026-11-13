@@ -1,19 +1,20 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
+using Ros.Config;
 namespace TerrainGen
 {
     // 地形点位与地形查询的唯一入口：点位来自烘焙数据，高度与刷新合法性一律走向下射线
     public static class TerrainSpawns
     {
         #region 地图范围（直接取配表，不缓存）
-        public static float MapMin => ConfigManager.GlobalVariableConfig.terrain_size_min;
-        public static float MapSize => ConfigManager.GlobalVariableConfig.terrain_size;
+        public static float MapMin => GlobalVariable.RangeMin(global_variablesEnum.terrain_size);
+        public static float MapSize => GlobalVariable.RangeLength(global_variablesEnum.terrain_size);
         public static float MapMax => MapMin + MapSize;
-        public static float ChunkSize => ConfigManager.GlobalVariableConfig.terrain_chunk_size;
-        public static int ChunkCount => ConfigManager.GlobalVariableConfig.terrain_chunk_size_count;
+        public static float ChunkSize => GlobalVariable.F(global_variablesEnum.terrain_chunk_size);
+        public static int ChunkCount => GlobalVariable.I(global_variablesEnum.terrain_chunk_size_count);
         public static Vector3 MapCenter => new Vector3(MapMin + MapSize * 0.5f, 0f, MapMin + MapSize * 0.5f);
-        public static float SurfaceY => ConfigManager.TerrainGenerationConfig.ground_height;
+        public static float SurfaceY => TerrainGeneration.F(terrain_generationEnum.ground_height);
         #endregion
 
         #region 点位
@@ -128,7 +129,7 @@ namespace TerrainGen
                 return false;
             }
 
-            float top = SurfaceY + ConfigManager.GlobalVariableConfig.terrain_height;
+            float top = SurfaceY + GlobalVariable.RangeLength(global_variablesEnum.terrain_height);
             var origin = new Vector3(x, top, z);
             if (!Physics.Raycast(origin, Vector3.down, out RaycastHit hit, top + 1f, 1 << layer, QueryTriggerInteraction.Ignore))
                 return false;

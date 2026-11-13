@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Ros.Skill.Utils;
 using Ros.Transport;
 using UnityEngine;
@@ -31,7 +31,7 @@ public class EntitySkillController
         slotCapacity = 0;
         recharge.Clear();
         // 普攻人人天生可用且不消耗（store = -1），登记只为查询口径与其它技能一致
-        recharge.AddSkill(Config.unarmed_punch);
+        recharge.AddSkill(GlobalConfig.unarmed_punch);
     }
 
     #region 技能列表管理
@@ -208,7 +208,7 @@ public class EntitySkillController
     // 全角色通用技能：不在实体技能列表也可直接释放（普攻，人人天生可用）
     private static bool IsUniversalSkill(int skillId)
     {
-        return skillId == Config.unarmed_punch;
+        return skillId == GlobalConfig.unarmed_punch;
     }
     #endregion
 
@@ -270,7 +270,7 @@ public class EntitySkillController
     {
         advancingBuffer.Clear();
         advancingBuffer.AddRange(slotSkills);
-        advancingBuffer.Add(Config.unarmed_punch);
+        advancingBuffer.Add(GlobalConfig.unarmed_punch);
         recharge.SetAdvancing(advancingBuffer);
     }
     #endregion

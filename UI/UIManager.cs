@@ -1,9 +1,10 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using FairyGUI;
 using Ros.UI.Main;
 using UnityEngine;
 
+using Ros.Config;
 public class UIManager : MonoBehaviour
 {
     private HomePage home;
@@ -288,7 +289,7 @@ public class UIManager : MonoBehaviour
     // 服务器提示是通用功能：与当前页面无关，收到即显示
     private void OnShowPrompt(int messageId)
     {
-        ShowFlyText(ConfigManager.NoticeConfig.Get(messageId).text);
+        ShowFlyText(NoticeConfig.Get(messageId).text);
     }
 
     private void ReturnToHome()

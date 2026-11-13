@@ -3,6 +3,7 @@ using Ros.Skill;
 using Ros.Transport;
 using UnityEngine;
 
+using Ros.Config;
 public static class SkillManager
 {
     private static readonly Dictionary<int, SkillBase> s_map = new();
@@ -25,12 +26,12 @@ public static class SkillManager
 
     public static float GetSkillCD(int id)
     {
-        return ConfigManager.SkillConfig.Get(id).cd;
+        return SkillConfig.Get(id).cd;
     }
 
     public static int GetSkillStore(int id)
     {
-        return ConfigManager.SkillConfig.Get(id).storeLimit;
+        return SkillConfig.Get(id).storeLimit;
     }
 
     public static int GetSkillCount()

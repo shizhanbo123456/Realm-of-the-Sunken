@@ -2,6 +2,7 @@
 using Ros.Transport;
 using UnityEngine;
 
+using Ros.Config;
 public partial class BattleManager
 {
     // 上帝视角：客户端按 0.2s 反复请求显示区域，服务器只在收到请求时扫描并回块，不保存状态、不做定时下发
@@ -15,7 +16,7 @@ public partial class BattleManager
 
         // 包围盒必须是有限值且有面积；超出地图的部分按地形口径夹回边界
         if (!IsFinite(request.min) || !IsFinite(request.max)) return;
-        float size = ConfigManager.GlobalVariableConfig.terrain_size;
+        float size = GlobalVariable.RangeLength(global_variablesEnum.terrain_size);
         float minX = Mathf.Clamp(Mathf.Min(request.min.x, request.max.x), 0f, size);
         float minZ = Mathf.Clamp(Mathf.Min(request.min.y, request.max.y), 0f, size);
         float maxX = Mathf.Clamp(Mathf.Max(request.min.x, request.max.x), 0f, size);
@@ -151,7 +152,7 @@ public partial class BattleManager
             if (PlayerInfoList.TryGetValue(pair.Key, out var player) && !string.IsNullOrEmpty(player.name)) return player.name;
             break;
         }
-        return ConfigManager.EntityConfig.GetByCategory(entity.type).name;
+        return EntityConfig.GetByCategory(entity.type).name;
     }
 
     private static bool IsFinite(Vector2 value) => !float.IsNaN(value.x) && !float.IsNaN(value.y)

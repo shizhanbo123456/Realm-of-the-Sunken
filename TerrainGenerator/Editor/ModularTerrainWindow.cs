@@ -1,9 +1,10 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 
+using Ros.Config;
 namespace TerrainGen.EditorTools
 {
     public class ModularTerrainWindow : EditorWindow
@@ -169,7 +170,7 @@ namespace TerrainGen.EditorTools
                 sumW += room.width;
                 sumH += room.height;
             }
-            float cell = ConfigManager.TerrainGenerationConfig.cell_size;
+            float cell = TerrainGeneration.F(terrain_generationEnum.cell_size);
             float avgW = field.Rooms.Count > 0 ? sumW * cell / field.Rooms.Count : 0f;
             float avgH = field.Rooms.Count > 0 ? sumH * cell / field.Rooms.Count : 0f;
 
@@ -248,7 +249,7 @@ namespace TerrainGen.EditorTools
                 return;
             }
 
-            int cells = ConfigManager.TerrainGenerationConfig.map_cells_xz;
+            int cells = TerrainGeneration.I(terrain_generationEnum.map_cells_xz);
             if (field == null || dirty || field.SizeX != cells || field.SizeZ != cells) Rebuild();
 
             TerrainPlanData data = TerrainGenerator.Bake(settings, kit);
@@ -591,7 +592,7 @@ namespace TerrainGen.EditorTools
         // 编辑器非播放态 ConfigManager.Awake 不会跑，配表静态字段还是 0 时整张图会塌到原点
         static bool EnsureConfig(out string error)
         {
-            if (ConfigManager.TerrainGenerationConfig.cell_size > 0f)
+            if (TerrainGeneration.F(terrain_generationEnum.cell_size) > 0f)
             {
                 error = string.Empty;
                 return true;
@@ -599,7 +600,7 @@ namespace TerrainGen.EditorTools
 
             try
             {
-                ConfigManager.LoadAll();
+                Ros.Config.ConfigManager.EnsureLoaded();
             }
             catch (System.Exception e)
             {
@@ -607,7 +608,7 @@ namespace TerrainGen.EditorTools
                 return false;
             }
 
-            error = ConfigManager.TerrainGenerationConfig.cell_size > 0f
+            error = TerrainGeneration.F(terrain_generationEnum.cell_size) > 0f
                 ? string.Empty
                 : "terrain_generation 配表里没有有效数据";
             return error.Length == 0;

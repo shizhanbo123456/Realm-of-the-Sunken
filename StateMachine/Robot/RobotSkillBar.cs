@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 
+using Ros.Config;
 // 人机技能栏：只做选栏与出招顺序；冷却与库存由实体的 EntitySkillController 记账
 public class RobotSkillBar
 {
@@ -31,9 +32,10 @@ public class RobotSkillBar
 
     private static int ComparePriority(int a, int b)
     {
-        var ca = ConfigManager.SkillConfig.Get(a);
-        var cb = ConfigManager.SkillConfig.Get(b);
-        if (ca.qualityRank != cb.qualityRank) return cb.qualityRank.CompareTo(ca.qualityRank);
+        var ca = SkillConfig.Get(a);
+        var cb = SkillConfig.Get(b);
+        int ra = SkillConfig.QualityRank(ca), rb = SkillConfig.QualityRank(cb);
+        if (ra != rb) return rb.CompareTo(ra);
         return b.CompareTo(a);
     }
 
@@ -49,8 +51,8 @@ public class RobotSkillBar
         }
 
         // 普攻同样取配表射程，够不到就交给决策层继续前压
-        if (dist > ConfigManager.SkillConfig.Get(Config.unarmed_punch).castRange) return false;
-        return TryCast(Config.unarmed_punch);
+        if (dist > SkillConfig.Get(GlobalConfig.unarmed_punch).castRange) return false;
+        return TryCast(GlobalConfig.unarmed_punch);
     }
 
     // 只影响自身的技能（射程 0）不看距离，其余必须覆盖当前距离

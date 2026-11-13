@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class EntityModelInfo:MonoBehaviour
 {
@@ -9,8 +9,8 @@ public class EntityModelInfo:MonoBehaviour
     public CapsuleCollider BuildCapsuleCollider()
     {
         float height = yRange.y - yRange.x;
-        // 半径全实体统一写死（Config.entity_capsule_radius），不再由包围盒推算
-        float radius = Config.entity_capsule_radius;
+        // 半径全实体统一写死（GlobalConfig.entity_capsule_radius），不再由包围盒推算
+        float radius = GlobalConfig.entity_capsule_radius;
         Vector3 center = new Vector3(
             (xRange.x + xRange.y) * 0.5f,
             (yRange.x + yRange.y) * 0.5f,

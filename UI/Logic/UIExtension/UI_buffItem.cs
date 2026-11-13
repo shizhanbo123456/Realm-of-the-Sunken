@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using FairyGUI;
 using UnityEngine;
 
+using Ros.Config;
 namespace Ros.UI.Main
 {
     // buff 图标条目：正负档、图标、层数，悬浮回调交给调用方
@@ -9,7 +10,7 @@ namespace Ros.UI.Main
     {
         public void Fill(int buffType, int level, Action<int, GObject> onHoverEnter, Action onHoverOut)
         {
-            var cfg = ConfigManager.EffectConfig.Get(buffType);
+            var cfg = EffectConfig.Get(buffType);
             m_negative.selectedIndex = cfg.positive == true ? 0 : 1; // 0 正面 / 1 负面
             Texture icon = null;
             var map = Tool.AssetsManager != null ? Tool.AssetsManager.BuffIconMap : null;

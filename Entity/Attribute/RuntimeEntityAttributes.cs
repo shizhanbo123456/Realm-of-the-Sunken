@@ -1,11 +1,12 @@
-using UnityEngine;
+﻿using UnityEngine;
+using Ros.Config;
 
 // 实体实际属性 = 基础（entity.csv）+ 玩家词条（BattleManager，玩家级）+ Buff 增量（EntityEffectController）
 // 当前生命也由本类持有：生命上限变化时按比例换算，并把 healthDirty 置脏让服务器立即同步
 public class RuntimeEntityAttributes
 {
     private readonly EntityData owner;
-    private readonly ConfigManager.EntityConfig config;
+    private readonly entity config;
 
     private CardBonus card = CardBonus.Empty;       // 所属玩家自己的词条（非玩家实体为空）
     private CardBonus campCard = CardBonus.Empty;   // 所属阵营玩家的词条累加（只给己方建筑用）

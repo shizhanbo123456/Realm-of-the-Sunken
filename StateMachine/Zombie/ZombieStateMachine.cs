@@ -27,7 +27,7 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
     {
         Owner = owner;
         homePosition = owner.transform.position;
-        ThinkInterval = Config.zombie_decide_interval;
+        ThinkInterval = GlobalConfig.zombie_decide_interval;
 
         wanderState = new WanderState(this);
         chaseState = new ChaseState(this);
@@ -56,7 +56,7 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
         if (Owner.NavUnreachable && currentTarget != null)
         {
             ignoredTargetId = currentTarget.id;
-            ignoreTargetUntil = Time.time + Config.ai_ignore_unreachable_time;
+            ignoreTargetUntil = Time.time + GlobalConfig.ai_ignore_unreachable_time;
             ClearTarget();
         }
 
@@ -87,8 +87,8 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
         {
             float view = Owner.attributes.ViewDistance > 0f
                 ? Owner.attributes.ViewDistance
-                : Config.zombie_acquire_range;
-            return Mathf.Min(view, Config.zombie_max_chase_distance - Config.zombie_acquire_margin);
+                : GlobalConfig.zombie_acquire_range;
+            return Mathf.Min(view, GlobalConfig.zombie_max_chase_distance - GlobalConfig.zombie_acquire_margin);
         }
     }
 
@@ -136,7 +136,7 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
     public bool TryAttack(EntityData target)
     {
         if (target == null) return false;
-        if (FlatDistance(target.transform.position) > Config.zombie_roar_range) return TryUseSkill(SkillIdAt(SlotRoar));
+        if (FlatDistance(target.transform.position) > GlobalConfig.zombie_roar_range) return TryUseSkill(SkillIdAt(SlotRoar));
         return TryClaw();
     }
 
@@ -169,7 +169,7 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
                     return null;
                 }
                 machine.hasWanderPoint = false;
-                machine.wanderResumeTime = Time.time + Config.zombie_wander_pause;
+                machine.wanderResumeTime = Time.time + GlobalConfig.zombie_wander_pause;
                 machine.RequestIdle();
                 return null;
             }
@@ -180,7 +180,7 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
                 return null;
             }
 
-            Vector2 offset = Random.insideUnitCircle * Config.zombie_wander_radius;
+            Vector2 offset = Random.insideUnitCircle * GlobalConfig.zombie_wander_radius;
             machine.wanderPoint = machine.homePosition + new Vector3(offset.x, 0f, offset.y);
             machine.hasWanderPoint = true;
             machine.RequestMove(machine.wanderPoint);
@@ -202,15 +202,15 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
             if (target == null) return machine.wanderState;
 
             float dist = machine.FlatDistance(target.transform.position);
-            if (dist > Config.zombie_max_chase_distance)
+            if (dist > GlobalConfig.zombie_max_chase_distance)
             {
                 machine.ClearTarget(); // 拉开太远：放弃，回出生点游荡
                 return machine.wanderState;
             }
-            if (dist <= Config.zombie_attack_range) return machine.attackState;
+            if (dist <= GlobalConfig.zombie_attack_range) return machine.attackState;
 
             // 远处且嘶吼冷却好了：进攻击态放一嗓子，放完由攻击态切回追击
-            if (dist > Config.zombie_roar_range && machine.CanUseSlot(SlotRoar)) return machine.attackState;
+            if (dist > GlobalConfig.zombie_roar_range && machine.CanUseSlot(SlotRoar)) return machine.attackState;
 
             machine.RequestChase(target); // 跟随目标物体
             return null;
@@ -237,20 +237,20 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
 
             float dist = machine.FlatDistance(target.transform.position);
 
-            if (dist <= Config.zombie_attack_range)
+            if (dist <= GlobalConfig.zombie_attack_range)
             {
                 machine.RequestAttack(target);
                 return null;
             }
 
-            if (dist > Config.zombie_roar_range && machine.CanUseSlot(SlotRoar))
+            if (dist > GlobalConfig.zombie_roar_range && machine.CanUseSlot(SlotRoar))
             {
                 machine.RequestAttack(target);
                 return null;
             }
 
             // 退出距离大于进入距离：目标在攻击距离边界晃动时不会在追击/攻击之间反复切换
-            if (dist > Config.zombie_attack_range * Config.zombie_attack_exit_scale) return machine.chaseState;
+            if (dist > GlobalConfig.zombie_attack_range * GlobalConfig.zombie_attack_exit_scale) return machine.chaseState;
 
             // 退出缓冲区内继续贴近，保持攻击态，不切状态也不出招
             machine.RequestChase(target);

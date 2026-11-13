@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class CoralEntityData : EntityData
 {
@@ -20,13 +20,13 @@ public class CoralEntityData : EntityData
         var source = BattleManager.GetEntity(effectController.GetSourceId(EffectType.PlaguePollute));
         if (source == null) return;
         Vector3 center = transform.position;
-        float sqr = Config.plague_pollute_radius * Config.plague_pollute_radius;
+        float sqr = GlobalConfig.plague_pollute_radius * GlobalConfig.plague_pollute_radius;
         foreach (var entity in BattleManager.EntityContainer.Entities)
         {
             if (entity == null || !entity.Alive || entity.camp != EntityCamp.Attack) continue;
             if ((entity.transform.position - center).sqrMagnitude > sqr) continue;
             if (entity.effectController == null) continue;
-            entity.effectController.AddEffect(EffectType.PlagueMark, 1, Config.plague_mark_duration, source);
+            entity.effectController.AddEffect(EffectType.PlagueMark, 1, GlobalConfig.plague_mark_duration, source);
         }
     }
 }

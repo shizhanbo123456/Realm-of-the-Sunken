@@ -1,8 +1,9 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using FairyGUI;
 using Ros.UI.Main;
 using UnityEngine;
 
+using Ros.Config;
 // 结算界面：独立的全局子界面，不挂在任何页面上（挂 GRoot）。
 // 战斗结束走 OnSettlementResult 显示；GM「结算界面」演示直接调 PlayDemo。
 public class SettlementView
@@ -75,7 +76,7 @@ public class SettlementView
             panel.visible = false;
         }
         panel.m_title.text = GetEndText(r.gameState, camp);
-        panel.m_content.text = $"战斗用时：{Mathf.RoundToInt(Mathf.Max(0f, ConfigManager.GlobalVariableConfig.battle_duration - r.remainTime))} 秒";
+        panel.m_content.text = $"战斗用时：{Mathf.RoundToInt(Mathf.Max(0f, GlobalVariable.F(global_variablesEnum.battle_duration) - r.remainTime))} 秒";
 
         if (detail == null)
         {

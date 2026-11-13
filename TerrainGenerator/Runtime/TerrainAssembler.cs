@@ -1,8 +1,8 @@
-using UnityEngine;
+﻿using UnityEngine;
 
+using Ros.Config;
 namespace TerrainGen
 {
-    using Gen = ConfigManager.TerrainGenerationConfig;
 
     public static class TerrainAssembler
     {
@@ -27,8 +27,8 @@ namespace TerrainGen
             {
                 seed = s.seed,
                 configVersion = s.version,
-                cellSize = Gen.cell_size,
-                groundHeight = Gen.ground_height,
+                cellSize = TerrainGeneration.F(terrain_generationEnum.cell_size),
+                groundHeight = TerrainGeneration.F(terrain_generationEnum.ground_height),
                 sizeX = field.SizeX,
                 sizeZ = field.SizeZ,
             };
@@ -130,7 +130,7 @@ namespace TerrainGen
             container.transform.SetParent(root, false);
 
             // 与摆放数据同一口径：0 号格中心的地图坐标
-            float mapMin = ConfigManager.GlobalVariableConfig.terrain_size_min;
+            float mapMin = GlobalVariable.RangeMin(global_variablesEnum.terrain_size);
             float ox = mapMin + data.cellSize * 0.5f;
             float oz = mapMin + data.cellSize * 0.5f;
             int subIndex = 0;

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using FairyGUI;
 using UnityEngine;
 
+using Ros.Config;
 namespace Ros.UI.Main
 {
     // 抽卡界面：三张卡横向铺开、逐张播入场动画；选卡 / 弃卡 / 关闭三个出口都由调用方决定怎么上报
@@ -143,9 +144,9 @@ namespace Ros.UI.Main
         {
             return tier switch
             {
-                CardTier.Silver => ConfigManager.GlobalVariableConfig.card_discard_exp_silver,
-                CardTier.Gold => ConfigManager.GlobalVariableConfig.card_discard_exp_gold,
-                _ => ConfigManager.GlobalVariableConfig.card_discard_exp_holo,
+                CardTier.Silver => GlobalVariable.I(global_variablesEnum.card_discard_exp_silver),
+                CardTier.Gold => GlobalVariable.I(global_variablesEnum.card_discard_exp_gold),
+                _ => GlobalVariable.I(global_variablesEnum.card_discard_exp_holo),
             };
         }
     }

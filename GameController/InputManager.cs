@@ -48,19 +48,19 @@ public class InputManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.D)) { pressed |= PlayerKey.DPress; dHeld = true; }
         if (Input.GetKeyUp(KeyCode.D)) { pressed |= PlayerKey.DRelease; dHeld = false; }
 
-        if (Input.GetKeyDown(Config.melee_key)) CastUnarmed();
-        if (Input.GetKeyDown(Config.jump_key)) pressed |= PlayerKey.K;
-        if (Input.GetKeyUp(Config.jump_key)) pressed |= PlayerKey.KRelease; // 长按抬起（飞行高度控制预留）
-        if (Input.GetKeyDown(Config.slide_key)) pressed |= PlayerKey.LShift;
-        if (Input.GetKeyUp(Config.slide_key)) pressed |= PlayerKey.LShiftRelease; // 长按抬起（飞行高度控制预留）
-        if (Input.GetKeyDown(Config.minimap_radius_key)) Tool.NetworkManager.SendMinimapRadiusSwitch(); //雷达显示半径切换
+        if (Input.GetKeyDown(GlobalConfig.melee_key)) CastUnarmed();
+        if (Input.GetKeyDown(GlobalConfig.jump_key)) pressed |= PlayerKey.K;
+        if (Input.GetKeyUp(GlobalConfig.jump_key)) pressed |= PlayerKey.KRelease; // 长按抬起（飞行高度控制预留）
+        if (Input.GetKeyDown(GlobalConfig.slide_key)) pressed |= PlayerKey.LShift;
+        if (Input.GetKeyUp(GlobalConfig.slide_key)) pressed |= PlayerKey.LShiftRelease; // 长按抬起（飞行高度控制预留）
+        if (Input.GetKeyDown(GlobalConfig.minimap_radius_key)) Tool.NetworkManager.SendMinimapRadiusSwitch(); //雷达显示半径切换
         // 技能键：按键 → 技能 id 由客户端技能栏解析，上行技能包而不是这个包
         var skills = Tool.ClientLogicManager != null ? Tool.ClientLogicManager.SkillVfx : null;
         if (skills != null)
         {
-            for (int i = 0; i < Config.skill_slot_keys.Length; i++)
+            for (int i = 0; i < GlobalConfig.skill_slot_keys.Length; i++)
             {
-                if (Input.GetKeyDown(Config.skill_slot_keys[i])) skills.CastSlot(i);
+                if (Input.GetKeyDown(GlobalConfig.skill_slot_keys[i])) skills.CastSlot(i);
             }
         }
 

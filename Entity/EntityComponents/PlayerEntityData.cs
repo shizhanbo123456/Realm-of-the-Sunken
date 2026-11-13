@@ -1,5 +1,6 @@
-using Ros.Transport;
+﻿using Ros.Transport;
 using UnityEngine;
+using Ros.Config;
 
 public class PlayerEntityData : EntityData
 {
@@ -162,8 +163,8 @@ public class PlayerEntityData : EntityData
         if (FlightMode)
         {
             float v = 0f;
-            if ((flyHeld & PlayerKey.K) != 0) v = Config.fly_vertical_speed;
-            else if ((flyHeld & PlayerKey.LShift) != 0) v = -Config.fly_vertical_speed;
+            if ((flyHeld & PlayerKey.K) != 0) v = GlobalVariable.F(global_variablesEnum.fly_vertical_speed);
+            else if ((flyHeld & PlayerKey.LShift) != 0) v = -GlobalVariable.F(global_variablesEnum.fly_vertical_speed);
             SetVelocityVertical(v, VelocitySource.Flight);
         }
 
@@ -183,7 +184,7 @@ public class PlayerEntityData : EntityData
                 float yawDelta = 0f;
                 if (Mathf.Abs(moveState.dir.x) > 0.01f)
                 {
-                    yawDelta = Config.move_turn_rate * Mathf.Sign(moveState.dir.x) * deltaTime;
+                    yawDelta = GlobalVariable.F(global_variablesEnum.move_turn_rate) * Mathf.Sign(moveState.dir.x) * deltaTime;
                     moveState.yaw += yawDelta;
                 }
                 moveState.yawSpeed = deltaTime > 0f ? yawDelta / deltaTime : 0f;

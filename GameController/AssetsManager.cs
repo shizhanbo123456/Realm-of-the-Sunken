@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -95,7 +95,7 @@ public class AssetsManager : MonoBehaviour
                 break;
             case EntityCategory.GuardStatue:
                 // 副守护点 value 0~2 各用自己那一种；主守护点 value >= sage_statue_count 用国王
-                if (type.value >= Config.sage_statue_count) graphic = KingStatueGraphic;
+                if (type.value >= GlobalConfig.sage_statue_count) graphic = KingStatueGraphic;
                 else if (type.value >= 0 && type.value < SageStatueGraphics.Count) graphic = SageStatueGraphics[type.value];
                 break;
             case EntityCategory.Coral:
@@ -103,7 +103,7 @@ public class AssetsManager : MonoBehaviour
                 graphic = RandomOf(type.value <= 0 ? CoralSmallGraphics : CoralLargeGraphics);
                 break;
             case EntityCategory.CrystalStatue:
-                // 3 种外观按实例编号选用（Config.crystal_statue_count = 3）；配置不足时取模循环
+                // 3 种外观按实例编号选用（GlobalConfig.crystal_statue_count = 3）；配置不足时取模循环
                 if (CrystalStatueGraphics.Count > 0) graphic = CrystalStatueGraphics[type.value % CrystalStatueGraphics.Count];
                 break;
             case EntityCategory.NeutralStatue:

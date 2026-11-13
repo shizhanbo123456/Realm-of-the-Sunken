@@ -3,6 +3,7 @@ using Ros.Skill;
 using Ros.Transport;
 using UnityEngine;
 
+using Ros.Config;
 public class EntityPlayerManager : ClientSubManager
 {
     public class ClientEntityView : MonoBehaviour
@@ -363,8 +364,8 @@ public class EntityPlayerManager : ClientSubManager
             {
                 view.anim.Init(null);
                 // 武器编号取实体配表、显示类型取武器表；显示位置之后完全由动画状态驱动
-                int weaponId = ConfigManager.EntityConfig.GetByCategory(info.type).weaponId;
-                if (weaponId >= 0) view.anim.SetWeapon(weaponId, ConfigManager.WeaponConfig.Get(weaponId).weaponDisplay);
+                int weaponId = EntityConfig.GetByCategory(info.type).weaponId ?? -1;
+                if (weaponId >= 0) view.anim.SetWeapon(weaponId, WeaponConfig.Get(weaponId).weaponDisplay);
                 else Debug.LogError($"[动画] 实体 {info.type} 有动画却没有配武器编号：武器显示类型取自 weapon.csv");
             }
 
@@ -394,11 +395,11 @@ public class EntityPlayerManager : ClientSubManager
         {
             var b = buffs[i];
             if (b == null || !s_activeBuffs.Add(b.type)) continue;
-            var effect = ConfigManager.EffectConfig.Get(b.type); // 特效类别/下标取 effect.csv 第 11、12 列
+            var effect = EffectConfig.Get(b.type); // 特效类别/下标取 effect.csv 第 11、12 列
             if (!effect.vfxKind.HasValue) continue;
             if (view.buffVfx.ContainsKey(b.type)) continue;
 
-            SkillVfxKind kind = effect.vfxKind.Value;
+            SkillVfxKind kind = (SkillVfxKind)effect.vfxKind.Value;
             int index = effect.vfxIndex.Value;
 
             // Buff 特效按 hits[0] 的竖直范围贴合实体：底对底、顶对顶，等比缩放
@@ -417,7 +418,7 @@ public class EntityPlayerManager : ClientSubManager
             }
 
             var trajectory = new SkillTrajectoryFollow(view.id, new Vector3(0f, offsetY, 0f));
-            trajectory.Duration = Config.buff_vfx_life_time;
+            trajectory.Duration = GlobalConfig.buff_vfx_life_time;
             var obj = PlayTrackedVfx(kind, index, trajectory, scale);
             if (obj != null) view.buffVfx[b.type] = obj;
         }

@@ -1,4 +1,5 @@
-using UnityEngine;
+﻿using UnityEngine;
+using Ros.Config;
 
 public class TestEntityData : EntityData
 {
@@ -44,7 +45,7 @@ public class TestEntityData : EntityData
     {
         float yaw = transform.eulerAngles.y;
         if (canInput && MotionCanMove && Mathf.Abs(turnInput) > 0.01f)
-            yaw += Config.move_turn_rate * Mathf.Sign(turnInput) * deltaTime;
+            yaw += GlobalVariable.F(global_variablesEnum.move_turn_rate) * Mathf.Sign(turnInput) * deltaTime;
         transform.rotation = Quaternion.Euler(0f, yaw, 0f);
     }
 
@@ -57,8 +58,8 @@ public class TestEntityData : EntityData
         rb.useGravity = true;
         rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
         rb.interpolation = RigidbodyInterpolation.None;
-        rb.drag = Config.rb_drag;
-        rb.angularDrag = Config.rb_angular_drag;
+        rb.drag = GlobalConfig.rb_drag;
+        rb.angularDrag = GlobalConfig.rb_angular_drag;
     }
 
     public string DescribeState()

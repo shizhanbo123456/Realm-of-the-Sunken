@@ -1,4 +1,4 @@
-using Ros.Transport;
+﻿using Ros.Transport;
 using UnityEngine;
 
 public enum CameraViewMode
@@ -155,7 +155,7 @@ public class CameraController : MonoBehaviour
             SetMode(CameraViewMode.Free); // 纯观战：按 W 脱离跟随进自由视角
         }
 
-        if (!keysBlocked && Input.GetKeyDown(Config.camera_mode_key))
+        if (!keysBlocked && Input.GetKeyDown(GlobalConfig.camera_mode_key))
         {
             switch (Mode)
             {

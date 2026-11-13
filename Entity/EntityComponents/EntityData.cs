@@ -5,6 +5,7 @@ using System.Threading;
 using UnityEngine;
 using UnityEngine.AI;
 
+using Ros.Config;
 // 输入操作屏蔽类别：屏蔽"前后"=屏蔽 W；屏蔽"旋转"=屏蔽 A/D（不再逐个按键屏蔽）
 [Flags]
 public enum InputBlockOp : byte
@@ -105,14 +106,14 @@ public abstract class EntityData : MonoBehaviour
     {
         this.id = id;
         this.type = type;
-        this.level = Mathf.Min(level, Config.battle_max_level); // 战斗期等级上限
+        this.level = Mathf.Min(level, GlobalVariable.I(global_variablesEnum.battle_max_level)); // 战斗期等级上限
         this.camp = camp;
         attributes = new RuntimeEntityAttributes(this, type);
         if (Tool.InfoManager != null)
         {
             var config = Tool.InfoManager.GetEntityConfig(type);
-            defaultEndure = config.endureLevel; // entity.csv「霸体等级」列：霸体下限
-            weaponId = config.weaponId;         // entity.csv「武器编号」列：实体固定武器
+            defaultEndure = config.endureLevel == true ? EndureType.Super : EndureType.None; // entity.csv「霸体等级」列：霸体下限
+            weaponId = config.weaponId ?? -1;         // entity.csv「武器编号」列：实体固定武器
         }
         effectController = new EntityEffectController();
         effectController.Init(this);
@@ -133,7 +134,7 @@ public abstract class EntityData : MonoBehaviour
                 Debug.LogError($"{name}（{type}）有动画却没有配武器编号：动作集与武器显示类型都取自 weapon.csv");
             else
             {
-                var weapon = ConfigManager.WeaponConfig.Get(weaponId);
+                var weapon = WeaponConfig.Get(weaponId);
                 anim.SetType(weapon.animType);
                 anim.SetWeapon(weaponId, weapon.weaponDisplay);
             }
@@ -184,7 +185,7 @@ public abstract class EntityData : MonoBehaviour
     private int navFailCount; // 连续算路失败次数：达到上限即判定目标不可达
     private float navNextRescueTime;
 
-    public bool NavUnreachable => navFailCount >= Config.nav_path_fail_limit;
+    public bool NavUnreachable => navFailCount >= GlobalConfig.nav_path_fail_limit;
 
     public void MoveTo(Vector3 dest)
     {
@@ -652,9 +653,9 @@ public abstract class EntityData : MonoBehaviour
             transformBaseReady = true;
             return;
         }
-        float eps = Config.entity_sync_pos_epsilon;
+        float eps = GlobalConfig.entity_sync_pos_epsilon;
         if ((p - transformBasePos).sqrMagnitude >= eps * eps) { transformDirty = 0; return; }
-        if (Mathf.Abs(Mathf.DeltaAngle(transformBaseYaw, yaw)) >= Config.entity_sync_yaw_epsilon) { transformDirty = 0; return; }
+        if (Mathf.Abs(Mathf.DeltaAngle(transformBaseYaw, yaw)) >= GlobalConfig.entity_sync_yaw_epsilon) { transformDirty = 0; return; }
         if (Mathf.Abs(speedSqr - transformBaseSpeedSqr) >= 0.01f) transformDirty = 0; // 0.01 ≈ 速度差 0.1m/s，兜住减速末段
     }
 
@@ -828,9 +829,9 @@ public abstract class EntityData : MonoBehaviour
 
         // 检测起点取脚部高度（约定），反映动画姿态；非人形无脚骨骼回退实体位置
         Vector3 origin = TryGetFootWorldY(out float footY)
-            ? new Vector3(transform.position.x, footY, transform.position.z) + Vector3.up * Config.ground_probe_up
-            : transform.position + Vector3.up * Config.ground_probe_up;
-        int count = Physics.RaycastNonAlloc(origin, Vector3.down, s_groundHits, Config.ground_probe_length, EntityPhysics.GroundMask, QueryTriggerInteraction.Ignore);
+            ? new Vector3(transform.position.x, footY, transform.position.z) + Vector3.up * GlobalVariable.F(global_variablesEnum.ground_probe_up)
+            : transform.position + Vector3.up * GlobalVariable.F(global_variablesEnum.ground_probe_up);
+        int count = Physics.RaycastNonAlloc(origin, Vector3.down, s_groundHits, GlobalVariable.F(global_variablesEnum.ground_probe_length), EntityPhysics.GroundMask, QueryTriggerInteraction.Ignore);
         bool onGround = false;
         for (int i = 0; i < count; i++)
         {
@@ -854,8 +855,8 @@ public abstract class EntityData : MonoBehaviour
         rb.useGravity = true; //下落与被击飞依赖重力（单位自身 Collider 必须配好，否则会一直坠落）
         rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
         rb.interpolation = RigidbodyInterpolation.None;
-        rb.drag = Config.rb_drag;
-        rb.angularDrag = Config.rb_angular_drag;
+        rb.drag = GlobalConfig.rb_drag;
+        rb.angularDrag = GlobalConfig.rb_angular_drag;
     }
     #endregion
 }

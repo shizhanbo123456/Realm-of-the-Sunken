@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using FairyGUI;
 using UnityEngine;
@@ -60,9 +60,9 @@ namespace Ros.UI.Main
         private void RenderSlot(int index, GObject obj)
         {
             if (obj is not UI_SkillListItem slot) return;
-            // 键位：槽位顺序即 Config.skill_slot_keys（U I O L H Y）
+            // 键位：槽位顺序即 GlobalConfig.skill_slot_keys（U I O L H Y）
             if (slot.m_key != null)
-                slot.m_key.text = index < Config.skill_slot_keys.Length ? Config.skill_slot_keys[index].ToString() : "";
+                slot.m_key.text = index < GlobalConfig.skill_slot_keys.Length ? GlobalConfig.skill_slot_keys[index].ToString() : "";
 
             Slot data = index < slots.Count ? slots[index] : new Slot(-1, 1f, 0, true);
             bool empty = data.skillId < 0;

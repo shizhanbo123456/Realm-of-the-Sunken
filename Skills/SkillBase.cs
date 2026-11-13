@@ -4,6 +4,7 @@ using Ros.Skill.Utils;
 using Ros.Transport;
 using UnityEngine;
 
+using Ros.Config;
 namespace Ros.Skill
 {
     // 键值会被 effect.csv 第 11 列以整数引用，新类别只能追加在末尾
@@ -14,15 +15,15 @@ namespace Ros.Skill
         public abstract int Id { get; }
 
         // 射程读 skill.csv 第 14 列：既是技能能影响到的距离，也是索敌半径与 AI 的作战距离；0 = 只影响自身
-        public float CastRange => ConfigManager.SkillConfig.Get(Id).castRange;
+        public float CastRange => SkillConfig.Get(Id).castRange;
         // 索敌口径读 skill.csv 第 13 列：夹角 <=0.1 = 不索敌，>179.9 = 不限方向；半径一律取射程
-        protected float TargetSector => ConfigManager.SkillConfig.Get(Id).targetSector;
+        protected float TargetSector => SkillConfig.Get(Id).targetSector;
         protected float TargetRadius => CastRange;
         // 第 17 列：释放瞬间是否自动转向射程内最近的敌人
-        private bool AutoTarget => ConfigManager.SkillConfig.Get(Id).autoTarget;
+        private bool AutoTarget => SkillConfig.Get(Id).autoTarget ?? false;
         // 攻击动画读 skill.csv 第 12 列，-1 = 无动画（按下立刻施放）
         protected bool HasCastAnim => (int)CastAnim != -1;
-        protected EntityAnim.AttackType CastAnim => (EntityAnim.AttackType)ConfigManager.SkillConfig.Get(Id).attackAnim;
+        protected EntityAnim.AttackType CastAnim => (EntityAnim.AttackType)SkillConfig.Get(Id).attackAnim;
 
         // 武器不随技能变化：一律取实体固定武器（服务器与客户端各从自己的实体拿）
         protected static int WeaponOf(EntityData entity) => entity.weaponId;
@@ -81,7 +82,7 @@ namespace Ros.Skill
         private void BroadcastSpecial(int skillId)
         {
             if (!BattleManager.AtServer || Tool.NetworkManager == null) return;
-            if (!ConfigManager.SkillConfig.Get(skillId).broadcast) return;
+            if (SkillConfig.Get(skillId).broadcast != true) return;
             Tool.NetworkManager.SendBattleEvent(new SCBattleEvent
             {
                 type = SCBattleEvent.Type.SkillBroadcast,
@@ -147,18 +148,18 @@ namespace Ros.Skill
             Action<EntityEffectController> addEffect = null,
             Action<EntityData> onHit = null, float? knockback = null)
         {
-            var config = ConfigManager.SkillConfig.Get(Id);
-            return AttackData.Create(entity, config.breakEndure,
+            var config = SkillConfig.Get(Id);
+            return AttackData.Create(entity, config.breakEndure ?? false,
                 addEffectEvent: addEffect, onHit: onHit, knockbackPower: knockback ?? config.knockback ?? 0f);
         }
 
         // 技能附带的 Buff 全部读 skill.csv，按 index 取用；越界属配表错配，直接抛
         protected BuffEntry ConfigBuff(int index)
         {
-            var buffs = ConfigManager.SkillConfig.Get(Id).buffs;
-            if (index < 0 || index >= buffs.Count)
-                throw new FormatException($"[配表] skill.csv 技能 {Id} 没有第 {index} 个 Buff（共 {buffs.Count} 个）");
-            return buffs[index];
+            var config = SkillConfig.Get(Id);
+            if (index < 0 || index >= config.BuffCount())
+                throw new FormatException($"[配表] skill.csv 技能 {Id} 没有第 {index} 个 Buff（共 {config.BuffCount()} 个）");
+            return config.BuffAt(index);
         }
 
         protected Action<EntityEffectController> ConfigHitBuff(EntityData caster, int index)
@@ -175,7 +176,7 @@ namespace Ros.Skill
         }
 
         // 第 9 列：有特效的技能 = 各特效的缩放倍率（空 = 原大小），无特效近战 = 判定半径
-        private List<float> SizedConfig => ConfigManager.SkillConfig.Get(Id).bulletSizes;
+        private List<float> SizedConfig => SkillConfig.Get(Id).bulletSizes;
 
         // 取第 index 个特效的缩放倍率；没配 = 原大小，配了但越界属错配，直接抛
         protected float VfxScale(int index = 0)
@@ -200,12 +201,12 @@ namespace Ros.Skill
         }
 
         // 第 10 列：同一目标最短再伤害间隔（秒）；留空在解析阶段已填 100 = 只结算一次
-        protected float DamageInterval => ConfigManager.SkillConfig.Get(Id).damageInterval;
+        protected float DamageInterval => SkillConfig.Get(Id).damageInterval ?? 100f;
 
         // 第 11 列指定项；空 = 全 1，越界属配表错配直接抛（与段倍率共用同一列）
         protected float ConfigDamageRate(int index = 0)
         {
-            var rates = ConfigManager.SkillConfig.Get(Id).damageRates;
+            var rates = SkillConfig.Get(Id).damageRates;
             if (rates.Count == 0) return 1f;
             if (index < 0 || index >= rates.Count)
                 throw new FormatException($"[配表] skill.csv 技能 {Id} 只配了 {rates.Count} 个伤害倍率，取第 {index} 个越界");
@@ -215,7 +216,7 @@ namespace Ros.Skill
         // 第 11 列：伤害倍率。空 = 全 1；只有 1 项 = 所有段共用；多项 = 按段序取
         private float[] SegmentRates(int segments)
         {
-            var rates = ConfigManager.SkillConfig.Get(Id).damageRates;
+            var rates = SkillConfig.Get(Id).damageRates;
             if (rates.Count == 0) return null;
             if (rates.Count == 1)
             {

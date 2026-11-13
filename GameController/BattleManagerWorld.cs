@@ -1,8 +1,9 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Ros.Transport;
 using TerrainGen;
 using UnityEngine;
 
+using Ros.Config;
 public partial class BattleManager
 {
     private Ticker coralSpawnTicker;
@@ -35,7 +36,7 @@ public partial class BattleManager
             SpawnEntity(EntityType.CrystalStatue(i), 1, TerrainSpawns.Towers[i], EntityCamp.Defense);
 
         // 中立雕像（中立争抢单位）：开局不刷，开战后按延迟计时刷新；之后由被打死的时机重排
-        neutralStatueRespawnTime = Time.time + Config.neutral_statue_first_spawn_delay;
+        neutralStatueRespawnTime = Time.time + GlobalConfig.neutral_statue_first_spawn_delay;
 
         CaptureGuardTotalHealth(); // 守护点总血量在此刻定死，经验增幅按已扣除比例算
     }
@@ -43,7 +44,7 @@ public partial class BattleManager
     private void SpawnZombie()
     {
         if (!TrySampleZombieSpawnPoint(out Vector3 pos)) return;
-        int variant = Random.Range(0, Config.zombie_variant_count);
+        int variant = Random.Range(0, GlobalConfig.zombie_variant_count);
         SpawnEntity(EntityType.Zombie(variant), GetZombieSpawnLevel(), pos, EntityCamp.Defense);
     }
 
@@ -52,12 +53,12 @@ public partial class BattleManager
     {
         if (!zombieSpawnTicker) return;
 
-        int max = ConfigManager.GlobalVariableConfig.zombie_max;
+        int max = GlobalVariable.I(global_variablesEnum.zombie_max);
         if (zombieCount >= max) return;
 
         int times = EnvironmentManager.IsDay
-            ? ConfigManager.GlobalVariableConfig.zombie_refresh_rate_slow
-            : ConfigManager.GlobalVariableConfig.zombie_refresh_rate_fast;
+            ? GlobalVariable.I(global_variablesEnum.zombie_refresh_rate_slow)
+            : GlobalVariable.I(global_variablesEnum.zombie_refresh_rate_fast);
         for (int i = 0; i < times && zombieCount < max; i++) SpawnZombie();
     }
 
@@ -91,8 +92,8 @@ public partial class BattleManager
         CollectAlivePlayerPositions();
         if (s_playerPosScratch.Count == 0) return TerrainSpawns.TrySampleSpawnPoint(out pos);
 
-        float minDist = ConfigManager.GlobalVariableConfig.zombie_spawn_range_min;
-        float maxDist = ConfigManager.GlobalVariableConfig.zombie_spawn_range_max;
+        float minDist = GlobalVariable.RangeMin(global_variablesEnum.zombie_spawn_range);
+        float maxDist = GlobalVariable.RangeMax(global_variablesEnum.zombie_spawn_range);
         for (int attempt = 0; attempt < RingSampleAttempts; attempt++)
         {
             Vector3 center = s_playerPosScratch[Random.Range(0, s_playerPosScratch.Count)];
@@ -122,7 +123,7 @@ public partial class BattleManager
 
     public void ScheduleNeutralStatueRespawn()
     {
-        neutralStatueRespawnTime = Time.time + Config.neutral_statue_respawn_delay;
+        neutralStatueRespawnTime = Time.time + GlobalConfig.neutral_statue_respawn_delay;
     }
 
     public void NotifyNeutralStatueCaptured(ushort treeId)
@@ -143,9 +144,9 @@ public partial class BattleManager
         DestroyFarCorals(); // 先清掉离所有存活玩家都超过 coral_kill_distance 的，再补刷
 
         // 场上珊瑚数超过阈值用慢速档的次数，否则用快速档
-        int times = EntityContainer.Corals.Count > ConfigManager.GlobalVariableConfig.coral_spawn_rate_rate
-            ? ConfigManager.GlobalVariableConfig.coral_spawn_rate_slow
-            : ConfigManager.GlobalVariableConfig.coral_spawn_rate_fast;
+        int times = EntityContainer.Corals.Count > GlobalVariable.I(global_variablesEnum.coral_spawn_rate_rate)
+            ? GlobalVariable.I(global_variablesEnum.coral_spawn_rate_slow)
+            : GlobalVariable.I(global_variablesEnum.coral_spawn_rate_fast);
         for (int i = 0; i < times; i++) TrySpawnOneCoral();
     }
 
@@ -155,7 +156,7 @@ public partial class BattleManager
         CollectAlivePlayerPositions();
         if (s_playerPosScratch.Count == 0) return; // 没有存活玩家就没有"最近玩家"，不清场
 
-        float killDistance = ConfigManager.GlobalVariableConfig.coral_kill_distance;
+        float killDistance = GlobalVariable.F(global_variablesEnum.coral_kill_distance);
         s_coralIdScratch.Clear();
         foreach (var entity in EntityContainer.Corals)
         {
@@ -180,10 +181,10 @@ public partial class BattleManager
         }
 
         Vector3 center = s_playerPosScratch[Random.Range(0, s_playerPosScratch.Count)];
-        float minDist = ConfigManager.GlobalVariableConfig.coral_spawn_range_min;
-        float maxDist = ConfigManager.GlobalVariableConfig.coral_spawn_range_max;
-        float spacing = ConfigManager.GlobalVariableConfig.coral_spawn_spacing;
-        float maxDensity = ConfigManager.GlobalVariableConfig.coral_spawn_max_density;
+        float minDist = GlobalVariable.RangeMin(global_variablesEnum.coral_spawn_range);
+        float maxDist = GlobalVariable.RangeMax(global_variablesEnum.coral_spawn_range);
+        float spacing = GlobalVariable.F(global_variablesEnum.coral_spawn_spacing);
+        float maxDensity = GlobalVariable.F(global_variablesEnum.coral_spawn_max_density);
 
         for (int attempt = 0; attempt < RingSampleAttempts; attempt++)
         {
@@ -192,7 +193,7 @@ public partial class BattleManager
             if (IsAnyCoralWithin(pos, spacing)) continue;               // 与已有珊瑚的最小间距
             if (CoralDensityAt(pos) >= maxDensity) continue;            // 所在区块珊瑚密度已达上限
 
-            EntityType type = Random.value < ConfigManager.GlobalVariableConfig.coral_spawn_as_large_chance ? EntityType.CoralLarge : EntityType.CoralSmall;
+            EntityType type = Random.value < GlobalVariable.F(global_variablesEnum.coral_spawn_as_large_chance) ? EntityType.CoralLarge : EntityType.CoralSmall;
             SpawnEntity(type, 1, pos, EntityCamp.Neutral);
             return;
         }
@@ -202,7 +203,7 @@ public partial class BattleManager
     private static float CoralDensityAt(Vector3 pos)
     {
         int count = EntityContainer.Corals.GetChunkCount(ChunkSearcher<EntityData>.GetChunkIndex(pos));
-        float chunkSize = ConfigManager.GlobalVariableConfig.terrain_chunk_size;
+        float chunkSize = GlobalVariable.F(global_variablesEnum.terrain_chunk_size);
         return count / (chunkSize * chunkSize);
     }
 
@@ -258,7 +259,7 @@ public partial class BattleManager
             if (pos.y >= 0f) continue;
             if (!TerrainSpawns.TrySampleGroundY(pos.x, pos.z, out float groundY)) continue;
 
-            pos.y = groundY + Config.entity_fall_recover_height;
+            pos.y = groundY + GlobalConfig.entity_fall_recover_height;
             entity.transform.position = pos;
             entity.rb.position = pos;
             Vector3 velocity = entity.rb.velocity;

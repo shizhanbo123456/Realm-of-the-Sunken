@@ -1,6 +1,7 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
+using Ros.Config;
 public enum CardTier
 {
     Silver = 0,
@@ -57,7 +58,7 @@ public static class CardCatalog
         var candidateIds = new List<int>();
         var candidateWeights = new List<int>();
 
-        foreach (var pair in ConfigManager.CardOptionConfig.content)
+        foreach (var pair in CardOptionConfig.content)
         {
             var card = pair.Value;
             if (!card.RangeOf((int)tier).Contains(luck)) continue;
@@ -82,10 +83,10 @@ public static class CardCatalog
     public static List<int> SkillPool(string quality, ICollection<int> heldSkills)
     {
         var pool = new List<int>();
-        for (int id = Config.weapon_skill_id_min; id <= Config.weapon_skill_id_max; id++)
+        for (int id = GlobalConfig.weapon_skill_id_min; id <= GlobalConfig.weapon_skill_id_max; id++)
         {
             if (heldSkills != null && heldSkills.Contains(id)) continue;
-            if (!ConfigManager.SkillConfig.content.TryGetValue(id, out var skill)) continue;
+            if (!SkillConfig.content.TryGetValue(id, out var skill)) continue;
             if (skill.quality != quality) continue;
             pool.Add(id);
         }
@@ -94,7 +95,7 @@ public static class CardCatalog
 
     private static CardRoll Build(int cardId, CardTier tier, ICollection<int> heldSkills)
     {
-        var card = ConfigManager.CardOptionConfig.Get(cardId);
+        var card = CardOptionConfig.Get(cardId);
         var roll = new CardRoll
         {
             cardId = cardId,
@@ -109,7 +110,7 @@ public static class CardCatalog
 
         var pool = SkillPool(QualityOf(card.type), heldSkills);
         roll.skillId = pool[Random.Range(0, pool.Count)];
-        roll.description = card.description.Replace("{0}", ConfigManager.SkillConfig.Get(roll.skillId).name);
+        roll.description = card.description.Replace("{0}", SkillConfig.Get(roll.skillId).name);
         return roll;
     }
 
@@ -140,10 +141,10 @@ public static class CardCatalog
 
     private static bool HasSkillOfQuality(string quality, ICollection<int> heldSkills)
     {
-        for (int id = Config.weapon_skill_id_min; id <= Config.weapon_skill_id_max; id++)
+        for (int id = GlobalConfig.weapon_skill_id_min; id <= GlobalConfig.weapon_skill_id_max; id++)
         {
             if (heldSkills != null && heldSkills.Contains(id)) continue;
-            if (!ConfigManager.SkillConfig.content.TryGetValue(id, out var skill)) continue;
+            if (!SkillConfig.content.TryGetValue(id, out var skill)) continue;
             if (skill.quality == quality) return true;
         }
         return false;

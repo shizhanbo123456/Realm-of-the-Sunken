@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 // 中立雕像：技能冷却好了且范围内有敌人就随机放一个；不移动、不转向
 public class NeutralStatueStateMachine : DecisionMachine, IBehaviorHost
@@ -29,7 +29,7 @@ public class NeutralStatueStateMachine : DecisionMachine, IBehaviorHost
 
     #region//Local
     private bool HasEnemyInRange() =>
-        BattleManager.EntityContainer.GetNearestEnemy(Owner, Config.neutral_statue_attack_range) != null;
+        BattleManager.EntityContainer.GetNearestEnemy(Owner, GlobalConfig.neutral_statue_attack_range) != null;
 
     private void RequestIdle() => arbiter.RequestIdle();
 

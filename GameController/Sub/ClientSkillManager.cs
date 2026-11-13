@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using Ros.Config;
 using Ros.Skill.Utils;
 using Ros.Transport;
 using UnityEngine;
@@ -106,7 +107,7 @@ public class ClientSkillManager : ClientSubManager
     {
         var loading = ClientLoadingManager.Current;
         if (loading == null || !loading.HasSession || loading.OwnEntityId == 0) return; // 无战斗实体（观战/未开局）不发
-        if (Tool.NetworkManager != null) Tool.NetworkManager.SendSkillCastInput(Config.unarmed_punch);
+        if (Tool.NetworkManager != null) Tool.NetworkManager.SendSkillCastInput(GlobalConfig.unarmed_punch);
     }
     #endregion
 
@@ -128,7 +129,7 @@ public class ClientSkillManager : ClientSubManager
         int saveIndex = loading.Camp switch
         {
             EntityCamp.Attack => ClientSelection.selectedAttackIndex,
-            EntityCamp.Defense => Config.attack_character_count + ClientSelection.selectedDefenseIndex,
+            EntityCamp.Defense => GlobalConfig.attack_character_count + ClientSelection.selectedDefenseIndex,
             _ => -1,
         };
         if (saveIndex < 0 || Tool.InfoManager == null || Tool.SaveManager == null) return 0;

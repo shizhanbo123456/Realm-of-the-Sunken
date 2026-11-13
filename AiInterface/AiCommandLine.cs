@@ -1,3 +1,4 @@
+﻿using Ros.Config;
 // AI 操控的命令行接口：命令注册 / 解析 / 分发 + 中断原因列表，外部 AI 的唯一入口
 using System;
 using System.Collections.Generic;
@@ -645,14 +646,14 @@ public sealed class AiCommandLine : ClientSubManager
     #region Home / Lobby 命令
     private void SelectCharacter(string[] args, Action<string> reply)
     {
-        if (!int.TryParse(args[0], out int attack) || attack < 0 || attack >= Config.attack_character_count)
+        if (!int.TryParse(args[0], out int attack) || attack < 0 || attack >= GlobalConfig.attack_character_count)
         {
-            reply($"错误：进攻下标范围 0~{Config.attack_character_count - 1}");
+            reply($"错误：进攻下标范围 0~{GlobalConfig.attack_character_count - 1}");
             return;
         }
-        if (!int.TryParse(args[1], out int defense) || defense < 0 || defense >= Config.defense_character_count)
+        if (!int.TryParse(args[1], out int defense) || defense < 0 || defense >= GlobalConfig.defense_character_count)
         {
-            reply($"错误：防守下标范围 0~{Config.defense_character_count - 1}");
+            reply($"错误：防守下标范围 0~{GlobalConfig.defense_character_count - 1}");
             return;
         }
         ClientSelection.selectedAttackIndex = attack;
@@ -1199,7 +1200,7 @@ public sealed class AiCommandLine : ClientSubManager
         minimapExpired.Clear();
         foreach (var pair in minimapSeen)
         {
-            if (Time.time - pair.Value <= Config.minimap_entity_timeout) continue;
+            if (Time.time - pair.Value <= GlobalConfig.minimap_entity_timeout) continue;
             minimapExpired.Add(pair.Key);
         }
         for (int i = 0; i < minimapExpired.Count; i++)
@@ -1385,12 +1386,12 @@ public sealed class AiCommandLine : ClientSubManager
             string name = loading != null ? loading.GetName(clientId) : null;
             return string.IsNullOrEmpty(name) ? "#" + clientId : name;
         }
-        if (!ConfigManager.NoticeConfig.content.ContainsKey(id))
+        if (!NoticeConfig.content.ContainsKey(id))
         {
             Debug.LogError($"[AI] notice.csv 缺少文本 id={id}");
             return "#" + id;
         }
-        return ConfigManager.NoticeConfig.Get(id).text;
+        return NoticeConfig.Get(id).text;
     }
     #endregion
 }

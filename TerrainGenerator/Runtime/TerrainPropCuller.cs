@@ -1,6 +1,8 @@
+﻿using Vector2Int = UnityEngine.Vector2Int;
 using System.Collections.Generic;
 using UnityEngine;
 
+using Ros.Config;
 namespace TerrainGen
 {
     // 显隐控制器：自身不含子物体；区块进入视野时从池里取物件，离开时归还，全程不销毁
@@ -63,8 +65,8 @@ namespace TerrainGen
             this.kit = kit;
             contentRoot = content;
 
-            if (ConfigManager.GlobalVariableConfig.terrain_chunk_size <= 0f
-                || ConfigManager.GlobalVariableConfig.terrain_chunk_size_count <= 0)
+            if (GlobalVariable.F(global_variablesEnum.terrain_chunk_size) <= 0f
+                || GlobalVariable.I(global_variablesEnum.terrain_chunk_size_count) <= 0)
             {
                 Debug.LogError("[地形] Culler 初始化失败：区块尺寸/数量未从配表读到", this);
                 return;
@@ -107,7 +109,7 @@ namespace TerrainGen
             Vector3 cameraPos = Camera.main.transform.position;
             if (!AnyChunkOutside(cameraPos))
             {
-                Debug.LogWarning($"[地形] 判定半径 {visibleDistance + ConfigManager.GlobalVariableConfig.terrain_chunk_size:0}m 以主相机位置为心覆盖了全部 {chunkDefs.Count} 个区块，"
+                Debug.LogWarning($"[地形] 判定半径 {visibleDistance + GlobalVariable.F(global_variablesEnum.terrain_chunk_size):0}m 以主相机位置为心覆盖了全部 {chunkDefs.Count} 个区块，"
                                  + $"当前不会回收任何区块（visibleDistance = {visibleDistance}），需要调小半径", this);
             }
 
@@ -219,8 +221,8 @@ namespace TerrainGen
 
             var go = new GameObject($"Chunk_{chunk.x}_{chunk.y}");
             go.transform.SetParent(contentRoot, false);
-            float mapMin = ConfigManager.GlobalVariableConfig.terrain_size_min;
-            float chunkSize = ConfigManager.GlobalVariableConfig.terrain_chunk_size;
+            float mapMin = GlobalVariable.RangeMin(global_variablesEnum.terrain_size);
+            float chunkSize = GlobalVariable.F(global_variablesEnum.terrain_chunk_size);
             go.transform.position = new Vector3(
                 mapMin + (chunk.x + 0.5f) * chunkSize,
                 contentRoot.position.y,
@@ -233,18 +235,18 @@ namespace TerrainGen
         // 图外坐标按最近区块夹取：越界的轴取端点，未越界的轴保留原索引
         Vector2Int NearestChunk(Vector3 world)
         {
-            float mapMin = ConfigManager.GlobalVariableConfig.terrain_size_min;
-            float chunkSize = ConfigManager.GlobalVariableConfig.terrain_chunk_size;
+            float mapMin = GlobalVariable.RangeMin(global_variablesEnum.terrain_size);
+            float chunkSize = GlobalVariable.F(global_variablesEnum.terrain_chunk_size);
             int x = Mathf.FloorToInt((world.x - mapMin) / chunkSize);
             int z = Mathf.FloorToInt((world.z - mapMin) / chunkSize);
-            int last = ConfigManager.GlobalVariableConfig.terrain_chunk_size_count - 1;
+            int last = GlobalVariable.I(global_variablesEnum.terrain_chunk_size_count) - 1;
             return new Vector2Int(Mathf.Clamp(x, 0, last), Mathf.Clamp(z, 0, last));
         }
 
         float ChunkDistanceSq(Vector2Int chunk, Vector3 center)
         {
-            float mapMin = ConfigManager.GlobalVariableConfig.terrain_size_min;
-            float chunkSize = ConfigManager.GlobalVariableConfig.terrain_chunk_size;
+            float mapMin = GlobalVariable.RangeMin(global_variablesEnum.terrain_size);
+            float chunkSize = GlobalVariable.F(global_variablesEnum.terrain_chunk_size);
             float cx = mapMin + (chunk.x + 0.5f) * chunkSize;
             float cz = mapMin + (chunk.y + 0.5f) * chunkSize;
             float dx = cx - center.x;
@@ -266,7 +268,7 @@ namespace TerrainGen
         {
             get
             {
-                float radius = visibleDistance + ConfigManager.GlobalVariableConfig.terrain_chunk_size;
+                float radius = visibleDistance + GlobalVariable.F(global_variablesEnum.terrain_chunk_size);
                 return radius * radius;
             }
         }

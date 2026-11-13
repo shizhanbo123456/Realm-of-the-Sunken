@@ -1,8 +1,9 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using FairyGUI;
 using Ros.UI.Main;
 using UnityEngine;
 
+using Ros.Config;
 // 首页：攻/守分页角色列表 + 属性面板 + 改名弹窗 + 连接
 public class HomePage : PageBase
 {
@@ -84,7 +85,7 @@ public class HomePage : PageBase
         GRoot.inst.AddChild(renamePanel);
         renamePanel.visible = false;
 
-        renamePanel.m_input.maxLength = ConfigManager.GlobalVariableConfig.name_length_max;
+        renamePanel.m_input.maxLength = GlobalVariable.I(global_variablesEnum.name_length_max);
         renamePanel.m_confirm.onClick.Add(CommitRename);
         renamePanel.m_panel.m_close.onClick.Set(CloseRename); // 关闭 / 取消 = 放弃修改
         renamePanel.m_cancel.onClick.Set(CloseRename);
@@ -103,8 +104,8 @@ public class HomePage : PageBase
     // 只有名字合法才改名并关闭；不合法只飘字，弹窗留在原地
     private void CommitRename()
     {
-        int min = ConfigManager.GlobalVariableConfig.name_length_min;
-        int max = ConfigManager.GlobalVariableConfig.name_length_max;
+        int min = GlobalVariable.I(global_variablesEnum.name_length_min);
+        int max = GlobalVariable.I(global_variablesEnum.name_length_max);
         string name = (renamePanel.m_input.text ?? "").Trim();
         if (name.Length < min || name.Length > max)
         {
@@ -192,14 +193,14 @@ public class HomePage : PageBase
     }
 
     // 存档下标：0~5 进攻、6~11 防守；页签只列其中一侧
-    private static bool IsDefense(int saveIndex) => saveIndex >= Config.attack_character_count;
+    private static bool IsDefense(int saveIndex) => saveIndex >= GlobalConfig.attack_character_count;
 
     private bool defenseTab;
 
     // 当前浏览的角色；两侧真正选中的下标各自记在 ClientSelection 里
     private int selectedSaveIndex;
 
-    private int CampOffset => defenseTab ? Config.attack_character_count : 0;
+    private int CampOffset => defenseTab ? GlobalConfig.attack_character_count : 0;
 
     // 本阵营已选角色的存档下标
     private int ChosenSaveIndex => CampOffset + (defenseTab ? ClientSelection.selectedDefenseIndex : ClientSelection.selectedAttackIndex);
@@ -207,7 +208,7 @@ public class HomePage : PageBase
     private void Refresh()
     {
         var selection = panel.m_character_selection_panel;
-        int count = defenseTab ? Config.defense_character_count : Config.attack_character_count;
+        int count = defenseTab ? GlobalConfig.defense_character_count : GlobalConfig.attack_character_count;
         selection.m_current_selected_camp.selectedIndex = defenseTab ? 1 : 0;
         selection.m_tab_attacker.selected = !defenseTab;
         selection.m_tab_defenser.selected = defenseTab;
@@ -233,7 +234,7 @@ public class HomePage : PageBase
     private void RefreshSpecialAbilities()
     {
         int saveIndex = selectedSaveIndex;
-        ConfigManager.EntityConfig info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
+        entity info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
         var entries = GuideCatalog.BuildCharacterAbilities(info, saveIndex, IsDefense(saveIndex));
 
         var list = panel.m_character_attr_panel.m_special_ability_list;
@@ -249,7 +250,7 @@ public class HomePage : PageBase
     {
         var head = (UI_RoleHead)obj;
         int saveIndex = CampOffset + index;
-        ConfigManager.EntityConfig info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
+        entity info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
 
         head.m_roleName.text = DisplayName(info, saveIndex);
 
@@ -288,7 +289,7 @@ public class HomePage : PageBase
     private void RefreshAttrList()
     {
         int saveIndex = selectedSaveIndex;
-        ConfigManager.EntityConfig info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
+        entity info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
         int[] values = ToValues(info.GetAttribute());
         bool defense = IsDefense(saveIndex);
 
@@ -313,7 +314,7 @@ public class HomePage : PageBase
     private static void FillAttrBar(GList bar, int rangeKey, int value)
     {
         if (bar == null) return;
-        var range = ConfigManager.AttrRangeConfig.Get(rangeKey);
+        var range = AttrRangeConfig.Get(rangeKey);
         int filled = Mathf.Clamp(Mathf.CeilToInt(range.Ratio(value) * AttrBarSegments), 0, AttrBarSegments);
 
         bar.itemRenderer = (i, obj) =>
@@ -326,15 +327,15 @@ public class HomePage : PageBase
     private void RefreshCharacterInfo()
     {
         int saveIndex = selectedSaveIndex;
-        ConfigManager.EntityConfig info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
+        entity info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
         panel.m_label_character_name.text = DisplayName(info, saveIndex);
     }
 
     // 列表条目与右侧标题共用一个名字口径：配表没名字时退回「进攻/防守角色 + 阵营内下标」
-    private static string DisplayName(ConfigManager.EntityConfig info, int saveIndex)
+    private static string DisplayName(entity info, int saveIndex)
     {
         if (!string.IsNullOrEmpty(info.name)) return info.name;
-        return IsDefense(saveIndex) ? $"防守角色 {saveIndex - Config.attack_character_count}" : $"进攻角色 {saveIndex}";
+        return IsDefense(saveIndex) ? $"防守角色 {saveIndex - GlobalConfig.attack_character_count}" : $"进攻角色 {saveIndex}";
     }
 
     // 属性一律取整显示
@@ -353,7 +354,7 @@ public class HomePage : PageBase
         if (Tool.ClientLogicManager == null || Tool.ClientLogicManager.HomePreview == null) return;
         int saveIndex = selectedSaveIndex;
         var type = IsDefense(saveIndex)
-            ? EntityType.Defense(saveIndex - Config.attack_character_count)
+            ? EntityType.Defense(saveIndex - GlobalConfig.attack_character_count)
             : EntityType.Attack(saveIndex);
         Tool.ClientLogicManager.HomePreview.RefreshHome(type);
     }
@@ -361,8 +362,8 @@ public class HomePage : PageBase
     private async void OnConnectClicked()
     {
         // 连接前校验玩家名字长度，不合法则飘字提示并拦截连接
-        int nameMin = ConfigManager.GlobalVariableConfig.name_length_min;
-        int nameMax = ConfigManager.GlobalVariableConfig.name_length_max;
+        int nameMin = GlobalVariable.I(global_variablesEnum.name_length_min);
+        int nameMax = GlobalVariable.I(global_variablesEnum.name_length_max);
         string name = (ClientSelection.playerName ?? "").Trim();
         if (name.Length < nameMin || name.Length > nameMax)
         {

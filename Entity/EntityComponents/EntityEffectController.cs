@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Ros.Transport;
 using UnityEngine;
 
+using Ros.Config;
 public enum EffectType
 {
     //防守方专有
@@ -73,7 +74,7 @@ public static class EffectTypeExt
         _ => false,
     };
 
-    public static bool IsControl(this EffectType type) => ConfigManager.EffectConfig.Get((int)type).lockMoveInput == true;
+    public static bool IsControl(this EffectType type) => EffectConfig.Get((int)type).lockMoveInput == true;
 
     public static bool IsDoT(this EffectType type) => type is EffectType.Burning or EffectType.Poison or EffectType.PaleFire;
 
@@ -81,10 +82,10 @@ public static class EffectTypeExt
     public static bool IsTicking(this EffectType type) => type is EffectType.Burning or EffectType.Poison or EffectType.PaleFire
         or EffectType.DeathStroll or EffectType.DeathCurse or EffectType.AngelBless or EffectType.DemonBless;
 
-    public static bool IsShield(this EffectType type) => ConfigManager.EffectConfig.Get((int)type).specialCalculate == 1;
+    public static bool IsShield(this EffectType type) => EffectConfig.Get((int)type).specialCalculate == true;
 
     //极性看配表 effect.csv 的「正面效果」列
-    public static bool IsNegative(this EffectType type) => ConfigManager.EffectConfig.Get((int)type).positive != true;
+    public static bool IsNegative(this EffectType type) => EffectConfig.Get((int)type).positive != true;
 }
 
 public class EntityEffectController
@@ -247,25 +248,25 @@ public class EntityEffectController
     public float GetDamageReduceRate()
     {
         float rate = GetLevel(EffectType.StatueReduce) * 0.25f;
-        if (HasEffect(EffectType.PopeGuard)) rate += Config.pope_guard_reduce_rate;
+        if (HasEffect(EffectType.PopeGuard)) rate += GlobalConfig.pope_guard_reduce_rate;
         return Mathf.Clamp01(rate);
     }
 
     public float GetOutDamageMultiplier()
     {
         float m = 1f + GetLevel(EffectType.BattleFury) * 0.1f;
-        if (HasEffect(EffectType.AngelBless)) m *= 1f + Config.angel_bless_damage_up;
-        if (HasEffect(EffectType.DemonBless)) m *= 1f + Config.demon_bless_damage_up;
+        if (HasEffect(EffectType.AngelBless)) m *= 1f + GlobalConfig.angel_bless_damage_up;
+        if (HasEffect(EffectType.DemonBless)) m *= 1f + GlobalConfig.demon_bless_damage_up;
         return m;
     }
 
     public float GetInDamageMultiplier()
     {
         float m = 1f / (1f + GetLevel(EffectType.BattleFury) * 0.1f);
-        if (HasEffect(EffectType.AngelBless)) m *= 1f - Config.angel_bless_damage_reduce;
-        if (HasEffect(EffectType.DemonBless)) m *= 1f + Config.demon_bless_damage_taken_up;
+        if (HasEffect(EffectType.AngelBless)) m *= 1f - GlobalConfig.angel_bless_damage_reduce;
+        if (HasEffect(EffectType.DemonBless)) m *= 1f + GlobalConfig.demon_bless_damage_taken_up;
         int curseLevel = GetLevel(EffectType.DeathCurse);
-        if (curseLevel > 0) m *= 1f + Config.death_curse_damage_taken_ratio * curseLevel;
+        if (curseLevel > 0) m *= 1f + GlobalVariable.F(global_variablesEnum.death_curse_damage_taken_ratio) * curseLevel;
         return m;
     }
 
@@ -274,7 +275,7 @@ public class EntityEffectController
     {
         int level = GetLevel(EffectType.Reflect);
         if (level <= 0 || receivedDamage <= 1f) return 0f;
-        return Mathf.Max(1, Mathf.FloorToInt(receivedDamage * level * Config.reflect_rate));
+        return Mathf.Max(1, Mathf.FloorToInt(receivedDamage * level * GlobalConfig.reflect_rate));
     }
 
     public bool IsActionBlocked() => blockMove;
@@ -300,13 +301,13 @@ public class EntityEffectController
     public float GetMoveAnimSpeedMultiplier()
     {
         float m = 1f;
-        if (HasEffect(EffectType.SpeedUp)) m *= Config.anim_move_speed_up;
-        if (HasEffect(EffectType.SlowDown)) m *= Config.anim_move_speed_down;
-        if (HasEffect(EffectType.Mire)) m *= Config.anim_move_speed_mire;
-        if (HasEffect(EffectType.DeathStroll)) m *= Config.death_stroll_speed_up;
-        if (HasEffect(EffectType.GmSpeedUp)) m *= Config.gm_speed_multiplier;
+        if (HasEffect(EffectType.SpeedUp)) m *= GlobalVariable.F(global_variablesEnum.buff_speed_up);
+        if (HasEffect(EffectType.SlowDown)) m *= GlobalVariable.F(global_variablesEnum.buff_speed_down);
+        if (HasEffect(EffectType.Mire)) m *= GlobalVariable.F(global_variablesEnum.buff_mire_speed_rate);
+        if (HasEffect(EffectType.DeathStroll)) m *= GlobalVariable.F(global_variablesEnum.buff_death_stroll_speed_up);
+        if (HasEffect(EffectType.GmSpeedUp)) m *= GlobalVariable.F(global_variablesEnum.gm_speed_multiplier);
         int screamLevel = TotalLevel(EffectType.ZombieScreamBoost);
-        if (screamLevel > 0) m *= 1f + Config.buff_scream_speed_ratio * screamLevel;
+        if (screamLevel > 0) m *= 1f + GlobalConfig.buff_scream_speed_ratio * screamLevel;
         return m;
     }
 
@@ -357,16 +358,16 @@ public class EntityEffectController
         switch (layer.type)
         {
             case EffectType.Burning:
-                if (owner != null) owner.OnDamaged(Config.burning_damage_per_tick * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.Burning);
+                if (owner != null) owner.OnDamaged(GlobalConfig.burning_damage_per_tick * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.Burning);
                 break;
             case EffectType.PaleFire:
-                if (owner != null) owner.OnDamaged(Config.burning_damage_per_tick * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.PaleFire);
+                if (owner != null) owner.OnDamaged(GlobalConfig.burning_damage_per_tick * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.PaleFire);
                 break;
             case EffectType.Poison:
             {
                 if (owner == null) break;
                 float stat = SourcePower(layer);
-                owner.OnDamaged(Config.poison_damage_ratio * stat * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.Poison);
+                owner.OnDamaged(GlobalConfig.poison_damage_ratio * stat * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.Poison);
                 break;
             }
             case EffectType.DeathStroll:
@@ -375,30 +376,30 @@ public class EntityEffectController
                 float stat = SourcePower(layer);
                 EntityCamp enemyCamp = EntityCampUtil.HostileOf(owner.type.category);
                 s_tickTargets.Clear();
-                BattleManager.EntityContainer.GetAllInCamp(owner.transform.position, Config.death_stroll_radius, enemyCamp, s_tickTargets);
+                BattleManager.EntityContainer.GetAllInCamp(owner.transform.position, GlobalConfig.death_stroll_radius, enemyCamp, s_tickTargets);
                 for (int i = 0; i < s_tickTargets.Count; i++)
                 {
-                    if (s_tickTargets[i] != null) s_tickTargets[i].OnDamaged(Config.death_stroll_dot_ratio * stat * layer.level, owner, fixedDamage: true, damageType: CombatLabelType.DeathStroll);
+                    if (s_tickTargets[i] != null) s_tickTargets[i].OnDamaged(GlobalConfig.death_stroll_dot_ratio * stat * layer.level, owner, fixedDamage: true, damageType: CombatLabelType.DeathStroll);
                 }
                 // 死灵诅咒：光环内敌人每秒刷新一层（叠加模式 2，等级随停留时间累加）
                 s_curseTargets.Clear();
-                BattleManager.EntityContainer.GetAllInCamp(owner.transform.position, Config.death_curse_radius, enemyCamp, s_curseTargets);
+                BattleManager.EntityContainer.GetAllInCamp(owner.transform.position, GlobalVariable.F(global_variablesEnum.death_curse_radius), enemyCamp, s_curseTargets);
                 for (int i = 0; i < s_curseTargets.Count; i++)
                 {
                     var cursed = s_curseTargets[i];
                     if (cursed != null && cursed.Alive && cursed.effectController != null)
-                        cursed.effectController.AddEffect(EffectType.DeathCurse, 1, Config.death_curse_duration, owner);
+                        cursed.effectController.AddEffect(EffectType.DeathCurse, 1, GlobalVariable.F(global_variablesEnum.death_curse_duration), owner);
                 }
                 break;
             }
             case EffectType.DeathCurse:
-                if (owner != null) owner.OnDamaged(Config.death_curse_tick_damage * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.DeathStroll);
+                if (owner != null) owner.OnDamaged(GlobalVariable.F(global_variablesEnum.death_curse_tick_damage) * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.DeathStroll);
                 break;
             case EffectType.AngelBless:
-                HealOwner(Config.angel_bless_heal_per_tick * layer.level);
+                HealOwner(GlobalConfig.angel_bless_heal_per_tick * layer.level);
                 break;
             case EffectType.DemonBless:
-                HealOwner(Config.demon_bless_heal_per_tick * layer.level);
+                HealOwner(GlobalConfig.demon_bless_heal_per_tick * layer.level);
                 break;
         }
     }
@@ -425,9 +426,7 @@ public class EntityEffectController
     // 叠加模式（effect.csv 第 4 列），留空属配表错配
     private static int StackModeOf(EffectType type)
     {
-        var mode = ConfigManager.EffectConfig.Get((int)type).stackMode;
-        if (mode == null) throw new FormatException($"[配表] effect.csv 第 {(int)type} 行缺少叠加模式");
-        return mode.Value;
+        return EffectConfig.Get((int)type).stackMode;
     }
 
     private void ApplyStackMode(List<EffectLayer> layers, EffectType type, int level, float endTime, EntityData source)
@@ -607,13 +606,13 @@ public class EntityEffectController
         foreach (var pair in effects)
         {
             if (pair.Value.Count == 0) continue;
-            var cfg = ConfigManager.EffectConfig.Get((int)pair.Key);
+            var cfg = EffectConfig.Get((int)pair.Key);
             if (cfg.lockMoveInput == true) move = true;
             if (cfg.lockSkillInput == true) skill = true;
             if (cfg.freezeAnimation == true) anim = true;
-            if (cfg.superArmorOverride != null)
+            if (cfg.superArmorOverride == true)
             {
-                var value = (EndureType)cfg.superArmorOverride.Value;
+                var value = EndureType.Super;
                 if (endure == null || value > endure.Value) endure = value;
             }
         }
@@ -640,8 +639,8 @@ public class EntityEffectController
             if (pair.Key == EffectType.ZombieScreamBoost)
             {
                 int screamLevel = SumLevel(pair.Value);
-                BuffAttack += owner.attributes.BaseAttack * Config.buff_scream_attack_ratio * screamLevel;
-                BuffCritRate += Config.buff_scream_crit_rate_points * screamLevel;
+                BuffAttack += owner.attributes.BaseAttack * GlobalConfig.buff_scream_attack_ratio * screamLevel;
+                BuffCritRate += GlobalConfig.buff_scream_crit_rate_points * screamLevel;
                 continue;
             }
             if (!pair.Key.IsAttribute()) continue;
@@ -665,10 +664,10 @@ public class EntityEffectController
         var field = FieldFromType(type);
         float amount = field switch
         {
-            AttrField.CritRate => Config.buff_crit_rate_points * level,
-            AttrField.CritDamage => Config.buff_crit_damage_points * level,
-            AttrField.Attack => owner.attributes.BaseAttack * Config.buff_attr_ratio * level,
-            AttrField.ViewDistance => owner.attributes.BaseViewDistance * Config.buff_attr_ratio * level,
+            AttrField.CritRate => GlobalConfig.buff_crit_rate_points * level,
+            AttrField.CritDamage => GlobalConfig.buff_crit_damage_points * level,
+            AttrField.Attack => owner.attributes.BaseAttack * GlobalConfig.buff_attr_ratio * level,
+            AttrField.ViewDistance => owner.attributes.BaseViewDistance * GlobalConfig.buff_attr_ratio * level,
             _ => UnsupportedAttrField(field),
         };
         return type.IsNegative() ? -amount : amount;
@@ -677,7 +676,7 @@ public class EntityEffectController
     // 护盾每层初始值 = 被施加者生命值上限 × 系数 × 该层等级
     private float ShieldValueOf(int level)
     {
-        return owner != null ? owner.attributes.MaxHealth * Config.shield_health_ratio * level : 0f;
+        return owner != null ? owner.attributes.MaxHealth * GlobalConfig.shield_health_ratio * level : 0f;
     }
 
     private static AttrField FieldFromType(EffectType type)

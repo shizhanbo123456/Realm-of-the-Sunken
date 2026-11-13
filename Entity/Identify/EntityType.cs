@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 [Serializable]
 public struct EntityType : IEquatable<EntityType>
@@ -32,7 +32,7 @@ public struct EntityType : IEquatable<EntityType>
     public static EntityType Attack4 => Attack(4);
     public static EntityType Attack5 => Attack(5);
     public static EntityType AttackFirst => Attack0;
-    public static EntityType AttackLast => Attack(Config.attack_character_count - 1);
+    public static EntityType AttackLast => Attack(GlobalConfig.attack_character_count - 1);
 
     // 防守方角色（6 人，基于实际模型资源）
     public static EntityType Defense0 => Defense(0);
@@ -42,13 +42,13 @@ public struct EntityType : IEquatable<EntityType>
     public static EntityType Defense4 => Defense(4);
     public static EntityType Defense5 => Defense(5);
     public static EntityType DefenseFirst => Defense0;
-    public static EntityType DefenseLast => Defense(Config.defense_character_count - 1);
+    public static EntityType DefenseLast => Defense(GlobalConfig.defense_character_count - 1);
 
     // 守护雕像：0/1/2 贤者雕像（外围），3 国王雕像（中心）
     public static EntityType SageStatue0 => GuardStatue(0);
     public static EntityType SageStatue1 => GuardStatue(1);
     public static EntityType SageStatue2 => GuardStatue(2);
-    public static EntityType KingStatue => GuardStatue(Config.sage_statue_count);
+    public static EntityType KingStatue => GuardStatue(GlobalConfig.sage_statue_count);
 
     // 珊瑚（value = 尺寸：0 小 / 1 大；同尺寸共用一套属性、外观列表与掉落率）
     public static EntityType CoralSmall => Coral(0);
@@ -57,7 +57,7 @@ public struct EntityType : IEquatable<EntityType>
     // 水晶雕像（0~2）
     public static EntityType CrystalStatue0 => CrystalStatue(0);
     public static EntityType CrystalStatueFirst => CrystalStatue(0);
-    public static EntityType CrystalStatueLast => CrystalStatue(Config.crystal_statue_count - 1);
+    public static EntityType CrystalStatueLast => CrystalStatue(GlobalConfig.crystal_statue_count - 1);
 
     // 中立雕像：0 天使雕像 / 1 恶魔雕像（行为一致，仅外观不同）
     public static EntityType AngelStatue => NeutralStatue(0);
@@ -65,11 +65,11 @@ public struct EntityType : IEquatable<EntityType>
 
     // 普通僵尸（0~4，共 5 种外观变体）
     public static EntityType ZombieFirst => Zombie(0);
-    public static EntityType ZombieLast => Zombie(Config.zombie_variant_count - 1);
+    public static EntityType ZombieLast => Zombie(GlobalConfig.zombie_variant_count - 1);
 
     // 精英僵尸（1 种，type.value 0；种类数取 Config 常量，避免与召唤逻辑脱节）
     public static EntityType EliteZombieFirst => EliteZombie(0);
-    public static EntityType EliteZombieLast => EliteZombie(Config.elite_zombie_variant_count - 1);
+    public static EntityType EliteZombieLast => EliteZombie(GlobalConfig.elite_zombie_variant_count - 1);
     #endregion
 
     #region common class func

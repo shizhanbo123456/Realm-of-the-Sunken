@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 
+using Ros.Config;
 public partial class BattleManager
 {
     private bool zombieSpawnLevelBoosted;
@@ -20,10 +21,10 @@ public partial class BattleManager
         }
         GmOnBattleStart(); // GM：清掉上一局的无敌记录
 
-        zombieSpawnLevelBoosted = DefenseHas(Config.defense_index_death_stroller);
+        zombieSpawnLevelBoosted = DefenseHas(GlobalConfig.defense_index_death_stroller);
 
         // 入夜才施加教皇守护，这里按当前昼夜补一次，避免开战即夜晚时漏掉
-        if (DefenseHas(Config.defense_index_masked_pope)) ApplyPopeGuard(EnvironmentManager.IsDay);
+        if (DefenseHas(GlobalConfig.defense_index_masked_pope)) ApplyPopeGuard(EnvironmentManager.IsDay);
     }
 
     private bool DefenseHas(int defenseValue) => defenseCharacters.Contains(defenseValue);
@@ -34,8 +35,8 @@ public partial class BattleManager
     public float AdjustIncomingDamage(EntityData victim, float damage)
     {
         if (victim == null || damage <= 0f) return damage;
-        if (victim.type != EntityType.Defense(Config.defense_index_count_eye)) return damage;
-        float cap = victim.attributes.MaxHealth * Config.count_eye_damage_cap_ratio;
+        if (victim.type != EntityType.Defense(GlobalConfig.defense_index_count_eye)) return damage;
+        float cap = victim.attributes.MaxHealth * GlobalConfig.count_eye_damage_cap_ratio;
         return damage > cap ? cap : damage;
     }
 
@@ -43,20 +44,20 @@ public partial class BattleManager
     public void CheckLowHealthShield(EntityData victim, CombatLabelType damageType)
     {
         if (victim == null || !victim.Alive) return;
-        if (victim.type != EntityType.Defense(Config.defense_index_plague_bringer)) return;
+        if (victim.type != EntityType.Defense(GlobalConfig.defense_index_plague_bringer)) return;
         // 只有命中类伤害参与判定，buff 伤害（DoT / 反伤 / 瘟疫引爆）不触发
         if (damageType != CombatLabelType.Normal && damageType != CombatLabelType.Crit) return;
 
         float health = victim.attributes.Health;
-        if (health <= 0f || health >= victim.attributes.MaxHealth * Config.plague_shield_trigger_ratio) return;
+        if (health <= 0f || health >= victim.attributes.MaxHealth * GlobalConfig.plague_shield_trigger_ratio) return;
 
         int key = EntityOwnerClient.TryGetValue(victim.id, out int owner) ? owner : 100000 + victim.id;
         if (plagueGuardReadyTime.TryGetValue(key, out float readyTime) && Time.time < readyTime) return;
 
-        plagueGuardReadyTime[key] = Time.time + Config.plague_shield_cooldown;
+        plagueGuardReadyTime[key] = Time.time + GlobalConfig.plague_shield_cooldown;
         if (victim.effectController != null)
-            victim.effectController.AddEffect(EffectType.Shield, Config.plague_shield_level, Config.plague_shield_duration);
-        victim.attributes.Heal(Config.plague_shield_heal);
+            victim.effectController.AddEffect(EffectType.Shield, GlobalConfig.plague_shield_level, GlobalConfig.plague_shield_duration);
+        victim.attributes.Heal(GlobalConfig.plague_shield_heal);
         victim.healthDirty = true;
     }
     #endregion
@@ -64,10 +65,10 @@ public partial class BattleManager
     #region 僵尸刷新等级（按战斗剩余时间实时计算，普通/精英共用）
     public int GetZombieSpawnLevel()
     {
-        float elapsed = Mathf.Clamp01((ConfigManager.GlobalVariableConfig.battle_duration - BattleRemainTime) / ConfigManager.GlobalVariableConfig.battle_duration);
-        int level = ConfigManager.GlobalVariableConfig.zombie_spawn_level
-            + Mathf.FloorToInt(elapsed / ConfigManager.GlobalVariableConfig.zombie_level_step_ratio);
-        if (zombieSpawnLevelBoosted) level += Config.zombie_spawn_level_passive_boost;
+        float elapsed = Mathf.Clamp01((GlobalVariable.F(global_variablesEnum.battle_duration) - BattleRemainTime) / GlobalVariable.F(global_variablesEnum.battle_duration));
+        int level = GlobalVariable.I(global_variablesEnum.zombie_spawn_level)
+            + Mathf.FloorToInt(elapsed / GlobalVariable.F(global_variablesEnum.zombie_level_step_ratio));
+        if (zombieSpawnLevelBoosted) level += GlobalConfig.zombie_spawn_level_passive_boost;
         return level;
     }
     #endregion
@@ -77,14 +78,14 @@ public partial class BattleManager
     {
         // 鹿铠怪人 被动「攻击暴击时附加轻微麻痹」：目标已死则不再挂状态
         if (type != CombatLabelType.Crit || attacker == null || target == null || !target.Alive) return;
-        if (attacker.type != EntityType.Defense(Config.defense_index_deer_knight)) return;
-        if (target.effectController != null) target.effectController.AddEffect(EffectType.Stun, 1, Config.crit_paralysis_duration, attacker);
+        if (attacker.type != EntityType.Defense(GlobalConfig.defense_index_deer_knight)) return;
+        if (target.effectController != null) target.effectController.AddEffect(EffectType.Stun, 1, GlobalConfig.crit_paralysis_duration, attacker);
     }
 
     private void OnDayNightFlipped(bool isDay)
     {
         if (!AtServer || !BattleStarted) return;
-        if (!DefenseHas(Config.defense_index_masked_pope)) return;
+        if (!DefenseHas(GlobalConfig.defense_index_masked_pope)) return;
         ApplyPopeGuard(isDay);
     }
 
@@ -112,21 +113,21 @@ public partial class BattleManager
         int light = effect.GetLevel(EffectType.PaleLight);
         int dark = effect.GetLevel(EffectType.PaleDark);
 
-        if (light >= Config.pale_full_stacks)
+        if (light >= GlobalConfig.pale_full_stacks)
         {
             effect.RemoveEffect(EffectType.PaleLight);
-            effect.AddEffect(EffectType.PaleIce, 1, Config.buff_duration_control, source);
+            effect.AddEffect(EffectType.PaleIce, 1, GlobalConfig.buff_duration_control, source);
         }
-        else if (dark >= Config.pale_full_stacks)
+        else if (dark >= GlobalConfig.pale_full_stacks)
         {
             effect.RemoveEffect(EffectType.PaleDark);
-            effect.AddEffect(EffectType.PaleThunder, 1, Config.buff_duration_control, source);
+            effect.AddEffect(EffectType.PaleThunder, 1, GlobalConfig.buff_duration_control, source);
         }
-        else if (light >= Config.pale_mixed_stacks && dark >= Config.pale_mixed_stacks)
+        else if (light >= GlobalConfig.pale_mixed_stacks && dark >= GlobalConfig.pale_mixed_stacks)
         {
             effect.RemoveEffect(EffectType.PaleLight);
             effect.RemoveEffect(EffectType.PaleDark);
-            effect.AddEffect(EffectType.PaleFire, 1, Config.buff_duration_debuff, source);
+            effect.AddEffect(EffectType.PaleFire, 1, GlobalConfig.buff_duration_debuff, source);
         }
     }
     #endregion

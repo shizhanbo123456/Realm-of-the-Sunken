@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 
+using Ros.Config;
 // 玩家级词条与局内进度：词条等级累加后派生加成；等级/经验/幸运/待抽次数也挂在这里（玩家级，不在实体上）
 // 建筑类词条按阵营累加后供己方建筑读取
 public partial class BattleManager
@@ -94,8 +95,8 @@ public partial class BattleManager
                 && target.attributes.Health / target.attributes.MaxHealth > stat.healthRatio)
                 mult += card.damageVsHigherHp;
 
-            int diff = Mathf.Clamp(stat.level - target.level, -Config.level_suppress_max_diff, Config.level_suppress_max_diff);
-            mult += Config.level_suppress_per_level * diff;
+            int diff = Mathf.Clamp(stat.level - target.level, -GlobalConfig.level_suppress_max_diff, GlobalConfig.level_suppress_max_diff);
+            mult += GlobalConfig.level_suppress_per_level * diff;
         }
 
         if (card.damageBelowHalfHp > 0f && stat.healthRatio < 0.5f) mult += card.damageBelowHalfHp;
@@ -135,7 +136,7 @@ public partial class BattleManager
     // 公式按策划口径：(扣血比例% × 2 − 时间比例%) × 10 = 增幅基数%
     private float ExpMultiplier(int clientId)
     {
-        float duration = ConfigManager.GlobalVariableConfig.battle_duration;
+        float duration = GlobalVariable.F(global_variablesEnum.battle_duration);
         if (duration <= 0f) return 1f;
 
         float timePct = Mathf.Clamp01(1f - BattleRemainTime / duration) * 100f;
@@ -176,7 +177,7 @@ public partial class BattleManager
     {
         if (amount <= 0) return;
         var p = EnsureProgress(clientId);
-        if (p.level >= ConfigManager.CharacterExpConfig.MaxLevel) return; // 满级不再吃经验
+        if (p.level >= CharacterExpConfig.MaxLevel) return; // 满级不再吃经验
 
         int final = applyMultiplier ? Mathf.RoundToInt(amount * ExpMultiplier(clientId)) : amount;
         if (final <= 0) return;
@@ -187,21 +188,21 @@ public partial class BattleManager
 
     private void LevelUp(int clientId, PlayerProgress p)
     {
-        while (p.level < ConfigManager.CharacterExpConfig.MaxLevel)
+        while (p.level < CharacterExpConfig.MaxLevel)
         {
-            int need = ConfigManager.CharacterExpConfig.NeedExp(p.level + 1);
+            int need = CharacterExpConfig.NeedExp(p.level + 1);
             if (need <= 0 || p.exp < need) break;
             p.exp -= need;
             p.level++;
 
             if (TryGetPlayerEntity(clientId, out var entity)) entity.level = p.level; // 压制按实体等级算
 
-            int[] weights = ConfigManager.CardGainUpgradeConfig.WeightsOf(p.level); // 按升级后等级的个位数给档位
+            int[] weights = CardGainUpgradeConfig.WeightsOf(p.level); // 按升级后等级的个位数给档位
             int tier = CardCatalog.RollTier(weights);
             if (tier >= 0) p.pending[tier]++;
         }
         // 满级后余经验不再累积，避免读数永远停在 MAX 之前
-        if (p.level >= ConfigManager.CharacterExpConfig.MaxLevel) p.exp = 0;
+        if (p.level >= CharacterExpConfig.MaxLevel) p.exp = 0;
     }
 
     private bool TryGetPlayerEntity(int clientId, out EntityData entity)
@@ -220,7 +221,7 @@ public partial class BattleManager
         var killer = victim.lastAttacker;
         if (killer == null) return;
 
-        var config = ConfigManager.EntityConfig.GetByCategory(victim.type);
+        var config = EntityConfig.GetByCategory(victim.type);
         bool hasCard = config.cardDropWeights != null && (config.cardDropWeights[0] > 0 || config.cardDropWeights[1] > 0 || config.cardDropWeights[2] > 0);
         if (config.expDrop <= 0 && !hasCard) return;
 
@@ -258,7 +259,7 @@ public partial class BattleManager
         if (tier < 0 || tier >= CardCatalog.TierCount) return;
         var p = EnsureProgress(clientId);
         if (p.pending[tier] <= 0) return;
-        if (!ConfigManager.CardOptionConfig.content.TryGetValue(cardId, out var card)) return;
+        if (!CardOptionConfig.content.TryGetValue(cardId, out var card)) return;
         // 技能卡必须带具体技能 id，否则这一抽作废（不扣次数）
         if (IsSkillType(card.type) && skillId < 0) return;
 
@@ -272,7 +273,7 @@ public partial class BattleManager
                 GrantSkill(clientId, skillId);
                 break;
             case CardType.InstantHeal:
-                HealByPercent(clientId, ConfigManager.GlobalVariableConfig.card_coef_instant_heal_boost * card.value / 100f);
+                HealByPercent(clientId, GlobalVariable.F(global_variablesEnum.card_coef_instant_heal_boost) * card.value / 100f);
                 break;
             default:
                 AddCardLevel(clientId, card.type, card.value);
@@ -296,9 +297,9 @@ public partial class BattleManager
         p.pending[tier]--;
         int exp = tier switch
         {
-            0 => ConfigManager.GlobalVariableConfig.card_discard_exp_silver,
-            1 => ConfigManager.GlobalVariableConfig.card_discard_exp_gold,
-            _ => ConfigManager.GlobalVariableConfig.card_discard_exp_holo,
+            0 => GlobalVariable.I(global_variablesEnum.card_discard_exp_silver),
+            1 => GlobalVariable.I(global_variablesEnum.card_discard_exp_gold),
+            _ => GlobalVariable.I(global_variablesEnum.card_discard_exp_holo),
         };
         GainExp(clientId, exp, applyMultiplier: false);
         SendProgress(clientId);

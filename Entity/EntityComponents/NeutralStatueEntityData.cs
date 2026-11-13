@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 public class NeutralStatueEntityData : EntityData
@@ -40,7 +40,7 @@ public class NeutralStatueEntityData : EntityData
                 1 => EffectType.DemonBless,
                 _ => throw new ArgumentOutOfRangeException(nameof(type.value), type.value, "中立雕像 value 只允许 0/1"),
             };
-            captor.effectController.AddEffect(bless, 1, Config.statue_bless_duration);
+            captor.effectController.AddEffect(bless, 1, GlobalConfig.statue_bless_duration);
         }
         battle.NotifyNeutralStatueCaptured(this.id);
         battle.ScheduleNeutralStatueRespawn();

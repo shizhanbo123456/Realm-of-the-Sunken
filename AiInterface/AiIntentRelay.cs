@@ -1,3 +1,4 @@
+﻿using Ros.Config;
 // 服务器侧意图转发器：只把客户端意图翻译成行为层请求，不含任何决策；附 BattleManager 的意图入口
 using System.Collections.Generic;
 using Ros.Transport;
@@ -97,14 +98,15 @@ public sealed class AiIntentRelay : DecisionMachine, IBehaviorHost
             if (TryUseSkill(castOrder[i])) return true;
         }
 
-        return TryUseSkill(Config.unarmed_punch);
+        return TryUseSkill(GlobalConfig.unarmed_punch);
     }
 
     private int ComparePriority(int a, int b)
     {
-        var ca = ConfigManager.SkillConfig.Get(a);
-        var cb = ConfigManager.SkillConfig.Get(b);
-        if (ca.qualityRank != cb.qualityRank) return cb.qualityRank.CompareTo(ca.qualityRank);
+        var ca = SkillConfig.Get(a);
+        var cb = SkillConfig.Get(b);
+        int ra = SkillConfig.QualityRank(ca), rb = SkillConfig.QualityRank(cb);
+        if (ra != rb) return rb.CompareTo(ra);
         return b.CompareTo(a);
     }
 

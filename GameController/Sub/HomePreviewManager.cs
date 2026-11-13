@@ -1,6 +1,7 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
+using Ros.Config;
 // 首页/大厅的场景展示：复制对应的 Arranger 预制体（含场景与锚点），摆所选角色并摆相机
 public class HomePreviewManager : ClientSubManager
 {
@@ -195,20 +196,20 @@ public class HomePreviewManager : ClientSubManager
         }
         anim.Init(null);
         // 武器编号取实体配表，动作集与武器显示类型取武器表，与战斗客户端同口径
-        int weaponId = ConfigManager.EntityConfig.GetByCategory(type).weaponId;
+        int weaponId = EntityConfig.GetByCategory(type).weaponId ?? -1;
         if (weaponId < 0)
         {
             Debug.LogError($"[展示] {type} 没有配武器编号：动作集与武器显示类型都取自 weapon.csv");
             return go;
         }
-        var weapon = ConfigManager.WeaponConfig.Get(weaponId);
+        var weapon = WeaponConfig.Get(weaponId);
         anim.SetType(weapon.animType);
         anim.SetWeapon(weaponId, weapon.weaponDisplay);
         anim.DoSpawn(); // 登场动画：首页与大厅建视图时各播一次，与战斗内 EntityData 的口径一致
         // 登场下落：从锚点上方匀速落到锚点，高度与时长取 global_variables
         go.AddComponent<SpawnDrop>().Play(anchor.position,
-            ConfigManager.GlobalVariableConfig.arranger_spawn_offset,
-            ConfigManager.GlobalVariableConfig.arranger_spawn_fall_duration);
+            GlobalVariable.F(global_variablesEnum.arranger_spawn_offset),
+            GlobalVariable.F(global_variablesEnum.arranger_spawn_fall_duration));
         return go;
     }
 

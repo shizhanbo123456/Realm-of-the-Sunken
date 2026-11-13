@@ -4,6 +4,7 @@ using Ros.Transport;
 using FairyGUI;
 using UnityEngine;
 
+using Ros.Config;
 public class BattlePage : PageBase
 {
     private readonly UI_BattlePanel panel;
@@ -16,8 +17,8 @@ public class BattlePage : PageBase
     private readonly Dictionary<ushort, (int health, int maxHealth)> entityVitals = new();
     private readonly List<UI_EntityBar.Buff> barBuffs = new(); // 血条 buff 快照缓冲（每个摘要包重填）
     private readonly List<SCEntityDisplayInfo.BuffRuntime> localBuffs = new();                      // 本地玩家左上角血条的 buff 数据源
-    private readonly float barDefaultSizeDistance = ConfigManager.GlobalVariableConfig.distance_of_bar_default_size; // 血条 scale=(1,1) 时的相机距离
-    private readonly float labelDefaultSizeDistance = ConfigManager.GlobalVariableConfig.distance_of_label_default_size; // 飘字 scale=(1,1) 时的相机距离
+    private readonly float barDefaultSizeDistance = GlobalVariable.I(global_variablesEnum.distance_of_bar_default_size); // 血条 scale=(1,1) 时的相机距离
+    private readonly float labelDefaultSizeDistance = GlobalVariable.I(global_variablesEnum.distance_of_label_default_size); // 飘字 scale=(1,1) 时的相机距离
     private UI_SkillTip skillTip;     // 技能悬浮提示（技能栏条目）
     private UI_BuffTip buffTip;       // buff 悬浮提示（任意 buff 图标）
     private UI_QuickMessagePanel quickMessagePanel; // 快捷指令轮盘（挂在战斗信息面板里）
@@ -144,10 +145,10 @@ public class BattlePage : PageBase
     {
         float now = Time.time;
         if (now < nextQuickMessageTime) return; // 防刷：同玩家 1s 一条
-        nextQuickMessageTime = now + Config.ai_message_min_interval;
+        nextQuickMessageTime = now + GlobalConfig.ai_message_min_interval;
 
         var message = new CSQuickMessage() { messageId = index };
-        if (Input.GetKey(Config.melee_key) && TryGetAimPoint(out var aim))
+        if (Input.GetKey(GlobalConfig.melee_key) && TryGetAimPoint(out var aim))
         {
             message.hasTargetPosition = true;
             message.targetPosition = aim;
@@ -173,7 +174,7 @@ public class BattlePage : PageBase
     private void OnQuickMessagePointer(SCQuickMessage message)
     {
         if (message == null) return;
-        float duration = ConfigManager.QuickMessageConfig.Get(message.messageId).markerDuration;
+        float duration = QuickMessageConfig.Get(message.messageId).markerDuration;
         if (duration <= 0f) return;
 
         var pointer = UI_QuickMessagePointer.CreateInstance();
@@ -224,7 +225,7 @@ public class BattlePage : PageBase
 
     private static bool AnyQuickMessageKeyDown(out int index)
     {
-        var keys = Config.quick_message_keys;
+        var keys = GlobalConfig.quick_message_keys;
         for (int i = 0; i < keys.Length; i++)
         {
             if (!Input.GetKeyDown(keys[i])) continue;
@@ -238,12 +239,12 @@ public class BattlePage : PageBase
     // 说明来自 setting_tips：规则页签按配表行生成，点页签把该行内容填进右上角的正文
     private void BuildSettingTips()
     {
-        var keys = new List<int>(ConfigManager.SettingTipsConfig.content.Keys);
+        var keys = new List<int>(SettingTipsConfig.content.Keys);
         keys.Sort();
         foreach (int key in keys)
         {
             settingTabKeys.Add(key);
-            settingTabTexts.Add(ConfigManager.SettingTipsConfig.content[key].text.Replace(@"{\n}", "\n"));
+            settingTabTexts.Add(SettingTipsConfig.content[key].text.Replace(@"{\n}", "\n"));
         }
 
         var view = panel.m_SettingsPanel.m_settings_scroll_view;
@@ -253,7 +254,7 @@ public class BattlePage : PageBase
             var tab = obj.asButton;
             // 页签标题写在条目自带的文本上（FGUI 里这个文本没命名）
             var label = tab.GetChild("n3") as GTextField;
-            if (label != null) label.text = ConfigManager.SettingTipsConfig.content[settingTabKeys[i]].name;
+            if (label != null) label.text = SettingTipsConfig.content[settingTabKeys[i]].name;
             tab.selected = i == settingTab;
             int index = i;
             tab.onClick.Set(() => SelectSettingTab(index));
@@ -316,7 +317,7 @@ public class BattlePage : PageBase
         HideAllTips();
         localBuffs.Clear();
         panel.m_playerPanel.m_buffList.m_list.numItems = 0;
-        panel.m_Minimap?.Reset(ConfigManager.GlobalVariableConfig.minimap_view_radius[0]); //每局回到默认档（首档），与服务器 ClearBattleState 对齐
+        panel.m_Minimap?.Reset(GlobalVariable.L(global_variablesEnum.minimap_view_radius)[0]); //每局回到默认档（首档），与服务器 ClearBattleState 对齐
         panel.m_largeMinimapPanel.Close();
         panel.m_godViewPanel.Close();
         panel.m_skillSelectPanel.Close();
@@ -369,7 +370,7 @@ public class BattlePage : PageBase
         // 键盘被 UI 占用（GM 面板 / 文字输入）时，技能选择、快捷消息与面板快捷键都不响应
         if (!InputManager.KeysCapturedByUi)
         {
-            if (Input.GetKeyDown(Config.skill_select_key)) ToggleSkillSelect();
+            if (Input.GetKeyDown(GlobalConfig.skill_select_key)) ToggleSkillSelect();
             if (AnyQuickMessageKeyDown(out int quickMessageIndex)) HandleQuickMessageKey(quickMessageIndex);
             TickGodViewOpenKey();
         }
@@ -408,7 +409,7 @@ public class BattlePage : PageBase
     {
         if (info == null) return;
         // 血条是否创建由 entity.csv 的「显示血条」列决定；名牌只给双方角色
-        if (ConfigManager.EntityConfig.GetByCategory(info.type).showHealthBar)
+        if (EntityConfig.GetByCategory(info.type).showHealthBar == true)
         {
             bool withName = info.type.category == EntityCategory.Character_Attack ||
                             info.type.category == EntityCategory.Character_Defense;
@@ -643,7 +644,7 @@ public class BattlePage : PageBase
     {
         if (guardian == null) return;
         float ratio = GuardRatio(index, out int health, out int max);
-        if (guardian.m_Name != null) guardian.m_Name.text = Config.GuardPointConfig(index).name;
+        if (guardian.m_Name != null) guardian.m_Name.text = GlobalConfig.GuardPointConfig(index).name;
         if (guardian.m_health_label != null) guardian.m_health_label.text = $"{health}/{max}";
         if (guardian.m_health_percentage != null) guardian.m_health_percentage.text = $"{Mathf.RoundToInt(ratio * 100f)}%";
         // 守护层数 = 还没被打掉的副点数量
@@ -655,7 +656,7 @@ public class BattlePage : PageBase
     {
         if (guardian == null) return;
         float ratio = GuardRatio(index, out _, out _);
-        if (guardian.m_guardian_name != null) guardian.m_guardian_name.text = Config.GuardPointConfig(index).name;
+        if (guardian.m_guardian_name != null) guardian.m_guardian_name.text = GlobalConfig.GuardPointConfig(index).name;
         if (guardian.m_health_percentage != null) guardian.m_health_percentage.text = $"{Mathf.RoundToInt(ratio * 100f)}%";
         if (guardian.m_killed != null) guardian.m_killed.selectedIndex = ratio <= 0f ? 1 : 0;
         SetGuardianBarFill(guardian.m_bar, ratio);
@@ -664,7 +665,7 @@ public class BattlePage : PageBase
     // 血量未知（守护点还没生成）按满血算，避免开局显示成空槽
     private float GuardRatio(int index, out int health, out int max)
     {
-        max = Mathf.Max(1, Mathf.RoundToInt(Config.GuardPointConfig(index).health));
+        max = Mathf.Max(1, Mathf.RoundToInt(GlobalConfig.GuardPointConfig(index).health));
         health = guardianHealth[index] < 0 ? max : guardianHealth[index];
         return Mathf.Clamp01((float)health / max);
     }
@@ -772,14 +773,14 @@ public class BattlePage : PageBase
             ResetGodViewPress(); // 已打开时不再累计，避免关闭后残留一半计数
             return;
         }
-        if (!Input.GetKeyDown(Config.god_view_open_key)) return;
-        if (godViewPressCount == 0 || Time.unscaledTime - godViewFirstPressTime > Config.god_view_open_press_window)
+        if (!Input.GetKeyDown(GlobalConfig.god_view_open_key)) return;
+        if (godViewPressCount == 0 || Time.unscaledTime - godViewFirstPressTime > GlobalConfig.god_view_open_press_window)
         {
             godViewPressCount = 1;
             godViewFirstPressTime = Time.unscaledTime;
         }
         else godViewPressCount++;
-        if (godViewPressCount < Config.god_view_open_press_count) return;
+        if (godViewPressCount < GlobalConfig.god_view_open_press_count) return;
         ResetGodViewPress();
         panel.m_godViewPanel.Open(ResolveGodViewCenter());
     }
@@ -794,7 +795,7 @@ public class BattlePage : PageBase
     private Vector2 ResolveGodViewCenter()
     {
         if (TryGetMinimapCenter(out var center)) return new Vector2(center.x, center.z);
-        float half = ConfigManager.GlobalVariableConfig.terrain_size * 0.5f;
+        float half = GlobalVariable.RangeLength(global_variablesEnum.terrain_size) * 0.5f;
         return new Vector2(half, half);
     }
 
@@ -849,7 +850,7 @@ public class BattlePage : PageBase
     // 重要事件 banner：技能名取 skill.csv，播报文案格式固定
     private void EnqueueImportantBanner(int skillId)
     {
-        importantBannerQueue.Enqueue(ImportantBannerPrefix + ConfigManager.SkillConfig.Get(skillId).name);
+        importantBannerQueue.Enqueue(ImportantBannerPrefix + SkillConfig.Get(skillId).name);
         PlayNextImportantBanner();
     }
 
@@ -919,7 +920,7 @@ public class BattlePage : PageBase
         }
 
         // 只拿死亡次数：复活总时长由客户端读配表算，progress 只作为起点（重连补发时非 0）
-        var revive = ConfigManager.ReviveTimeConfig.GetClamped(Mathf.Max(1, info.deathCount));
+        var revive = ReviveTimeConfig.GetClamped(Mathf.Max(1, info.deathCount));
         bool isAttack = Session.Camp == EntityCamp.Attack;
         reviveDuration = isAttack ? revive.attackReviveSeconds : revive.defenseReviveSeconds;
         reviveElapsed = Mathf.Clamp01(info.progress) * reviveDuration;
@@ -1149,7 +1150,7 @@ public class BattlePage : PageBase
     {
         var playerPanel = panel.m_playerPanel;
         if (playerPanel == null) return;
-        int need = ConfigManager.CharacterExpConfig.NeedExp(cardLevel + 1);
+        int need = CharacterExpConfig.NeedExp(cardLevel + 1);
         if (levelLabel != null) levelLabel.text = cardLevel.ToString();
         if (playerPanel.m_bar_exp != null && playerPanel.m_bar_exp.m_fill != null)
             playerPanel.m_bar_exp.m_fill.fillAmount = need > 0 ? Mathf.Clamp01((float)cardExp / need) : 1f;

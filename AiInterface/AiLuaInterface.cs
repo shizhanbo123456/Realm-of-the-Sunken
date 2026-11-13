@@ -1,3 +1,4 @@
+﻿using Ros.Config;
 // AI 操控的 Lua 接口：脚本加载与重载、状态机驱动、给 Lua 的读写 API（LuaEnv 本体在 LuaManager，此处只借用）
 using System;
 using System.Collections.Generic;
@@ -460,7 +461,7 @@ public sealed class AiLuaApi
     // 射程 = 技能能影响到的距离，Lua 据此判断当前能否打到目标
     public string skill_info(int skillId)
     {
-        if (!ConfigManager.SkillConfig.content.TryGetValue(skillId, out var cfg)) return "";
+        if (!SkillConfig.content.TryGetValue(skillId, out var cfg)) return "";
 
         var builder = new StringBuilder();
         builder.Append("id=").Append(cfg.key)
@@ -468,7 +469,7 @@ public sealed class AiLuaApi
             .Append(" 品质=").Append(string.IsNullOrEmpty(cfg.quality) ? "无" : cfg.quality)
             .Append(" 射程=").Append(cfg.castRange.ToString("0.##"))
             .Append(" 夹角=").Append(cfg.targetSector.ToString("0.##"))
-            .Append(" 自动索敌=").Append(cfg.autoTarget ? 1 : 0)
+            .Append(" 自动索敌=").Append((cfg.autoTarget ?? false) ? 1 : 0)
             .Append(" CD=").Append(cfg.cd.ToString("0.##"))
             .Append(" 存储上限=").Append(cfg.storeLimit);
         return builder.ToString();
@@ -484,10 +485,10 @@ public sealed class AiLuaApi
         var info = commands.GuardSnapshot;
         switch (index)
         {
-            case 0: return Config.GuardPointDamagedPercent(0, info.mainHealth);
-            case 1: return Config.GuardPointDamagedPercent(1, info.sub1Health);
-            case 2: return Config.GuardPointDamagedPercent(2, info.sub2Health);
-            case 3: return Config.GuardPointDamagedPercent(3, info.sub3Health);
+            case 0: return GlobalConfig.GuardPointDamagedPercent(0, info.mainHealth);
+            case 1: return GlobalConfig.GuardPointDamagedPercent(1, info.sub1Health);
+            case 2: return GlobalConfig.GuardPointDamagedPercent(2, info.sub2Health);
+            case 3: return GlobalConfig.GuardPointDamagedPercent(3, info.sub3Health);
             default: return -1;
         }
     }

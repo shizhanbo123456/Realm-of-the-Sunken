@@ -1,6 +1,7 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
+using Ros.Config;
 // 图鉴与角色特殊能力的数据来源：技能/Buff 读配表，防守方被动暂无配表先硬编码
 public static class GuideCatalog
 {
@@ -43,7 +44,7 @@ public static class GuideCatalog
     }
 
     // 角色特殊能力：进攻方只有初始技能，防守方再加一条被动
-    public static List<Entry> BuildCharacterAbilities(ConfigManager.EntityConfig config, int saveIndex, bool defense)
+    public static List<Entry> BuildCharacterAbilities(entity config, int saveIndex, bool defense)
     {
         var list = new List<Entry>();
         if (config.initialSkills != null)
@@ -51,13 +52,13 @@ public static class GuideCatalog
             for (int i = 0; i < config.initialSkills.Count; i++)
             {
                 int id = config.initialSkills[i];
-                if (!ConfigManager.SkillConfig.content.TryGetValue(id, out var skill)) continue;
+                if (!SkillConfig.content.TryGetValue(id, out var skill)) continue;
                 list.Add(new Entry(skill.name, skill.description, SkillIcon(id)));
             }
         }
-        if (defense && HasDefensePassive(saveIndex - Config.attack_character_count))
+        if (defense && HasDefensePassive(saveIndex - GlobalConfig.attack_character_count))
         {
-            var passive = DefensePassive(saveIndex - Config.attack_character_count);
+            var passive = DefensePassive(saveIndex - GlobalConfig.attack_character_count);
             list.Add(new Entry(passive.title, passive.description, null));
         }
         return list;
@@ -66,7 +67,7 @@ public static class GuideCatalog
     public static List<Entry> BuildSkillEntries()
     {
         var list = new List<Entry>();
-        foreach (var pair in SortedKeys(ConfigManager.SkillConfig.content))
+        foreach (var pair in SortedKeys(SkillConfig.content))
         {
             var skill = pair.Value;
             string store = skill.storeLimit < 0 ? "无限" : skill.storeLimit.ToString();
@@ -79,7 +80,7 @@ public static class GuideCatalog
     public static List<Entry> BuildBuffEntries()
     {
         var list = new List<Entry>();
-        foreach (var pair in SortedKeys(ConfigManager.EffectConfig.content))
+        foreach (var pair in SortedKeys(EffectConfig.content))
         {
             var buff = pair.Value;
             list.Add(new Entry(buff.name, buff.description, BuffIcon(buff.iconId)));

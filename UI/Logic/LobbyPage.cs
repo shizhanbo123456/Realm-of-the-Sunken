@@ -1,9 +1,10 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using FairyGUI;
 using Ros.Transport;
 using Ros.UI.Main;
 using UnityEngine;
 
+using Ros.Config;
 // 组队大厅：两块阵营操作（加入/退出 + AI 数量）+ 准备/退出 + 观战人数；成员头像列表在新版 UI 里已去掉
 public class LobbyPage : PageBase
 {
@@ -164,8 +165,8 @@ public class LobbyPage : PageBase
         if (camp == PlayerCampType.Spectator) return true;
         bool attack = camp == PlayerCampType.Attack;
         int limit = attack
-            ? ConfigManager.GlobalVariableConfig.player_limit_attacker
-            : ConfigManager.GlobalVariableConfig.player_limit_defenser;
+            ? GlobalVariable.I(global_variablesEnum.player_limit_attacker)
+            : GlobalVariable.I(global_variablesEnum.player_limit_defenser);
         int count = attack ? humanAttack : humanDefense;
         if (count < limit) return true;
         if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(attack ? "进攻方人数已满" : "防守方人数已满");
@@ -177,8 +178,8 @@ public class LobbyPage : PageBase
         if (camp == PlayerCampType.Spectator || BlockedByReady()) return;
         bool defense = camp == PlayerCampType.Defense;
         int limit = defense
-            ? ConfigManager.GlobalVariableConfig.player_limit_defenser_AI
-            : ConfigManager.GlobalVariableConfig.player_limit_attacker_AI;
+            ? GlobalVariable.I(global_variablesEnum.player_limit_defenser_AI)
+            : GlobalVariable.I(global_variablesEnum.player_limit_attacker_AI);
         int current = defense ? defenseAI : attackAI;
         if (delta > 0 && current >= limit)
         {

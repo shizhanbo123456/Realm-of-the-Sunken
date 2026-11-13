@@ -82,7 +82,7 @@ namespace Ros.Skill.Utils
         public static void SetEntitiesInRangeToBuffer(IEnumerable<EntityData> bucket, Vector3 pos, float radius)
         {
             TargetBuffer.Clear();
-            bool unlimited = radius > Config.skill_target_unlimited_radius;
+            bool unlimited = radius > GlobalConfig.skill_target_unlimited_radius;
             float sqr = radius * radius;
             foreach (var e in bucket)
             {
@@ -114,7 +114,7 @@ namespace Ros.Skill.Utils
         {
             TargetBuffer.Clear();
             EntityCamp hostile = EntityCampUtil.HostileOf(ownCategory);
-            bool unlimited = radius > Config.skill_target_unlimited_radius;
+            bool unlimited = radius > GlobalConfig.skill_target_unlimited_radius;
             float sqr = radius * radius;
             foreach (var e in BattleManager.EntityContainer.Entities)
             {

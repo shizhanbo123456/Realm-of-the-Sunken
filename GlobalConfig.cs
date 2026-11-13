@@ -2,7 +2,8 @@
 using Ros.Transport;
 using UnityEngine;
 
-public static class Config
+using Ros.Config;
+public static class GlobalConfig
 {
     #region 角色
     public const int attack_character_count = 6;
@@ -16,7 +17,6 @@ public static class Config
     public const int level_suppress_max_diff = 3;
 
     // 战斗期等级上限 = global_variables，配表加行即生效
-    public static int battle_max_level => ConfigManager.GlobalVariableConfig.battle_max_level;
     #endregion
 
     #region 守护雕像（防守目标）
@@ -31,7 +31,7 @@ public static class Config
     }
 
     // 守护点血量上限与名字都在这张表里（entity.csv「生命」「姓名」列）
-    public static ConfigManager.EntityConfig GuardPointConfig(int index) => ConfigManager.EntityConfig.GetByCategory(GuardPointType(index));
+    public static entity GuardPointConfig(int index) => EntityConfig.GetByCategory(GuardPointType(index));
 
     // 当前血量 → 被打掉的百分比（0~100）；血量为负说明守护点还没生成，按未受损算
     public static int GuardPointDamagedPercent(int index, int health)
@@ -152,9 +152,6 @@ public static class Config
     public const float gm_teleport_height = 200f; // GM 传送的 Y（传送面板只给 x/z）
 
     // 转向 / 飞行升降 / GM 极速倍率来自配表 global_variables
-    public static float move_turn_rate => ConfigManager.GlobalVariableConfig.move_turn_rate;
-    public static float fly_vertical_speed => ConfigManager.GlobalVariableConfig.fly_vertical_speed;
-    public static float gm_speed_multiplier => ConfigManager.GlobalVariableConfig.gm_speed_multiplier;
     #endregion
 
     #region 武器与技能
@@ -199,9 +196,6 @@ public static class Config
     public const int unarmed_punch = (int)SkillType.SkillPunch;
 
     // 移动类 Buff 的移速倍率来自配表 global_variables（同一乘区，连乘叠加）
-    public static float anim_move_speed_up => ConfigManager.GlobalVariableConfig.buff_speed_up;
-    public static float anim_move_speed_down => ConfigManager.GlobalVariableConfig.buff_speed_down;
-    public static float anim_move_speed_mire => ConfigManager.GlobalVariableConfig.buff_mire_speed_rate;
 
     // 技能索敌阈值（索敌夹角与射程逐技能读 skill.csv，射程同时就是索敌半径）
     public const float skill_target_no_sector = 0.1f;        // 夹角 <= 此值 = 完全不索敌
@@ -228,11 +222,6 @@ public static class Config
     #region 防守方技能参数（占位初值，待策划定稿）
     public const float death_stroll_radius = 4f;
     public const float death_stroll_dot_ratio = 1.5f; // 死灵漫步光环每跳 = 施加者攻击 × 此系数 × 等级
-    public static float death_stroll_speed_up => ConfigManager.GlobalVariableConfig.buff_death_stroll_speed_up; // 移速倍率取配表
-    public static float death_curse_radius => ConfigManager.GlobalVariableConfig.death_curse_radius;           // 死灵诅咒施加半径
-    public static float death_curse_duration => ConfigManager.GlobalVariableConfig.death_curse_duration;       // 死灵诅咒单次持续时长
-    public static float death_curse_tick_damage => ConfigManager.GlobalVariableConfig.death_curse_tick_damage; // 每跳 = 此值 × 等级
-    public static float death_curse_damage_taken_ratio => ConfigManager.GlobalVariableConfig.death_curse_damage_taken_ratio; // 受伤增幅每级
     public const int summon_zombie_count = 5;
     public const int summon_elite_count = 3;
     public const float plague_detonate_damage = 20f;
@@ -254,8 +243,6 @@ public static class Config
     #endregion
 
     #region 地面检测（探针从脚部 +ground_probe_up 向下打 ground_probe_length；数值来自配表 global_variables）
-    public static float ground_probe_up => ConfigManager.GlobalVariableConfig.ground_probe_up;
-    public static float ground_probe_length => ConfigManager.GlobalVariableConfig.ground_probe_length;
     #endregion
 
     #region 防守方角色下标（type.value，顺序同策划案第五章与 entity.csv）

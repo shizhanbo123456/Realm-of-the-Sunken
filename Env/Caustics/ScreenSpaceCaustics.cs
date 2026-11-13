@@ -1,6 +1,7 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Rendering;
 
+using Ros.Config;
 // 挂在相机上：在画完不透明物体后全屏加色叠加焦散，不需要改动场景里任何材质
 [RequireComponent(typeof(Camera))]
 public class ScreenSpaceCaustics : MonoBehaviour
@@ -136,8 +137,8 @@ public class ScreenSpaceCaustics : MonoBehaviour
     private void Start()
     {
         // 地图范围来自配表，晚于 Awake 读取以确保 ConfigManager 已加载
-        mapMin = ConfigManager.GlobalVariableConfig.terrain_size_min;
-        mapSize = ConfigManager.GlobalVariableConfig.terrain_size;
+        mapMin = GlobalVariable.RangeMin(global_variablesEnum.terrain_size);
+        mapSize = GlobalVariable.RangeLength(global_variablesEnum.terrain_size);
         if (mapSize <= 0f)
         {
             Debug.LogWarning("[ScreenSpaceCaustics] 配表 terrain_size 无效（<=0），遮挡判定关闭", this);

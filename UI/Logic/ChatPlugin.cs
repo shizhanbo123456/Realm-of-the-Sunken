@@ -4,6 +4,7 @@ using Ros.Transport;
 using Ros.UI.Main;
 using UnityEngine;
 
+using Ros.Config;
 //全局聊天面板：联网后常驻显示，大厅与战斗共用；离开房间清空并隐藏
 public class ChatPlugin
 {
@@ -230,7 +231,7 @@ public class ChatPlugin
     private void OnQuickMessage(SCQuickMessage message)
     {
         if (message == null) return;
-        var cfg = ConfigManager.QuickMessageConfig.Get(message.messageId);
+        var cfg = QuickMessageConfig.Get(message.messageId);
         if (string.IsNullOrEmpty(cfg.chatText)) return;
 
         entries.Add(new ChatEntry()
@@ -319,7 +320,7 @@ public class ChatPlugin
     private static string ResolveEventText(int id)
     {
         if (id >= SCBattleEvent.PlayerNameBase) return GetUnitName(id - SCBattleEvent.PlayerNameBase);
-        return ConfigManager.NoticeConfig.Get(id).text;
+        return NoticeConfig.Get(id).text;
     }
 
     private static string GetUnitName(int clientId)

@@ -1,7 +1,8 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
 
+using Ros.Config;
 [ExecuteInEditMode]
 public class Tool : MonoBehaviour
 {
@@ -42,7 +43,7 @@ public class Tool : MonoBehaviour
     public static Tool Instance { get; private set; }
 
     #region 管理器引用（由各管理器 Awake 注册）
-    public static ConfigManager ConfigManager;
+    public static Ros.Config.ConfigManager ConfigManager;
     public static NetworkManager NetworkManager;
     public static BattleManager BattleManager;
     public static InfoManager InfoManager;
@@ -124,8 +125,8 @@ public class Tool : MonoBehaviour
 
         errors += CheckInfoManager();
         errors += CheckEntityGraphics();          // 实体图形两端都用：BattleManager 生成实体依赖它
-        errors += CheckCharacterRows(EntityCategory.Character_Attack, Config.attack_character_count, "进攻方");
-        errors += CheckCharacterRows(EntityCategory.Character_Defense, Config.defense_character_count, "防守方");
+        errors += CheckCharacterRows(EntityCategory.Character_Attack, GlobalConfig.attack_character_count, "进攻方");
+        errors += CheckCharacterRows(EntityCategory.Character_Defense, GlobalConfig.defense_character_count, "防守方");
         errors += CheckGuardStatueSpawns();
         if (!isServer) errors += CheckClientAssets();
 
@@ -169,9 +170,9 @@ public class Tool : MonoBehaviour
 
         int e = 0;
         int subCount = TerrainGen.TerrainSpawns.SubGuards.Count;
-        if (subCount != Config.sage_statue_count)
+        if (subCount != GlobalConfig.sage_statue_count)
         {
-            Debug.LogError($"[启动自检] 地形烘焙数据里有 {subCount} 个副守护点，与贤者雕像数量 {Config.sage_statue_count} 不一致：雕像会多出或缺失");
+            Debug.LogError($"[启动自检] 地形烘焙数据里有 {subCount} 个副守护点，与贤者雕像数量 {GlobalConfig.sage_statue_count} 不一致：雕像会多出或缺失");
             e++;
         }
         return e;
@@ -183,13 +184,13 @@ public class Tool : MonoBehaviour
         int e = 0;
         for (int i = 0; i < count; i++)
         {
-            if (ConfigManager.EntityConfig.content.ContainsKey(new EntityType(category, i))) continue;
+            if (EntityConfig.content.ContainsKey(new EntityType(category, i))) continue;
             Debug.LogError($"[启动自检] entity.csv 缺少{label}角色行 (value={i})：选到该角色会直接抛异常");
             e++;
         }
 
         int rows = 0;
-        foreach (var key in ConfigManager.EntityConfig.content.Keys)
+        foreach (var key in EntityConfig.content.Keys)
             if (key.category == category) rows++;
         if (rows > count) Debug.LogWarning($"[启动自检] entity.csv 的{label}角色有 {rows} 行，多于角色数量 {count}：多出的行不会被选中，建议删除");
         return e;
@@ -201,16 +202,16 @@ public class Tool : MonoBehaviour
         if (m == null) return 0;
 
         int e = 0;
-        e += CheckList("AssetsManager.AttackCharacterGraphics", m.AttackCharacterGraphics, Config.attack_character_count);
-        e += CheckList("AssetsManager.DefenseCharacterGraphics", m.DefenseCharacterGraphics, Config.defense_character_count);
-        e += CheckList("AssetsManager.ZombieGraphics", m.ZombieGraphics, Config.zombie_variant_count);
-        e += CheckList("AssetsManager.EliteZombieGraphics", m.EliteZombieGraphics, Config.elite_zombie_variant_count);
-        e += CheckList("AssetsManager.SageStatueGraphics", m.SageStatueGraphics, Config.sage_statue_count);
+        e += CheckList("AssetsManager.AttackCharacterGraphics", m.AttackCharacterGraphics, GlobalConfig.attack_character_count);
+        e += CheckList("AssetsManager.DefenseCharacterGraphics", m.DefenseCharacterGraphics, GlobalConfig.defense_character_count);
+        e += CheckList("AssetsManager.ZombieGraphics", m.ZombieGraphics, GlobalConfig.zombie_variant_count);
+        e += CheckList("AssetsManager.EliteZombieGraphics", m.EliteZombieGraphics, GlobalConfig.elite_zombie_variant_count);
+        e += CheckList("AssetsManager.SageStatueGraphics", m.SageStatueGraphics, GlobalConfig.sage_statue_count);
         e += CheckObject("AssetsManager.KingStatueGraphic", m.KingStatueGraphic);
         e += CheckList("AssetsManager.CoralSmallGraphics", m.CoralSmallGraphics, 0);
         e += CheckList("AssetsManager.CoralLargeGraphics", m.CoralLargeGraphics, 0);
-        e += CheckList("AssetsManager.CrystalStatueGraphics", m.CrystalStatueGraphics, Config.crystal_statue_count);
-        e += CheckList("AssetsManager.NeutralStatueGraphics", m.NeutralStatueGraphics, Config.neutral_statue_variant_count);
+        e += CheckList("AssetsManager.CrystalStatueGraphics", m.CrystalStatueGraphics, GlobalConfig.crystal_statue_count);
+        e += CheckList("AssetsManager.NeutralStatueGraphics", m.NeutralStatueGraphics, GlobalConfig.neutral_statue_variant_count);
 
         // 数量/空项之外再逐项核对：组件没挂、范围没录、碰撞体层不对，运行时照样打不中或不动
         e += CheckPrefabs("AssetsManager.AttackCharacterGraphics", m.AttackCharacterGraphics, humanoid: true);
@@ -316,14 +317,14 @@ public class Tool : MonoBehaviour
 
         e += CheckList("AssetsManager.WeaponPrefabs", m.WeaponPrefabs, weapon_count);
 
-        e += CheckList("AssetsManager.AttackCharacterIcons", m.AttackCharacterIcons, Config.attack_character_count);
-        e += CheckList("AssetsManager.DefenseCharacterIcons", m.DefenseCharacterIcons, Config.defense_character_count);
+        e += CheckList("AssetsManager.AttackCharacterIcons", m.AttackCharacterIcons, GlobalConfig.attack_character_count);
+        e += CheckList("AssetsManager.DefenseCharacterIcons", m.DefenseCharacterIcons, GlobalConfig.defense_character_count);
 
         // Buff 特效按 hits[0] 贴合实体高度，缺命中球就没法定位/缩放（映射见 effect.csv 第 11、12 列）
-        foreach (var row in ConfigManager.EffectConfig.content.Values)
+        foreach (var row in EffectConfig.content.Values)
         {
             if (!row.vfxKind.HasValue) continue;
-            if (VfxHitSource.GetHits(row.vfxKind.Value, row.vfxIndex.Value).Length > 0) continue;
+            if (VfxHitSource.GetHits((Ros.Skill.SkillVfxKind)row.vfxKind.Value, row.vfxIndex.Value).Length > 0) continue;
             Debug.LogError($"[启动自检] Buff {row.key}「{row.name}」→ {row.vfxKind.Value}[{row.vfxIndex.Value}] 没有 BulletVfxInfo.hits：无法贴合实体高度");
             e++;
         }

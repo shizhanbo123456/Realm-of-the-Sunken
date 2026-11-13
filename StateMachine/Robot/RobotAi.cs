@@ -49,7 +49,7 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
     {
         Owner = owner;
         skillBar = new RobotSkillBar(owner, this);
-        ThinkInterval = Config.ai_think_interval;
+        ThinkInterval = GlobalConfig.ai_think_interval;
 
         searchState = new SearchState(this);
         searchCombatState = new SearchCombatState(this);
@@ -70,11 +70,11 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
         arbiter = new BehaviorArbiter(this);
 
         // 战斗态：撤离血线 / 活动范围 / 撤离去向 按战斗策略表配；脱战回到由 Bind 时传入
-        combatState.Setup(Config.ai_combat_retreat_ratio, 0f, dangerEvadeState, EntityReportState.Combat);
-        escortCombatState.Setup(Config.ai_escort_retreat_ratio, Config.ai_escort_combat_radius * 1.5f, dangerEvadeState, EntityReportState.EscortCombat);
-        dangerCombatState.Setup(Config.ai_combat_retreat_ratio, Config.ai_danger_clear_radius * 1.5f, dangerEvadeState, EntityReportState.DangerClearCombat);
-        rallyGuardState.Setup(Config.ai_rally_retreat_ratio, Config.ai_guard_alert_radius, rallyApproachState, EntityReportState.RallyGuard);
-        assaultCombatState.Setup(Config.ai_combat_retreat_ratio, Config.ai_assault_combat_activity, dangerEvadeState, EntityReportState.AssaultCombat);
+        combatState.Setup(GlobalConfig.ai_combat_retreat_ratio, 0f, dangerEvadeState, EntityReportState.Combat);
+        escortCombatState.Setup(GlobalConfig.ai_escort_retreat_ratio, GlobalConfig.ai_escort_combat_radius * 1.5f, dangerEvadeState, EntityReportState.EscortCombat);
+        dangerCombatState.Setup(GlobalConfig.ai_combat_retreat_ratio, GlobalConfig.ai_danger_clear_radius * 1.5f, dangerEvadeState, EntityReportState.DangerClearCombat);
+        rallyGuardState.Setup(GlobalConfig.ai_rally_retreat_ratio, GlobalConfig.ai_guard_alert_radius, rallyApproachState, EntityReportState.RallyGuard);
+        assaultCombatState.Setup(GlobalConfig.ai_combat_retreat_ratio, GlobalConfig.ai_assault_combat_activity, dangerEvadeState, EntityReportState.AssaultCombat);
 
         stuckSamplePos = owner.transform.position;
         stuckSampleTime = Time.time;
@@ -112,12 +112,12 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
     // 静止一段时间说明目的地走不到
     private void UpdateStuckSample()
     {
-        if (Time.time - stuckSampleTime < Config.ai_unreachable_pause) return;
+        if (Time.time - stuckSampleTime < GlobalConfig.ai_unreachable_pause) return;
         Vector3 delta = Owner.transform.position - stuckSamplePos;
         delta.y = 0f;
         stuckSampleTime = Time.time;
         stuckSamplePos = Owner.transform.position;
-        if (delta.magnitude >= Config.ai_stuck_min_move) return;
+        if (delta.magnitude >= GlobalConfig.ai_stuck_min_move) return;
 
         // 丢掉走不到的目的地，交给状态换目标，避免一直对着同一处撞
         Owner.StopMoving();
@@ -134,7 +134,7 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
     {
         if (target == null) return;
         ignoredTarget = target;
-        ignoreTargetUntil = Time.time + Config.ai_ignore_unreachable_time;
+        ignoreTargetUntil = Time.time + GlobalConfig.ai_ignore_unreachable_time;
     }
 
     private bool IsIgnored(EntityData entity)
@@ -156,7 +156,7 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
     protected EntityData NearestEnemy(bool includeCoral)
     {
         // 索敌半径取「视野」与「追击上限 - 余量」的较小者：等于上限时刚索到就会超限放弃，搜索/追击每拍互踢
-        float radius = Mathf.Min(ViewDistance, Config.ai_chase_limit - Config.ai_acquire_margin);
+        float radius = Mathf.Min(ViewDistance, GlobalConfig.ai_chase_limit - GlobalConfig.ai_acquire_margin);
         return NearestEnemyAround(Owner.transform.position, radius, includeCoral);
     }
 
@@ -193,7 +193,7 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
         foreach (var statue in BattleManager.EntityContainer.GuardStatues)
         {
             if (statue == null || !statue.Alive || statue.camp != Owner.camp) continue;
-            var enemy = NearestEnemyAround(statue.transform.position, Config.ai_guard_alert_radius, false);
+            var enemy = NearestEnemyAround(statue.transform.position, GlobalConfig.ai_guard_alert_radius, false);
             if (enemy == null) continue;
             float d = (enemy.transform.position - Owner.transform.position).sqrMagnitude;
             if (d < bestSqr) { bestSqr = d; best = enemy; }
@@ -313,8 +313,8 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
             ? message.targetPosition
             : (ResolveSender(message.senderClientId) != null ? ResolveSender(message.senderClientId).transform.position : Owner.transform.position);
 
-        bool nearby = FlatDistance(point) <= Config.ai_danger_response_distance;
-        if (nearby && HealthRatio > Config.ai_danger_response_ratio)
+        bool nearby = FlatDistance(point) <= GlobalConfig.ai_danger_response_distance;
+        if (nearby && HealthRatio > GlobalConfig.ai_danger_response_ratio)
             SwitchTo(dangerClearState.Bind(point));
         else
             SwitchTo(dangerEvadeState.Bind(point));
@@ -372,7 +372,7 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
             {
                 var neutral = FindNeutralStatue();
                 if (neutral == null) return fallback; // 执行时再校验一次：中立单位已不存在
-                return chaseState.Bind(neutral, searchState, Config.ai_chase_limit);
+                return chaseState.Bind(neutral, searchState, GlobalConfig.ai_chase_limit);
             }
             default:
                 return fallback;

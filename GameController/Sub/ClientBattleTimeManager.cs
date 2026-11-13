@@ -1,6 +1,7 @@
-using Ros.Transport;
+﻿using Ros.Transport;
 using UnityEngine;
 
+using Ros.Config;
 public class ClientBattleTimeManager : ClientSubManager
 {
     public SCScoreInfo LatestScore { get; private set; }
@@ -27,7 +28,7 @@ public class ClientBattleTimeManager : ClientSubManager
     {
         // 开战前与终局后都不推演，否则在菜单里待久了剩余时间会被算成 0
         if (!running || BattleOver) return;
-        RemainTime = Mathf.Max(0f, ConfigManager.GlobalVariableConfig.battle_duration - (Time.time - startTime));
+        RemainTime = Mathf.Max(0f, GlobalVariable.F(global_variablesEnum.battle_duration) - (Time.time - startTime));
     }
 
     public void OnDayNightSync(SCDayNightInfo info)
@@ -49,7 +50,7 @@ public class ClientBattleTimeManager : ClientSubManager
         else if (info.resync)
         {
             // 中途快照（重连 / 中途进入）：用服务器剩余时间反推本地起点，否则断线期间的时间会被算成已消耗
-            startTime = Time.time - Mathf.Max(0f, ConfigManager.GlobalVariableConfig.battle_duration - info.remainTime);
+            startTime = Time.time - Mathf.Max(0f, GlobalVariable.F(global_variablesEnum.battle_duration) - info.remainTime);
             running = true;
             BattleOver = false;
             hasResyncSnapshot = true;
@@ -68,6 +69,6 @@ public class ClientBattleTimeManager : ClientSubManager
         hasResyncSnapshot = false;
         if (fromSnapshot) return;
         startTime = Time.time;
-        RemainTime = ConfigManager.GlobalVariableConfig.battle_duration;
+        RemainTime = GlobalVariable.F(global_variablesEnum.battle_duration);
     }
 }

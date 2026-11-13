@@ -3,6 +3,7 @@ using Ros.Transport;
 using TerrainGen;
 using UnityEngine;
 
+using Ros.Config;
 public partial class BattleManager
 {
     #region 服务器权威移动（双手键盘：角色相对移动 + 渐转，朝向服务器权威）
@@ -236,8 +237,8 @@ public partial class BattleManager
         var player = GetCoralKillerPlayer(coral, out _);
         if (player == null || !player.Alive) return;
         float heal = coral.type.value <= 0
-            ? ConfigManager.GlobalVariableConfig.coral_small_regeneration
-            : ConfigManager.GlobalVariableConfig.coral_large_regeneration;
+            ? GlobalVariable.F(global_variablesEnum.coral_small_regeneration)
+            : GlobalVariable.F(global_variablesEnum.coral_large_regeneration);
         if (heal <= 0f) return;
         player.attributes.Heal(heal);
         player.healthDirty = true;
@@ -250,11 +251,11 @@ public partial class BattleManager
         if (player == null || player.skillController == null) return;
 
         float chance = coral.type.value <= 0
-            ? ConfigManager.GlobalVariableConfig.coral_small_drop_chance
-            : ConfigManager.GlobalVariableConfig.coral_large_drop_chance;
+            ? GlobalVariable.F(global_variablesEnum.coral_small_drop_chance)
+            : GlobalVariable.F(global_variablesEnum.coral_large_drop_chance);
         if (UnityEngine.Random.value > chance) return;
 
-        int weaponId = Config.GetRandomWeaponSkillId(); // 掉的是技能：武器技能段内均匀随机
+        int weaponId = GlobalConfig.GetRandomWeaponSkillId(); // 掉的是技能：武器技能段内均匀随机
         var ids = player.skillController.GetSkillIds();
         if (ids.Contains(weaponId)) return;
         player.skillController.AddSkill(weaponId);
@@ -287,7 +288,7 @@ public partial class BattleManager
             if (!PlayerCamps.TryGetValue(clientId, out var camp)) continue;
 
             // 复活时长固定看配表（第几次复活 → 秒数），不再区分昼夜
-            var revive = ConfigManager.ReviveTimeConfig.GetClamped(Mathf.Max(1, rs.deathCount));
+            var revive = ReviveTimeConfig.GetClamped(Mathf.Max(1, rs.deathCount));
             if (camp == PlayerCampType.Attack)
             {
                 rs.progress += dt / revive.attackReviveSeconds;
@@ -338,7 +339,7 @@ public partial class BattleManager
         SendSkillRecharge(clientId); // 新实体满库存：把重生后的技能栏快照同步给本人
 
         // 愈战愈勇：第 n 条命层数（配表按死亡次数给出，永久 Buff）
-        int fury = ConfigManager.BattleFuryLayerConfig.GetClamped(rs.deathCount).buffLayerCount;
+        int fury = BattleFuryLayerConfig.GetClamped(rs.deathCount).buffLayerCount;
         if (fury > 0 && data != null)
         {
             if (data.effectController != null) data.effectController.AddEffect(EffectType.BattleFury, fury, float.MaxValue);
@@ -365,7 +366,7 @@ public partial class BattleManager
             progress = Mathf.Clamp01(rs.progress),
             ready = ready,
             entityId = entityId,
-            furyStack = ConfigManager.BattleFuryLayerConfig.GetClamped(rs.deathCount).buffLayerCount,
+            furyStack = BattleFuryLayerConfig.GetClamped(rs.deathCount).buffLayerCount,
         });
     }
 
@@ -435,7 +436,7 @@ public partial class BattleManager
     {
         if (statue.type == EntityType.KingStatue) return 0;
         if (statue.type.category != EntityCategory.GuardStatue) return -1;
-        return statue.type.value >= 0 && statue.type.value < Config.sage_statue_count ? statue.type.value + 1 : -1;
+        return statue.type.value >= 0 && statue.type.value < GlobalConfig.sage_statue_count ? statue.type.value + 1 : -1;
     }
 
     // 血量向下取整，客户端显示与进度条用同一个数

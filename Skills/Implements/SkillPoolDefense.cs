@@ -56,11 +56,11 @@ namespace Ros.Skill
 
         protected override void OnCast(EntityData caster)
         {
-            for (int i = 0; i < Config.power_suppress_hits; i++)
+            for (int i = 0; i < GlobalConfig.power_suppress_hits; i++)
             {
                 int hit = i;
                 if (hit == 0) Smash(caster);
-                else Timer.AddTimer(hit, _ => Smash(caster), Config.power_suppress_interval * hit, 1, false);
+                else Timer.AddTimer(hit, _ => Smash(caster), GlobalConfig.power_suppress_interval * hit, 1, false);
             }
             SendWave(caster, 0, context => context.WriteVector3(caster.transform.position));
         }
@@ -71,25 +71,25 @@ namespace Ros.Skill
             if (caster == null || !caster.Alive) return;
             Tool.BattleManager.ShootBullet(caster,
                 BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0)),
-                new SkillTrajectoryPoint(caster.transform.position, Config.power_suppress_vfx_life),
-                Config.power_suppress_vfx_life,
-                HitSpec(SkillVfxKind.RangeMagic, Config.power_suppress_vfx_index, VfxScale()));
+                new SkillTrajectoryPoint(caster.transform.position, GlobalConfig.power_suppress_vfx_life),
+                GlobalConfig.power_suppress_vfx_life,
+                HitSpec(SkillVfxKind.RangeMagic, GlobalConfig.power_suppress_vfx_index, VfxScale()));
         }
 
         public override void PlayWave(SCSkillDisplayContext context)
         {
             Vector3 center = context.ReadVector3();
-            for (int i = 0; i < Config.power_suppress_hits; i++)
+            for (int i = 0; i < GlobalConfig.power_suppress_hits; i++)
             {
                 int hit = i;
                 if (hit == 0) PlaySmash(center);
-                else Timer.AddTimer(hit, _ => PlaySmash(center), Config.power_suppress_interval * hit, 1, false);
+                else Timer.AddTimer(hit, _ => PlaySmash(center), GlobalConfig.power_suppress_interval * hit, 1, false);
             }
         }
 
         private void PlaySmash(Vector3 center)
-            => VfxHelper.PlayAt(SkillVfxKind.RangeMagic, Config.power_suppress_vfx_index, center,
-                Config.power_suppress_vfx_life, VfxScale());
+            => VfxHelper.PlayAt(SkillVfxKind.RangeMagic, GlobalConfig.power_suppress_vfx_index, center,
+                GlobalConfig.power_suppress_vfx_life, VfxScale());
     }
 
     public class SkillCrystalStatueBlazeCast : SkillBase
@@ -145,9 +145,9 @@ namespace Ros.Skill
         {
             if (caster == null || Tool.BattleManager == null) return;
             int level = Tool.BattleManager.GetZombieSpawnLevel(); // 跟随自然刷新等级
-            for (int i = 0; i < Config.summon_zombie_count; i++)
+            for (int i = 0; i < GlobalConfig.summon_zombie_count; i++)
             {
-                var type = EntityType.Zombie(UnityEngine.Random.Range(0, Config.zombie_variant_count));
+                var type = EntityType.Zombie(UnityEngine.Random.Range(0, GlobalConfig.zombie_variant_count));
                 Tool.BattleManager.SpawnEntity(type, level,
                     caster.transform.position + TargetSelect.SummonOffset(i), EntityCamp.Defense);
             }
@@ -169,9 +169,9 @@ namespace Ros.Skill
         {
             if (caster == null || Tool.BattleManager == null) return;
             int level = Tool.BattleManager.GetZombieSpawnLevel(); // 跟随自然刷新等级
-            for (int i = 0; i < Config.summon_elite_count; i++)
+            for (int i = 0; i < GlobalConfig.summon_elite_count; i++)
             {
-                var type = EntityType.EliteZombie(UnityEngine.Random.Range(0, Config.elite_zombie_variant_count));
+                var type = EntityType.EliteZombie(UnityEngine.Random.Range(0, GlobalConfig.elite_zombie_variant_count));
                 Tool.BattleManager.SpawnEntity(type, level,
                     caster.transform.position + TargetSelect.SummonOffset(i, 3f), EntityCamp.Defense);
             }
@@ -257,7 +257,7 @@ namespace Ros.Skill
                 if (target == null || target.effectController == null) continue;
                 int level = target.effectController.GetLevel(EffectType.PlagueMark);
                 if (level <= 0) continue;
-                target.OnDamaged(level * Config.plague_detonate_damage, caster, damageType: CombatLabelType.PlagueBurst);
+                target.OnDamaged(level * GlobalConfig.plague_detonate_damage, caster, damageType: CombatLabelType.PlagueBurst);
                 target.effectController.RemoveEffect(EffectType.PlagueMark);
             }
         }

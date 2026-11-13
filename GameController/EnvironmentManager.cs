@@ -1,6 +1,7 @@
-using Ros.Transport;
+﻿using Ros.Transport;
 using UnityEngine;
 
+using Ros.Config;
 public class EnvironmentManager : MonoBehaviour
 {
     public const float CycleLength = 2f;
@@ -76,8 +77,8 @@ public class EnvironmentManager : MonoBehaviour
     // 昼夜时长只来自配表 global_variables，代码里不设默认值
     private void ApplyConfigDurations()
     {
-        int day = ConfigManager.GlobalVariableConfig.day_duration;
-        int night = ConfigManager.GlobalVariableConfig.night_duration;
+        int day = GlobalVariable.I(global_variablesEnum.day_duration);
+        int night = GlobalVariable.I(global_variablesEnum.night_duration);
 
         if (day <= 0 || night <= 0)
             throw new System.InvalidOperationException("[配表] global_variables.csv 的 day_duration / night_duration 必须填大于 0 的整数");

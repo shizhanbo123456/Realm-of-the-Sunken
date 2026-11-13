@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 
+using Ros.Config;
 // 卡牌词条类型键（与 card_option.csv「类型（代码用）」列一一对应）
 public static class CardType
 {
@@ -64,19 +65,19 @@ public class CardBonus
         if (level <= 0) return;
         switch (type)
         {
-            case CardType.Luck: luck += ConfigManager.GlobalVariableConfig.card_coef_luck_boost * level; break;
-            case CardType.Health: healthPercent += ConfigManager.GlobalVariableConfig.card_coef_health_boost * level / 100f; break;
-            case CardType.Attack: attackFlat += ConfigManager.GlobalVariableConfig.card_coef_attack_boost * level; break;
-            case CardType.CritRate: critRate += ConfigManager.GlobalVariableConfig.card_coef_crit_rate_boost * level; break;
-            case CardType.CritDamage: critDamage += ConfigManager.GlobalVariableConfig.card_coef_crit_damage_boost * level; break;
-            case CardType.DamageVsPlayer: damageVsPlayer += ConfigManager.GlobalVariableConfig.card_coef_damage_vs_player * level / 100f; break;
-            case CardType.DamageVsCoral: damageVsCoral += ConfigManager.GlobalVariableConfig.card_coef_damage_vs_coral * level / 100f; break;
-            case CardType.DamageVsBuilding: damageVsBuilding += ConfigManager.GlobalVariableConfig.card_coef_damage_vs_building * level / 100f; break;
-            case CardType.TowerAttack: towerAttack += ConfigManager.GlobalVariableConfig.card_coef_tower_attack_boost * level; break;
-            case CardType.GuardReduction: guardReduction += ConfigManager.GlobalVariableConfig.card_coef_guard_reduction_boost * level / 100f; break;
-            case CardType.InstantHeal: healPercent += Mathf.RoundToInt(ConfigManager.GlobalVariableConfig.card_coef_instant_heal_boost * level); break;
-            case CardType.DamageBelowHalfHp: damageBelowHalfHp += ConfigManager.GlobalVariableConfig.card_coef_damage_below_half_hp * level / 100f; break;
-            case CardType.DamageVsHigherHp: damageVsHigherHp += ConfigManager.GlobalVariableConfig.card_coef_damage_vs_higher_hp * level / 100f; break;
+            case CardType.Luck: luck += GlobalVariable.I(global_variablesEnum.card_coef_luck_boost) * level; break;
+            case CardType.Health: healthPercent += GlobalVariable.F(global_variablesEnum.card_coef_health_boost) * level / 100f; break;
+            case CardType.Attack: attackFlat += GlobalVariable.I(global_variablesEnum.card_coef_attack_boost) * level; break;
+            case CardType.CritRate: critRate += GlobalVariable.I(global_variablesEnum.card_coef_crit_rate_boost) * level; break;
+            case CardType.CritDamage: critDamage += GlobalVariable.I(global_variablesEnum.card_coef_crit_damage_boost) * level; break;
+            case CardType.DamageVsPlayer: damageVsPlayer += GlobalVariable.F(global_variablesEnum.card_coef_damage_vs_player) * level / 100f; break;
+            case CardType.DamageVsCoral: damageVsCoral += GlobalVariable.F(global_variablesEnum.card_coef_damage_vs_coral) * level / 100f; break;
+            case CardType.DamageVsBuilding: damageVsBuilding += GlobalVariable.F(global_variablesEnum.card_coef_damage_vs_building) * level / 100f; break;
+            case CardType.TowerAttack: towerAttack += GlobalVariable.I(global_variablesEnum.card_coef_tower_attack_boost) * level; break;
+            case CardType.GuardReduction: guardReduction += GlobalVariable.F(global_variablesEnum.card_coef_guard_reduction_boost) * level / 100f; break;
+            case CardType.InstantHeal: healPercent += Mathf.RoundToInt(GlobalVariable.F(global_variablesEnum.card_coef_instant_heal_boost) * level); break;
+            case CardType.DamageBelowHalfHp: damageBelowHalfHp += GlobalVariable.F(global_variablesEnum.card_coef_damage_below_half_hp) * level / 100f; break;
+            case CardType.DamageVsHigherHp: damageVsHigherHp += GlobalVariable.F(global_variablesEnum.card_coef_damage_vs_higher_hp) * level / 100f; break;
             case CardType.SkillB:
             case CardType.SkillA:
             case CardType.SkillS:

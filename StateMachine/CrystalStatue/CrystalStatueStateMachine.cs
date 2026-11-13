@@ -42,7 +42,7 @@ public class CrystalStatueStateMachine : DecisionMachine, IBehaviorHost
     private bool SkillReady => IsSkillReady(CurrentSkillId);
 
     private bool HasEnemyInRange() =>
-        BattleManager.EntityContainer.GetNearestEnemy(Owner, Config.crystal_statue_attack_range) != null;
+        BattleManager.EntityContainer.GetNearestEnemy(Owner, GlobalConfig.crystal_statue_attack_range) != null;
 
     private void RequestIdle() => arbiter.RequestIdle();
 

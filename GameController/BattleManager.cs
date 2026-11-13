@@ -5,6 +5,7 @@ using TerrainGen;
 using UnityEngine;
 using UnityEngine.Profiling;
 
+using Ros.Config;
 public partial class BattleManager : EnsBehaviour
 {
     private void Awake()
@@ -108,15 +109,15 @@ public partial class BattleManager : EnsBehaviour
         // 索敌：夹角 <= skill_target_no_sector = 不索敌；> skill_target_full_sector = 不限方向；半径 > skill_target_unlimited_radius = 不限距离
         public static EntityData GetNearestEnemy(EntityData entity, float radius, float sectorHalfAngle)
         {
-            if (entity == null || sectorHalfAngle <= Config.skill_target_no_sector) return null;
+            if (entity == null || sectorHalfAngle <= GlobalConfig.skill_target_no_sector) return null;
             Vector3 pos = entity.transform.position;
             Vector3 fwd = entity.transform.forward;
             fwd.y = 0f;
-            bool inSector = sectorHalfAngle <= Config.skill_target_full_sector;
+            bool inSector = sectorHalfAngle <= GlobalConfig.skill_target_full_sector;
             if (inSector && fwd.sqrMagnitude < 1e-6f) return null; // 朝向退化时不猜方向
             fwd.Normalize();
             float cosLimit = inSector ? Mathf.Cos(sectorHalfAngle * Mathf.Deg2Rad) : -1f;
-            bool unlimited = radius > Config.skill_target_unlimited_radius;
+            bool unlimited = radius > GlobalConfig.skill_target_unlimited_radius;
             float sqrLimit = unlimited ? float.MaxValue : radius * radius;
 
             s_buffer.Clear();
@@ -204,7 +205,7 @@ public partial class BattleManager : EnsBehaviour
         }
         ushort id = reservedId;
         // 人形判定走预制体是否挂 EntityAnim（项目唯一口径）：人形离地抬升，出生点给的是地面高度，直接落上去会卡进地面
-        if (prefab.GetComponentInChildren<EntityAnim>(true) != null) pos.y += Config.entity_spawn_rise;
+        if (prefab.GetComponentInChildren<EntityAnim>(true) != null) pos.y += GlobalConfig.entity_spawn_rise;
         var go = Instantiate(prefab, pos, Quaternion.identity);
         // EntityData 不挂预制体（图形预制体自带表现），生成时按类别补上对应子类
         var data = go.GetComponent<EntityData>();
@@ -219,7 +220,7 @@ public partial class BattleManager : EnsBehaviour
         // 初始技能表按实体类型统一赋（来源 entity.csv 初始技能列表列）：玩家角色与非玩家单位（僵尸/精英/雕像）同一条路径，
         // 表里没配即为空表
         if (data.skillController != null)
-            data.skillController.SetSkillList(ConfigManager.EntityConfig.GetByCategory(type).initialSkills);
+            data.skillController.SetSkillList(EntityConfig.GetByCategory(type).initialSkills);
         ApplyMinimapLostOnSpawn(data); // 夜间出生/复活：补上「小地图失联」（昼夜事件只在翻转那一刻遍历）
         AddToContainer(data);
         reservedEntityIds.Remove(id); // 已实体化，不再占用预留位
@@ -234,7 +235,7 @@ public partial class BattleManager : EnsBehaviour
         do
         {
             nextEntityId++;
-            if (nextEntityId > Config.entity_id_max) nextEntityId = 1;
+            if (nextEntityId > GlobalConfig.entity_id_max) nextEntityId = 1;
         } while (EntityContainer.Entities.Contains(nextEntityId) || reservedEntityIds.Contains(nextEntityId));
         return nextEntityId;
     }
@@ -342,8 +343,8 @@ public partial class BattleManager : EnsBehaviour
     // 名字按字符数裁剪：超上限截断，不足下限用默认名兜底（客户端已有同样限制，这里防绕过）
     private static void NormalizeName(CSLobbyPlayerInfo info, int clientId)
     {
-        int max = ConfigManager.GlobalVariableConfig.name_length_max;
-        int min = ConfigManager.GlobalVariableConfig.name_length_min;
+        int max = GlobalVariable.I(global_variablesEnum.name_length_max);
+        int min = GlobalVariable.I(global_variablesEnum.name_length_min);
         string name = (info.name ?? "").Trim();
         if (name.Length > max) name = name.Substring(0, max);
         info.name = name.Length < min ? $"玩家{clientId}" : name;
@@ -413,11 +414,11 @@ public partial class BattleManager : EnsBehaviour
         };
         if (camp == PlayerCampType.Attack)
         {
-            info.attackCharacter = EntityType.Attack(UnityEngine.Random.Range(0, Config.attack_character_count));
+            info.attackCharacter = EntityType.Attack(UnityEngine.Random.Range(0, GlobalConfig.attack_character_count));
         }
         else
         {
-            info.defenseCharacter = EntityType.Defense(UnityEngine.Random.Range(0, Config.defense_character_count));
+            info.defenseCharacter = EntityType.Defense(UnityEngine.Random.Range(0, GlobalConfig.defense_character_count));
         }
         PlayerInfoList[robotClientId] = info;
         PlayerCamps[robotClientId] = camp;
@@ -438,8 +439,8 @@ public partial class BattleManager : EnsBehaviour
         SetReady(clientId, update.ready);
 
         // AI 数量：房间共享，任意玩家可编辑，上限按配表钳制。数量变化时重建 AI 玩家（= AI 进场随机选角）
-        int attackAI = Mathf.Clamp(update.attackAICount, 0, ConfigManager.GlobalVariableConfig.player_limit_attacker_AI);
-        int defenseAI = Mathf.Clamp(update.defenseAICount, 0, ConfigManager.GlobalVariableConfig.player_limit_defenser_AI);
+        int attackAI = Mathf.Clamp(update.attackAICount, 0, GlobalVariable.I(global_variablesEnum.player_limit_attacker_AI));
+        int defenseAI = Mathf.Clamp(update.defenseAICount, 0, GlobalVariable.I(global_variablesEnum.player_limit_defenser_AI));
         if (attackAI != AttackAICount || defenseAI != DefenseAICount)
         {
             AttackAICount = attackAI;
@@ -455,8 +456,8 @@ public partial class BattleManager : EnsBehaviour
     {
         if (PlayerCamps.TryGetValue(clientId, out var current) && current == camp) return true;
         int limit = camp == PlayerCampType.Attack
-            ? ConfigManager.GlobalVariableConfig.player_limit_attacker
-            : ConfigManager.GlobalVariableConfig.player_limit_defenser;
+            ? GlobalVariable.I(global_variablesEnum.player_limit_attacker)
+            : GlobalVariable.I(global_variablesEnum.player_limit_defenser);
         int count = 0;
         foreach (var pair in PlayerCamps)
         {
@@ -498,7 +499,7 @@ public partial class BattleManager : EnsBehaviour
             return;
         }
         SendPromptToAll(28); // 全员已准备，战斗即将开始
-        startCountdownHandle = Timer.AddTimer(0, _ => TryFireStartBattle(), ConfigManager.GlobalVariableConfig.ready_start_delay, 1, false);
+        startCountdownHandle = Timer.AddTimer(0, _ => TryFireStartBattle(), GlobalVariable.F(global_variablesEnum.ready_start_delay), 1, false);
     }
 
     // 业务取消：置空句柄并让已注册任务作废，重开倒计时才是全新计时
@@ -772,7 +773,7 @@ public partial class BattleManager : EnsBehaviour
         EntityData sender = GetEntityOfClient(senderClientId);
         if (sender == null) return;
 
-        float radius = ConfigManager.GlobalVariableConfig.chat_nearby_radius;
+        float radius = GlobalVariable.F(global_variablesEnum.chat_nearby_radius);
         Vector3 from = sender.transform.position;
         foreach (int targetClientId in PlayerInfoList.Keys)
         {
@@ -899,7 +900,7 @@ public partial class BattleManager : EnsBehaviour
     {
         EntityCamp hostile = EntityCampUtil.HostileOf(self.type.category);
         EntityContainer.Entities.GetIdsInRange(self.transform.position,
-            ConfigManager.GlobalVariableConfig.entity_character_visiable_radius, s_hostileBuffer);
+            GlobalVariable.F(global_variablesEnum.entity_character_visiable_radius), s_hostileBuffer);
 
         int count = 0;
         foreach (int id in s_hostileBuffer)
@@ -967,7 +968,7 @@ public partial class BattleManager : EnsBehaviour
 
     public float DefenseScore()
     {
-        return StatueRemainingHealth() * (1f + Config.kill_score_factor * DefenseKills);
+        return StatueRemainingHealth() * (1f + GlobalConfig.kill_score_factor * DefenseKills);
     }
 
     #endregion
@@ -995,7 +996,7 @@ public partial class BattleManager : EnsBehaviour
         if (!EntityContainer.Entities.TryGetObject(entityId, out var entity)) return;
         // 连招窗口内的普攻：不重新起手，直接让动画接下一段（下一段的攻击帧自己会再结算一次技能）
         // 必须放在所有输入阻断之前：窗口内设 Combo 不接受任何阻断（AI 接管、攻击动画期间一律放行）
-        if (skillId == Config.unarmed_punch && entity.anim != null && entity.anim.AllowCombo)
+        if (skillId == GlobalConfig.unarmed_punch && entity.anim != null && entity.anim.AllowCombo)
         {
             entity.anim.DoCombo();
             return;
@@ -1061,7 +1062,7 @@ public partial class BattleManager : EnsBehaviour
         }
 
         BattleStarted = true;
-        BattleRemainTime = ConfigManager.GlobalVariableConfig.battle_duration;
+        BattleRemainTime = GlobalVariable.F(global_variablesEnum.battle_duration);
         if (Tool.EnvironmentManager != null)
         {
             Tool.EnvironmentManager.ResetDayNight();
@@ -1079,13 +1080,13 @@ public partial class BattleManager : EnsBehaviour
         ClearBattleState();
 
         // 周期任务计时器：开战重建，间隔取自配表（配表启动后不再变，构造时固化）
-        syncTicker = new Ticker(Config.entity_sync_interval_fast);
-        detailsTicker = new Ticker(Config.entity_sync_interval_details);
-        dayNightTicker = new Ticker(Config.daynight_sync_interval);
-        minimapTicker = new Ticker(Config.minimap_sync_interval);
-        zombieSpawnTicker = new Ticker(ConfigManager.GlobalVariableConfig.zombie_spawn_attempt_interval);
-        coralSpawnTicker = new Ticker(ConfigManager.GlobalVariableConfig.coral_spawn_attempt_interval);
-        fallCheckTicker = new Ticker(Config.entity_fall_check_interval);
+        syncTicker = new Ticker(GlobalConfig.entity_sync_interval_fast);
+        detailsTicker = new Ticker(GlobalConfig.entity_sync_interval_details);
+        dayNightTicker = new Ticker(GlobalConfig.daynight_sync_interval);
+        minimapTicker = new Ticker(GlobalConfig.minimap_sync_interval);
+        zombieSpawnTicker = new Ticker(GlobalVariable.F(global_variablesEnum.zombie_spawn_attempt_interval));
+        coralSpawnTicker = new Ticker(GlobalVariable.F(global_variablesEnum.coral_spawn_attempt_interval));
+        fallCheckTicker = new Ticker(GlobalConfig.entity_fall_check_interval);
 
         // 玩家实体重与 AI 同路径（AI clientId 为负虚拟 id），仅输入来源不同：真人 CSPlayerInput、AI UpdateAI
         foreach (var pair in PlayerInfoList)
@@ -1232,7 +1233,7 @@ public partial class BattleManager : EnsBehaviour
         Profiler.EndSample(); // kTimerTag
 
         // 昼夜推进（服务器权威，见策划案 13 章）：周期值在 [0,2) 循环（0/2 午夜、1 正午），方向由周期值推导。
-        // 时长或时间被改动时立即补发快照；此外每 Config.daynight_sync_interval 秒心跳一次，兜底两端漂移
+        // 时长或时间被改动时立即补发快照；此外每 GlobalConfig.daynight_sync_interval 秒心跳一次，兜底两端漂移
         Profiler.BeginSample(kDayNightTag);
         if (Tool.EnvironmentManager != null)
         {
@@ -1329,7 +1330,7 @@ public partial class BattleManager : EnsBehaviour
         if (syncTicker) SyncEntitiesToClients(detailsTicker.Tick());
         Profiler.EndSample(); // kSyncEntitiesTag
 
-        // 小地图同步（阵营共享视野，独立节流，见 Config.minimap_sync_interval）
+        // 小地图同步（阵营共享视野，独立节流，见 GlobalConfig.minimap_sync_interval）
         Profiler.BeginSample(kSyncMinimapTag);
         if (minimapTicker) SyncMinimapToClients();
         Profiler.EndSample(); // kSyncMinimapTag
