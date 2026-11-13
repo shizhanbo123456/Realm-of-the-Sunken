@@ -54,6 +54,13 @@ public class LobbyPage : PageBase
         EventManager.RemoveEvent<SCLobbyInfo>(ClientEvent.OnLobbyInfoUpdate, OnLobbyInfoUpdate);
     }
 
+    // 换分辨率后 UIScale 与相机投影都变了，阵营面板要按新投影重新落位
+    public override void OnResize(float width, float height)
+    {
+        base.OnResize(width, height);
+        AlignCampPanels();
+    }
+
     #region//Local
     // 两块阵营面板按 Arranger 的 UIPos 世界坐标投影落位（对齐点由 FGUI 里的 pivot 决定，这里只管位置）
     private void AlignCampPanels()
