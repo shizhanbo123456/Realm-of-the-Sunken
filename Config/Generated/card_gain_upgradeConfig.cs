@@ -24,7 +24,7 @@ namespace Ros.Config
                 {
                     card_gain_upgrade row;
                     row.key = r.ReadInt32();
-                    row.postUpgradeLevelSingleDigit = ConfigBinary.ReadString(r);
+                    row.postUpgradeLevelSingleDigit = r.ReadInt32();
                     row.silverCardWeight = r.ReadInt32();
                     row.GoldCardWeight = r.ReadInt32();
                     row.ColourfulCardWeight = r.ReadInt32();
@@ -36,7 +36,7 @@ namespace Ros.Config
     public struct card_gain_upgrade
     {
         public int key;  // 主键
-        public string postUpgradeLevelSingleDigit;  // 升级后的等级的个位数
+        public int postUpgradeLevelSingleDigit;  // 升级后的等级的个位数
         public int silverCardWeight;  // 白银卡权重
         public int GoldCardWeight;  // 黄金卡权重
         public int ColourfulCardWeight;  // 炫彩卡权重

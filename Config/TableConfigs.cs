@@ -169,7 +169,7 @@ namespace Ros.Config
             foreach (card_gain_upgrade row in m.card_gain_upgradeData.Values)
             {
                 content.Add(row.key, row);
-                weightsByDigit[int.Parse(row.postUpgradeLevelSingleDigit, System.Globalization.CultureInfo.InvariantCulture)] = new[] { row.silverCardWeight, row.GoldCardWeight, row.ColourfulCardWeight };
+                weightsByDigit[row.postUpgradeLevelSingleDigit] = new[] { row.silverCardWeight, row.GoldCardWeight, row.ColourfulCardWeight };
             }
         }
 
