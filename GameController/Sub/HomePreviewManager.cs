@@ -15,29 +15,26 @@ public class HomePreviewManager : ClientSubManager
     private readonly Dictionary<EntityType, List<GameObject>> pool = new();   // 复用池：类型 → 可用视图
     private HomeDisplayArranger homeStage;
     private LobbyDisplayArranger lobbyStage;
-    private GameObject attackerView;
-    private GameObject defenserView;
+    private GameObject homeView;
 
-    // 首页：复制 Home Arranger（已复制则复用）并只摆当前选中的攻/守各一个
-    public void RefreshHome(int attackIndex, int defenseIndex)
+    // 首页：复制 Home Arranger（已复制则复用）并在 CharacterAnchor 摆一个角色
+    public void RefreshHome(EntityType type)
     {
         var stage = HomeStage();
         if (stage == null) return;
         slots.Clear();
-        slots.Add((EntityType.Attack(attackIndex), stage.AttackerAnchor));
-        slots.Add((EntityType.Defense(defenseIndex), stage.DefenserAnchor));
+        slots.Add((type, stage.CharacterAnchor));
         var got = Apply();
-        attackerView = got.Length > 0 ? got[0] : null;
-        defenserView = got.Length > 1 ? got[1] : null;
+        homeView = got.Length > 0 ? got[0] : null;
     }
 
-    // 首页选角：相机留在 CameraPos，原地转向该阵营角色的胸口锚点
-    public void LookAtHome(PlayerCampType camp)
+    // 首页选角：相机留在 CameraPos，原地转向展示角色的胸口锚点
+    public void LookAtHome()
     {
         var stage = HomeStage();
         var cam = Tool.CameraController;
         if (stage == null || cam == null) return;
-        var view = camp == PlayerCampType.Defense ? defenserView : attackerView;
+        var view = homeView;
         if (view == null) return; // 模型缺失已由 AddView 报错
         var model = view.GetComponentInChildren<EntityModelInfo>();
         var anim = view.GetComponentInChildren<EntityAnim>();
@@ -230,8 +227,7 @@ public class HomePreviewManager : ClientSubManager
         views.Clear();
         pool.Clear();
         slots.Clear();
-        attackerView = null;
-        defenserView = null;
+        homeView = null;
     }
     #endregion
 }

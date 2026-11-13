@@ -44,6 +44,7 @@ public class HomePage : PageBase
     public override void Enter(ShowParam param)
     {
         base.Enter(param);
+        selectedSaveIndex = ClientSelection.homeDisplayedSaveIndex;
         RefreshPlayerName();
         Refresh();
         RefreshPreview();
@@ -247,6 +248,7 @@ public class HomePage : PageBase
         if (IsDefense(saveIndex)) ClientSelection.selectedDefenseIndex = saveIndex - Config.attack_character_count;
         else ClientSelection.selectedAttackIndex = saveIndex;
         selectedSaveIndex = saveIndex;
+        ClientSelection.homeDisplayedSaveIndex = saveIndex;
         Refresh();
         RefreshPreview();
     }
@@ -315,8 +317,12 @@ public class HomePage : PageBase
     // 选中角色变化后重建场景里的预览模型
     private void RefreshPreview()
     {
-        if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
-            Tool.ClientLogicManager.HomePreview.RefreshHome(ClientSelection.selectedAttackIndex, ClientSelection.selectedDefenseIndex);
+        if (Tool.ClientLogicManager == null || Tool.ClientLogicManager.HomePreview == null) return;
+        int saveIndex = selectedSaveIndex;
+        var type = IsDefense(saveIndex)
+            ? EntityType.Defense(saveIndex - Config.attack_character_count)
+            : EntityType.Attack(saveIndex);
+        Tool.ClientLogicManager.HomePreview.RefreshHome(type);
     }
 
     private async void OnConnectClicked()

@@ -4,11 +4,10 @@ using UnityEngine;
 public class HomeDisplayArranger : MonoBehaviour
 {
     public Transform CameraPos;
-    public Transform AttackerAnchor;
-    public Transform DefenserAnchor;
+    public Transform CharacterAnchor;
     private void Awake()
     {
-        if (CameraPos == null || AttackerAnchor == null || DefenserAnchor == null)
+        if (CameraPos == null || CharacterAnchor == null)
         {
             throw new System.Exception();
         }
