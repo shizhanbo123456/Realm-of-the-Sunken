@@ -59,7 +59,7 @@ public static class EntityAnchorExtensions
                 case EntityAnchor.Chest: return anim.GetBoneTransform(HumanBodyBones.Chest).ToAnchorInfo(entityRot);
                 case EntityAnchor.WeaponHipLeft: return WeaponMount(anim.GetBoneTransform(HumanBodyBones.Hips), entityRot, new Vector3(-HalfWidth(model) - WeaponHipSideExtra, WeaponHipHeight, WeaponHipForward), WeaponHipTilt);
                 case EntityAnchor.WeaponHipRight: return WeaponMount(anim.GetBoneTransform(HumanBodyBones.Hips), entityRot, new Vector3(HalfWidth(model) + WeaponHipSideExtra, WeaponHipHeight, WeaponHipForward), WeaponHipTilt);
-                case EntityAnchor.WeaponBack: return WeaponMount(anim.GetBoneTransform(HumanBodyBones.Chest), entityRot, new Vector3(0f, -0.05f, model.zRange.x - 0.08f), WeaponBackTilt);
+                case EntityAnchor.WeaponBack: return WeaponMount(anim.GetBoneTransform(HumanBodyBones.Chest), entityRot, new Vector3(0f, 0.2f, model.zRange.x + 0.2f), WeaponBackTilt);
 
                 case EntityAnchor.Bar: 
                     {
