@@ -3,7 +3,7 @@ using FairyGUI;
 using Ros.UI.Main;
 using UnityEngine;
 
-// 首页：角色混排列表（攻 0~5 / 守 6~11）+ 属性面板 + 连接；改名改为点击玩家名进入
+// 首页：攻/守分页角色列表 + 属性面板 + 改名弹窗 + 连接
 public class HomePage : PageBase
 {
     private static readonly string[] StatKeys = { "生命", "攻击", "暴击", "暴伤", "视野", "技能槽" };
@@ -26,10 +26,13 @@ public class HomePage : PageBase
     {
         var selection = panel.m_character_selection_panel;
         selection.m_characterList.itemRenderer = RenderCharacter;
+        selection.m_tab_attacker.onClick.Add(() => SwitchCamp(false));
+        selection.m_tab_defenser.onClick.Add(() => SwitchCamp(true));
 
-        // 玩家改名：新版首页没有改名按钮，改为点击名字
+        // 玩家改名：按钮与名字都可点
         panel.m_playerInfo.m_label_playerName.touchable = true;
         panel.m_playerInfo.m_label_playerName.onClick.Add(OpenRename);
+        panel.m_playerInfo.m_btn_editName.onClick.Add(OpenRename);
         BuildRenamePanel();
 
         panel.m_character_attr_panel.m_btn_select_character.onClick.Add(ConfirmSelection);
@@ -45,6 +48,7 @@ public class HomePage : PageBase
     {
         base.Enter(param);
         selectedSaveIndex = ClientSelection.homeDisplayedSaveIndex;
+        defenseTab = IsDefense(selectedSaveIndex);
         RefreshPlayerName();
         Refresh();
         RefreshPreview();
@@ -184,23 +188,42 @@ public class HomePage : PageBase
         item.m_des.text = entry.description;
     }
 
-    // 列表是攻/守混排：0~5 进攻、6~11 防守，下标直接当存档下标用
-    private static int CharacterCount => Config.attack_character_count + Config.defense_character_count;
-
+    // 存档下标：0~5 进攻、6~11 防守；页签只列其中一侧
     private static bool IsDefense(int saveIndex) => saveIndex >= Config.attack_character_count;
 
-    // 当前展示的角色（攻/守共用一条列表）；两侧的选择各自记在 ClientSelection 里，上报时用到
+    private bool defenseTab;
+
+    // 当前浏览的角色；两侧真正选中的下标各自记在 ClientSelection 里
     private int selectedSaveIndex;
+
+    private int CampOffset => defenseTab ? Config.attack_character_count : 0;
+
+    // 本阵营已选角色的存档下标
+    private int ChosenSaveIndex => CampOffset + (defenseTab ? ClientSelection.selectedDefenseIndex : ClientSelection.selectedAttackIndex);
 
     private void Refresh()
     {
         var selection = panel.m_character_selection_panel;
-        selection.m_characterList.numItems = CharacterCount;
-        selection.m_current_selected_camp.selectedIndex = IsDefense(selectedSaveIndex) ? 1 : 0;
-        panel.m_character_attr_panel.m_character_selcted.selectedIndex = 1;
+        int count = defenseTab ? Config.defense_character_count : Config.attack_character_count;
+        selection.m_current_selected_camp.selectedIndex = defenseTab ? 1 : 0;
+        selection.m_tab_attacker.selected = !defenseTab;
+        selection.m_tab_defenser.selected = defenseTab;
+        selection.m_characterList.numItems = count;
+        // numItems 不变时 FGUI 不重绘已有条目，切页签与选中变化都要手动重画
+        for (int i = 0; i < count; i++) RenderCharacter(i, selection.m_characterList.GetChildAt(i));
+
+        panel.m_character_attr_panel.m_character_selcted.selectedIndex = selectedSaveIndex == ChosenSaveIndex ? 1 : 0;
         RefreshAttrList();
         RefreshSpecialAbilities();
         RefreshCharacterInfo();
+    }
+
+    // 切阵营后回到该阵营已选角色
+    private void SwitchCamp(bool defense)
+    {
+        if (defenseTab == defense) return;
+        defenseTab = defense;
+        Browse(ChosenSaveIndex);
     }
 
     // 特殊能力：初始技能（攻守都有）+ 防守方被动（暂无配表，见 GuideCatalog）
@@ -222,31 +245,27 @@ public class HomePage : PageBase
     private void RenderCharacter(int index, GObject obj)
     {
         var head = (UI_RoleHead)obj;
-        ConfigManager.EntityConfig info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(index) : default;
+        int saveIndex = CampOffset + index;
+        ConfigManager.EntityConfig info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
 
-        head.m_roleName.text = DisplayName(info, index);
+        head.m_roleName.text = DisplayName(info, saveIndex);
 
         // 头像：图标列表未导入或下标越界时置空
         var icons = Tool.AssetsManager == null ? null
-            : IsDefense(index) ? Tool.AssetsManager.DefenseCharacterIcons : Tool.AssetsManager.AttackCharacterIcons;
-        int iconIndex = IsDefense(index) ? index - Config.attack_character_count : index;
-        bool hasIcon = icons != null && iconIndex < icons.Count && icons[iconIndex] != null;
-        head.m_headIcon.texture = hasIcon ? new NTexture(icons[iconIndex]) : null;
+            : defenseTab ? Tool.AssetsManager.DefenseCharacterIcons : Tool.AssetsManager.AttackCharacterIcons;
+        bool hasIcon = icons != null && index < icons.Count && icons[index] != null;
+        head.m_headIcon.texture = hasIcon ? new NTexture(icons[index]) : null;
         head.m_lock.selectedIndex = 0; // 全角色默认解锁
-        head.m_confirm.selectedIndex = index == selectedSaveIndex ? 1 : 0;
+        head.m_confirm.selectedIndex = saveIndex == ChosenSaveIndex ? 1 : 0;
 
-        // 点击选中（FGUI onClick 为追加制，先清后加以防列表复用叠加）
+        // 点击浏览（FGUI onClick 为追加制，先清后加以防列表复用叠加）
         head.onClick.Set(() => { });
-        head.onClick.Add(() =>
-        {
-            Select(index);
-        });
+        head.onClick.Add(() => Browse(saveIndex));
     }
 
-    private void Select(int saveIndex)
+    // 只切换展示与预览，不写出场选择；确认按钮才落 ClientSelection
+    private void Browse(int saveIndex)
     {
-        if (IsDefense(saveIndex)) ClientSelection.selectedDefenseIndex = saveIndex - Config.attack_character_count;
-        else ClientSelection.selectedAttackIndex = saveIndex;
         selectedSaveIndex = saveIndex;
         ClientSelection.homeDisplayedSaveIndex = saveIndex;
         Refresh();
@@ -255,6 +274,10 @@ public class HomePage : PageBase
 
     private void ConfirmSelection()
     {
+        int localIndex = selectedSaveIndex - CampOffset;
+        if (defenseTab) ClientSelection.selectedDefenseIndex = localIndex;
+        else ClientSelection.selectedAttackIndex = localIndex;
+        Refresh();
         if (Tool.UIManager != null)
             Tool.UIManager.ShowFlyText($"已选择 {panel.m_label_character_name.text}");
     }
@@ -293,11 +316,10 @@ public class HomePage : PageBase
     {
         int saveIndex = selectedSaveIndex;
         ConfigManager.EntityConfig info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
-        int iconIndex = IsDefense(saveIndex) ? saveIndex - Config.attack_character_count : saveIndex;
-        panel.m_label_character_name.text = DisplayName(info, iconIndex);
+        panel.m_label_character_name.text = DisplayName(info, saveIndex);
     }
 
-    // 列表条目与右侧标题共用一个名字口径：配表没名字时退回「进攻/防守角色 + 页内下标」
+    // 列表条目与右侧标题共用一个名字口径：配表没名字时退回「进攻/防守角色 + 阵营内下标」
     private static string DisplayName(ConfigManager.EntityConfig info, int saveIndex)
     {
         if (!string.IsNullOrEmpty(info.name)) return info.name;
@@ -314,7 +336,7 @@ public class HomePage : PageBase
         };
     }
 
-    // 选中角色变化后重建场景里的预览模型
+    // 浏览角色变化后重建场景里的预览模型
     private void RefreshPreview()
     {
         if (Tool.ClientLogicManager == null || Tool.ClientLogicManager.HomePreview == null) return;
