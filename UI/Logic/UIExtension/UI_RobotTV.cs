@@ -12,6 +12,7 @@ namespace Ros.UI.Main
         private const int TriggerIdleAnim = 1; // 待机动画
         private const int TriggerPress = 2;    // 按钮
         private const int TriggerIdleHold = 3; // 待机
+        private const float EnterDelay = 2f;   // 进入游戏后延迟播放开场动画
 
         private enum Stage
         {
@@ -35,6 +36,8 @@ namespace Ros.UI.Main
         private int frameIndex;
         private float frameTimer;
         private bool constructed;
+        private bool pendingEnter;
+        private float enterDelayTimer;
 
         // 创建后调用一次：聚合配表、接管点击、播开场
         public void Construct()
@@ -42,7 +45,8 @@ namespace Ros.UI.Main
             BuildClips();
             onClick.Add(OnTapped);
             constructed = true;
-            Play(Pick(TriggerEnter), Stage.Enter);
+            pendingEnter = true;
+            enterDelayTimer = EnterDelay;
         }
 
         public void Shutdown()
@@ -51,11 +55,25 @@ namespace Ros.UI.Main
             onClick.Remove(OnTapped);
             constructed = false;
             current = null;
+            pendingEnter = false;
         }
 
         public void Tick(float dt)
         {
-            if (!constructed || current == null) return;
+            if (!constructed) return;
+
+            if (pendingEnter)
+            {
+                enterDelayTimer -= dt;
+                if (enterDelayTimer <= 0f)
+                {
+                    pendingEnter = false;
+                    Play(Pick(TriggerEnter), Stage.Enter);
+                }
+                return;
+            }
+
+            if (current == null) return;
 
             frameTimer -= dt;
             if (frameTimer > 0f) return;

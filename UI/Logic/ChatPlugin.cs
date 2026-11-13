@@ -77,7 +77,7 @@ public class ChatPlugin
         EventManager.RemoveEvent(ClientEvent.OnRestartGame, OnLeaveRoom);
     }
 
-    //与页面同规则的整体缩放（设计高度 1080）；贴屏幕左侧中点
+    //与页面同规则的整体缩放（设计高度 1080）；贴屏幕左下角
     public void OnResize(float uiScale)
     {
         this.uiScale = uiScale;
@@ -87,8 +87,8 @@ public class ChatPlugin
     #region//Local
     private void ApplyTransform()
     {
-        panel.scale = new Vector2(uiScale, uiScale);
-        panel.SetXY(0f, GRoot.inst.height * 0.5f);
+            panel.scale = new Vector2(uiScale, uiScale);
+            panel.SetXY(0f, GRoot.inst.height - panel.height * uiScale); // x 贴左边缘，y 贴屏幕底
     }
 
     private void OnConnect()
