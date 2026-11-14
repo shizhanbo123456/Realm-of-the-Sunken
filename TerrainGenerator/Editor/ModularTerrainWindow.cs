@@ -158,6 +158,14 @@ namespace TerrainGen.EditorTools
         void Rebuild()
         {
             report.Clear();
+            if (!EnsureConfig(out string configError))
+            {
+                summary = "预览失败：" + configError;
+                summaryIsError = true;
+                Log(summary);
+                return;
+            }
+
             field = new BuildingField();
             field.Generate(settings);
             dirty = false;
@@ -589,29 +597,30 @@ namespace TerrainGen.EditorTools
             return false;
         }
 
-        // 编辑器非播放态 ConfigManager.Awake 不会跑，配表静态字段还是 0 时整张图会塌到原点
+        // 编辑器非播放态 ConfigManager.Awake 不会跑，配表没加载时静态包装层会直接抛「未加载」
         static bool EnsureConfig(out string error)
         {
-            if (TerrainGeneration.F(terrain_generationEnum.cell_size) > 0f)
+            if (!Ros.Config.ConfigManager.Loaded)
             {
-                error = string.Empty;
-                return true;
+                try
+                {
+                    Ros.Config.ConfigManager.EnsureLoaded();
+                }
+                catch (System.Exception e)
+                {
+                    error = "配表加载失败：" + e.Message;
+                    return false;
+                }
             }
 
-            try
+            if (!Ros.Config.ConfigManager.Loaded)
             {
-                Ros.Config.ConfigManager.EnsureLoaded();
-            }
-            catch (System.Exception e)
-            {
-                error = "配表加载失败：" + e.Message;
+                error = "配表初始化没有完成，terrain_generation 不可用";
                 return false;
             }
 
-            error = TerrainGeneration.F(terrain_generationEnum.cell_size) > 0f
-                ? string.Empty
-                : "terrain_generation 配表里没有有效数据";
-            return error.Length == 0;
+            error = string.Empty;
+            return true;
         }
 
         void ClearScene()

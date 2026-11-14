@@ -25,13 +25,23 @@ namespace Ros.Config
             Debug.Log("[配表] 加载完成 | " + Summary());
         }
 
-        // 编辑器工具在非播放态也要读配表（Awake 不会跑）
+        // 编辑器工具在非播放态也要读配表（Awake 不会跑）：优先复用场景里已有的 ConfigManager，
+        // 没有才建一个不参与保存的临时宿主
         public static ConfigManager EnsureLoaded()
         {
             if (Instance == null)
             {
-                var host = new GameObject("[ConfigManager]") { hideFlags = HideFlags.HideAndDontSave };
-                Instance = host.AddComponent<ConfigManager>();
+                ConfigManager scene = FindObjectOfType<ConfigManager>();
+                if (scene != null)
+                {
+                    Instance = scene;
+                    Tool.ConfigManager = scene;
+                }
+                else
+                {
+                    var host = new GameObject("[ConfigManager]") { hideFlags = HideFlags.HideAndDontSave };
+                    Instance = host.AddComponent<ConfigManager>();
+                }
             }
             Instance.Init();
             return Instance;
