@@ -6,15 +6,16 @@ using UnityEngine;
 namespace TerrainGen.EditorTools
 {
     // 只维护素材预制体根上的一个“尺寸盒”（禁用的 BoxCollider），生成期靠它 O(1) 量尺寸；
-    // 预制体里其它碰撞体（手摆的激活碰撞体）一律不碰
+    // 预制体里其它碰撞体（手摆的激活碰撞体）一律不碰：不删除、不禁用、不改尺寸
     public static class ColliderPreprocessor
     {
         const string KitPath = "Assets/Scripts/TerrainGenerator/Config/BuildingKitSet.asset";
 
         enum Mode
         {
-            BoxDisabled,  // 根物体写一个禁用 BoxCollider，只供生成器量尺寸，场景里不参与物理
-            NoBounds      // 不加尺寸盒，预制体完全不动
+            BoxDisabled,           // 根物体写一个禁用 BoxCollider，只供生成器量尺寸，场景里不参与物理
+            BoxDisabledExclusive,  // 同 BoxDisabled，但根物体已有激活 BoxCollider 时视为素材错误：报错跳过，不覆盖也不禁用
+            NoBounds               // 不加尺寸盒，预制体完全不动
         }
 
         struct Entry
@@ -43,7 +44,7 @@ namespace TerrainGen.EditorTools
             new Entry("灌木", k => k.bushes, Mode.BoxDisabled),
             new Entry("摆件", k => k.props, Mode.BoxDisabled),
             new Entry("藤蔓", k => k.vines, Mode.NoBounds),
-            new Entry("障碍", k => k.obstacles, Mode.BoxDisabled),
+            new Entry("障碍", k => k.obstacles, Mode.BoxDisabledExclusive),
             new Entry("障碍装饰", k => k.obstacleDecorations, Mode.NoBounds),
             new Entry("漂浮装饰", k => k.floatingDecorations, Mode.NoBounds),
             new Entry("鱼群", k => k.fishSchools, Mode.NoBounds),
@@ -195,8 +196,17 @@ namespace TerrainGen.EditorTools
                 }
 
                 // 只维护根上这一个尺寸盒，永远禁用；预制体里其它碰撞体（手摆的激活碰撞体）一律不碰
-                var box = root.GetComponent<BoxCollider>();
-                if (box == null) box = root.AddComponent<BoxCollider>();
+                BoxCollider box;
+                if (mode == Mode.BoxDisabledExclusive)
+                {
+                    box = GetExclusiveBox(path, root);
+                    if (box == null) return false;
+                }
+                else
+                {
+                    box = root.GetComponent<BoxCollider>();
+                    if (box == null) box = root.AddComponent<BoxCollider>();
+                }
                 box.center = bounds.center;
 
                 // 零厚度轴（贴片类素材）给个极小厚度，避免出现无效尺寸
@@ -219,6 +229,30 @@ namespace TerrainGen.EditorTools
                 PrefabUtility.UnloadPrefabContents(root);
             }
             return ok;
+        }
+
+        // 障碍：根上只允许存在预处理写入的那个禁用尺寸盒；激活的 BoxCollider 说明素材把真正参与物理的盒子摆在根上，
+        // 再写尺寸盒会覆盖它的 center/size，所以报错跳过，交给素材侧修正
+        static BoxCollider GetExclusiveBox(string path, GameObject root)
+        {
+            BoxCollider[] boxes = root.GetComponents<BoxCollider>();
+            for (int i = 0; i < boxes.Length; i++)
+            {
+                if (boxes[i].enabled)
+                {
+                    Debug.LogError($"[地形] {path} 根物体上有激活的 BoxCollider（第 {i + 1} 个）；"
+                                   + "根物体的 BoxCollider 只归尺寸盒所有，参与物理的碰撞体请改用其它类型，已跳过、预制体未做改动");
+                    return null;
+                }
+            }
+
+            if (boxes.Length > 1)
+            {
+                Debug.LogError($"[地形] {path} 根物体上有 {boxes.Length} 个 BoxCollider，无法确定哪个是尺寸盒，已跳过、预制体未做改动");
+                return null;
+            }
+
+            return boxes.Length == 1 ? boxes[0] : root.AddComponent<BoxCollider>();
         }
     }
 }
