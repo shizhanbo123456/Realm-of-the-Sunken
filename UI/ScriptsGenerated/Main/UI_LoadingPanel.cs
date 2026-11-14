@@ -10,7 +10,6 @@ namespace Ros.UI.Main
         public Controller m_page;
         public Controller m_show_bar;
         public GProgressBar m_progressbar;
-        public GTextField m_progress;
         public GTextField m_label;
         public const string URL = "ui://q68vr2bfpdekji";
 
@@ -26,8 +25,7 @@ namespace Ros.UI.Main
             m_page = GetControllerAt(0);
             m_show_bar = GetControllerAt(1);
             m_progressbar = (GProgressBar)GetChildAt(4);
-            m_progress = (GTextField)GetChildAt(5);
-            m_label = (GTextField)GetChildAt(6);
+            m_label = (GTextField)GetChildAt(5);
         }
     }
 }
