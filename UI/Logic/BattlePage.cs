@@ -1067,7 +1067,8 @@ public class BattlePage : PageBase
     {
         var dayNight = panel.m_BattleInfoPanel != null ? panel.m_BattleInfoPanel.m_display_day_night : null;
         if (dayNight == null || dayNight.m_pointer == null) return;
-        dayNight.m_pointer.rotation = 180f - EnvironmentManager.Time01 * 180f;
+        // 用单调的 CycleTime 驱动整圈旋转；Time01 是亮度三角波，会在正午/午夜折返
+        dayNight.m_pointer.rotation = 180f - EnvironmentManager.CycleTime * 180f;
     }
 
     private static string FormatTime(float seconds)
