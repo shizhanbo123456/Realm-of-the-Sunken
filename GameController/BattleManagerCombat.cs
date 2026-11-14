@@ -78,9 +78,10 @@ public partial class BattleManager
         }
     }
 
-    // 与客户端 BulletPlayer.Tangent 同一算法：取轨迹上稍后的一点定朝向
+    // 与客户端 BulletPlayer.Tangent 同一算法：取轨迹上稍后的一点定朝向；贴武器/贴骨骼的轨迹自带朝向
     private static Quaternion FacingAt(BulletTrajectory trajectory, float age, float lifeTime)
     {
+        if (trajectory.TryGetRotation(out var fixedRotation)) return fixedRotation;
         float inv = lifeTime > 0f ? 1f / lifeTime : 0f;
         Vector3 cur = trajectory.Lerp(Mathf.Clamp01(age * inv));
         Vector3 dir = trajectory.Lerp(Mathf.Clamp01((age + 0.02f) * inv)) - cur;

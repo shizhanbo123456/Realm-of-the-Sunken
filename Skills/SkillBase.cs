@@ -92,15 +92,11 @@ namespace Ros.Skill
         }
 
         #region 框架工具（起点 / 落点 / 攻击结算）
-        private static readonly EntityData[] s_hitBuffer = new EntityData[50];
         private static readonly HashSet<int> s_weaponHitWarned = new();
+        private static readonly HashSet<int> s_weaponVisualWarned = new();
 
-        protected static EntityAnchorInfo HandPos(EntityData entity, bool leftHand = false)
-        {
-            if (entity == null) return default;
-            return (leftHand ? EntityAnchor.LeftHand : EntityAnchor.RightHand)
-                .GetTransform(entity.ModelInfo, entity.anim);
-        }
+        // 近战判定窗（秒）：隐形子弹的存活时长，覆盖整段挥刀动作
+        private const float MeleeBulletLife = 0.5f;
 
         // 起点 = 实体骨骼锚点 + 实体朝向下的固定偏移
         protected static Vector3 OriginPos(EntityData entity, EntityAnchor anchor, Vector3 offset)
@@ -250,11 +246,7 @@ namespace Ros.Skill
                 VfxHitSource.GetLifeTime(kind, vfxIndex), $"{kind}[{vfxIndex}]");
         }
 
-        // 无特效近战的球形判定：伤害倍率同样只认 skill.csv 第 11 列（单段取第 0 项，空 = 1）
-        protected void StrikeSphere(EntityData entity, Vector3 center, float radius, AttackData attack)
-            => HitSphere(entity, attack, center, radius, ConfigDamageRate());
-
-        // 武器普攻：命中球取当前武器预制体，球心 = 手骨 + 角色朝向偏移；瞬时判定
+        // 武器近战：发一颗隐形子弹贴着武器实例走完整段挥刀，判定球中心与半径取武器预制体的 BulletVfxInfo
         protected void StrikeWeapon(EntityData entity, AttackData attack)
         {
             int weapon = WeaponOf(entity);
@@ -265,36 +257,25 @@ namespace Ros.Skill
                     Debug.LogError($"[武器] 武器 {weapon} 没有命中球，普攻不造成伤害（每个武器只报一次）");
                 return;
             }
+            // 判定球跟着武器实例走：取不到实例（模型未挂武器 / 当前片段隐藏武器）就不发弹，避免球心落到原点
+            if (!BulletTrajectory.TryGetWeaponPose(entity.id, out _, out _, out _))
+            {
+                if (s_weaponVisualWarned.Add(weapon))
+                    Debug.LogError($"[武器] 武器 {weapon} 的实例不在场上（当前动画隐藏武器或模型没挂上），近战不造成伤害");
+                return;
+            }
             float scale = VfxScale();
-            EntityAnchorInfo hand = HandPos(entity);
-            Quaternion rotation = entity.transform.rotation;
             float rate = ConfigDamageRate();
+            var spheres = new BulletVfxInfo.HitInfo[hits.Length];
+            var rates = new float[hits.Length];
             for (int i = 0; i < hits.Length; i++)
             {
-                Vector3 center = hand.position + rotation * (hits[i].center * scale);
-                HitSphere(entity, attack, center, hits[i].radius * scale, rate);
+                // 只取中心与半径：判定窗由挥刀时长决定，资产里配的 start/end 不参与
+                spheres[i] = new BulletVfxInfo.HitInfo { center = hits[i].center, radius = hits[i].radius };
+                rates[i] = rate;
             }
-        }
-
-        private void HitSphere(EntityData entity, AttackData attack, Vector3 center, float radius, float rate)
-        {
-#if UNITY_EDITOR
-            DamageRangeDebugHost.Sphere(center, radius); // 调试：可视化本次球形伤害判定范围（渐隐渲染）
-#endif
-            int count = EntityPhysics.OverlapCircleXZ(center, radius, s_hitBuffer);
-            for (int i = 0; i < count; i++)
-            {
-                var target = s_hitBuffer[i];
-                if (target == null || !target.Alive) continue;
-                if (target.id == entity.id || !EntityCampUtil.IsHostile(entity.type.category, target.camp)) continue;
-                int damage = attack.GetDamage(target, out CombatLabelType type, rate);
-                target.ProcessHit(attack, damage, type, center); // 击飞方向取判定球心 → 目标
-                if (attack.addEffectEvent != null && target.effectController != null)
-                {
-                    attack.addEffectEvent.Invoke(target.effectController);
-                }
-                if (attack.onHit != null) attack.onHit.Invoke(target);
-            }
+            var spec = new BulletHitSpec(spheres, rates, scale, DamageInterval, 0f, $"近战[武器{weapon}]");
+            Tool.BattleManager.ShootBullet(entity, attack, new SkillTrajectoryWeapon(entity.id), MeleeBulletLife, spec);
         }
         #endregion
     }
