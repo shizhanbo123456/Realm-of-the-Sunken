@@ -1,6 +1,7 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
-// 挂在相机上：OnRenderImage 里按深度做距离雾与高度雾，一次全屏绘制，不改动场景里任何材质
+// 挂在相机上：透明队列之前画一次全屏 quad，按深度把距离雾与高度雾混到背景层，不改动场景里任何材质
 [RequireComponent(typeof(Camera))]
 public class ScreenSpaceFog : MonoBehaviour
 {
@@ -156,7 +157,10 @@ public class ScreenSpaceFog : MonoBehaviour
 
     private Camera cam;
     private Material material;
+    private Mesh quad;
+    private CommandBuffer buffer;
     private bool ready;
+    private bool attached;
 
     private void Awake()
     {
@@ -182,25 +186,39 @@ public class ScreenSpaceFog : MonoBehaviour
 
         material = new Material(fogShader) { hideFlags = HideFlags.HideAndDontSave };
         cam.depthTextureMode |= DepthTextureMode.Depth;
+
+        quad = BuildQuad();
+        buffer = new CommandBuffer { name = "ScreenSpaceFog" };
+        buffer.DrawMesh(quad, Matrix4x4.identity, material, 0, 0);
         ready = true;
     }
 
-    // 别处覆盖深度模式时每帧补回来
+    private void OnEnable()
+    {
+        if (!ready || cam == null || attached) return;
+
+        cam.AddCommandBuffer(CameraEvent.BeforeForwardAlpha, buffer);
+        attached = true;
+    }
+
+    private void OnDisable()
+    {
+        Detach();
+    }
+
+    private void Detach()
+    {
+        if (!attached) return;
+
+        if (cam != null && buffer != null) cam.RemoveCommandBuffer(CameraEvent.BeforeForwardAlpha, buffer);
+        attached = false;
+    }
+
+    // Unity 在渲染前读深度模式，别处覆盖时每帧补回来；雾的材质参数也在这里刷，保证画之前是最新的
     private void OnPreCull()
     {
         cam.depthTextureMode |= DepthTextureMode.Depth;
-    }
-
-    private void OnRenderImage(RenderTexture src, RenderTexture dst)
-    {
-        if (!ready)
-        {
-            Graphics.Blit(src, dst);
-            return;
-        }
-
-        ApplyMaterial();
-        Graphics.Blit(src, dst, material);
+        if (ready) ApplyMaterial();
     }
 
     private void ApplyMaterial()
@@ -261,7 +279,30 @@ public class ScreenSpaceFog : MonoBehaviour
 
     private void OnDestroy()
     {
-        Destroy(material);
+        Detach();
+
+        if (buffer != null) buffer.Release();
+        if (material != null) Destroy(material);
+        if (quad != null) Destroy(quad);
+    }
+
+    private static Mesh BuildQuad()
+    {
+        // 顶点直接给裁剪空间坐标，shader 里不再走矩阵，包围盒放大避免被剔除
+        var mesh = new Mesh { name = "ScreenSpaceFogQuad", hideFlags = HideFlags.HideAndDontSave };
+        mesh.vertices = new[]
+        {
+            new Vector3(-1f, -1f, 0f), new Vector3(1f, -1f, 0f),
+            new Vector3(-1f, 1f, 0f), new Vector3(1f, 1f, 0f),
+        };
+        mesh.uv = new[]
+        {
+            new Vector2(0f, 0f), new Vector2(1f, 0f),
+            new Vector2(0f, 1f), new Vector2(1f, 1f),
+        };
+        mesh.triangles = new[] { 0, 2, 1, 2, 3, 1 };
+        mesh.bounds = new Bounds(Vector3.zero, Vector3.one * 1e6f);
+        return mesh;
     }
 
 #if UNITY_EDITOR
