@@ -85,7 +85,7 @@ public class HomePreviewManager : ClientSubManager
     {
         if (homeStage != null) return homeStage;
         DestroyLobbyStage();
-        if (!TryGetStagePrefab(ResourceType.HomeDisplayArranger, out var prefab))
+        if (!TryGetStagePrefab<HomeDisplayArranger>(ResourceType.HomeDisplayArranger, out var prefab))
         {
             Debug.LogError("[展示] ResourceManager 的 HomeDisplayArranger 为空（HomeArranger 预制体），首页无法布置场景");
             return null;
@@ -98,7 +98,7 @@ public class HomePreviewManager : ClientSubManager
     {
         if (lobbyStage != null) return lobbyStage;
         DestroyHomeStage();
-        if (!TryGetStagePrefab(ResourceType.LobbyDisplayArranger, out var prefab))
+        if (!TryGetStagePrefab<LobbyDisplayArranger>(ResourceType.LobbyDisplayArranger, out var prefab))
         {
             Debug.LogError("[展示] ResourceManager 的 LobbyDisplayArranger 为空（LobbyArranger 预制体），大厅无法布置场景");
             return null;
@@ -107,11 +107,14 @@ public class HomePreviewManager : ClientSubManager
         return lobbyStage;
     }
 
-    // 布置图在进游戏时已由 ResourceManager 预加载，这里只取已加载的模板
-    private static bool TryGetStagePrefab(ResourceType type, out GameObject prefab)
+    // 布置图在进游戏时已由 ResourceManager 预加载，这里只取已加载的模板（按目标类型取根上的组件）
+    private static bool TryGetStagePrefab<T>(ResourceType type, out T prefab) where T : Component
     {
         prefab = null;
-        return Tool.ResourceManager != null && Tool.ResourceManager.TryGetPrefab(type, 0, out prefab);
+        if (Tool.ResourceManager == null) return false;
+        if (!Tool.ResourceManager.TryGetPrefab(type, 0, out var template) || template == null) return false;
+        prefab = template.GetComponent<T>();
+        return prefab != null;
     }
 
     private void DestroyHomeStage()
