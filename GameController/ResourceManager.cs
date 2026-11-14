@@ -27,9 +27,17 @@ public class ResourceManager : MonoBehaviour
         public int preloadCount;                       // 常驻计数：归零才允许卸载
         public AsyncOperationHandle<GameObject> handle;
         public readonly List<GameObject> instances = new();
-        public readonly List<Action<GameObject>> waiting = new();   // 加载中排队的实例化请求
-        public readonly List<Action> notify = new();                 // 加载结束的完成通知（含失败）
+        public readonly List<Pending> waiting = new();   // 加载中排队的实例化请求
+        public readonly List<Action> notify = new();     // 加载结束的完成通知（含失败）
         public Timer.TimerHandle unloadTimer;
+    }
+
+    // 调用方在请求时就已算好的落位：粒子在实例化的第一帧就会喷，不能等回调里再摆
+    private struct Pending
+    {
+        public Vector3 position;
+        public Quaternion rotation;
+        public Action<GameObject> callback;
     }
 
     private void Awake()
@@ -161,8 +169,8 @@ public class ResourceManager : MonoBehaviour
     #endregion
 
     #region 按需加载（特效）
-    // 加载完成后回调一个已实例化的物体，持有者负责摆放与销毁；管理器按实例存活情况回收资产
-    public void Load(ResourceType type, int index, Action<GameObject> onLoaded)
+    // 加载完成后回调一个已实例化的物体（落在调用方给的位姿上），持有者负责后续驱动与销毁
+    public void Load(ResourceType type, int index, Vector3 position, Quaternion rotation, Action<GameObject> onLoaded)
     {
         if (onLoaded == null)
         {
@@ -175,11 +183,11 @@ public class ResourceManager : MonoBehaviour
         CancelUnload(entry);
         if (entry.state == AssetState.Loaded)
         {
-            onLoaded(Spawn(entry));
+            onLoaded(Spawn(entry, position, rotation));
             return;
         }
 
-        entry.waiting.Add(onLoaded);
+        entry.waiting.Add(new Pending { position = position, rotation = rotation, callback = onLoaded });
         EnsureLoaded(key, entry);
     }
     #endregion
@@ -202,6 +210,16 @@ public class ResourceManager : MonoBehaviour
     }
 
     public bool TryGetVfxPrefab(ResourceType type, int index, out GameObject prefab) => TryGetPrefab(type, index, out prefab);
+
+    // 启动自检用：数量与引用是否配齐（不触发加载）
+    public int AssetCount(ResourceType type) => CountOf(type);
+
+    public bool IsAssetConfigured(ResourceType type, int index)
+    {
+        if (index < 0 || index >= CountOf(type)) return false;
+        return entries.TryGetValue(RefToInt(type, index), out Entry entry)
+            && entry.reference != null && entry.reference.RuntimeKeyIsValid();
+    }
 
     public bool TryGetPrefab(ResourceType type, int index, out GameObject prefab)
     {
@@ -340,9 +358,13 @@ public class ResourceManager : MonoBehaviour
 
         if (entry.waiting.Count > 0)
         {
-            var callbacks = new List<Action<GameObject>>(entry.waiting);
+            var callbacks = new List<Pending>(entry.waiting);
             entry.waiting.Clear();
-            for (int i = 0; i < callbacks.Count; i++) callbacks[i](Spawn(entry));
+            for (int i = 0; i < callbacks.Count; i++)
+            {
+                Pending pending = callbacks[i];
+                pending.callback(Spawn(entry, pending.position, pending.rotation));
+            }
         }
         FlushNotify(entry);
     }
@@ -356,9 +378,9 @@ public class ResourceManager : MonoBehaviour
         for (int i = 0; i < callbacks.Count; i++) callbacks[i]();
     }
 
-    private GameObject Spawn(Entry entry)
+    private GameObject Spawn(Entry entry, Vector3 position, Quaternion rotation)
     {
-        var instance = Instantiate(entry.handle.Result);
+        var instance = Instantiate(entry.handle.Result, position, rotation);
         entry.instances.Add(instance);
         return instance;
     }

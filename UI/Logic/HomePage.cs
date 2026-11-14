@@ -255,8 +255,8 @@ public class HomePage : PageBase
         head.m_roleName.text = DisplayName(info, saveIndex);
 
         // 头像：图标列表未导入或下标越界时置空
-        var icons = Tool.AssetsManager == null ? null
-            : defenseTab ? Tool.AssetsManager.DefenseCharacterIcons : Tool.AssetsManager.AttackCharacterIcons;
+        var icons = Tool.ResourceManager == null ? null
+            : defenseTab ? Tool.ResourceManager.DefenseCharacterIcons : Tool.ResourceManager.AttackCharacterIcons;
         bool hasIcon = icons != null && index < icons.Count && icons[index] != null;
         head.m_headIcon.texture = hasIcon ? new NTexture(icons[index]) : null;
         head.m_lock.selectedIndex = 0; // 全角色默认解锁

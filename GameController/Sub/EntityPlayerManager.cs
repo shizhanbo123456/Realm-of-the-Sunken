@@ -34,6 +34,7 @@ public class EntityPlayerManager : ClientSubManager
         public Transform cameraAnchor;    // 相机注视点 = EntityAnchor.Camera；旋转取实体根，供相机偏航同步
 
         public readonly Dictionary<int, GameObject> buffVfx = new();
+        public readonly HashSet<int> activeBuffs = new();   // 本次同步里仍生效的 buff：异步加载完成后据此判断还要不要
 
         private void OnDestroy()
         {
@@ -330,11 +331,11 @@ public class EntityPlayerManager : ClientSubManager
 
     private ClientEntityView CreateView(SCEntityDisplayInfo info)
     {
-        // 客户端图形：优先 AssetsManager 配置；无配置时以空物体占位（保证 UI 可寻址）
+        // 客户端图形由 ResourceManager 提供（角色在进游戏、怪物与场景物件在进战斗时已预加载）
         GameObject graphic = null;
-        if (Tool.AssetsManager != null)
+        if (Tool.ResourceManager != null)
         {
-            Tool.AssetsManager.TryGetGraphic(info.type, out graphic);
+            Tool.ResourceManager.TryGetGraphic(info.type, out graphic);
         }
         GameObject go;
         if (graphic != null)
@@ -384,34 +385,65 @@ public class EntityPlayerManager : ClientSubManager
         return view;
     }
 
-    private static readonly HashSet<int> s_activeBuffs = new();
     private static readonly HashSet<int> s_expiredBuffs = new();
     private static readonly HashSet<int> s_noHitBuffs = new(); // 缺命中球的 buff 特效只报一次
 
     private static void ApplyBuffVfx(ClientEntityView view, List<SCEntityDisplayInfo.BuffRuntime> buffs)
     {
-        s_activeBuffs.Clear();
+        view.activeBuffs.Clear();
         for (int i = 0; i < buffs.Count; i++)
         {
             var b = buffs[i];
-            if (b == null || !s_activeBuffs.Add(b.type)) continue;
+            if (b == null || !view.activeBuffs.Add(b.type)) continue;
             var effect = EffectConfig.Get(b.type); // 特效类别/下标取 effect.csv 第 11、12 列
             if (!effect.vfxKind.HasValue) continue;
             if (view.buffVfx.ContainsKey(b.type)) continue;
 
             SkillVfxKind kind = (SkillVfxKind)effect.vfxKind.Value;
             int index = effect.vfxIndex.Value;
+            if (!VfxManager.TryResourceOf(kind, out ResourceType resourceType)) continue; // 类别在 effect.csv 里配错
 
-            // Buff 特效按 hits[0] 的竖直范围贴合实体：底对底、顶对顶，等比缩放
-            var hits = VfxHitSource.GetHits(kind, index);
+            // 特效按需加载：先按实体根落位，加载完成后再按实例上的 hits 贴合高度
+            var anchor = new SkillTrajectoryFollow(view.id, Vector3.zero);
+            anchor.Duration = GlobalConfig.buff_vfx_life_time;
+            ApplyBuffVfxWhenLoaded(view, b.type, resourceType, index, anchor);
+        }
+
+        s_expiredBuffs.Clear();
+        foreach (var pair in view.buffVfx)
+        {
+            if (!view.activeBuffs.Contains(pair.Key)) s_expiredBuffs.Add(pair.Key);
+        }
+        foreach (var type in s_expiredBuffs)
+        {
+            if (view.buffVfx[type] != null) UnityEngine.Object.Destroy(view.buffVfx[type]);
+            view.buffVfx.Remove(type);
+        }
+    }
+
+    // 特效加载完成后：按实例的 BulletVfxInfo.hits 算贴合倍率与纵向偏移，再挂到实体上跟随
+    private static void ApplyBuffVfxWhenLoaded(ClientEntityView view, int buffType, ResourceType resourceType,
+        int index, SkillTrajectoryFollow anchor)
+    {
+        Tool.VfxManager.LoadVfx(resourceType, index, anchor.Lerp(0f), Quaternion.identity, obj =>
+        {
+            if (obj == null) return;
+            // 加载期间 buff 已过期或实体已销毁：直接丢掉，避免留下无主特效
+            if (!view.activeBuffs.Contains(buffType) || view.buffVfx.ContainsKey(buffType))
+            {
+                UnityEngine.Object.Destroy(obj);
+                return;
+            }
+
             float scale = 1f;
             float offsetY = 0f;
-            if (hits.Length == 0)
+            var info = obj.GetComponent<BulletVfxInfo>();
+            if (info == null || info.hits.Count == 0)
             {
-                if (s_noHitBuffs.Add(((int)kind << 16) | index))
-                    Debug.LogError($"[Buff特效] {kind}[{index}] 的 BulletVfxInfo.hits 为空：无法贴合实体高度，按原始大小播放");
+                if (s_noHitBuffs.Add(((int)resourceType << 16) | index))
+                    Debug.LogError($"[Buff特效] {resourceType}[{index}] 的 BulletVfxInfo.hits 为空：无法贴合实体高度，按原始大小播放");
             }
-            else if (!TryFitBuffVfxToEntity(view, hits[0], out scale, out offsetY))
+            else if (!TryFitBuffVfxToEntity(view, info.hits[0], out scale, out offsetY))
             {
                 scale = 1f;
                 offsetY = 0f;
@@ -419,20 +451,9 @@ public class EntityPlayerManager : ClientSubManager
 
             var trajectory = new SkillTrajectoryFollow(view.id, new Vector3(0f, offsetY, 0f));
             trajectory.Duration = GlobalConfig.buff_vfx_life_time;
-            var obj = PlayTrackedVfx(kind, index, trajectory, scale);
-            if (obj != null) view.buffVfx[b.type] = obj;
-        }
-
-        s_expiredBuffs.Clear();
-        foreach (var pair in view.buffVfx)
-        {
-            if (!s_activeBuffs.Contains(pair.Key)) s_expiredBuffs.Add(pair.Key);
-        }
-        foreach (var type in s_expiredBuffs)
-        {
-            if (view.buffVfx[type] != null) UnityEngine.Object.Destroy(view.buffVfx[type]);
-            view.buffVfx.Remove(type);
-        }
+            Tool.VfxManager.Play(obj, trajectory, GlobalConfig.buff_vfx_life_time, BulletPlayer.RotationMode.Constant, scale);
+            view.buffVfx[buffType] = obj;
+        });
     }
 
     // 命中球的竖直范围（center.y ± radius）对齐实体包围盒（EntityModelInfo.yRange）的上下沿
@@ -465,24 +486,6 @@ public class EntityPlayerManager : ClientSubManager
         // FollowTrajectory 给的是实体根位置，缩放后特效底部落在 根位置+offsetY+vfxBottom*scale
         offsetY = (worldBottom - view.transform.position.y) - vfxBottom * scale;
         return true;
-    }
-
-    private static GameObject PlayTrackedVfx(SkillVfxKind kind, int index, BulletTrajectory trajectory, float scale)
-    {
-        var vfx = Tool.VfxManager;
-        if (vfx == null || kind == SkillVfxKind.None || index < 0) return null;
-        switch (kind)
-        {
-            case SkillVfxKind.Buff:
-                return vfx.PlayBuffVFX(index, trajectory, 0f, BulletPlayer.RotationMode.Constant, scale);
-            case SkillVfxKind.Shield:
-                return vfx.PlayShieldVFX(index, trajectory, 0f, BulletPlayer.RotationMode.Constant, scale);
-            case SkillVfxKind.MagicCircle:
-                return vfx.Play(vfx.GetMagicCircleVfx(index), trajectory, 0f, BulletPlayer.RotationMode.Constant, scale);
-            default:
-                Debug.LogError($"[Buff特效] 未处理的特效类别：{kind}（effect.csv 的特效类型列配置错误）");
-                return null;
-        }
     }
 
     private void ApplyDisplay(ClientEntityView view, SCEntityDisplayInfo info)

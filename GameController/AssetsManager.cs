@@ -1,35 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
+// 服务器资产引用管理器：服务器全程同步走直接引用。实体生成、命中球判定与武器显示共用同一份预制体，
+// 不经过 Addressables。客户端场景不挂本组件，改由 ResourceManager 提供资源。
 public class AssetsManager : MonoBehaviour
 {
     private void Awake()
     {
         Tool.AssetsManager = this;
-        SkillIconMap = BuildIconMap(skillIconTextures, nameof(skillIconTextures));
-        BuffIconMap = BuildIconMap(buffIconTextures, nameof(buffIconTextures));
-    }
-
-    // 图标 id 取贴图名前 3 位（如 "015_霜棱散" → 15）；名字不合规或 id 重复属资源配置错配，直接抛
-    private static Dictionary<int, Texture> BuildIconMap(List<Texture> textures, string fieldName)
-    {
-        var map = new Dictionary<int, Texture>();
-        if (textures == null)
-            throw new FormatException($"[图标] AssetsManager.{fieldName} 列表为空引用，请在 Inspector 里重新配置");
-
-        foreach (var texture in textures)
-        {
-            if (texture == null)
-                throw new FormatException($"[图标] AssetsManager.{fieldName} 含空引用，请检查 Inspector 列表");
-            string textureName = texture.name;
-            if (textureName.Length < 3 || !int.TryParse(textureName.Substring(0, 3), out int id))
-                throw new FormatException($"[图标] AssetsManager.{fieldName} 的贴图「{textureName}」前 3 位不是图标 id");
-            if (map.ContainsKey(id))
-                throw new FormatException($"[图标] AssetsManager.{fieldName} 的贴图「{textureName}」id {id} 与「{map[id].name}」重复");
-            map.Add(id, texture);
-        }
-        return map;
     }
 
     #region 实体图形
@@ -43,7 +21,6 @@ public class AssetsManager : MonoBehaviour
     public List<GameObject> CoralLargeGraphics = new();
     public List<GameObject> CrystalStatueGraphics = new();
     public List<GameObject> NeutralStatueGraphics = new();
-    public RuntimeAnimatorController animatorController;
     #endregion
 
     #region 特效（编号与《特效清单与分配表.md》对应）
@@ -61,60 +38,13 @@ public class AssetsManager : MonoBehaviour
     public List<GameObject> WeaponPrefabs = new();
     #endregion
 
-    #region UI 图标
-    public List<Texture2D> AttackCharacterIcons = new();
-    public List<Texture2D> DefenseCharacterIcons = new();
-    [SerializeField] private List<Texture> skillIconTextures = new();   // 贴图名前 3 位 = 技能 id
-    [SerializeField] private List<Texture> buffIconTextures = new();    // 贴图名前 3 位 = Buff(EffectType) id
-
-    public Dictionary<int, Texture> SkillIconMap { get; private set; } = new();
-    public Dictionary<int, Texture> BuffIconMap { get; private set; } = new();
-    #endregion
-
-    #region
-    public HomeDisplayArranger homeDisplayArranger;
-    public LobbyDisplayArranger lobbyDisplayArranger;
-    #endregion
-
     public bool TryGetGraphic(EntityType type, out GameObject graphic)
     {
         graphic = null;
-        switch (type.category)
-        {
-            case EntityCategory.Character_Attack:
-                if (type.value >= 0 && type.value < AttackCharacterGraphics.Count) graphic = AttackCharacterGraphics[type.value];
-                break;
-            case EntityCategory.Character_Defense:
-                if (type.value >= 0 && type.value < DefenseCharacterGraphics.Count) graphic = DefenseCharacterGraphics[type.value];
-                break;
-            case EntityCategory.Zombie:
-                if (ZombieGraphics.Count > 0) graphic = ZombieGraphics[type.value % ZombieGraphics.Count];
-                break;
-            case EntityCategory.EliteZombie:
-                if (EliteZombieGraphics.Count > 0) graphic = EliteZombieGraphics[type.value % EliteZombieGraphics.Count];
-                break;
-            case EntityCategory.GuardStatue:
-                // 副守护点 value 0~2 各用自己那一种；主守护点 value >= sage_statue_count 用国王
-                if (type.value >= GlobalConfig.sage_statue_count) graphic = KingStatueGraphic;
-                else if (type.value >= 0 && type.value < SageStatueGraphics.Count) graphic = SageStatueGraphics[type.value];
-                break;
-            case EntityCategory.Coral:
-                // 小/大珊瑚各用自己列表，列表内随机取一个变体（每个实体创建时只取一次）
-                graphic = RandomOf(type.value <= 0 ? CoralSmallGraphics : CoralLargeGraphics);
-                break;
-            case EntityCategory.CrystalStatue:
-                // 3 种外观按实例编号选用（GlobalConfig.crystal_statue_count = 3）；配置不足时取模循环
-                if (CrystalStatueGraphics.Count > 0) graphic = CrystalStatueGraphics[type.value % CrystalStatueGraphics.Count];
-                break;
-            case EntityCategory.NeutralStatue:
-                // 0 天使雕像 / 1 恶魔雕像，按 value 取对应外观
-                if (NeutralStatueGraphics.Count > 0) graphic = NeutralStatueGraphics[type.value % NeutralStatueGraphics.Count];
-                break;
-        }
+        if (!GraphicIndexResolver.Resolve(type, CountOf, out ResourceType resourceType, out int index)) return false;
+        graphic = At(resourceType, index);
         return graphic != null;
     }
-
-    private static GameObject RandomOf(List<GameObject> list) => list.Count > 0 ? list[UnityEngine.Random.Range(0, list.Count)] : null;
 
     // 武器是一维列表：编号即 entity.csv「武器编号」
     public bool TryGetWeaponPrefab(int weaponId, out GameObject prefab)
@@ -123,5 +53,48 @@ public class AssetsManager : MonoBehaviour
         if (weaponId < 0 || weaponId >= WeaponPrefabs.Count) return false;
         prefab = WeaponPrefabs[weaponId];
         return prefab != null;
+    }
+
+    private int CountOf(ResourceType type)
+    {
+        if (type == ResourceType.KingStatueGraphic) return KingStatueGraphic != null ? 1 : 0;
+        List<GameObject> list = ListOf(type);
+        return list != null ? list.Count : 0;
+    }
+
+    private GameObject At(ResourceType type, int index)
+    {
+        if (type == ResourceType.KingStatueGraphic) return index == 0 ? KingStatueGraphic : null;
+
+        List<GameObject> list = ListOf(type);
+        if (list == null || list.Count == 0) return null;
+        if (index == GraphicIndexResolver.RandomIndex) index = GraphicIndexResolver.PickRandom(index, list.Count);
+        return index >= 0 && index < list.Count ? list[index] : null;
+    }
+
+    private List<GameObject> ListOf(ResourceType type)
+    {
+        switch (type)
+        {
+            case ResourceType.AttackCharacterGraphics: return AttackCharacterGraphics;
+            case ResourceType.DefenseCharacterGraphics: return DefenseCharacterGraphics;
+            case ResourceType.ZombieGraphics: return ZombieGraphics;
+            case ResourceType.EliteZombieGraphics: return EliteZombieGraphics;
+            case ResourceType.SageStatueGraphics: return SageStatueGraphics;
+            case ResourceType.CoralSmallGraphics: return CoralSmallGraphics;
+            case ResourceType.CoralLargeGraphics: return CoralLargeGraphics;
+            case ResourceType.CrystalStatueGraphics: return CrystalStatueGraphics;
+            case ResourceType.NeutralStatueGraphics: return NeutralStatueGraphics;
+            case ResourceType.BulletVFX: return BulletVFX;
+            case ResourceType.ShieldVFX: return ShieldVFX;
+            case ResourceType.RangeMagicVFX: return RangeMagicVFX;
+            case ResourceType.MagicCircleVFX: return MagicCircleVFX;
+            case ResourceType.BuffVFX: return BuffVFX;
+            case ResourceType.HitVFX: return HitVFX;
+            case ResourceType.SlashVFX: return SlashVFX;
+            case ResourceType.ProjectionVFX: return ProjectionVFX;
+            case ResourceType.WeaponPrefabs: return WeaponPrefabs;
+            default: return null;
+        }
     }
 }

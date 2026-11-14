@@ -414,8 +414,8 @@ namespace Ros.UI.Main
         {
             bool isCharacter = info.type.category == EntityCategory.Character_Attack
                 || info.type.category == EntityCategory.Character_Defense;
-            var icons = Tool.AssetsManager == null ? null
-                : info.camp == EntityCamp.Defense ? Tool.AssetsManager.DefenseCharacterIcons : Tool.AssetsManager.AttackCharacterIcons;
+            var icons = Tool.ResourceManager == null ? null
+                : info.camp == EntityCamp.Defense ? Tool.ResourceManager.DefenseCharacterIcons : Tool.ResourceManager.AttackCharacterIcons;
             int index = info.type.value;
             bool hasIcon = isCharacter && icons != null && index >= 0 && index < icons.Count && icons[index] != null;
             if (m_roleHead != null)

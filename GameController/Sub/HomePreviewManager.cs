@@ -85,10 +85,9 @@ public class HomePreviewManager : ClientSubManager
     {
         if (homeStage != null) return homeStage;
         DestroyLobbyStage();
-        var prefab = Tool.AssetsManager != null ? Tool.AssetsManager.homeDisplayArranger : null;
-        if (prefab == null)
+        if (!TryGetStagePrefab(ResourceType.HomeDisplayArranger, out var prefab))
         {
-            Debug.LogError("[展示] AssetsManager 未挂 homeDisplayArranger（HomeArranger 预制体），首页无法布置场景");
+            Debug.LogError("[展示] ResourceManager 的 HomeDisplayArranger 为空（HomeArranger 预制体），首页无法布置场景");
             return null;
         }
         homeStage = UnityEngine.Object.Instantiate(prefab);
@@ -99,14 +98,20 @@ public class HomePreviewManager : ClientSubManager
     {
         if (lobbyStage != null) return lobbyStage;
         DestroyHomeStage();
-        var prefab = Tool.AssetsManager != null ? Tool.AssetsManager.lobbyDisplayArranger : null;
-        if (prefab == null)
+        if (!TryGetStagePrefab(ResourceType.LobbyDisplayArranger, out var prefab))
         {
-            Debug.LogError("[展示] AssetsManager 未挂 lobbyDisplayArranger（LobbyArranger 预制体），大厅无法布置场景");
+            Debug.LogError("[展示] ResourceManager 的 LobbyDisplayArranger 为空（LobbyArranger 预制体），大厅无法布置场景");
             return null;
         }
         lobbyStage = UnityEngine.Object.Instantiate(prefab);
         return lobbyStage;
+    }
+
+    // 布置图在进游戏时已由 ResourceManager 预加载，这里只取已加载的模板
+    private static bool TryGetStagePrefab(ResourceType type, out GameObject prefab)
+    {
+        prefab = null;
+        return Tool.ResourceManager != null && Tool.ResourceManager.TryGetPrefab(type, 0, out prefab);
     }
 
     private void DestroyHomeStage()
@@ -181,7 +186,7 @@ public class HomePreviewManager : ClientSubManager
     private GameObject AddView(EntityType type, Transform anchor)
     {
         if (anchor == null) return null;
-        if (Tool.AssetsManager == null || !Tool.AssetsManager.TryGetGraphic(type, out var prefab) || prefab == null)
+        if (Tool.ResourceManager == null || !Tool.ResourceManager.TryGetGraphic(type, out var prefab) || prefab == null)
         {
             Debug.LogError($"[展示] 缺少角色图形：{type}");
             return null;

@@ -113,7 +113,7 @@ namespace Ros.UI.Main
         internal static Texture ResolveIcon(int skillId)
         {
             if (skillId < 0) return null;
-            var map = Tool.AssetsManager != null ? Tool.AssetsManager.SkillIconMap : null;
+            var map = Tool.ResourceManager != null ? Tool.ResourceManager.SkillIconMap : null;
             if (map == null) return null;
             return map.TryGetValue(skillId, out var icon) ? icon : null; // 没配图标 → 不显示
         }

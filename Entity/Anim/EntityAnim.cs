@@ -125,11 +125,13 @@ public class EntityAnim : MonoBehaviour
         }
         mainAnimator = animators[0];
         EnsureWeaponSocket();
-        CacheAnchorRestOffsets(); // 必须早于赋 controller：此时还是绑定姿势
+        CacheAnchorRestOffsets(); // 必须早于参数推送：此时还是绑定姿势
         for (int i = 0; i < animators.Count; i++)
         {
             Animator animator = animators[i];
-            animator.runtimeAnimatorController = Tool.AssetsManager.animatorController;
+            // 动画机由预制体自带；漏配时状态机为空、动画不播且不报错，故显式拦一条
+            if (animator.runtimeAnimatorController == null)
+                Debug.LogError($"{gameObject.name} 的 Animator「{animator.name}」没有配 runtimeAnimatorController：动画不会播放");
             var behaviours = animator.GetBehaviours<AnimEvent>();
             foreach (var behaviour in behaviours) behaviour.Init(this, data,i==0);
         }
@@ -225,14 +227,14 @@ public class EntityAnim : MonoBehaviour
             Debug.LogError($"{gameObject.name} 缺少 EntityModelInfo，武器挂点解析不了");
             return;
         }
-        if (Tool.AssetsManager == null)
+        // 武器预制体：服务器取 AssetsManager 的直接引用，客户端取 ResourceManager（进游戏时已预加载）
+        GameObject prefab = null;
+        bool found = Tool.IsServer
+            ? Tool.AssetsManager != null && Tool.AssetsManager.TryGetWeaponPrefab(weaponId, out prefab)
+            : Tool.ResourceManager != null && Tool.ResourceManager.TryGetWeaponPrefab(weaponId, out prefab);
+        if (!found)
         {
-            Debug.LogError($"{gameObject.name} 显示武器需要 AssetsManager");
-            return;
-        }
-        if (!Tool.AssetsManager.TryGetWeaponPrefab(weaponId, out var prefab))
-        {
-            Debug.LogError($"{gameObject.name} 的武器 {weaponId} 不在 AssetsManager 的武器列表中");
+            Debug.LogError($"{gameObject.name} 的武器 {weaponId} 不在 {(Tool.IsServer ? "AssetsManager" : "ResourceManager")} 的武器列表中");
             return;
         }
         if (weaponPos == WeaponPos.Hand)

@@ -6,15 +6,23 @@ public class VfxTest : MonoBehaviour
     private struct VfxEntry
     {
         public string label;
-        public GameObject prefab;
+        public ResourceType type;
+        public int index;
+        public bool configured;
     }
 
     private static readonly string[] CategoryNames = { "Bullet", "Shield", "RangeMagic", "MagicCircle", "Buff" };
+    private static readonly ResourceType[] CategoryTypes =
+    {
+        ResourceType.BulletVFX, ResourceType.ShieldVFX, ResourceType.RangeMagicVFX,
+        ResourceType.MagicCircleVFX, ResourceType.BuffVFX,
+    };
 
     private readonly List<VfxEntry> entries = new();
     private readonly List<int> categoryStarts = new();
     private Vector2 scroll;
     private int selected = -1;
+    private int selectVersion;   // 连续点选时丢弃上一份迟到的加载结果
     private int currentTab;
     private GameObject currentVfx;
     private float angle;
@@ -78,7 +86,7 @@ public class VfxTest : MonoBehaviour
 
     private void OnGUI()
     {
-        if (entries.Count == 0 && Tool.AssetsManager != null) BuildEntries();
+        if (entries.Count == 0 && Tool.ResourceManager != null) BuildEntries();
         Matrix4x4 oldMatrix = GUI.matrix;
         GUIUtility.ScaleAroundPivot(new Vector2(guiScale, guiScale), Vector2.zero); // 整体放大，适配编辑器小窗口
         windowRect.height = Mathf.Min(windowRect.height, Screen.height / guiScale);
@@ -90,28 +98,31 @@ public class VfxTest : MonoBehaviour
     {
         entries.Clear();
         categoryStarts.Clear();
-        var mgr = Tool.AssetsManager;
+        var mgr = Tool.ResourceManager;
         if (mgr == null) return;
-        AddCategory("Bullet", mgr.BulletVFX);
-        AddCategory("Shield", mgr.ShieldVFX);
-        AddCategory("RangeMagic", mgr.RangeMagicVFX);
-        AddCategory("MagicCircle", mgr.MagicCircleVFX);
-        AddCategory("Buff", mgr.BuffVFX);
-    }
-
-    private void AddCategory(string name, List<GameObject> list)
-    {
-        categoryStarts.Add(entries.Count);
-        int count = list != null ? list.Count : 0;
-        for (int i = 0; i < count; i++)
-            entries.Add(new VfxEntry { label = $"{name} {i}", prefab = list[i] });
+        for (int c = 0; c < CategoryTypes.Length; c++)
+        {
+            categoryStarts.Add(entries.Count);
+            ResourceType type = CategoryTypes[c];
+            int count = mgr.AssetCount(type);
+            for (int i = 0; i < count; i++)
+            {
+                entries.Add(new VfxEntry
+                {
+                    label = $"{CategoryNames[c]} {i}",
+                    type = type,
+                    index = i,
+                    configured = mgr.IsAssetConfigured(type, i),
+                });
+            }
+        }
     }
 
     private void DrawWindow(int id)
     {
-        if (Tool.AssetsManager == null)
+        if (Tool.ResourceManager == null)
         {
-            GUILayout.Label("场景中未找到 AssetsManager");
+            GUILayout.Label("场景中未找到 ResourceManager");
             return;
         }
 
@@ -140,22 +151,35 @@ public class VfxTest : MonoBehaviour
         for (int i = start; i < next; i++)
         {
             var e = entries[i];
-            GUI.enabled = e.prefab != null;
-            string text = (i == selected ? "▶ " : "") + e.label + (e.prefab == null ? "（空）" : "");
+            GUI.enabled = e.configured;
+            string text = (i == selected ? "▶ " : "") + e.label + (e.configured ? "" : "（空）");
             if (GUILayout.Button(text)) Select(i);
         }
         GUI.enabled = true;
         GUILayout.EndScrollView();
     }
 
+    // 特效按需加载：切换时旧实例立即销毁，迟到的加载结果直接丢掉
     private void Select(int index)
     {
-        if (currentVfx != null) Destroy(currentVfx); // 切换/停止时销毁上一个
+        if (currentVfx != null) Destroy(currentVfx);
         currentVfx = null;
         selected = index;
-        if (index < 0 || index >= entries.Count || entries[index].prefab == null) return;
+        if (index < 0 || index >= entries.Count || !entries[index].configured) return;
+
         OrbitPose(angle, out Vector3 pos, out Quaternion rot);
-        currentVfx = Instantiate(entries[index].prefab, pos, rot);
-        currentVfx.name = $"VfxTest_{entries[index].prefab.name}";
+        VfxEntry entry = entries[index];
+        int version = ++selectVersion;
+        Tool.VfxManager.LoadVfx(entry.type, entry.index, pos, rot, obj =>
+        {
+            if (obj == null) return;
+            if (version != selectVersion)
+            {
+                Destroy(obj);
+                return;
+            }
+            currentVfx = obj;
+            obj.name = $"VfxTest_{obj.name}";
+        });
     }
 }

@@ -42,6 +42,9 @@ public class Tool : MonoBehaviour
 
     public static Tool Instance { get; private set; }
 
+    // 服务器/客户端的唯一判定口径（Inspector 上的 isServer）
+    public static bool IsServer => Instance != null && Instance.isServer;
+
     #region 管理器引用（由各管理器 Awake 注册）
     public static Ros.Config.ConfigManager ConfigManager;
     public static NetworkManager NetworkManager;
@@ -113,7 +116,6 @@ public class Tool : MonoBehaviour
         errors += CheckObject(nameof(BattleManager), BattleManager);
         errors += CheckObject(nameof(InfoManager), InfoManager);
         errors += CheckObject(nameof(EnvironmentManager), EnvironmentManager);
-        errors += CheckObject(nameof(AssetsManager), AssetsManager);
         if (!isServer)
         {
             errors += CheckObject(nameof(InputManager), InputManager);
@@ -125,11 +127,22 @@ public class Tool : MonoBehaviour
         }
 
         errors += CheckInfoManager();
-        errors += CheckEntityGraphics();          // 实体图形两端都用：BattleManager 生成实体依赖它
         errors += CheckCharacterRows(EntityCategory.Character_Attack, GlobalConfig.attack_character_count, "进攻方");
         errors += CheckCharacterRows(EntityCategory.Character_Defense, GlobalConfig.defense_character_count, "防守方");
         errors += CheckGuardStatueSpawns();
-        if (!isServer) errors += CheckClientAssets();
+
+        // 资源来源按端分：服务器同步读 AssetsManager 的直接引用，客户端读 ResourceManager 的 AssetReference
+        if (isServer)
+        {
+            errors += CheckObject(nameof(AssetsManager), AssetsManager);
+            errors += CheckEntityGraphics();
+            errors += CheckServerVfxAssets();
+        }
+        else
+        {
+            errors += CheckObject(nameof(ResourceManager), ResourceManager);
+            errors += CheckClientAssets();
+        }
 
         string mode = isServer ? "服务器" : "客户端";
         if (errors == 0) Debug.Log($"[启动自检] 通过（{mode}）");
@@ -301,7 +314,8 @@ public class Tool : MonoBehaviour
         return name.Length > 0 ? $"{name}({layer})" : layer.ToString();
     }
 
-    private static int CheckClientAssets()
+    // 服务器：特效与武器是判定侧资产（命中球、存活时长），数量与命中球一并校验
+    private static int CheckServerVfxAssets()
     {
         var m = AssetsManager;
         if (m == null) return 0;
@@ -315,11 +329,7 @@ public class Tool : MonoBehaviour
         e += CheckList("AssetsManager.HitVFX", m.HitVFX, vfx_hit_count);
         e += CheckList("AssetsManager.SlashVFX", m.SlashVFX, vfx_slash_count);
         e += CheckList("AssetsManager.ProjectionVFX", m.ProjectionVFX, vfx_projection_count);
-
         e += CheckList("AssetsManager.WeaponPrefabs", m.WeaponPrefabs, weapon_count);
-
-        e += CheckList("AssetsManager.AttackCharacterIcons", m.AttackCharacterIcons, GlobalConfig.attack_character_count);
-        e += CheckList("AssetsManager.DefenseCharacterIcons", m.DefenseCharacterIcons, GlobalConfig.defense_character_count);
 
         // Buff 特效按 hits[0] 贴合实体高度，缺命中球就没法定位/缩放（映射见 effect.csv 第 11、12 列）
         foreach (var row in EffectConfig.content.Values)
@@ -327,6 +337,58 @@ public class Tool : MonoBehaviour
             if (!row.vfxKind.HasValue) continue;
             if (VfxHitSource.GetHits((Ros.Skill.SkillVfxKind)row.vfxKind.Value, row.vfxIndex.Value).Length > 0) continue;
             Debug.LogError($"[启动自检] Buff {row.key}「{row.name}」→ {row.vfxKind.Value}[{row.vfxIndex.Value}] 没有 BulletVfxInfo.hits：无法贴合实体高度");
+            e++;
+        }
+        return e;
+    }
+
+    // 客户端：只校验 AssetReference 是否配齐、图标是否到位；预制体本体要到加载后才可验
+    private static int CheckClientAssets()
+    {
+        var m = ResourceManager;
+        if (m == null) return 0;
+
+        int e = 0;
+        e += CheckReferences("ResourceManager.AttackCharacterGraphics", m, ResourceType.AttackCharacterGraphics, GlobalConfig.attack_character_count);
+        e += CheckReferences("ResourceManager.DefenseCharacterGraphics", m, ResourceType.DefenseCharacterGraphics, GlobalConfig.defense_character_count);
+        e += CheckReferences("ResourceManager.ZombieGraphics", m, ResourceType.ZombieGraphics, GlobalConfig.zombie_variant_count);
+        e += CheckReferences("ResourceManager.EliteZombieGraphics", m, ResourceType.EliteZombieGraphics, GlobalConfig.elite_zombie_variant_count);
+        e += CheckReferences("ResourceManager.SageStatueGraphics", m, ResourceType.SageStatueGraphics, GlobalConfig.sage_statue_count);
+        e += CheckReferences("ResourceManager.CrystalStatueGraphics", m, ResourceType.CrystalStatueGraphics, GlobalConfig.crystal_statue_count);
+        e += CheckReferences("ResourceManager.NeutralStatueGraphics", m, ResourceType.NeutralStatueGraphics, GlobalConfig.neutral_statue_variant_count);
+        e += CheckReferences("ResourceManager.KingStatueGraphic", m, ResourceType.KingStatueGraphic, 1);
+        e += CheckReferences("ResourceManager.HomeDisplayArranger", m, ResourceType.HomeDisplayArranger, 1);
+        e += CheckReferences("ResourceManager.LobbyDisplayArranger", m, ResourceType.LobbyDisplayArranger, 1);
+        e += CheckReferences("ResourceManager.CoralSmallGraphics", m, ResourceType.CoralSmallGraphics, 0);
+        e += CheckReferences("ResourceManager.CoralLargeGraphics", m, ResourceType.CoralLargeGraphics, 0);
+        e += CheckReferences("ResourceManager.BulletVFX", m, ResourceType.BulletVFX, vfx_bullet_count);
+        e += CheckReferences("ResourceManager.ShieldVFX", m, ResourceType.ShieldVFX, vfx_shield_count);
+        e += CheckReferences("ResourceManager.RangeMagicVFX", m, ResourceType.RangeMagicVFX, vfx_range_magic_count);
+        e += CheckReferences("ResourceManager.MagicCircleVFX", m, ResourceType.MagicCircleVFX, vfx_magic_circle_count);
+        e += CheckReferences("ResourceManager.BuffVFX", m, ResourceType.BuffVFX, vfx_buff_count);
+        e += CheckReferences("ResourceManager.HitVFX", m, ResourceType.HitVFX, vfx_hit_count);
+        e += CheckReferences("ResourceManager.SlashVFX", m, ResourceType.SlashVFX, vfx_slash_count);
+        e += CheckReferences("ResourceManager.ProjectionVFX", m, ResourceType.ProjectionVFX, vfx_projection_count);
+        e += CheckReferences("ResourceManager.WeaponPrefabs", m, ResourceType.WeaponPrefabs, weapon_count);
+
+        e += CheckList("ResourceManager.AttackCharacterIcons", m.AttackCharacterIcons, GlobalConfig.attack_character_count);
+        e += CheckList("ResourceManager.DefenseCharacterIcons", m.DefenseCharacterIcons, GlobalConfig.defense_character_count);
+        return e;
+    }
+
+    private static int CheckReferences(string label, ResourceManager m, ResourceType type, int expected)
+    {
+        int count = m.AssetCount(type);
+        int e = 0;
+        if (expected > 0 && count != expected)
+        {
+            if (count < expected) { Debug.LogError($"[启动自检] {label} 数量不足：{count} / 期望 {expected}"); e++; }
+            else Debug.LogWarning($"[启动自检] {label} 数量偏多：{count} / 期望 {expected}");
+        }
+        for (int i = 0; i < count; i++)
+        {
+            if (m.IsAssetConfigured(type, i)) continue;
+            Debug.LogError($"[启动自检] {label}[{i}] 的 AssetReference 为空或未指向 addressable 资产");
             e++;
         }
         return e;

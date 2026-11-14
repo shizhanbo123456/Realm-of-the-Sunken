@@ -13,7 +13,7 @@ namespace Ros.UI.Main
             var cfg = EffectConfig.Get(buffType);
             m_negative.selectedIndex = cfg.positive == true ? 0 : 1; // 0 正面 / 1 负面
             Texture icon = null;
-            var map = Tool.AssetsManager != null ? Tool.AssetsManager.BuffIconMap : null;
+            var map = Tool.ResourceManager != null ? Tool.ResourceManager.BuffIconMap : null;
             if (map != null && map.TryGetValue(cfg.iconId, out var tex)) icon = tex;
             m_mask.m_loader.texture = icon != null ? new NTexture(icon) : null; // 没配图标 → 不显示
             // level 即显示层数：逐层计时类 = 各层等级之和，单层类 = 该条等级（服务端已聚合）

@@ -198,7 +198,8 @@ public partial class BattleManager : EnsBehaviour
     // 用加载阶段预分配的 id 生成（id 由 BeginLoading 预留，客户端加载期拿到的就是它）
     public ushort SpawnEntity(ushort reservedId, EntityType type, int level, Vector3 pos, EntityCamp camp)
     {
-        if (!Tool.AssetsManager.TryGetGraphic(type, out var prefab) || prefab == null)
+        // 实体生成是服务器权威路径：客户端不挂 AssetsManager，走到这里说明服务器逻辑跑到了客户端上
+        if (Tool.AssetsManager == null || !Tool.AssetsManager.TryGetGraphic(type, out var prefab) || prefab == null)
         {
             Debug.LogWarning($"缺少实体预制体：{type}，请先在 AssetsManager 配置对应 Graphics");
             return 0;

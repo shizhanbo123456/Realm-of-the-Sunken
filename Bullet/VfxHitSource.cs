@@ -2,7 +2,8 @@ using System.Collections.Generic;
 using Ros.Skill;
 using UnityEngine;
 
-// 技能特效 → 预制体上的命中球。判定在服务器进行，服务器同样挂着 AssetsManager，故直接读预制体，不另存一份配表
+// 技能特效 → 预制体上的命中球。只在服务器使用（判定权威端，服务器挂着 AssetsManager 走直接引用），
+// 故直接读预制体，不另存一份配表；客户端按需加载的特效改从实例上读 BulletVfxInfo。
 public static class VfxHitSource
 {
     private static readonly Dictionary<int, BulletVfxInfo.HitInfo[]> cache = new();

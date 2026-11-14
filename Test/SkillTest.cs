@@ -129,11 +129,11 @@ public class SkillTest : MonoBehaviour
             status = "场景中没有 InfoManager：请放置一个配置完整的 InfoManager（属性模板）后重新运行";
             return;
         }
-        GameObject prefab = FirstGraphic(Tool.AssetsManager != null ? Tool.AssetsManager.AttackCharacterGraphics : null);
-        prefab = prefab != null ? prefab : FirstGraphic(Tool.AssetsManager != null ? Tool.AssetsManager.DefenseCharacterGraphics : null);
+        GameObject prefab = FirstGraphic(ResourceType.AttackCharacterGraphics);
+        prefab = prefab != null ? prefab : FirstGraphic(ResourceType.DefenseCharacterGraphics);
         if (prefab == null)
         {
-            status = "AssetsManager 里没有可用的角色预制体，无法生成测试实体";
+            status = "ResourceManager 里没有已加载的角色预制体（进游戏预加载未完成）";
             return;
         }
         try
@@ -167,9 +167,9 @@ public class SkillTest : MonoBehaviour
     private void SpawnDummy()
     {
         if (Tool.InfoManager == null) { status = "场景中没有 InfoManager，无法生成测试敌人"; return; }
-        GameObject prefab = FirstGraphic(Tool.AssetsManager != null ? Tool.AssetsManager.DefenseCharacterGraphics : null);
-        prefab = prefab != null ? prefab : FirstGraphic(Tool.AssetsManager != null ? Tool.AssetsManager.AttackCharacterGraphics : null);
-        if (prefab == null) { status = "AssetsManager 里没有可用的角色预制体"; return; }
+        GameObject prefab = FirstGraphic(ResourceType.DefenseCharacterGraphics);
+        prefab = prefab != null ? prefab : FirstGraphic(ResourceType.AttackCharacterGraphics);
+        if (prefab == null) { status = "ResourceManager 里没有已加载的角色预制体"; return; }
         try
         {
             var go = Instantiate(prefab, new Vector3(0f, 0f, 5f), Quaternion.identity);
@@ -193,11 +193,13 @@ public class SkillTest : MonoBehaviour
         }
     }
 
-    private static GameObject FirstGraphic(List<GameObject> list)
+    // 只取已加载的模板：测试场景里进游戏预加载已经跑过
+    private static GameObject FirstGraphic(ResourceType type)
     {
-        if (list == null) return null;
-        foreach (var go in list)
-            if (go != null) return go;
+        if (Tool.ResourceManager == null) return null;
+        int count = Tool.ResourceManager.AssetCount(type);
+        for (int i = 0; i < count; i++)
+            if (Tool.ResourceManager.TryGetPrefab(type, i, out var go) && go != null) return go;
         return null;
     }
 

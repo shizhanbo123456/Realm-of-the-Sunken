@@ -90,13 +90,13 @@ public static class GuideCatalog
 
     private static Texture SkillIcon(int skillId)
     {
-        var map = Tool.AssetsManager != null ? Tool.AssetsManager.SkillIconMap : null;
+        var map = Tool.ResourceManager != null ? Tool.ResourceManager.SkillIconMap : null;
         return map != null && map.TryGetValue(skillId, out var tex) ? tex : null;
     }
 
     private static Texture BuffIcon(int iconId)
     {
-        var map = Tool.AssetsManager != null ? Tool.AssetsManager.BuffIconMap : null;
+        var map = Tool.ResourceManager != null ? Tool.ResourceManager.BuffIconMap : null;
         return map != null && map.TryGetValue(iconId, out var tex) ? tex : null;
     }
 

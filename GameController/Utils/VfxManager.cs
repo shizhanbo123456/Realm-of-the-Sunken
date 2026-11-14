@@ -1,5 +1,9 @@
+using System;
+using Ros.Skill;
 using UnityEngine;
 
+// 全项目唯一的特效取用入口。模板经 ResourceManager 按需加载，加载完成后在回调里落到算好的位姿上：
+// 定点版生成即播放并按时长销毁，轨迹版交给 BulletPlayer 驱动，跟随类（护盾/Buff/光环）由持有者决定何时销毁。
 public class VfxManager : MonoBehaviour
 {
     private void Awake()
@@ -7,83 +11,59 @@ public class VfxManager : MonoBehaviour
         Tool.VfxManager = this;
     }
 
-    #region 特效模板获取（按类别返回预制体，供自定义播放方式使用）
-    public GameObject GetBulletVfx(int index)
+    #region 取实例（按需加载）
+    // position/rotation 必须由调用方在请求时算好：粒子在实例化那一帧就会喷，晚摆会留下原点残影
+    public void LoadVfx(ResourceType type, int index, Vector3 position, Quaternion rotation, Action<GameObject> onSpawned)
     {
-        var list = Tool.AssetsManager != null ? Tool.AssetsManager.BulletVFX : null;
-        return GetVFX(list, index);
+        if (Tool.ResourceManager == null)
+        {
+            Debug.LogError("[Vfx] 缺少 ResourceManager：无法加载特效");
+            return;
+        }
+        Tool.ResourceManager.Load(type, index, position, rotation, onSpawned);
     }
 
-    public GameObject GetShieldVfx(int index)
+    public static bool TryResourceOf(SkillVfxKind kind, out ResourceType type)
     {
-        var list = Tool.AssetsManager != null ? Tool.AssetsManager.ShieldVFX : null;
-        return GetVFX(list, index);
-    }
-
-    public GameObject GetRangeMagicVfx(int index)
-    {
-        var list = Tool.AssetsManager != null ? Tool.AssetsManager.RangeMagicVFX : null;
-        return GetVFX(list, index);
-    }
-
-    public GameObject GetMagicCircleVfx(int index)
-    {
-        var list = Tool.AssetsManager != null ? Tool.AssetsManager.MagicCircleVFX : null;
-        return GetVFX(list, index);
-    }
-
-    public GameObject GetBuffVfx(int index)
-    {
-        var list = Tool.AssetsManager != null ? Tool.AssetsManager.BuffVFX : null;
-        return GetVFX(list, index);
-    }
-
-    public GameObject GetHitVfx(int index)
-    {
-        var list = Tool.AssetsManager != null ? Tool.AssetsManager.HitVFX : null;
-        return GetVFX(list, index);
-    }
-
-    public GameObject GetSlashVfx(int index)
-    {
-        var list = Tool.AssetsManager != null ? Tool.AssetsManager.SlashVFX : null;
-        return GetVFX(list, index);
-    }
-
-    public GameObject GetProjectionVfx(int index)
-    {
-        var list = Tool.AssetsManager != null ? Tool.AssetsManager.ProjectionVFX : null;
-        return GetVFX(list, index);
+        switch (kind)
+        {
+            case SkillVfxKind.Bullet: type = ResourceType.BulletVFX; return true;
+            case SkillVfxKind.Shield: type = ResourceType.ShieldVFX; return true;
+            case SkillVfxKind.RangeMagic: type = ResourceType.RangeMagicVFX; return true;
+            case SkillVfxKind.MagicCircle: type = ResourceType.MagicCircleVFX; return true;
+            case SkillVfxKind.Buff: type = ResourceType.BuffVFX; return true;
+            case SkillVfxKind.Slash: type = ResourceType.SlashVFX; return true;
+            case SkillVfxKind.Projection: type = ResourceType.ProjectionVFX; return true;
+            case SkillVfxKind.Weapon: type = ResourceType.WeaponPrefabs; return true;
+            default: type = default; return false;
+        }
     }
     #endregion
 
-    #region 通用播放原语（已持有模板 GameObject 时使用）
-    public GameObject Play(GameObject vfxPrefab, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
+    #region 播放原语（已持有实例）
+    public GameObject Play(GameObject instance, float lifeTime, float scale = 0f)
     {
-        if (vfxPrefab == null) return null;
-        var obj = Instantiate(vfxPrefab, pos, rot);
-        ApplyScale(obj, scale);
-        Destroy(obj, ResolveLife(vfxPrefab, lifeTime));
-        return obj;
+        if (instance == null) return null;
+        ApplyScale(instance, scale);
+        Destroy(instance, ResolveLife(instance, lifeTime));
+        return instance;
     }
 
-    public GameObject Play(GameObject vfxPrefab, BulletTrajectory trajectory, float lifeTime = 0f,
+    public GameObject Play(GameObject instance, BulletTrajectory trajectory, float lifeTime = 0f,
         BulletPlayer.RotationMode rotation = BulletPlayer.RotationMode.Tangent, float scale = 0f)
     {
-        if (vfxPrefab == null || trajectory == null) return null;
-        // 必须实例化时就给到起点：世界空间的粒子在 playOnAwake 的瞬间就会按预制体位置喷一帧，之后再摆位置会留下原点残影
-        var obj = Instantiate(vfxPrefab, trajectory.Lerp(0f), vfxPrefab.transform.rotation);
-        ApplyScale(obj, scale);
+        if (instance == null || trajectory == null) return null;
+        ApplyScale(instance, scale);
         float life = lifeTime > 0f ? lifeTime : trajectory.Duration;
         // 跟随实体的持续表现（护盾/Buff/光环）由持有者决定何时销毁，不吃资产存活时长
-        BulletPlayer.Create(obj, trajectory, trajectory is SkillTrajectoryFollow ? life : ResolveLife(vfxPrefab, life), rotation);
-        return obj;
+        BulletPlayer.Create(instance, trajectory, trajectory is SkillTrajectoryFollow ? life : ResolveLife(instance, life), rotation);
+        return instance;
     }
 
     // 存活时长：资产填了就用资产的；<=0（-1 = 资产自身不主动清除）用调用方给的时长，再退回 1 秒防泄漏
-    private static float ResolveLife(GameObject vfxPrefab, float lifeTime)
+    private static float ResolveLife(GameObject instance, float lifeTime)
     {
-        float asset = BulletVfxInfo.LifeOf(vfxPrefab);
+        float asset = BulletVfxInfo.LifeOf(instance);
         if (asset > 0f) return asset;
         return lifeTime > 0f ? lifeTime : 1f;
     }
@@ -96,129 +76,122 @@ public class VfxManager : MonoBehaviour
     }
     #endregion
 
-    #region 按下标播放（取模板 + 播放的便捷封装，外部常规入口）
+    #region 按下标播放（内部按需加载）
     public void PlayBulletVFX(int index, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
     {
-        Play(GetBulletVfx(index), pos, rot, lifeTime, scale);
+        PlayByIndex(ResourceType.BulletVFX, index, pos, rot, lifeTime, scale);
     }
 
-    public GameObject PlayBulletVFX(int index, BulletTrajectory trajectory, float lifeTime = 0f,
+    public void PlayBulletVFX(int index, BulletTrajectory trajectory, float lifeTime = 0f,
         BulletPlayer.RotationMode rotation = BulletPlayer.RotationMode.Tangent, float scale = 0f)
     {
-        return Play(GetBulletVfx(index), trajectory, lifeTime, rotation, scale);
+        PlayByIndex(ResourceType.BulletVFX, index, trajectory, lifeTime, rotation, scale);
     }
 
-    // 传武器编号（entity.csv「武器编号」）
-    public GameObject PlayWeaponVFX(int weaponId, BulletTrajectory trajectory, float lifeTime = 0f,
+    // 传武器编号（entity.csv「武器编号」）；武器在进游戏时已预加载，回调是同步的
+    public void PlayWeaponVFX(int weaponId, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
+    {
+        PlayByIndex(ResourceType.WeaponPrefabs, weaponId, pos, rot, lifeTime, scale);
+    }
+
+    public void PlayWeaponVFX(int weaponId, BulletTrajectory trajectory, float lifeTime = 0f,
         BulletPlayer.RotationMode rotation = BulletPlayer.RotationMode.Tangent, float scale = 0f)
     {
-        if (Tool.AssetsManager == null || !Tool.AssetsManager.TryGetWeaponPrefab(weaponId, out var prefab)) return null;
-        return Play(prefab, trajectory, lifeTime, rotation, scale);
+        PlayByIndex(ResourceType.WeaponPrefabs, weaponId, trajectory, lifeTime, rotation, scale);
     }
 
-    // 传武器编号（entity.csv「武器编号」）
-    public GameObject PlayWeaponVFX(int weaponId, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
+    public void PlayShieldVFX(int index, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
     {
-        if (Tool.AssetsManager == null || !Tool.AssetsManager.TryGetWeaponPrefab(weaponId, out var prefab)) return null;
-        return Play(prefab, pos, rot, lifeTime, scale);
+        PlayByIndex(ResourceType.ShieldVFX, index, pos, rot, lifeTime, scale);
     }
 
-    public GameObject PlayShieldVFX(int index, BulletTrajectory trajectory, float lifeTime = 0f,
+    public void PlayShieldVFX(int index, BulletTrajectory trajectory, float lifeTime = 0f,
         BulletPlayer.RotationMode rotation = BulletPlayer.RotationMode.Constant, float scale = 0f)
     {
-        return Play(GetShieldVfx(index), trajectory, lifeTime, rotation, scale);
-    }
-
-    public GameObject PlayShieldVFX(int index, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
-    {
-        return Play(GetShieldVfx(index), pos, rot, lifeTime, scale);
+        PlayByIndex(ResourceType.ShieldVFX, index, trajectory, lifeTime, rotation, scale);
     }
 
     public void PlayRangeMagicVFX(int index, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
     {
-        Play(GetRangeMagicVfx(index), pos, rot, lifeTime, scale);
+        PlayByIndex(ResourceType.RangeMagicVFX, index, pos, rot, lifeTime, scale);
     }
 
     // 轨迹版语义：取轨迹终点（Lerp(1)）落地定点播放，朝向固定 identity
     public void PlayRangeMagicVFX(int index, BulletTrajectory trajectory, float lifeTime = 0f, float scale = 0f)
     {
-        if (trajectory == null) return;
-        float life = lifeTime > 0f ? lifeTime : trajectory.Duration;
-        PlayRangeMagicVFX(index, trajectory.End, Quaternion.identity, life, scale);
+        PlayAtTrajectoryEnd(ResourceType.RangeMagicVFX, index, trajectory, lifeTime, scale);
     }
 
-    public GameObject PlayMagicCircleVFX(int index, Vector3 pos, float duration, float scale = 0f)
+    public void PlayMagicCircleVFX(int index, Vector3 pos, float duration, float scale = 0f)
     {
-        var prefab = GetMagicCircleVfx(index);
-        if (prefab == null) return null;
-        var obj = Instantiate(prefab, pos, Quaternion.identity);
-        ApplyScale(obj, scale);
-        Destroy(obj, ResolveLife(prefab, duration));
-        return obj;
+        PlayByIndex(ResourceType.MagicCircleVFX, index, pos, Quaternion.identity, duration, scale);
     }
 
     // 轨迹版语义：取轨迹终点（Lerp(1)）落地定点播放，朝向固定 identity
-    public GameObject PlayMagicCircleVFX(int index, BulletTrajectory trajectory, float duration = 0f, float scale = 0f)
+    public void PlayMagicCircleVFX(int index, BulletTrajectory trajectory, float duration = 0f, float scale = 0f)
     {
-        if (trajectory == null) return null;
-        float life = duration > 0f ? duration : trajectory.Duration;
-        return PlayMagicCircleVFX(index, trajectory.End, life, scale);
+        PlayAtTrajectoryEnd(ResourceType.MagicCircleVFX, index, trajectory, duration, scale);
     }
 
-    public GameObject PlayBuffVFX(int index, BulletTrajectory trajectory, float lifeTime = 0f,
+    public void PlayBuffVFX(int index, BulletTrajectory trajectory, float lifeTime = 0f,
         BulletPlayer.RotationMode rotation = BulletPlayer.RotationMode.Constant, float scale = 0f)
     {
-        return Play(GetBuffVfx(index), trajectory, lifeTime, rotation, scale);
+        PlayByIndex(ResourceType.BuffVFX, index, trajectory, lifeTime, rotation, scale);
     }
 
-    public GameObject PlayBuffVFX(int index, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
+    public void PlayBuffVFX(int index, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
     {
-        return Play(GetBuffVfx(index), pos, rot, lifeTime, scale);
+        PlayByIndex(ResourceType.BuffVFX, index, pos, rot, lifeTime, scale);
     }
 
-    public GameObject PlayHitVFX(int index, Vector3 pos, float lifeTime, float scale = 0f)
+    public void PlayHitVFX(int index, Vector3 pos, float lifeTime, float scale = 0f)
     {
-        return Play(GetHitVfx(index), pos, Quaternion.identity, lifeTime, scale);
+        PlayByIndex(ResourceType.HitVFX, index, pos, Quaternion.identity, lifeTime, scale);
     }
 
-    public GameObject PlaySlashVFX(int index, BulletTrajectory trajectory, float lifeTime = 0f,
+    public void PlaySlashVFX(int index, BulletTrajectory trajectory, float lifeTime = 0f,
         BulletPlayer.RotationMode rotation = BulletPlayer.RotationMode.Tangent, float scale = 0f)
     {
-        return Play(GetSlashVfx(index), trajectory, lifeTime, rotation, scale);
+        PlayByIndex(ResourceType.SlashVFX, index, trajectory, lifeTime, rotation, scale);
     }
 
-    public GameObject PlaySlashVFX(int index, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
+    public void PlaySlashVFX(int index, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
     {
-        return Play(GetSlashVfx(index), pos, rot, lifeTime, scale);
+        PlayByIndex(ResourceType.SlashVFX, index, pos, rot, lifeTime, scale);
     }
 
-    public GameObject PlayProjectionVFX(int index, BulletTrajectory trajectory, float lifeTime = 0f,
+    public void PlayProjectionVFX(int index, BulletTrajectory trajectory, float lifeTime = 0f,
         BulletPlayer.RotationMode rotation = BulletPlayer.RotationMode.Tangent, float scale = 0f)
     {
-        return Play(GetProjectionVfx(index), trajectory, lifeTime, rotation, scale);
+        PlayByIndex(ResourceType.ProjectionVFX, index, trajectory, lifeTime, rotation, scale);
     }
 
-    public GameObject PlayProjectionVFX(int index, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
+    public void PlayProjectionVFX(int index, Vector3 pos, Quaternion rot, float lifeTime, float scale = 0f)
     {
-        return Play(GetProjectionVfx(index), pos, rot, lifeTime, scale);
+        PlayByIndex(ResourceType.ProjectionVFX, index, pos, rot, lifeTime, scale);
     }
     #endregion
 
     #region//Local
-    private GameObject GetVFX(System.Collections.Generic.List<GameObject> list, int index)
+    private void PlayByIndex(ResourceType type, int index, Vector3 pos, Quaternion rot, float lifeTime, float scale)
     {
-        if (list == null)
-        {
-            Debug.LogError("[Vfx] 特效列表未配置（AssetsManager 缺失或启动自检未通过）");
-            return null;
-        }
-        if (index < 0 || index >= list.Count)
-        {
-            Debug.LogError($"[Vfx] 特效下标越界：{index}（该类共 {list.Count} 个），请核对《特效清单与分配表》");
-            return null;
-        }
-        if (list[index] == null) Debug.LogError($"[Vfx] 特效预制体为空：下标 {index}");
-        return list[index];
+        LoadVfx(type, index, pos, rot, obj => Play(obj, lifeTime, scale));
+    }
+
+    private void PlayByIndex(ResourceType type, int index, BulletTrajectory trajectory, float lifeTime,
+        BulletPlayer.RotationMode rotation, float scale)
+    {
+        if (trajectory == null) return;
+        LoadVfx(type, index, trajectory.Lerp(0f), Quaternion.identity,
+            obj => Play(obj, trajectory, lifeTime, rotation, scale));
+    }
+
+    // 轨迹版语义：取轨迹终点（Lerp(1)）落地定点播放
+    private void PlayAtTrajectoryEnd(ResourceType type, int index, BulletTrajectory trajectory, float lifeTime, float scale)
+    {
+        if (trajectory == null) return;
+        float life = lifeTime > 0f ? lifeTime : trajectory.Duration;
+        PlayByIndex(type, index, trajectory.End, Quaternion.identity, life, scale);
     }
     #endregion
 }
