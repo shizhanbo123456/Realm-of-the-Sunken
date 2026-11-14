@@ -29,7 +29,7 @@ namespace TerrainGen
 
         // 客户端：建内容根与点位，物件交给 Culler 按区块流式取还
         // 编辑器非播放态：只把数据烘焙到 StreamingAssets/TerrainGenerator 并返回 null
-        public TerrainPropCuller Generate()
+        public TerrainPropCuller Generate(System.Action onGenerated = null)
         {
             if (settings == null)
             {
@@ -37,6 +37,43 @@ namespace TerrainGen
                 return null;
             }
 
+            // 编辑器烘焙直接用 Inspector 里的 kit
+            if (!Application.isPlaying)
+            {
+                TerrainPropCuller baked = GenerateInternal();
+                onGenerated?.Invoke();
+                return baked;
+            }
+
+            // 运行时客户端由 ResourceManager 加载素材表：kit 上直接引用会让预制体被重复打包，必须留空
+            if (kit != null)
+            {
+                Debug.LogError("[地形] 客户端场景不应直接挂 kit（地形预制体会被重复打包），请清空它并在 ResourceManager 配好 BuildingKit", this);
+                kit = null;
+            }
+            if (Tool.ResourceManager == null)
+            {
+                Debug.LogError("[地形] 客户端缺少 ResourceManager，无法加载地形素材表", this);
+                return null;
+            }
+
+            Tool.ResourceManager.LoadBuildingKit(loaded =>
+            {
+                if (loaded == null)
+                {
+                    Debug.LogError("[地形] 地形素材表加载失败，地形未生成", this);
+                    onGenerated?.Invoke();
+                    return;
+                }
+                kit = loaded;
+                GenerateInternal();
+                onGenerated?.Invoke();
+            });
+            return null;
+        }
+
+        private TerrainPropCuller GenerateInternal()
+        {
             Clear();
             culler = TerrainGenerator.Generate(settings, kit, out contentRoot);
             return culler;
@@ -48,6 +85,11 @@ namespace TerrainGen
             if (settings == null)
             {
                 Debug.LogError("[地形] 未指定生成参数 BuildingSettings", this);
+                return;
+            }
+            if (kit == null)
+            {
+                Debug.LogError("[地形] 服务器场景未指定素材表 kit：地形未生成", this);
                 return;
             }
 

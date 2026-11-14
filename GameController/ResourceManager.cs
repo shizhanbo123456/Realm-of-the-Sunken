@@ -248,12 +248,13 @@ public class ResourceManager : MonoBehaviour
             onLoaded?.Invoke(buildingKitHandle.Result);
             return;
         }
-        if (onLoaded != null) buildingKitWaiting.Add(() => onLoaded(buildingKitHandle.Result));
+        if (onLoaded != null) buildingKitWaiting.Add(() => onLoaded(IsBuildingKitLoaded ? buildingKitHandle.Result : null));
         if (buildingKitLoading) return;
 
         if (BuildingKit == null || !BuildingKit.RuntimeKeyIsValid())
         {
             Debug.LogError("[资源] BuildingKit 未配置或 AssetReference 无效：地形无法生成");
+            FlushBuildingKit();
             return;
         }
 
@@ -266,12 +267,13 @@ public class ResourceManager : MonoBehaviour
     {
         buildingKitLoading = false;
         if (operation.Status != AsyncOperationStatus.Succeeded || operation.Result == null)
-        {
             Debug.LogError($"[资源] 地形素材表加载失败：{operation.OperationException?.Message}");
-            buildingKitWaiting.Clear();
-            return;
-        }
+        FlushBuildingKit();
+    }
 
+    // 失败也要回调（结果为 null），否则等素材表的加载阶段会一直卡住
+    private void FlushBuildingKit()
+    {
         var callbacks = new List<Action>(buildingKitWaiting);
         buildingKitWaiting.Clear();
         for (int i = 0; i < callbacks.Count; i++) callbacks[i]();

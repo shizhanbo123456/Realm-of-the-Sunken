@@ -12,6 +12,7 @@ public class ClientLoadingManager : ClientSubManager
         AttackPlayers,
         DefensePlayers,
         AiUnits,
+        BattleAssets,   // 僵尸/精英/雕像/珊瑚预加载
     }
 
     private readonly List<LoadingUnitEntry> units = new(); // 三步汇总：真人玩家 + AI 单位
@@ -20,6 +21,8 @@ public class ClientLoadingManager : ClientSubManager
     private readonly Dictionary<int, int> playerEntities = new(); // 玩家令牌 → 实体 id（-1 = 无实体）
 
     private Step step = Step.Idle;
+    private bool terrainReady;       // 地形已生成（素材表要异步加载，不能假定在 Prepared 之前完成）
+    private bool preparedReceived;
 
     public static ClientLoadingManager Current =>
         Tool.ClientLogicManager != null ? Tool.ClientLogicManager.Loading : null;
@@ -58,16 +61,25 @@ public class ClientLoadingManager : ClientSubManager
         Camp = info.camp;
         OwnEntityId = 0;
         step = Step.Idle;
+        terrainReady = false;
+        preparedReceived = false;
         if (Tool.UIManager != null) Tool.UIManager.ShowLoading();
         GenerateTerrain();
     }
 
-    // 服务器预处理完成（实体 id 已预分配）：开始逐步请求数据
+    // 服务器预处理完成（实体 id 已预分配）：地形就绪后才开始逐步请求数据
     public void OnLoadingPrepared(SCLoadingPrepared info)
     {
         OwnEntityId = info.ownEntityId;
         CharacterType = info.characterType;
         NetworkManager.SyncServerTime(info.serverTime); // 服务器时间基准，顺带校准本地时钟
+        preparedReceived = true;
+        TryStartSteps();
+    }
+
+    private void TryStartSteps()
+    {
+        if (!terrainReady || !preparedReceived) return;
         step = Step.AttackPlayers;
         if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(0f, "正在加载…");
         if (Tool.NetworkManager != null) Tool.NetworkManager.SendLoadingAttackPlayerRequest();
@@ -78,7 +90,7 @@ public class ClientLoadingManager : ClientSubManager
         if (step != Step.AttackPlayers) return;
         Merge(info.list);
         step = Step.DefensePlayers;
-        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(1f / 3f, "正在加载…");
+        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(1f / 4f, "正在加载…");
         if (Tool.NetworkManager != null) Tool.NetworkManager.SendLoadingDefensePlayerRequest();
     }
 
@@ -87,7 +99,7 @@ public class ClientLoadingManager : ClientSubManager
         if (step != Step.DefensePlayers) return;
         Merge(info.list);
         step = Step.AiUnits;
-        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(2f / 3f, "正在加载…");
+        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(2f / 4f, "正在加载…");
         if (Tool.NetworkManager != null) Tool.NetworkManager.SendLoadingAiUnitRequest();
     }
 
@@ -95,6 +107,19 @@ public class ClientLoadingManager : ClientSubManager
     {
         if (step != Step.AiUnits) return;
         Merge(info.list);
+        step = Step.BattleAssets;
+        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(3f / 4f, "正在加载战斗资源…");
+        if (Tool.ResourceManager == null)
+        {
+            Debug.LogError("[加载] 缺少 ResourceManager：僵尸与珊瑚未预加载");
+            FinishLoading();
+            return;
+        }
+        Tool.ResourceManager.LoadBattleNecessary(FinishLoading);
+    }
+
+    private void FinishLoading()
+    {
         step = Step.Idle;
         if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(1f, "加载完成");
         if (Tool.NetworkManager != null) Tool.NetworkManager.SendLoadingComplete();
@@ -133,16 +158,25 @@ public class ClientLoadingManager : ClientSubManager
 
     #region//Local
     // 地形一次性生成在加载界面：之后由 Culler 按主相机位置取还区块，离开战斗页再销毁
+    // 素材表走 Addressables，生成完成才放行后面的加载步骤
     private void GenerateTerrain()
     {
         if (Tool.ModularTerrainGenerator == null)
         {
             Debug.LogError("[地形] 场景未挂 ModularTerrainGenerator：进战斗不会生成地形");
+            terrainReady = true;
+            TryStartSteps();
             return;
         }
 
         if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(0f, "正在生成地形…");
-        Tool.ModularTerrainGenerator.Generate();
+        Tool.ModularTerrainGenerator.Generate(OnTerrainGenerated);
+    }
+
+    private void OnTerrainGenerated()
+    {
+        terrainReady = true;
+        TryStartSteps();
     }
 
     private void Merge(List<LoadingUnitEntry> list)
