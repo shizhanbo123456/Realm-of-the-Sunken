@@ -14,17 +14,32 @@ public class HomePreviewManager : ClientSubManager
     private readonly List<ViewEntry> views = new();                 // 场上现有视图
     private readonly List<(EntityType type, Transform anchor)> slots = new(); // 本次期望摆位
     private readonly Dictionary<EntityType, List<GameObject>> pool = new();   // 复用池：类型 → 可用视图
+    private readonly HashSet<int> failedLoads = new();              // 已报过错的资源槽位：不再重试，避免刷日志
+    private readonly List<int> lastAttackers = new();
+    private readonly List<int> lastDefensers = new();
     private HomeDisplayArranger homeStage;
     private LobbyDisplayArranger lobbyStage;
     private GameObject homeView;
+    private EntityType lastHomeType;
+    private bool lastWasLobby;
+    private bool rebuildQueued;   // 正等素材加载，避免重复排队
+    private bool hidden;
 
     // 首页：复制 Home Arranger（已复制则复用）并在 CharacterAnchor 摆一个角色
     public void RefreshHome(EntityType type)
     {
+        hidden = false;
+        lastWasLobby = false;
+        lastHomeType = type;
+        DoRefreshHome();
+    }
+
+    private void DoRefreshHome()
+    {
         var stage = HomeStage();
         if (stage == null) return;
         slots.Clear();
-        slots.Add((type, stage.CharacterAnchor));
+        slots.Add((lastHomeType, stage.CharacterAnchor));
         var got = Apply();
         homeView = got.Length > 0 ? got[0] : null;
     }
@@ -53,11 +68,22 @@ public class HomePreviewManager : ClientSubManager
     // 大厅：复制 Lobby Arranger（已复制则复用），真人成员按成员表顺序占锚点（下标 < 0 由调用方过滤）
     public void RefreshLobby(IReadOnlyList<int> attackerIndices, IReadOnlyList<int> defenserIndices)
     {
+        hidden = false;
+        lastWasLobby = true;
+        lastAttackers.Clear();
+        if (attackerIndices != null) lastAttackers.AddRange(attackerIndices);
+        lastDefensers.Clear();
+        if (defenserIndices != null) lastDefensers.AddRange(defenserIndices);
+        DoRefreshLobby();
+    }
+
+    private void DoRefreshLobby()
+    {
         var stage = LobbyStage();
         if (stage == null) return;
         slots.Clear();
-        FillSlots(stage.AttackerAnchors, attackerIndices, true);
-        FillSlots(stage.DefenserAnchors, defenserIndices, false);
+        FillSlots(stage.AttackerAnchors, lastAttackers, true);
+        FillSlots(stage.DefenserAnchors, lastDefensers, false);
         Apply();
     }
 
@@ -72,6 +98,7 @@ public class HomePreviewManager : ClientSubManager
     // 进战斗前清掉两页的场景与角色（相机交给 CameraController）
     public void Hide()
     {
+        hidden = true;
         ClearViews();
         DestroyHomeStage();
         DestroyLobbyStage();
@@ -80,16 +107,59 @@ public class HomePreviewManager : ClientSubManager
     protected override void UnbindEvents() => Hide();
 
     #region//Local
+    private bool HasFailed(ResourceType type, int index) => failedLoads.Contains(SlotKey(type, index));
+
+    private static int SlotKey(ResourceType type, int index) => ((int)type << 16) | index;
+
+    // 素材是异步加载的：首页/大厅在自己 Start 里就要布置，此时常驻资源通常还没到货。
+    // 这里挂一次等待，到货后重放最后一次布置请求；加载失败或字段没配则报错一次、不再排队。
+    private void QueueRebuild(ResourceType type, int index)
+    {
+        if (rebuildQueued || HasFailed(type, index)) return;
+        if (Tool.ResourceManager == null)
+        {
+            failedLoads.Add(SlotKey(type, index));
+            Debug.LogError("[展示] 缺少 ResourceManager：展示素材无法加载");
+            return;
+        }
+        if (!Tool.ResourceManager.IsAssetConfigured(type, index))
+        {
+            failedLoads.Add(SlotKey(type, index));
+            Debug.LogError($"[展示] ResourceManager 的 {type}[{index}] 未配置（AssetReference 为空或未指向 addressable 资产）");
+            return;
+        }
+
+        rebuildQueued = true;
+        Tool.ResourceManager.LoadTemplate(type, index, template =>
+        {
+            rebuildQueued = false;
+            if (template == null)
+            {
+                failedLoads.Add(SlotKey(type, index));
+                Debug.LogError($"[展示] {type}[{index}] 加载失败：展示缺少该资源");
+                return;
+            }
+            ReplayLast();
+        });
+    }
+
+    private void ReplayLast()
+    {
+        if (hidden) return;
+        if (lastWasLobby) DoRefreshLobby();
+        else DoRefreshHome();
+    }
+
     // 首页/大厅的场景互斥：复制其中一个时销毁另一个
     private HomeDisplayArranger HomeStage()
     {
         if (homeStage != null) return homeStage;
-        DestroyLobbyStage();
         if (!TryGetStagePrefab<HomeDisplayArranger>(ResourceType.HomeDisplayArranger, out var prefab))
         {
-            Debug.LogError("[展示] ResourceManager 的 HomeDisplayArranger 为空（HomeArranger 预制体），首页无法布置场景");
+            QueueRebuild(ResourceType.HomeDisplayArranger, 0);
             return null;
         }
+        DestroyLobbyStage();
         homeStage = UnityEngine.Object.Instantiate(prefab);
         return homeStage;
     }
@@ -97,12 +167,12 @@ public class HomePreviewManager : ClientSubManager
     private LobbyDisplayArranger LobbyStage()
     {
         if (lobbyStage != null) return lobbyStage;
-        DestroyHomeStage();
         if (!TryGetStagePrefab<LobbyDisplayArranger>(ResourceType.LobbyDisplayArranger, out var prefab))
         {
-            Debug.LogError("[展示] ResourceManager 的 LobbyDisplayArranger 为空（LobbyArranger 预制体），大厅无法布置场景");
+            QueueRebuild(ResourceType.LobbyDisplayArranger, 0);
             return null;
         }
+        DestroyHomeStage();
         lobbyStage = UnityEngine.Object.Instantiate(prefab);
         return lobbyStage;
     }
@@ -189,11 +259,29 @@ public class HomePreviewManager : ClientSubManager
     private GameObject AddView(EntityType type, Transform anchor)
     {
         if (anchor == null) return null;
-        if (Tool.ResourceManager == null || !Tool.ResourceManager.TryGetGraphic(type, out var prefab) || prefab == null)
+        if (Tool.ResourceManager == null)
         {
-            Debug.LogError($"[展示] 缺少角色图形：{type}");
+            Debug.LogError("[展示] 缺少 ResourceManager：无法取角色图形");
             return null;
         }
+        if (!Tool.ResourceManager.TryGetGraphic(type, out var prefab) || prefab == null)
+        {
+            // 角色图形同样可能还没加载完：等它到货再重放一次布置
+            if (Tool.ResourceManager.TryGetGraphicSlot(type, out ResourceType resourceType, out int index))
+                QueueRebuild(resourceType, index);
+            else
+                Debug.LogError($"[展示] 缺少角色图形：{type}（ResourceManager 未配置该类别）");
+            return null;
+        }
+        // 武器编号取实体配表，动作集与武器显示类型取武器表，与战斗客户端同口径
+        int weaponId = EntityConfig.GetByCategory(type).weaponId ?? -1;
+        // 武器也是异步预加载的：没到货就先不建视图，等它到了再重放（无武器实体不受影响）
+        if (weaponId >= 0 && !Tool.ResourceManager.TryGetWeaponPrefab(weaponId, out _))
+        {
+            QueueRebuild(ResourceType.WeaponPrefabs, weaponId);
+            return null;
+        }
+
         var go = UnityEngine.Object.Instantiate(prefab, anchor.position, anchor.rotation);
 
         var anim = go.GetComponentInChildren<EntityAnim>();
@@ -203,8 +291,6 @@ public class HomePreviewManager : ClientSubManager
             return go;
         }
         anim.Init(null);
-        // 武器编号取实体配表，动作集与武器显示类型取武器表，与战斗客户端同口径
-        int weaponId = EntityConfig.GetByCategory(type).weaponId ?? -1;
         if (weaponId < 0)
         {
             Debug.LogError($"[展示] {type} 没有配武器编号：动作集与武器显示类型都取自 weapon.csv");

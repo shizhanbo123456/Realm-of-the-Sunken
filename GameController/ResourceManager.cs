@@ -28,6 +28,7 @@ public class ResourceManager : MonoBehaviour
         public AsyncOperationHandle<GameObject> handle;
         public readonly List<GameObject> instances = new();
         public readonly List<Pending> waiting = new();   // 加载中排队的实例化请求
+        public readonly List<Action<GameObject>> templateWaiting = new();   // 加载中排队的「只要模板」请求
         public readonly List<Action> notify = new();     // 加载结束的完成通知（含失败）
         public Timer.TimerHandle unloadTimer;
     }
@@ -190,15 +191,44 @@ public class ResourceManager : MonoBehaviour
         entry.waiting.Add(new Pending { position = position, rotation = rotation, callback = onLoaded });
         EnsureLoaded(key, entry);
     }
+
+    // 只要模板本体（不实例化）；未加载时会等加载完成再回调，加载失败回调 null
+    public void LoadTemplate(ResourceType type, int index, Action<GameObject> onLoaded)
+    {
+        if (onLoaded == null)
+        {
+            Debug.LogError($"[资源] LoadTemplate 的回调为空：{type}[{index}]");
+            return;
+        }
+
+        int key = RefToInt(type, index);
+        Entry entry = GetEntry(key);
+        CancelUnload(entry);
+        if (entry.state == AssetState.Loaded)
+        {
+            onLoaded(entry.handle.Result);
+            return;
+        }
+
+        entry.templateWaiting.Add(onLoaded);
+        EnsureLoaded(key, entry);
+    }
     #endregion
 
     #region 取模板（要求已加载）
     public bool TryGetGraphic(EntityType type, out GameObject prefab)
     {
         prefab = null;
-        if (!GraphicIndexResolver.Resolve(type, CountOf, out ResourceType resourceType, out int index)) return false;
-        if (index == GraphicIndexResolver.RandomIndex) index = GraphicIndexResolver.PickRandom(index, CountOf(resourceType));
+        if (!TryGetGraphicSlot(type, out ResourceType resourceType, out int index)) return false;
         return TryGetPrefab(resourceType, index, out prefab);
+    }
+
+    // EntityType → 具体资源槽位（珊瑚的随机下标在这里就定下来）
+    public bool TryGetGraphicSlot(EntityType type, out ResourceType resourceType, out int index)
+    {
+        if (!GraphicIndexResolver.Resolve(type, CountOf, out resourceType, out index)) return false;
+        if (index == GraphicIndexResolver.RandomIndex) index = GraphicIndexResolver.PickRandom(index, CountOf(resourceType));
+        return true;
     }
 
     // 武器是一维列表：编号即 entity.csv「武器编号」
@@ -352,11 +382,13 @@ public class ResourceManager : MonoBehaviour
             entry.state = AssetState.Unloaded;
             entry.handle = default;
             entry.waiting.Clear();
+            FlushTemplates(entry, null);
             FlushNotify(entry);
             return;
         }
 
         entry.state = AssetState.Loaded;
+        GameObject template = entry.handle.Result;
 
         if (entry.waiting.Count > 0)
         {
@@ -368,7 +400,17 @@ public class ResourceManager : MonoBehaviour
                 pending.callback(Spawn(entry, pending.position, pending.rotation));
             }
         }
+
+        FlushTemplates(entry, template);
         FlushNotify(entry);
+    }
+
+    private static void FlushTemplates(Entry entry, GameObject template)
+    {
+        if (entry.templateWaiting.Count == 0) return;
+        var callbacks = new List<Action<GameObject>>(entry.templateWaiting);
+        entry.templateWaiting.Clear();
+        for (int i = 0; i < callbacks.Count; i++) callbacks[i](template);
     }
 
     // 加载失败也要通知，否则依赖完成通知的加载阶段会一直卡住
