@@ -22,24 +22,63 @@ public partial class BattleManager
             return;
         }
 
-        // 副守护点：index 即 value 0~2（贤者雕像）
+        // 副守护点：index 即 value 0~2（贤者雕像），统一面向主守护点
         for (int i = 0; i < TerrainSpawns.SubGuards.Count; i++)
-            SpawnEntity(EntityType.GuardStatue(i), 1, TerrainSpawns.SubGuards[i], EntityCamp.Defense);
+        {
+            ushort id = SpawnEntity(EntityType.GuardStatue(i), 1, TerrainSpawns.SubGuards[i], EntityCamp.Defense);
+            FacePoint(id, TerrainSpawns.MainGuard);
+        }
 
-        // 主守护点：国王雕像
-        SpawnEntity(EntityType.KingStatue, 1, TerrainSpawns.MainGuard, EntityCamp.Defense);
+        // 主守护点：国王雕像，面向进攻方出生点
+        FacePoint(SpawnEntity(EntityType.KingStatue, 1, TerrainSpawns.MainGuard, EntityCamp.Defense), TerrainSpawns.AttackSpawn);
 
         // 珊瑚：开局不生成，按玩家邻近采样合法位置动态生成（见 TickCoralSpawn）
 
-        // 防御塔（水晶雕像）：烘焙数据里每个守护点 3 个塔位
+        // 防御塔（水晶雕像）：烘焙数据里每个守护点 3 个塔位；朝向取最近的守护点，故不需要知道塔位归属哪个守护点
         for (int i = 0; i < TerrainSpawns.Towers.Count; i++)
-            SpawnEntity(EntityType.CrystalStatue(i), 1, TerrainSpawns.Towers[i], EntityCamp.Defense);
+        {
+            ushort id = SpawnEntity(EntityType.CrystalStatue(i), 1, TerrainSpawns.Towers[i], EntityCamp.Defense);
+            FacePoint(id, NearestGuard(TerrainSpawns.Towers[i]));
+        }
 
         // 中立雕像（中立争抢单位）：开局不刷，开战后按延迟计时刷新；之后由被打死的时机重排
         neutralStatueRespawnTime = Time.time + GlobalConfig.neutral_statue_first_spawn_delay;
 
         CaptureGuardTotalHealth(); // 守护点总血量在此刻定死，经验增幅按已扣除比例算
     }
+
+    #region 生成后摆方向
+    // 生成完实体再单独摆方向：只写 Y 轴，不平移；两点重合即 0 度（不用 LookRotation，避开零向量报错）
+    private static void FacePoint(ushort id, Vector3 point)
+    {
+        if (id == 0) return; // 模板缺失，SpawnEntity 已告警
+        var entity = GetEntity(id);
+        Vector3 dir = point - entity.transform.position;
+        entity.transform.rotation = Quaternion.Euler(0f, Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg, 0f);
+    }
+
+    // 最近的守护点（主 + 副全体，XZ 距离）：防御塔朝向用，不必区分塔位属于哪个守护点
+    private static Vector3 NearestGuard(Vector3 pos)
+    {
+        Vector3 nearest = TerrainSpawns.MainGuard;
+        float nearestSqr = SqrDistanceXZ(pos, nearest);
+        for (int i = 0; i < TerrainSpawns.SubGuards.Count; i++)
+        {
+            float sqr = SqrDistanceXZ(pos, TerrainSpawns.SubGuards[i]);
+            if (sqr >= nearestSqr) continue;
+            nearestSqr = sqr;
+            nearest = TerrainSpawns.SubGuards[i];
+        }
+        return nearest;
+    }
+
+    private static float SqrDistanceXZ(Vector3 a, Vector3 b)
+    {
+        float dx = a.x - b.x;
+        float dz = a.z - b.z;
+        return dx * dx + dz * dz;
+    }
+    #endregion
 
     private void SpawnZombie()
     {

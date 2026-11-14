@@ -254,7 +254,7 @@ public partial class BattleManager
         SpawnEntity(type, 1, TerrainSpawns.RandomOf(TerrainSpawns.NeutralStatues), EntityCamp.Neutral);
     }
 
-    // 防御塔（水晶雕像）落在塔位锚点上，塔位与 CrystalStatue 的下标一一对应
+    // 防御塔（水晶雕像）落在塔位锚点上，塔位与 CrystalStatue 的下标一一对应；朝向与开局生成一致，取最近守护点
     private void GmSpawnTowers(int count)
     {
         if (!BattleStarted) return;
@@ -263,7 +263,8 @@ public partial class BattleManager
         for (int k = 0; k < count; k++)
         {
             int index = Random.Range(0, towers.Count);
-            SpawnEntity(EntityType.CrystalStatue(index), 1, towers[index], EntityCamp.Defense);
+            ushort id = SpawnEntity(EntityType.CrystalStatue(index), 1, towers[index], EntityCamp.Defense);
+            FacePoint(id, NearestGuard(towers[index]));
         }
     }
 
