@@ -183,9 +183,15 @@ public class EntityAnim : MonoBehaviour
     private WeaponDisplayType weaponDisplay;
     private WeaponPos weaponPos = WeaponPos.Hide;
     private readonly List<GameObject> weaponVisuals = new();
+    private readonly List<Transform> weaponInstances = new(); // 武器预制体实例：近战判定球按它的实际位姿摆放
     private EntityModelInfo modelInfo;
 
     public int WeaponId => weaponId;
+
+    // 第一把武器实例（含 WeaponFix 标定旋转）；收起/无武器时为 null
+    public Transform WeaponTransform => weaponInstances.Count > 0 ? weaponInstances[0] : null;
+
+    public bool WeaponInHand => weaponPos == WeaponPos.Hand;
 
     // 实体固定武器：服务器与客户端视图、首页角色各在 Init 之后调一次
     public void SetWeapon(int id, WeaponDisplayType display)
@@ -211,6 +217,7 @@ public class EntityAnim : MonoBehaviour
             if (weaponVisuals[i] != null) Destroy(weaponVisuals[i]);
         }
         weaponVisuals.Clear();
+        weaponInstances.Clear();
 
         if (weaponPos == WeaponPos.Hide || weaponId < 0) return;
         if (modelInfo == null)
@@ -270,6 +277,7 @@ public class EntityAnim : MonoBehaviour
         GameObject instance = Instantiate(prefab, mount);
         instance.transform.localPosition = Vector3.zero;
         instance.transform.localRotation = WeaponFix(anchor);
+        weaponInstances.Add(instance.transform);
         weaponVisuals.Add(mount.gameObject);
     }
 
@@ -304,6 +312,7 @@ public class EntityAnim : MonoBehaviour
         GameObject instance = Instantiate(prefab, mount);
         instance.transform.localPosition = Vector3.zero;
         instance.transform.localRotation = WeaponFix(anchor);
+        weaponInstances.Add(instance.transform);
         weaponVisuals.Add(mount.gameObject);
     }
 
