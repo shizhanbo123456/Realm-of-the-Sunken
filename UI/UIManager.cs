@@ -190,7 +190,7 @@ public class UIManager : MonoBehaviour
         if (loading == null) return;
         loading.m_show_bar.selectedIndex = 1;
         loading.m_progressbar.value = Mathf.Clamp01(progress01) * loading.m_progressbar.max;
-        loading.m_progress.text = text;
+        loading.m_label.text = text;
     }
 
     // 进入游戏：先挂加载界面把常驻资源拉齐（攻守角色/武器/两张布置图/地形素材表），完成后再进首页
