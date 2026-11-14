@@ -5,6 +5,7 @@ using UnityEngine;
 public class ScreenSpaceFog : MonoBehaviour
 {
     public const string ShaderName = "Hidden/Fog/ScreenFog";
+    public const string WaterNormalPath = "Assets/Packages/Env/AQUAS-Lite/Textures/Waves_HiRes.png";
     public const string WaterCausticsPath = "Assets/Files/Shaders/Caustics/T_Caustics.TGA";
 
     [Header("距离雾")]
@@ -71,38 +72,49 @@ public class ScreenSpaceFog : MonoBehaviour
     [Tooltip("关闭后天空只剩雾色渐变")]
     public bool enableWaterSurface = true;
 
-    [Tooltip("水面光斑贴图，复用 Assets/Files/Shaders/Caustics/T_Caustics")]
+    [Tooltip("波浪法线图，用 Assets/Packages/Env/AQUAS-Lite/Textures/Waves_HiRes（须为 Normal map 类型）")]
+    public Texture waterNormalMap;
+
+    [Tooltip("透射光斑贴图，复用 Assets/Files/Shaders/Caustics/T_Caustics")]
     public Texture waterCausticsMap;
 
     [Range(0f, 90f)]
-    [Tooltip("高于此仰角的天空区域视为水面（度），48.6 是水下看水面的全反射临界角")]
+    [Tooltip("水面铺到多少仰角（度），48.6 是水下看水面的全反射临界角")]
     public float waterAngleDeg = 48.6f;
 
     [Range(0.1f, 20f)]
     [Tooltip("水面与雾的过渡宽度（度）")]
-    public float waterSoftnessDeg = 5f;
+    public float waterSoftnessDeg = 8f;
 
-    [Tooltip("水面基色")]
-    public Color waterColor = new Color(0.60f, 0.76f, 0.80f);
+    [Tooltip("透射端（正对水面）的亮色")]
+    public Color waterColor = new Color(0.36f, 0.50f, 0.54f);
+
+    [Tooltip("掠射端（贴临界角）的全反射色，取雾色附近才不会出现暗环")]
+    public Color waterDeepColor = new Color(0.21f, 0.29f, 0.33f);
 
     [Min(0f)]
-    [Tooltip("光斑密度，越大光斑越密")]
-    public float waterTiling = 1.5f;
+    [Tooltip("波浪密度，越大波纹越密")]
+    public float waterTiling = 1.8f;
+
+    [Range(0f, 2f)]
+    [Tooltip("波浪法线强度，0 等于一块平面")]
+    public float waterNormalStrength = 1.8f;
 
     [Range(0f, 1f)]
     [Tooltip("光斑明暗强度")]
-    public float waterPattern = 0.55f;
+    public float waterPattern = 0.5f;
 
-    [Range(0.1f, 20f)]
-    [Tooltip("贴边亮带宽度（度），从阈值边界往内衰减")]
-    public float waterRimWidthDeg = 8f;
+    [Range(0f, 2f)]
+    [Tooltip("波浪对光斑的折射扰动强度")]
+    public float waterRefraction = 0.05f;
 
-    [Tooltip("贴边亮带颜色")]
-    public Color waterRimColor = new Color(0.80f, 0.92f, 0.95f);
+    [Range(0f, 2f)]
+    [Tooltip("波峰朝天光方向的高光强度")]
+    public float waterSparkle = 0.7f;
 
-    [Range(0f, 1f)]
-    [Tooltip("贴边亮带强度")]
-    public float waterRimIntensity = 0.5f;
+    [Min(0f)]
+    [Tooltip("波浪滚动速度，0 为完全静止")]
+    public float waterWaveSpeed = 0f;
 
     [Tooltip("全屏雾 shader，添加组件时自动填入")]
     public Shader fogShader;
@@ -124,15 +136,18 @@ public class ScreenSpaceFog : MonoBehaviour
     private static readonly int EnableDistanceId = Shader.PropertyToID("_EnableDistance");
     private static readonly int EnableHeightId = Shader.PropertyToID("_EnableHeight");
     private static readonly int EnableWaterId = Shader.PropertyToID("_EnableWater");
+    private static readonly int WaterNormalMapId = Shader.PropertyToID("_WaterNormalMap");
     private static readonly int WaterCausticsMapId = Shader.PropertyToID("_WaterCausticsMap");
     private static readonly int WaterAngleId = Shader.PropertyToID("_WaterAngle");
     private static readonly int WaterSoftnessId = Shader.PropertyToID("_WaterSoftness");
     private static readonly int WaterColorId = Shader.PropertyToID("_WaterColor");
+    private static readonly int WaterDeepColorId = Shader.PropertyToID("_WaterDeepColor");
     private static readonly int WaterTilingId = Shader.PropertyToID("_WaterTiling");
+    private static readonly int WaterNormalStrengthId = Shader.PropertyToID("_WaterNormalStrength");
     private static readonly int WaterPatternId = Shader.PropertyToID("_WaterPattern");
-    private static readonly int WaterRimWidthId = Shader.PropertyToID("_WaterRimWidth");
-    private static readonly int WaterRimColorId = Shader.PropertyToID("_WaterRimColor");
-    private static readonly int WaterRimIntensityId = Shader.PropertyToID("_WaterRimIntensity");
+    private static readonly int WaterRefractionId = Shader.PropertyToID("_WaterRefraction");
+    private static readonly int WaterSparkleId = Shader.PropertyToID("_WaterSparkle");
+    private static readonly int WaterWaveSpeedId = Shader.PropertyToID("_WaterWaveSpeed");
     private static readonly int CamPosId = Shader.PropertyToID("_CamPos");
     private static readonly int CornerBLId = Shader.PropertyToID("_CornerBL");
     private static readonly int CornerBRId = Shader.PropertyToID("_CornerBR");
@@ -159,9 +174,9 @@ public class ScreenSpaceFog : MonoBehaviour
             return;
         }
 
-        if (enableWaterSurface && waterCausticsMap == null)
+        if (enableWaterSurface && (waterNormalMap == null || waterCausticsMap == null))
         {
-            Debug.LogError("[ScreenSpaceFog] 未指定 waterCausticsMap（Assets/Files/Shaders/Caustics/T_Caustics），水面关闭", this);
+            Debug.LogError($"[ScreenSpaceFog] 未指定 {(waterNormalMap == null ? "waterNormalMap" : "waterCausticsMap")}，水面关闭（贴图见 WaterNormalPath / WaterCausticsPath）", this);
             enableWaterSurface = false;
         }
 
@@ -207,15 +222,18 @@ public class ScreenSpaceFog : MonoBehaviour
         material.SetFloat(EnableDistanceId, enableDistanceFog ? 1f : 0f);
         material.SetFloat(EnableHeightId, enableHeightFog ? 1f : 0f);
         material.SetFloat(EnableWaterId, enableWaterSurface ? 1f : 0f);
+        if (waterNormalMap != null) material.SetTexture(WaterNormalMapId, waterNormalMap);
         if (waterCausticsMap != null) material.SetTexture(WaterCausticsMapId, waterCausticsMap);
         material.SetFloat(WaterAngleId, waterAngleDeg);
         material.SetFloat(WaterSoftnessId, Mathf.Max(waterSoftnessDeg, 0.1f));
         material.SetColor(WaterColorId, waterColor);
+        material.SetColor(WaterDeepColorId, waterDeepColor);
         material.SetFloat(WaterTilingId, waterTiling);
+        material.SetFloat(WaterNormalStrengthId, waterNormalStrength);
         material.SetFloat(WaterPatternId, waterPattern);
-        material.SetFloat(WaterRimWidthId, Mathf.Max(waterRimWidthDeg, 0.1f));
-        material.SetColor(WaterRimColorId, waterRimColor);
-        material.SetFloat(WaterRimIntensityId, waterRimIntensity);
+        material.SetFloat(WaterRefractionId, waterRefraction);
+        material.SetFloat(WaterSparkleId, waterSparkle);
+        material.SetFloat(WaterWaveSpeedId, waterWaveSpeed);
         UpdateFrustumCorners();
     }
 
@@ -253,6 +271,7 @@ public class ScreenSpaceFog : MonoBehaviour
         if (fogShader == null)
             Debug.LogError($"[ScreenSpaceFog] 找不到 shader「{ShaderName}」", this);
 
+        waterNormalMap = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture>(WaterNormalPath);
         waterCausticsMap = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture>(WaterCausticsPath);
     }
 #endif
