@@ -58,6 +58,7 @@ public class Tool : MonoBehaviour
     public static TransitionManager TransitionManager;
     public static LuaManager LuaManager;
     public static TerrainGen.ModularTerrainGenerator ModularTerrainGenerator;
+    public static ResourceManager ResourceManager;
     #endregion
 
     #region 通用工具
