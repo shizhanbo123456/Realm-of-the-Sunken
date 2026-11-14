@@ -9,7 +9,7 @@ namespace TerrainGen.EditorTools
 {
     public class ModularTerrainWindow : EditorWindow
     {
-        const string ConfigFolder = "Assets/Scripts/TerrainGenerator/Config";
+        const string ConfigFolder = "Assets/Files/TerrainGeneratorConfig";
         const int WalkableArea = 0;      // 项目 NavMeshAreas 第 0 项 Walkable
         const int NotWalkableArea = 1;   // 第 1 项 Not Walkable：只当障碍，不生成行走面
 
@@ -646,11 +646,7 @@ namespace TerrainGen.EditorTools
 
         void CreateKit()
         {
-            if (!AssetDatabase.IsValidFolder(ConfigFolder))
-            {
-                if (!AssetDatabase.IsValidFolder("Assets/TerrainGenerator")) AssetDatabase.CreateFolder("Assets", "TerrainGenerator");
-                AssetDatabase.CreateFolder("Assets/TerrainGenerator", "Config");
-            }
+            EnsureConfigFolder();
 
             string path = ConfigFolder + "/BuildingKitSet.asset";
             kit = AssetDatabase.LoadAssetAtPath<BuildingKitSet>(path);
@@ -670,11 +666,7 @@ namespace TerrainGen.EditorTools
 
         void CreateAssets()
         {
-            if (!AssetDatabase.IsValidFolder(ConfigFolder))
-            {
-                if (!AssetDatabase.IsValidFolder("Assets/TerrainGenerator")) AssetDatabase.CreateFolder("Assets", "TerrainGenerator");
-                AssetDatabase.CreateFolder("Assets/TerrainGenerator", "Config");
-            }
+            EnsureConfigFolder();
             settings = AssetDatabase.LoadAssetAtPath<BuildingSettings>(ConfigFolder + "/BuildingSettings.asset");
             if (settings == null)
             {
@@ -684,6 +676,21 @@ namespace TerrainGen.EditorTools
             }
             summary = "生成参数已就绪：" + ConfigFolder + "/BuildingSettings.asset";
             summaryIsError = false;
+        }
+
+        // 按 ConfigFolder 逐级建目录，避免创建位置与读取位置不一致
+        static void EnsureConfigFolder()
+        {
+            if (AssetDatabase.IsValidFolder(ConfigFolder)) return;
+
+            string[] parts = ConfigFolder.Split('/');
+            string cur = parts[0];
+            for (int i = 1; i < parts.Length; i++)
+            {
+                string next = cur + "/" + parts[i];
+                if (!AssetDatabase.IsValidFolder(next)) AssetDatabase.CreateFolder(cur, parts[i]);
+                cur = next;
+            }
         }
     }
 }

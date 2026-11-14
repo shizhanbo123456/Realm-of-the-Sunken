@@ -9,7 +9,7 @@ namespace TerrainGen.EditorTools
     // 预制体里其它碰撞体（手摆的激活碰撞体）一律不碰：不删除、不禁用、不改尺寸
     public static class ColliderPreprocessor
     {
-        const string KitPath = "Assets/Scripts/TerrainGenerator/Config/BuildingKitSet.asset";
+        const string KitPath = "Assets/Files/TerrainGeneratorConfig/BuildingKitSet.asset";
 
         enum Mode
         {
