@@ -1,14 +1,17 @@
 ﻿using System.Collections.Generic;
+using Ros.Config;
 using Ros.Gm;
 using Ros.Transport;
 using TerrainGen;
 using UnityEngine;
 
-using Ros.Config;
-// GM 指令的服务器执行体：NetworkManager.ServerReceiveGmLocal → ExecuteGm，只处理"联网项"
-// 纯客户端项（雾气/地形/存档/调试/敌方对话/结算演示）在 GmPanel 本地做；无权限校验（开发工具）
+// GM 指令的服务器执行体：NetworkManager.ServerReceiveGmLocal → ExecuteGm
+// 指令 id 与参数含义见配表 gm_command；纯客户端项（敌方聊天/雾气/结算演示/客户端调试）在 GmPanel 本地执行
 public partial class BattleManager
 {
+    // 击飞指令的固定作用半径
+    private const float gmKickRadius = 5f;
+
     // 无敌实体（EntityData.OnDamaged 命中即按 0 伤害）
     private static readonly HashSet<ushort> gmInvincible = new();
 
@@ -23,94 +26,103 @@ public partial class BattleManager
     public void ExecuteGm(int clientId, CSGm gm)
     {
         if (!AtServer) return;
-        Debug.Log($"[GM] {gm.type}(int1={gm.int1},int2={gm.int2},f1={gm.float1},f2={gm.float2},f3={gm.float3}) client={clientId}");
+        Debug.Log($"[GM] {gm.type}(i={gm.i},v={gm.v0},{gm.v1},{gm.v2}) client={clientId}");
 
         switch (gm.type)
         {
             // ===== 对局 =====
-            case GmEnum.Battle_RemainTime_Add: GmSetRemainTime(BattleRemainTime + gm.float1); break;
-            case GmEnum.Battle_RemainTime_Reduce: GmSetRemainTime(BattleRemainTime - gm.float1); break;
-            case GmEnum.Battle_RemainTime_Set: GmSetRemainTime(gm.float1); break;
-            case GmEnum.Battle_Settle:
+            case GmCommandId.TimeAdd: GmSetRemainTime(BattleRemainTime + gm.i); break;
+            case GmCommandId.TimeReduce: GmSetRemainTime(BattleRemainTime - gm.i); break;
+            case GmCommandId.TimeSet: GmSetRemainTime(gm.i); break;
+            case GmCommandId.End:
                 if (!BattleStarted) break;
-                if (gm.int1 == (int)GmSettleType.Annihilate) CheckAttackWiped();
-                else EndBattle(AttackScore >= DefenseScore() ? 1 : 2); // 时间结束：按分数
+                EndBattle(AttackScore >= DefenseScore() ? 1 : 2); // 时间结束：按比分
                 break;
-            case GmEnum.Battle_DayNight_SetTimePoint:
-                // 滑条 = 0~1 全天进度 → 周期值 [0,2)
+            case GmCommandId.SetDayTime:
+                // 0~1 全天进度 → 周期值 [0,2)
                 if (Tool.EnvironmentManager != null)
-                    Tool.EnvironmentManager.SetCycleTime(gm.float1 * EnvironmentManager.CycleLength);
+                    Tool.EnvironmentManager.SetCycleTime(gm.v0 * EnvironmentManager.CycleLength);
                 break;
-            case GmEnum.Battle_DayNight_SetDayDuration:
+            case GmCommandId.SetDayLength:
                 if (Tool.EnvironmentManager != null)
-                    Tool.EnvironmentManager.dayDuration = Mathf.Max(0.01f, gm.float1);
+                    Tool.EnvironmentManager.dayDuration = Mathf.Max(0.01f, gm.i);
                 break;
-            case GmEnum.Battle_DayNight_SetNightDuration:
+            case GmCommandId.SetNightLength:
                 if (Tool.EnvironmentManager != null)
-                    Tool.EnvironmentManager.nightDuration = Mathf.Max(0.01f, gm.float1);
+                    Tool.EnvironmentManager.nightDuration = Mathf.Max(0.01f, gm.i);
                 break;
 
             // ===== 实体 =====
-            case GmEnum.Entity_Spawn: GmSpawn(clientId, (GmEntityType)gm.int1); break;
-            case GmEnum.Entity_Knockback: GmKnockback(clientId, gm.float1, gm.float2, (GmFilterType)gm.int1, gm.float3); break;
+            case GmCommandId.SpawnZombie:
+                if (!BattleStarted) break;
+                for (int k = 0; k < gm.i; k++)
+                    GmSpawnAtPlayer(clientId, EntityType.Zombie(Random.Range(0, GlobalConfig.zombie_variant_count)),
+                        GetZombieSpawnLevel(), EntityCamp.Defense);
+                break;
+            case GmCommandId.SpawnEliteZombie:
+                if (!BattleStarted) break;
+                for (int k = 0; k < gm.i; k++)
+                    GmSpawnAtPlayer(clientId, EntityType.EliteZombie(Random.Range(0, GlobalConfig.elite_zombie_variant_count)),
+                        GetZombieSpawnLevel(), EntityCamp.Defense);
+                break;
+            case GmCommandId.SpawnAngelStatue: GmSpawnNeutralStatue(EntityType.AngelStatue); break;
+            case GmCommandId.SpawnDevilStatue: GmSpawnNeutralStatue(EntityType.DemonStatue); break;
+            case GmCommandId.SpawnTower: GmSpawnTowers(gm.i); break;
+
+            case GmCommandId.Kick: GmKick(clientId, gm.v0); break;
 
             // ===== 玩家 =====
-            case GmEnum.Player_Teleport_ToCoordinate:
-                GmTeleport(clientId, new Vector3(gm.float1, GlobalConfig.gm_teleport_height, gm.float2));
+            case GmCommandId.Tp: GmTeleport(clientId, new Vector3(gm.v0, gm.v1, gm.v2)); break;
+            case GmCommandId.TpTo: GmTeleportToGuardPoint(clientId, gm.i); break;
+            case GmCommandId.Respawn: GmRevive(clientId); break;
+            case GmCommandId.GetSkill: GmAddSkill(clientId, gm.i); break;
+            case GmCommandId.UseSkill: GmForceUseSkill(clientId, gm.i); break;
+            case GmCommandId.ClearSkill: GmClearSkill(clientId); break;
+            case GmCommandId.AddBuff: GmAddBuff(clientId, (EffectType)gm.i); break;
+            case GmCommandId.ClearBuff: GmRemoveAllBuff(clientId); break;
+            case GmCommandId.Fly:
+                if (GetGmPlayerEntity(clientId) is PlayerEntityData flight) flight.SetFlightMode(gm.i != 0);
                 break;
-            case GmEnum.Player_Teleport_ToGuardPoint: GmTeleportToStatue(clientId, gm.int1); break;
-            case GmEnum.Player_Revive: GmRevive(clientId); break;
-            case GmEnum.Player_Skill_GetSkill: GmAddSkill(clientId, gm.int1); break;
-            case GmEnum.Player_Skill_DirectUseSkill: GmForceUseSkill(clientId, gm.int1); break;
-            case GmEnum.Player_Skill_ClearSkill: GmClearSkill(clientId); break;
-            case GmEnum.Player_Buff_AddBuff: GmAddBuff(clientId, (EffectType)gm.int1); break;
-            case GmEnum.Player_Buff_RemoveBuff: GmRemoveBuff(clientId, (EffectType)gm.int1); break;
-            case GmEnum.Player_Buff_RemoveAllBuff: GmRemoveAllBuff(clientId); break;
-            case GmEnum.Player_Cheat_Flight:
-                if (GetGmPlayerEntity(clientId) is PlayerEntityData flight) flight.SetFlightMode(gm.int1 != 0);
-                break;
-            case GmEnum.Player_Cheat_Invincible: GmSetInvincible(clientId, gm.int1 != 0); break;
-            case GmEnum.Player_Cheat_Speed:
+            case GmCommandId.Invincible: GmSetInvincible(clientId, gm.i != 0); break;
+            case GmCommandId.ExtremeSpeed:
                 {
                     var effect = GetGmEffectController(clientId);
                     if (effect == null) break;
-                    if (gm.int1 != 0) effect.AddEffect(EffectType.GmSpeedUp);
+                    if (gm.i != 0) effect.AddEffect(EffectType.GmSpeedUp);
                     else effect.RemoveEffect(EffectType.GmSpeedUp);
                     break;
                 }
 
-            // ===== 其它（性能）=====
-            case GmEnum.Other_Collect_ServerFps:
-            case GmEnum.Other_Collect_ServerTime:
-                Tool.NetworkManager.SendGm(clientId, new SCGm()
-                {
-                    type = gm.type,
-                    int1 = EnsInstance.frameRate,
-                    float1 = UnityEngine.Time.time,
-                });
+            // ===== 服务器查询 =====
+            case GmCommandId.ServerFps:
+                SendGmResult(clientId, gm.type, i: EnsInstance.frameRate);
+                break;
+            case GmCommandId.ServerTime:
+                SendGmResult(clientId, gm.type, v: Time.time);
+                break;
+            case GmCommandId.ServerEntityCount:
+                SendGmResult(clientId, gm.type, i: GmCountAliveEntities());
+                break;
+            case GmCommandId.ServerDayLength:
+                if (Tool.EnvironmentManager != null) SendGmResult(clientId, gm.type, v: Tool.EnvironmentManager.dayDuration);
+                break;
+            case GmCommandId.ServerNightLength:
+                if (Tool.EnvironmentManager != null) SendGmResult(clientId, gm.type, v: Tool.EnvironmentManager.nightDuration);
+                break;
+            case GmCommandId.ServerZombieSpawnLevel:
+                SendGmResult(clientId, gm.type, i: GetZombieSpawnLevel());
                 break;
 
-            // ===== 其它（战斗数据）=====
-            case GmEnum.Other_CombatData_ZombieCount:
-                Tool.NetworkManager.SendGm(clientId, new SCGm { type = gm.type, int1 = zombieCount });
+            default:
+                Debug.LogWarning($"[GM] 服务器未处理的指令 id={gm.type}（可能是纯客户端项被误发）");
                 break;
-            case GmEnum.Other_CombatData_ZombieSpawnLevel:
-                Tool.NetworkManager.SendGm(clientId, new SCGm { type = gm.type, int1 = GetZombieSpawnLevel() });
-                break;
-            case GmEnum.Other_CombatData_DayDuration:
-            case GmEnum.Other_CombatData_NightDuration:
-                {
-                    var env = Tool.EnvironmentManager;
-                    if (env == null) break;
-                    bool isDay = gm.type == GmEnum.Other_CombatData_DayDuration;
-                    Tool.NetworkManager.SendGm(clientId, new SCGm
-                    {
-                        type = gm.type,
-                        float1 = isDay ? env.dayDuration : env.nightDuration,
-                    });
-                    break;
-                }
         }
+    }
+
+    private static void SendGmResult(int clientId, int type, int i = 0, float v = 0f)
+    {
+        if (Tool.NetworkManager == null) return;
+        Tool.NetworkManager.SendGm(clientId, new SCGm { type = type, i = i, v0 = v });
     }
 
     #region//Local
@@ -169,12 +181,6 @@ public partial class BattleManager
         if (effect != null) effect.AddEffect(type);
     }
 
-    private void GmRemoveBuff(int clientId, EffectType type)
-    {
-        var effect = GetGmEffectController(clientId);
-        if (effect != null) effect.RemoveEffect(type);
-    }
-
     private void GmRemoveAllBuff(int clientId)
     {
         var effect = GetGmEffectController(clientId);
@@ -189,12 +195,11 @@ public partial class BattleManager
         else gmInvincible.Remove(target.id);
     }
 
-    // 传送：直接落点（y = GlobalConfig.gm_teleport_height），并清速度与位移，避免刚体/位移效果把角色拉回
+    // 传送：直接落点，并清速度与位移，避免刚体/位移效果把角色拉回
     private void GmTeleport(int clientId, Vector3 pos)
     {
         var target = GetGmPlayerEntity(clientId);
         if (target == null) return;
-        pos.y = GlobalConfig.gm_teleport_height;
         target.transform.position = pos;
         if (target.rb != null)
         {
@@ -204,19 +209,17 @@ public partial class BattleManager
         target.motion = null;
     }
 
-    private void GmTeleportToStatue(int clientId, int guardStatueIndex)
+    // 0 = 主守护点（国王雕像），1~3 = 副守护点（贤者雕像 0~2）
+    private void GmTeleportToGuardPoint(int clientId, int index)
     {
+        EntityType want = index <= 0 ? EntityType.KingStatue : EntityType.GuardStatue(index - 1);
         foreach (var guardStatue in EntityContainer.GuardStatues)
         {
-            if (guardStatue == null) continue;
-            bool match = guardStatueIndex >= GlobalConfig.sage_statue_count
-                ? guardStatue.type == EntityType.KingStatue
-                : guardStatue.type.category == EntityCategory.GuardStatue && guardStatue.type.value == guardStatueIndex;
-            if (!match) continue;
+            if (guardStatue == null || guardStatue.type != want) continue;
             GmTeleport(clientId, guardStatue.transform.position);
             return;
         }
-        Debug.LogWarning($"[GM] 场上没有可用的雕像（{guardStatueIndex}），传送取消");
+        Debug.LogWarning($"[GM] 场上没有目标守护点（{index}），传送取消");
     }
 
     private void GmRevive(int clientId)
@@ -231,33 +234,7 @@ public partial class BattleManager
         RespawnPlayer(clientId, rs);
     }
 
-    // 刷新固定 1 个：僵尸/精英/珊瑚落在发起 GM 的玩家位置，中立单位落在中立雕像锚点
-    private void GmSpawn(int clientId, GmEntityType type)
-    {
-        if (!BattleStarted) return;
-
-        switch (type)
-        {
-            case GmEntityType.Zombie:
-                GmSpawnAtPlayer(clientId, EntityType.Zombie(Random.Range(0, GlobalConfig.zombie_variant_count)), GetZombieSpawnLevel(), EntityCamp.Defense);
-                break;
-            case GmEntityType.EliteZombie:
-                GmSpawnAtPlayer(clientId, EntityType.EliteZombie(Random.Range(0, GlobalConfig.elite_zombie_variant_count)), GetZombieSpawnLevel(), EntityCamp.Defense);
-                break;
-            case GmEntityType.Coral:
-                EntityType coral = Random.value < GlobalVariable.F(global_variablesEnum.coral_spawn_as_large_chance) ? EntityType.CoralLarge : EntityType.CoralSmall;
-                GmSpawnAtPlayer(clientId, coral, 1, EntityCamp.Neutral);
-                break;
-            case GmEntityType.Neutral:
-                // 中立单位（中立雕像）场上最多 1 个，已有就不再刷
-                foreach (var e in EntityContainer.Entities)
-                    if (e != null && e.Alive && e.type.category == EntityCategory.NeutralStatue) return;
-                SpawnEntity(EntityType.AngelStatue, 1, TerrainSpawns.RandomOf(TerrainSpawns.NeutralStatues), EntityCamp.Neutral);
-                break;
-        }
-    }
-
-    // 落点 = 令牌对应玩家实体的 x/z（高度吸附地形，人形抬升由 SpawnEntity 统一处理）；取不到玩家实体就不刷
+    // 刷新 1 个：落点 = 令牌对应玩家实体的 x/z（高度吸附地形，人形抬升由 SpawnEntity 统一处理）
     private void GmSpawnAtPlayer(int clientId, EntityType type, int level, EntityCamp camp)
     {
         var owner = GetGmPlayerEntity(clientId);
@@ -267,56 +244,63 @@ public partial class BattleManager
         SpawnEntity(type, level, pos, camp);
     }
 
-    // 击飞：从 GM 自己实体向外；不判霸体；飞行（FlightMode）与无刚体单位跳过
-    private void GmKnockback(int clientId, float horizontal, float vertical, GmFilterType filter, float radius)
+    // 中立雕像（天使/恶魔）场上最多 1 个：已有任意中立雕像就不再刷
+    private void GmSpawnNeutralStatue(EntityType type)
     {
         if (!BattleStarted) return;
-        var source = GetGmPlayerEntity(clientId);
-        if (source == null) return;
-        var targets = CollectGmTargets(clientId, null, filter, radius);
-        foreach (var e in targets)
+        foreach (var e in EntityContainer.Entities)
+            if (e != null && e.Alive && e.type.category == EntityCategory.NeutralStatue) return;
+        if (TerrainSpawns.NeutralStatues.Count == 0) return;
+        SpawnEntity(type, 1, TerrainSpawns.RandomOf(TerrainSpawns.NeutralStatues), EntityCamp.Neutral);
+    }
+
+    // 防御塔（水晶雕像）落在塔位锚点上，塔位与 CrystalStatue 的下标一一对应
+    private void GmSpawnTowers(int count)
+    {
+        if (!BattleStarted) return;
+        var towers = TerrainSpawns.Towers;
+        if (towers.Count == 0) return;
+        for (int k = 0; k < count; k++)
         {
-            if (e.FlightMode || e.rb == null) continue;
-            Vector3 away = e.transform.position - source.transform.position;
-            away.y = 0f;
-            Vector3 dir = away.sqrMagnitude > 0.0001f ? away.normalized : e.transform.forward;
-            if (horizontal != 0f)
-                e.SetVelocityHorizontal(new Vector2(dir.x * horizontal, dir.z * horizontal), VelocitySource.Knockback);
-            if (vertical != 0f) e.SetVelocityVertical(vertical, VelocitySource.Knockback);
+            int index = Random.Range(0, towers.Count);
+            SpawnEntity(EntityType.CrystalStatue(index), 1, towers[index], EntityCamp.Defense);
         }
     }
 
+    // 击飞：从 GM 自己实体向外推开 5 米内的实体；不判霸体；飞行与无刚体单位跳过
     private readonly List<EntityData> gmTargetScratch = new();
 
-    // 目标筛选（都以 GM 自己实体为参照）：All 全部 / Nearest 最近 1 个 / Count 就近 amount 个 / Radius amount 米内
-    private List<EntityData> CollectGmTargets(int clientId, EntityCategory? category, GmFilterType filter, float amount)
+    private void GmKick(int clientId, float force)
     {
-        gmTargetScratch.Clear();
+        if (!BattleStarted || force == 0f) return;
         var source = GetGmPlayerEntity(clientId);
-        Vector3 origin = source != null ? source.transform.position : TerrainSpawns.MapCenter;
+        if (source == null) return;
+
+        gmTargetScratch.Clear();
+        Vector3 origin = source.transform.position;
         foreach (var e in EntityContainer.Entities)
         {
-            if (e == null || !e.Alive) continue;
-            if (source != null && e.id == source.id) continue; // 排除自己
-            if (category.HasValue && e.type.category != category.Value) continue;
+            if (e == null || !e.Alive || e.id == source.id) continue;
+            if ((e.transform.position - origin).sqrMagnitude > gmKickRadius * gmKickRadius) continue;
             gmTargetScratch.Add(e);
         }
 
-        switch (filter)
+        foreach (var e in gmTargetScratch)
         {
-            case GmFilterType.Nearest:
-            case GmFilterType.Count:
-                gmTargetScratch.Sort((a, b) => (a.transform.position - origin).sqrMagnitude
-                    .CompareTo((b.transform.position - origin).sqrMagnitude));
-                int keep = filter == GmFilterType.Nearest ? 1 : Mathf.Max(1, Mathf.RoundToInt(amount));
-                if (gmTargetScratch.Count > keep) gmTargetScratch.RemoveRange(keep, gmTargetScratch.Count - keep);
-                break;
-            case GmFilterType.Radius:
-                float r = Mathf.Max(0f, amount);
-                gmTargetScratch.RemoveAll(e => (e.transform.position - origin).sqrMagnitude > r * r);
-                break;
+            if (e.FlightMode || e.rb == null) continue;
+            Vector3 away = e.transform.position - origin;
+            away.y = 0f;
+            Vector3 dir = away.sqrMagnitude > 0.0001f ? away.normalized : e.transform.forward;
+            e.SetVelocityHorizontal(new Vector2(dir.x * force, dir.z * force), VelocitySource.Knockback);
         }
-        return gmTargetScratch;
+    }
+
+    private static int GmCountAliveEntities()
+    {
+        int count = 0;
+        foreach (var e in EntityContainer.Entities)
+            if (e != null && e.Alive) count++;
+        return count;
     }
     #endregion
 }

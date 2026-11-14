@@ -11,6 +11,7 @@ namespace Ros.UI.Main
         public UI_GmButtonList m_firstMenu;
         public UI_GmButtonList m_secondMenu;
         public GList m_GmItemList;
+        public GTextField m_logOutput;
         public const string URL = "ui://q68vr2bftjktio";
 
         public static UI_GmPanel CreateInstance()
@@ -26,6 +27,7 @@ namespace Ros.UI.Main
             m_firstMenu = (UI_GmButtonList)GetChildAt(1);
             m_secondMenu = (UI_GmButtonList)GetChildAt(2);
             m_GmItemList = (GList)GetChildAt(5);
+            m_logOutput = (GTextField)GetChildAt(7);
         }
     }
 }

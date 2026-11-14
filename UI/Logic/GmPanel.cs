@@ -1,24 +1,30 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using FairyGUI;
+using Ros.Config;
 using Ros.Gm;
 using Ros.Transport;
 using Ros.UI.Main;
 using UnityEngine;
 
-// GM 面板：一级=组、二级=子功能；指令按 [GmStatus] 过滤，当前状态不可用的只留一行"空置"（标题照常显示）
-// 按钮默认行为 = 收集本指令控件值 → 按行顺序填 CSGm → 发包；待核对 GmItem 内容页名与菜单 button_list 的 item 类型
+// GM 面板：菜单与参数全部来自 gm_command 配表；每条命令渲染「主栏(描述) + 副栏(参数) + 按钮」，无参数时不出副栏
 public class GmPanel
 {
     private readonly UI_GmPanel panel;
 
-    private readonly List<string> groups = new();                              // 一级菜单：组名
-    private readonly List<string> subs = new();                                // 二级菜单：当前组的子功能
-    private readonly List<LayoutInfo> rows = new();                            // Item 列表行（含分割标题）
-    private readonly List<(GmEnum cmd, int start, int end)> cmdRanges = new(); // 每条指令的行区间 [start,end)（不含分割标题）
-
+    private readonly List<string> groups = new();   // 一级菜单：配表 commandName
+    private readonly List<string> subs = new();     // 二级菜单：当前组下的 subcommand
+    private readonly List<int> subIds = new();      // 与 subs 一一对应的配表主键
     private string curGroup;
-    private string curSub;
+    private int curId = -1;
+
+    // 参数类型编码，与配表 paramType 一致
+    private const int ParamInt = 0;
+    private const int ParamBool = 1;
+    private const int ParamFloat = 2;
+    private const int ParamVector2 = 3;
+    private const int ParamVector3 = 4;
 
     // 面板入口：1 秒内连按 3 次 V 打开；关闭走面板上的关闭按钮
     private const KeyCode panelOpenKey = KeyCode.V;
@@ -26,16 +32,12 @@ public class GmPanel
     private const float panelOpenPressWindow = 1f;
     private int pressCount;
     private float firstPressTime;
-    private string meshFacesText = string.Empty;   // 性能-模型网格面数：点刷新时算一次，渲染时读缓存
-    private string serverFpsText = string.Empty;   // 性能-服务器帧率：服务器回包后填
-    private string serverTimeText = string.Empty;  // 性能-服务器时间：服务器回包后填
-    private string zombieCountText = string.Empty;   // 战斗数据-僵尸数量：服务器回包后填
-    private string zombieLevelText = string.Empty;   // 战斗数据-僵尸刷新等级：服务器回包后填
-    private string dayDurationText = string.Empty;   // 战斗数据-白天时长：服务器回包后填
-    private string nightDurationText = string.Empty; // 战斗数据-夜晚时长：服务器回包后填
 
-    // 开关类指令的本地状态（服务端按目标状态设置；本地只用于按钮标题与切换）
-    private readonly HashSet<GmEnum> toggleOn = new();
+    private struct GmArg
+    {
+        public int i;
+        public float v0, v1, v2;
+    }
 
     public GmPanel(UI_GmPanel panel)
     {
@@ -52,7 +54,7 @@ public class GmPanel
         panel.m_firstMenu.m_button_list.onClickItem.Add(OnClickGroup);
         panel.m_secondMenu.m_button_list.itemRenderer = RenderSubButton;
         panel.m_secondMenu.m_button_list.onClickItem.Add(OnClickSub);
-        panel.m_GmItemList.itemRenderer = RenderRow;
+        panel.m_GmItemList.itemRenderer = RenderItem;
         panel.m_panel.m_close.onClick.Add(Close);
 
         // EventManager 是静态的，订阅必须与解绑成对
@@ -109,6 +111,7 @@ public class GmPanel
     public void Open()
     {
         panel.visible = true;
+        Output(string.Empty);
         BuildGroups();
     }
 
@@ -118,45 +121,18 @@ public class GmPanel
 
     private void OnNetChanged() { if (panel.visible) BuildGroups(); }
 
-    // 开战：相位由组队期变对局中，各指令的启用时机随之变化 → 重建菜单
+    // 开战：相位由组队期变对局中，各指令的可用时机随之变化 → 重建菜单
     private void OnBattleStartChanged(int camp) => OnNetChanged();
 
+    // 输出框每次覆盖，不追加
+    private void Output(string text) => panel.m_logOutput.text = text;
+
     #region//菜单
-    private static string GroupOf(GmEnum t) => SplitLabel(t)[0];
-    private static string SubOf(GmEnum t) => SplitLabel(t)[1];
-
-    private static string LeafOf(GmEnum t)
+    // 当前相位对应的配表列
+    private static bool Available(gm_command row)
     {
-        string[] s = SplitLabel(t);
-        return s[s.Length - 1];
-    }
-
-    private static string[] SplitLabel(GmEnum type) => GetLabel(type).Split('-');
-
-    private static string GetLabel(GmEnum type)
-    {
-        var f = typeof(GmEnum).GetField(type.ToString());
-        var a = f != null ? (GmLabelAttribute)Attribute.GetCustomAttribute(f, typeof(GmLabelAttribute)) : null;
-        return a != null ? a.label : type.ToString();
-    }
-
-    // 当前相位：未联网 / 已联网未开战 / 对局进行中
-    private static GmStatusType CurrentStatus
-    {
-        get
-        {
-            if (!Online) return GmStatusType.Offline;
-            return NetworkManager.BattleRunning ? GmStatusType.Battle : GmStatusType.Lobby;
-        }
-    }
-
-    // 启用时机读枚举项上的 [GmStatus]；未标注按默认「仅战斗」
-    private static bool Visible(GmEnum t)
-    {
-        var f = typeof(GmEnum).GetField(t.ToString());
-        var a = f != null ? (GmStatusAttribute)Attribute.GetCustomAttribute(f, typeof(GmStatusAttribute)) : null;
-        GmStatusType status = a != null ? a.status : GmStatusType.Battle;
-        return (status & CurrentStatus) != 0;
+        if (!Online) return row.home ?? false;
+        return NetworkManager.BattleRunning ? row.battle ?? false : row.lobby ?? false;
     }
 
     // numItems 置相同值不会重刷，先置 0 再置 N
@@ -169,61 +145,45 @@ public class GmPanel
     private void BuildGroups()
     {
         groups.Clear();
-        foreach (GmEnum t in Enum.GetValues(typeof(GmEnum)))
+        foreach (var row in GmCommandConfig.ordered)
         {
-            string g = GroupOf(t);
-            if (!groups.Contains(g)) groups.Add(g);
+            if (!Available(row)) continue;
+            if (!groups.Contains(row.commandName)) groups.Add(row.commandName);
         }
         Refresh(panel.m_firstMenu.m_button_list, groups.Count);
         if (groups.Count > 0) SelectGroup(groups[0]);
+        else { subs.Clear(); subIds.Clear(); curId = -1; ClearItems(); }
     }
 
-    private void SelectGroup(string g)
+    private void SelectGroup(string group)
     {
-        curGroup = g;
+        curGroup = group;
         Refresh(panel.m_firstMenu.m_button_list, groups.Count); // 重刷一级菜单，否则上一个组的高亮会残留
         subs.Clear();
-        foreach (GmEnum t in Enum.GetValues(typeof(GmEnum)))
+        subIds.Clear();
+        foreach (var row in GmCommandConfig.ordered)
         {
-            if (GroupOf(t) != g) continue;
-            string s = SubOf(t);
-            if (!subs.Contains(s)) subs.Add(s);
+            if (row.commandName != group || !Available(row)) continue;
+            subs.Add(row.subcommand);
+            subIds.Add(row.key);
         }
         Refresh(panel.m_secondMenu.m_button_list, subs.Count);
-        if (subs.Count > 0) SelectSub(subs[0]);
-        else ClearItems();
+        if (subIds.Count > 0) SelectSub(0);
+        else { curId = -1; ClearItems(); }
     }
 
-    private void SelectSub(string sub)
+    private void SelectSub(string sub) => SelectSub(subs.IndexOf(sub));
+
+    private void SelectSub(int index)
     {
-        curSub = sub;
-        Refresh(panel.m_secondMenu.m_button_list, subs.Count); // 重刷二级菜单，否则上一个子功能的高亮会残留
-        rows.Clear();
-        cmdRanges.Clear();
-        foreach (GmEnum t in Enum.GetValues(typeof(GmEnum)))
-        {
-            if (GroupOf(t) != curGroup || SubOf(t) != sub) continue;
-            if (!Visible(t))
-            {
-                // 当前状态不可用的指令不再整条隐藏，只留一行"空置"（标题照常显示）
-                rows.Add(new EmptyRow(LeafOf(t)));
-                continue;
-            }
-            rows.Add(new SectionTitle(LeafOf(t))); // 栏目标题：用 GmItem 的"分隔栏"页显示
-            int start = rows.Count;
-            var r = Layout.GetLayout(t);
-            rows.AddRange(r);
-            cmdRanges.Add((t, start, start + r.Count));
-        }
-        Refresh(panel.m_GmItemList, rows.Count);
+        if (index < 0 || index >= subIds.Count) { curId = -1; ClearItems(); return; }
+        curId = subIds[index];
+        Refresh(panel.m_secondMenu.m_button_list, subs.Count); // 重刷二级菜单，否则上一个子项的高亮会残留
+        var row = GmCommandConfig.Get(curId);
+        Refresh(panel.m_GmItemList, row.paramType.HasValue ? 3 : 2);
     }
 
-    private void ClearItems()
-    {
-        rows.Clear();
-        cmdRanges.Clear();
-        Refresh(panel.m_GmItemList, 0);
-    }
+    private void ClearItems() => Refresh(panel.m_GmItemList, 0);
 
     private void RenderGroupButton(int index, GObject obj)
     {
@@ -236,392 +196,195 @@ public class GmPanel
     {
         if (index >= subs.Count || obj is not GButton btn) return;
         btn.title = subs[index];
-        btn.selected = subs[index] == curSub;
+        btn.selected = index == subIds.IndexOf(curId);
     }
 
     private void OnClickGroup(EventContext ctx) => SelectGroup(groups[panel.m_firstMenu.m_button_list.GetChildIndex((GObject)ctx.data)]);
-
-    private void OnClickSub(EventContext ctx) => SelectSub(subs[panel.m_secondMenu.m_button_list.GetChildIndex((GObject)ctx.data)]);
+    private void OnClickSub(EventContext ctx) => SelectSub(panel.m_secondMenu.m_button_list.GetChildIndex((GObject)ctx.data));
     #endregion
 
-    #region//参数行
-    // 某行属于哪条指令（分割标题行不属于任何指令，返回 null）
-    private (GmEnum cmd, int start, int end)? FindRange(int rowIndex)
+    #region//条目：主栏 / 副栏 / 按钮
+    private void RenderItem(int index, GObject obj)
     {
-        foreach (var r in cmdRanges)
-            if (rowIndex >= r.start && rowIndex < r.end) return r;
-        return null;
-    }
+        if (obj is not UI_GmItem item || curId < 0) return;
+        var row = GmCommandConfig.Get(curId);
 
-    private void RenderRow(int index, GObject obj)
-    {
-        if (obj is not UI_GmItem item || index >= rows.Count) return;
-        var row = rows[index];
-        item.m_title.text = RowLeft(row);
-
-        var range = FindRange(index);
-        if (range != null && ApplySpecial(range.Value.cmd, index - range.Value.start, item)) return;
-
-        switch (row.LayoutType)
+        if (index == 0)
         {
-            case LayoutType.Label:
-                item.m_content.selectedPage = "文本";
-                item.m_content_text.text = ((Label)row).right;
-                break;
-
-            case LayoutType.SectionTitle:
-                item.m_content.selectedPage = "分隔栏";
-                break;
-
-            case LayoutType.EmptyRow:
-                item.m_content.selectedPage = "空置";
-                break;
-
-            case LayoutType.Button:
-                item.m_content.selectedPage = "按钮";
-                item.m_content_btn.title = range != null
-                    ? ButtonTitle(range.Value.cmd, ((Button)row).buttonTitle)
-                    : ((Button)row).buttonTitle;
-                // GList 复用 item，回调需先清空再挂，避免重复
-                item.m_content_btn.onClick.Clear();
-                item.m_content_btn.onClick.Add(() => OnAction(index));
-                break;
-
-            case LayoutType.IntInput:
-            case LayoutType.FloatInput:
-                item.m_content.selectedPage = "输入框";
-                item.m_content_inputField.text = string.Empty;
-                break;
-
-            case LayoutType.IntSlider:
-                SetupSlider(item, ((IntSlider)row).min, ((IntSlider)row).max);
-                break;
-
-            case LayoutType.FloatSlider:
-                SetupSlider(item, ((FloatSlider)row).min, ((FloatSlider)row).max);
-                break;
-
-            case LayoutType.Dropdown:
-                SetupDropdown(item, ((Dropdown)row).enumType);
-                break;
-        }
-    }
-
-    private static void SetupSlider(UI_GmItem item, float min, float max)
-    {
-        item.m_content.selectedPage = "滑动条";
-        item.m_content_slider.min = min;
-        item.m_content_slider.max = max;
-        item.m_content_slider.value = min;
-        item.m_content_slider_value.text = min.ToString("0.##");
-        // GList 复用 item，回调需先清空再挂；拖动时把当前值同步到右侧文本
-        item.m_content_slider.onChanged.Clear();
-        item.m_content_slider.onChanged.Add(() => item.m_content_slider_value.text = item.m_content_slider.value.ToString("0.##"));
-    }
-
-    private static void SetupDropdown(UI_GmItem item, Type enumType)
-    {
-        item.m_content.selectedPage = "下拉框";
-        item.m_content_dropdown.items = GetDropdownLabels(enumType);
-        item.m_content_dropdown.selectedIndex = 0;
-    }
-
-    // 下拉可选项：优先读成员的 [GmLabel]，否则用枚举名
-    private static string[] GetDropdownLabels(Type enumType)
-    {
-        if (enumType == null || !enumType.IsEnum) return new string[0];
-        string[] names = Enum.GetNames(enumType);
-        for (int i = 0; i < names.Length; i++)
-        {
-            var f = enumType.GetField(names[i]);
-            var a = f != null ? (GmLabelAttribute)Attribute.GetCustomAttribute(f, typeof(GmLabelAttribute)) : null;
-            if (a != null) names[i] = a.label;
-        }
-        return names;
-    }
-
-    private static string RowLeft(LayoutInfo row) => row switch
-    {
-        Label r => r.left,
-        SectionTitle r => r.title,
-        EmptyRow r => r.title,
-        Button r => r.left,
-        InputInt r => r.left,
-        FloatInput r => r.left,
-        IntSlider r => r.left,
-        FloatSlider r => r.left,
-        Dropdown r => r.left,
-        _ => string.Empty,
-    };
-
-    // 按钮标题：开关型按钮带当前状态（敌方对话 / 四个外挂），其余用布局里的静态标题
-    private string ButtonTitle(GmEnum cmd, string staticTitle)
-    {
-        if (cmd == GmEnum.Other_EnemyDialog) return $"敌方对话：{(ChatPlugin.ShowEnemyDialog ? "开" : "关")}";
-        if (cmd is GmEnum.Player_Cheat_Flight or GmEnum.Player_Cheat_Invincible or GmEnum.Player_Cheat_Speed)
-            return $"{staticTitle}：{(toggleOn.Contains(cmd) ? "开" : "关")}";
-        return staticTitle;
-    }
-    #endregion
-
-    #region//默认行为：收集 → 组包 → 发包（本地项除外）
-    private void OnAction(int rowIndex)
-    {
-        var range = FindRange(rowIndex);
-        if (range == null) return;
-        var (cmd, start, end) = range.Value;
-
-        // 开关类：本地记状态 + 按钮标题随状态更新（敌方对话纯本地，其余把目标状态发服务器）
-        if (IsToggle(cmd))
-        {
-            HandleToggle(cmd, rowIndex);
+            item.m_type.selectedPage = "主栏";
+            item.m_label_main_column.text = row.des;
             return;
         }
 
-        // 本地项（纯客户端指令）直接本地执行，不需要联网
-        if (IsLocalExecutable(cmd))
+        if (index == 1 && row.paramType.HasValue)
         {
-            RunLocal(cmd, start, end);
+            item.m_type.selectedPage = "副栏";
+            item.m_content.selectedPage = ContentPage(row.paramType.Value);
+            item.m_label_sub_column.text = row.paramDec;
+            item.m_input.text = string.Empty;
             return;
         }
 
-        if (!Online) return; // 联网项未联网不发包
-        var gm = new CSGm { type = cmd };
-        FillPacket(gm, start, end, rowIndex);
-        if (Tool.NetworkManager != null) Tool.NetworkManager.SendGm(gm);
+        // 按钮：标题用 FGUI 设计稿里的文案，这里不覆盖
+        item.m_type.selectedPage = "按钮";
+        item.m_btn.onClick.Clear(); // GList 复用 item，回调先清再挂
+        item.m_btn.onClick.Add(Execute);
     }
 
-    // 按行顺序：int 值的行依次填 int1/int2，float 值的行依次填 float1/float2/float3
-    private void FillPacket(CSGm gm, int start, int end, int clickedRowIndex)
+    private static string ContentPage(int paramType) => paramType switch
     {
-        int intSlot = 0, floatSlot = 0;
-        for (int i = start; i < end; i++)
-        {
-            var item = panel.m_GmItemList.GetChildAt(i) as UI_GmItem;
-            if (item == null) continue;
-            var row = rows[i];
+        ParamInt => "int",
+        ParamBool => "bool",
+        ParamFloat => "float",
+        ParamVector2 => "v2",
+        ParamVector3 => "v3",
+        _ => "int",
+    };
 
-            switch (row.LayoutType)
-            {
-                case LayoutType.IntInput:
-                    PutInt(gm, ref intSlot, ParseInt(item.m_content_inputField.text));
-                    break;
-                case LayoutType.FloatInput:
-                    PutFloat(gm, ref floatSlot, ParseFloat(item.m_content_inputField.text));
-                    break;
-                case LayoutType.IntSlider:
-                    PutInt(gm, ref intSlot, (int)item.m_content_slider.value);
-                    break;
-                case LayoutType.FloatSlider:
-                    PutFloat(gm, ref floatSlot, (float)item.m_content_slider.value);
-                    break;
-                case LayoutType.Dropdown:
-                    PutInt(gm, ref intSlot, EnumValueOf(((Dropdown)row).enumType, item.m_content_dropdown.selectedIndex));
-                    break;
-                case LayoutType.Button:
-                    if (i == clickedRowIndex) PutInt(gm, ref intSlot, i - start); // 多按钮指令（如被动×5）用指令内序号区分
-                    break;
-            }
+    private UI_GmItem ItemAt(int index) => panel.m_GmItemList.GetChildAt(index) as UI_GmItem;
+    #endregion
+
+    #region//执行
+    private void Execute()
+    {
+        if (curId < 0 || !GmCommandConfig.content.TryGetValue(curId, out var row)) return;
+
+        string raw = row.paramType.HasValue && ItemAt(1) is UI_GmItem input ? input.m_input.text : string.Empty;
+        if (!TryParseParam(row, raw, out GmArg arg, out string error))
+        {
+            string msg = $"{row.subcommand} 参数解析失败：{error}（输入：{raw}）";
+            Output(msg);
+            Debug.LogWarning("[GM] " + msg);
+            return;
+        }
+
+        if (RunLocal(row, arg)) return;
+
+        if (!Online) { Output($"{row.subcommand}：需要联网执行"); return; }
+        Tool.NetworkManager.SendGm(new CSGm { type = row.key, i = arg.i, v0 = arg.v0, v1 = arg.v1, v2 = arg.v2 });
+    }
+
+    // 参数解析：int/bool/float 直接读，Vector2/3 用 "(1.1,2.2)" 形式
+    private static bool TryParseParam(gm_command row, string raw, out GmArg arg, out string error)
+    {
+        arg = default;
+        error = null;
+        if (!row.paramType.HasValue) return true;
+
+        string text = (raw ?? string.Empty).Trim();
+        if (text.Length == 0) { error = "未填参数"; return false; }
+
+        switch (row.paramType.Value)
+        {
+            case ParamInt:
+                if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int i)) { arg.i = i; return true; }
+                error = "需要整数";
+                return false;
+
+            case ParamBool:
+                if (TryParseBool(text, out bool b)) { arg.i = b ? 1 : 0; return true; }
+                error = "需要 1/0（也接受 true/false、t/f）";
+                return false;
+
+            case ParamFloat:
+                if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out float f)) { arg.v0 = f; return true; }
+                error = "需要小数";
+                return false;
+
+            case ParamVector2:
+                if (TryParseVector(text, 2, out float[] v2)) { arg.v0 = v2[0]; arg.v1 = v2[1]; return true; }
+                error = "需要 (x,y) 两个分量";
+                return false;
+
+            case ParamVector3:
+                if (TryParseVector(text, 3, out float[] v3)) { arg.v0 = v3[0]; arg.v1 = v3[1]; arg.v2 = v3[2]; return true; }
+                error = "需要 (x,y,z) 三个分量";
+                return false;
+
+            default:
+                error = $"配表 paramType={row.paramType.Value} 不认识（只支持 0~4）";
+                return false;
         }
     }
 
-    private static void PutInt(CSGm gm, ref int slot, int v)
+    private static bool TryParseBool(string text, out bool value)
     {
-        if (slot == 0) gm.int1 = v;
-        else if (slot == 1) gm.int2 = v;
-        slot++;
+        switch (text.ToLowerInvariant())
+        {
+            case "1": case "t": case "true": value = true; return true;
+            case "0": case "f": case "false": value = false; return true;
+            default: value = false; return false;
+        }
     }
 
-    private static void PutFloat(CSGm gm, ref int slot, float v)
+    private static bool TryParseVector(string text, int count, out float[] values)
     {
-        if (slot == 0) gm.float1 = v;
-        else if (slot == 1) gm.float2 = v;
-        else if (slot == 2) gm.float3 = v;
-        slot++;
-    }
+        values = null;
+        string s = text.Trim();
+        if (s.StartsWith("(")) s = s.Substring(1);
+        if (s.EndsWith(")")) s = s.Substring(0, s.Length - 1);
+        s = s.Replace('，', ',');
+        string[] parts = s.Split(',');
+        if (parts.Length != count) return false;
 
-    private static int ParseInt(string s) => int.TryParse(s, out var v) ? v : 0;
-    private static float ParseFloat(string s) => float.TryParse(s, out var v) ? v : 0f;
-
-    private static int EnumValueOf(Type enumType, int index)
-    {
-        if (enumType == null || !enumType.IsEnum) return index;
-        var values = Enum.GetValues(enumType);
-        return index >= 0 && index < values.Length ? Convert.ToInt32(values.GetValue(index)) : 0;
+        float[] result = new float[count];
+        for (int k = 0; k < count; k++)
+        {
+            if (!float.TryParse(parts[k].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out result[k])) return false;
+        }
+        values = result;
+        return true;
     }
     #endregion
 
-    #region//特殊处理（Label 数据 / 本地项）
-    // 本地项（纯客户端指令）：不联网也生效，各条实现在 RunLocal 里一一对应
-    private static bool IsLocalExecutable(GmEnum cmd) => cmd switch
+    #region//本地指令（不联网也生效；返回 true 表示已处理）
+    private bool RunLocal(gm_command row, GmArg arg)
     {
-        GmEnum.Screen_Terrain_ShowRadius or
-        GmEnum.Screen_Fog or
-        GmEnum.Other_Settlement or
-        GmEnum.Other_Debug or
-        GmEnum.Other_Collect_MeshFaces or
-        GmEnum.Other_LocalDelay => true,
-        _ => false,
-    };
-
-    private void RunLocal(GmEnum cmd, int start, int end)
-    {
-        switch (cmd)
+        switch (row.key)
         {
-            case GmEnum.Screen_Terrain_ShowRadius:
-                SetTerrainRadius(ReadFloat(start));
-                break;
-            case GmEnum.Screen_Fog:
-                ToggleFog();
-                break;
-            case GmEnum.Other_Debug:
-                RefreshDataRows(start, end); // 重算 FPS / 实体数量 / 延迟 / 客户端时间
-                break;
-            case GmEnum.Other_Collect_MeshFaces:
-                meshFacesText = CountSceneMeshFaces().ToString();
-                RefreshDataRows(start, end);
-                break;
-            case GmEnum.Other_Settlement:
+            case GmCommandId.ShowEnemyCampConversation:
+                ChatPlugin.ShowEnemyDialog = arg.i != 0;
+                Output($"敌方阵营聊天：{(ChatPlugin.ShowEnemyDialog ? "开" : "关")}");
+                return true;
+
+            case GmCommandId.SettlementView:
                 if (Tool.UIManager != null) Tool.UIManager.Settlement.PlayDemo();
-                break;
-            case GmEnum.Other_LocalDelay:
-                if (Tool.Instance != null) Tool.Instance.delay = ReadSliderInt(start);
-                break;
+                Output("已播放结算界面演示");
+                return true;
+
+            case GmCommandId.Delay:
+                if (arg.i < 0) { Output("延迟不能为负"); return true; }
+                if (Tool.Instance != null) Tool.Instance.delay = arg.i;
+                Output($"本地延迟已设为 {arg.i} ms");
+                return true;
+
+            case GmCommandId.DebugFps:
+                Output($"{(1f / Mathf.Max(Time.unscaledDeltaTime, 1e-5f)).ToString("0")} FPS");
+                return true;
+
+            case GmCommandId.DebugEntityCount:
+                Output($"客户端实体数量：{CountEntities()}");
+                return true;
+
+            case GmCommandId.ClientTime:
+                Output($"客户端时间：{Time.time.ToString("0.0")}");
+                return true;
+
+            case GmCommandId.MeshSurfaceCount:
+                Output($"模型网格面数：{CountSceneMeshFaces()}");
+                return true;
+
+            case GmCommandId.Fog:
+                var env = Tool.EnvironmentManager;
+                if (env == null) { Output("雾气：当前场景没有 EnvironmentManager"); return true; }
+                env.SetFogEnabled(arg.i != 0);
+                Output($"雾气：{(env.fogEnabled ? "开" : "关")}");
+                return true;
+
+            default:
+                return false;
         }
     }
-
-    // 开关类：客户端记本地状态（按钮标题随状态更新）；四个外挂把目标状态发服务器，敌方对话纯本地
-    private static bool IsToggle(GmEnum cmd) =>
-        cmd is GmEnum.Other_EnemyDialog
-            or GmEnum.Player_Cheat_Flight or GmEnum.Player_Cheat_Invincible
-            or GmEnum.Player_Cheat_Speed;
-
-    private void HandleToggle(GmEnum cmd, int rowIndex)
-    {
-        if (cmd == GmEnum.Other_EnemyDialog)
-        {
-            ChatPlugin.ShowEnemyDialog = !ChatPlugin.ShowEnemyDialog;
-            RefreshButtonTitle(rowIndex);
-            return;
-        }
-
-        bool turnOn = !toggleOn.Contains(cmd);
-        if (turnOn) toggleOn.Add(cmd); else toggleOn.Remove(cmd);
-        if (Tool.NetworkManager != null)
-            Tool.NetworkManager.SendGm(new CSGm { type = cmd, int1 = turnOn ? 1 : 0 });
-        RefreshButtonTitle(rowIndex);
-    }
-
-    // 只改按钮标题，不重挂事件（避免在按钮自己的回调里清掉 onClick）
-    private void RefreshButtonTitle(int rowIndex)
-    {
-        var range = FindRange(rowIndex);
-        if (range == null || rows[rowIndex] is not Button row || ItemAt(rowIndex) is not UI_GmItem item) return;
-        item.m_content_btn.title = ButtonTitle(range.Value.cmd, row.buttonTitle);
-    }
-
-    // 服务器回包（性能 / 战斗数据）：填缓存并重画该指令的数据行
-    private void OnGmResult(SCGm gm)
-    {
-        if (gm == null) return;
-        switch (gm.type)
-        {
-            case GmEnum.Other_Collect_ServerFps: serverFpsText = $"{gm.int1} FPS"; break;
-            case GmEnum.Other_Collect_ServerTime: serverTimeText = gm.float1.ToString("0.0"); break;
-            case GmEnum.Other_CombatData_ZombieCount: zombieCountText = gm.int1.ToString(); break;
-            case GmEnum.Other_CombatData_ZombieSpawnLevel: zombieLevelText = gm.int1.ToString(); break;
-            case GmEnum.Other_CombatData_DayDuration: dayDurationText = gm.float1.ToString("0.0") + " s"; break;
-            case GmEnum.Other_CombatData_NightDuration: nightDurationText = gm.float1.ToString("0.0") + " s"; break;
-            default: return;
-        }
-        if (!panel.visible) return;
-        foreach (var r in cmdRanges)
-        {
-            if (r.cmd != gm.type) continue;
-            RefreshDataRows(r.start, r.end);
-            break;
-        }
-    }
-
-    // 个别指令的行需要特殊渲染时在此返回 true 接管；index 是"该指令内"的行序号。
-    private bool ApplySpecial(GmEnum cmd, int index, UI_GmItem item)
-    {
-        if (cmd == GmEnum.Other_Debug && index <= 3)
-        {
-            item.m_content.selectedPage = "文本";
-            item.m_content_text.text = DebugText(index);
-            return true;
-        }
-        if (cmd == GmEnum.Other_Collect_MeshFaces && index == 1)
-        {
-            item.m_content.selectedPage = "文本";
-            item.m_content_text.text = meshFacesText;
-            return true;
-        }
-        if (cmd == GmEnum.Other_Collect_ServerFps && index == 1)
-        {
-            item.m_content.selectedPage = "文本";
-            item.m_content_text.text = serverFpsText;
-            return true;
-        }
-        if (cmd == GmEnum.Other_Collect_ServerTime && index == 1)
-        {
-            item.m_content.selectedPage = "文本";
-            item.m_content_text.text = serverTimeText;
-            return true;
-        }
-        if (cmd == GmEnum.Other_CombatData_ZombieCount && index == 1)
-        {
-            item.m_content.selectedPage = "文本";
-            item.m_content_text.text = zombieCountText;
-            return true;
-        }
-        if (cmd == GmEnum.Other_CombatData_ZombieSpawnLevel && index == 1)
-        {
-            item.m_content.selectedPage = "文本";
-            item.m_content_text.text = zombieLevelText;
-            return true;
-        }
-        if (cmd == GmEnum.Other_CombatData_DayDuration && index == 1)
-        {
-            item.m_content.selectedPage = "文本";
-            item.m_content_text.text = dayDurationText;
-            return true;
-        }
-        if (cmd == GmEnum.Other_CombatData_NightDuration && index == 1)
-        {
-            item.m_content.selectedPage = "文本";
-            item.m_content_text.text = nightDurationText;
-            return true;
-        }
-        return false;
-    }
-
-    // 刷新按钮：只重画该指令里的数据行；不动按钮行本身（避免在按钮回调里重挂它的事件）
-    private void RefreshDataRows(int start, int end)
-    {
-        for (int i = start; i < end; i++)
-        {
-            if (rows[i].LayoutType != LayoutType.Label) continue;
-            if (ItemAt(i) is UI_GmItem item) RenderRow(i, item);
-        }
-    }
-
-    private UI_GmItem ItemAt(int rowIndex) => panel.m_GmItemList.GetChildAt(rowIndex) as UI_GmItem;
-
-    private int ReadInt(int rowIndex) => ItemAt(rowIndex) is UI_GmItem it ? ParseInt(it.m_content_inputField.text) : 0;
-    private float ReadFloat(int rowIndex) => ItemAt(rowIndex) is UI_GmItem it ? ParseFloat(it.m_content_inputField.text) : 0f;
-    private int ReadSliderInt(int rowIndex) => ItemAt(rowIndex) is UI_GmItem it ? (int)it.m_content_slider.value : 0;
-    private int ReadDropdownValue(int rowIndex, Type enumType) => ItemAt(rowIndex) is UI_GmItem it ? EnumValueOf(enumType, it.m_content_dropdown.selectedIndex) : 0;
-
-    private static string DebugText(int index) => index switch
-    {
-        0 => (1f / Mathf.Max(Time.unscaledDeltaTime, 1e-5f)).ToString("0"),
-        1 => CountEntities().ToString(),
-        2 => $"{EnsInstance.LocalClientDelay} ms",
-        3 => Time.time.ToString("0.0"),
-        _ => string.Empty,
-    };
 
     private static int CountEntities()
     {
@@ -648,19 +411,23 @@ public class GmPanel
         }
         return faces;
     }
+    #endregion
 
-    // 新地形只有一套区块剔除，半径改 TerrainPropCuller.visibleDistance
-    private static void SetTerrainRadius(float radius)
+    #region//服务器查询回包
+    private void OnGmResult(SCGm gm)
     {
-        var culler = Tool.ModularTerrainGenerator != null ? Tool.ModularTerrainGenerator.Culler : null;
-        if (culler == null) { Debug.LogWarning("[GM] 地形尚未生成，显示半径不生效"); return; }
-        culler.visibleDistance = Mathf.Max(0f, radius);
-    }
-
-    private static void ToggleFog()
-    {
-        var env = Tool.EnvironmentManager;
-        if (env != null) env.SetFogEnabled(!env.fogEnabled);
+        if (gm == null) return;
+        string text = gm.type switch
+        {
+            GmCommandId.ServerFps => $"服务器帧率：{gm.i} FPS",
+            GmCommandId.ServerEntityCount => $"服务器实体数量：{gm.i}",
+            GmCommandId.ServerTime => $"服务器时间：{gm.v0.ToString("0.0")}",
+            GmCommandId.ServerDayLength => $"白天时长：{gm.v0.ToString("0.0")} s",
+            GmCommandId.ServerNightLength => $"夜晚时长：{gm.v0.ToString("0.0")} s",
+            GmCommandId.ServerZombieSpawnLevel => $"僵尸刷新等级：{gm.i}",
+            _ => null,
+        };
+        if (text != null) Output(text);
     }
     #endregion
 }

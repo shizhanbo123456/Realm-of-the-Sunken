@@ -25,11 +25,11 @@ namespace Ros.UI.Main
             base.ConstructFromXML(xml);
 
             m_quit_mode = GetControllerAt(0);
-            m_label_AI_count = (GTextField)GetChildAt(1);
-            m_add_ai = (GButton)GetChildAt(2);
-            m_remove_ai = (GButton)GetChildAt(3);
-            m_join = (GButton)GetChildAt(6);
-            m_quit = (GButton)GetChildAt(7);
+            m_label_AI_count = (GTextField)GetChildAt(2);
+            m_add_ai = (GButton)GetChildAt(3);
+            m_remove_ai = (GButton)GetChildAt(4);
+            m_join = (GButton)GetChildAt(7);
+            m_quit = (GButton)GetChildAt(8);
         }
     }
 }

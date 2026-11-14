@@ -344,4 +344,22 @@ namespace Ros.Config
             }
         }
     }
+
+    public static class GmCommandConfig
+    {
+        public static readonly Dictionary<int, gm_command> content = new();
+        // 按主键升序：GM 面板的菜单分组与命令顺序都以它为准
+        public static readonly List<gm_command> ordered = new();
+
+        internal static void Bake(ConfigManager m)
+        {
+            content.Clear();
+            ordered.Clear();
+            foreach (gm_command row in m.gm_commandData.Values) content.Add(row.key, row);
+            ordered.AddRange(content.Values);
+            ordered.Sort((a, b) => a.key.CompareTo(b.key));
+        }
+
+        public static gm_command Get(int key) => ConfigBinary.Require(content, key, "gm_command");
+    }
 }
