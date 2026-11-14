@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using UnityEditor;
 using UnityEditor.AddressableAssets;
+using UnityEditor.AddressableAssets.Settings;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 
@@ -83,7 +84,8 @@ public static class ResourceFieldFiller
     }
 
     // 返回写入数量；0 表示选中项里没有匹配的类型，目标未改动
-    public static int Fill(UnityEngine.Object target, FieldInfo field, bool append)
+    public static int Fill(UnityEngine.Object target, FieldInfo field, bool append,
+        bool markAddressable = true, string groupName = null)
     {
         Spec spec = Classify(field.FieldType);
         var picked = PickSelection(spec.elementType);
@@ -93,7 +95,6 @@ public static class ResourceFieldFiller
             return 0;
         }
 
-        WarnIfNotAddressable(spec, picked);
         Undo.RecordObject(target, "填充资源引用");
 
         switch (spec.kind)
@@ -105,8 +106,40 @@ public static class ResourceFieldFiller
         }
 
         EditorUtility.SetDirty(target);
+
+        // 只有 AssetReference 依赖 Addressables；直接引用的图标/对象列表不动
+        if (spec.kind == Kind.AssetRefList || spec.kind == Kind.AssetRefSingle)
+        {
+            if (markAddressable) AddressableMarker.MarkAssets(picked, groupName);
+            else WarnIfNotAddressable(spec, picked);
+        }
+
         Debug.Log($"[资源填充] {field.Name} ← {picked.Count} 个（按名称自然序）");
         return picked.Count;
+    }
+
+    // 本组件所有资源字段里已填的 GUID（AssetReference 才有）
+    public static List<string> CollectGuids(UnityEngine.Object target)
+    {
+        var guids = new List<string>();
+        foreach (var field in ResourceFields(target.GetType()))
+        {
+            object value = field.GetValue(target);
+            var list = value as IList;
+            if (list != null)
+            {
+                foreach (var item in list)
+                {
+                    var reference = item as AssetReference;
+                    if (reference != null && reference.RuntimeKeyIsValid()) guids.Add(reference.AssetGUID);
+                }
+                continue;
+            }
+
+            var single = value as AssetReference;
+            if (single != null && single.RuntimeKeyIsValid()) guids.Add(single.AssetGUID);
+        }
+        return guids;
     }
 
     public static void Clear(UnityEngine.Object target, FieldInfo field)
@@ -200,26 +233,95 @@ public static class ResourceFieldFiller
     private static void WarnIfNotAddressable(Spec spec, List<UnityEngine.Object> picked)
     {
         if (spec.kind != Kind.AssetRefList && spec.kind != Kind.AssetRefSingle) return;
-
-        var settings = AddressableAssetSettingsDefaultObject.Settings;
-        if (settings == null)
-        {
-            Debug.LogWarning("[资源填充] Addressables 尚未初始化：引用已写入，但运行时加载会失败（先在 Addressables Groups 建一次配置）");
-            return;
-        }
-
-        List<string> missing = null;
-        for (int i = 0; i < picked.Count; i++)
-        {
-            string guid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(picked[i]));
-            if (settings.FindAssetEntry(guid) != null) continue;
-            if (missing == null) missing = new List<string>();
-            missing.Add(picked[i].name);
-        }
-        if (missing != null)
+        List<string> missing = AddressableMarker.Missing(picked);
+        if (missing.Count > 0)
             Debug.LogWarning($"[资源填充] 以下资产还不是 addressable，运行时加载会失败：{string.Join("、", missing)}");
     }
     #endregion
+}
+
+// 把引用到的资产一键标成 Addressable：AssetReference 只存 GUID，资产没进组时运行时会抛
+// InvalidKeyException（No Location found for Key=...）。
+public static class AddressableMarker
+{
+    public const string DefaultGroupName = "Resources";
+
+    public static int MarkAssets(List<UnityEngine.Object> assets, string groupName)
+    {
+        var guids = new List<string>(assets.Count);
+        for (int i = 0; i < assets.Count; i++)
+        {
+            string guid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(assets[i]));
+            if (!string.IsNullOrEmpty(guid)) guids.Add(guid);
+        }
+        return MarkGuids(guids, groupName);
+    }
+
+    public static int MarkGuids(List<string> guids, string groupName)
+    {
+        if (guids.Count == 0) return 0;
+        if (!EnsureSettings()) return 0;
+
+        var settings = AddressableAssetSettingsDefaultObject.Settings;
+        AddressableAssetGroup group = GroupOf(settings, string.IsNullOrEmpty(groupName) ? DefaultGroupName : groupName);
+
+        int marked = 0;
+        for (int i = 0; i < guids.Count; i++)
+        {
+            settings.CreateOrMoveEntry(guids[i], group, false, true);
+            marked++;
+        }
+
+        settings.SetDirty(AddressableAssetSettings.ModificationEvent.BatchModification, null, true, true);
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[资源标记] {marked} 个资产已加入 Addressables 组「{group.Name}」");
+        return marked;
+    }
+
+    // 把某个组件里已填的全部引用一次标记完（武器填好但没标 addressable 时就靠这个补救）
+    public static int MarkAll(UnityEngine.Object target, string groupName)
+    {
+        return MarkGuids(ResourceFieldFiller.CollectGuids(target), groupName);
+    }
+
+    public static List<string> Missing(List<UnityEngine.Object> assets)
+    {
+        var missing = new List<string>();
+        var settings = AddressableAssetSettingsDefaultObject.Settings;
+        if (settings == null)
+        {
+            for (int i = 0; i < assets.Count; i++) missing.Add(assets[i].name);
+            return missing;
+        }
+
+        for (int i = 0; i < assets.Count; i++)
+        {
+            string guid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(assets[i]));
+            if (settings.FindAssetEntry(guid) == null) missing.Add(assets[i].name);
+        }
+        return missing;
+    }
+
+    private static bool EnsureSettings()
+    {
+        if (AddressableAssetSettingsDefaultObject.Settings != null) return true;
+
+        bool create = EditorUtility.DisplayDialog("初始化 Addressables",
+            "工程里还没有 Addressables 配置（AddressableAssetsData）。\n现在创建并把引用到的资产加进组里吗？", "创建", "取消");
+        if (!create) return false;
+
+        AddressableAssetSettingsDefaultObject.GetSettings(true);
+        return AddressableAssetSettingsDefaultObject.Settings != null;
+    }
+
+    // 新组复制默认组的 schema，否则新组没有 bundle 打包设置
+    private static AddressableAssetGroup GroupOf(AddressableAssetSettings settings, string groupName)
+    {
+        AddressableAssetGroup group = settings.FindGroup(groupName);
+        if (group != null) return group;
+        return settings.CreateGroup(groupName, false, false, true,
+            new List<AddressableAssetGroupSchema>(settings.DefaultGroup.Schemas));
+    }
 }
 
 // 工具窗口：目标组件由自己查找（不依赖 Inspector 选择），每个资源字段一行按钮
@@ -230,6 +332,8 @@ public class ResourceFieldFillWindow : EditorWindow
     private int side;
     private UnityEngine.Object target;
     private Vector2 scroll;
+    private bool markAddressable = true;
+    private string groupName = AddressableMarker.DefaultGroupName;
 
     [MenuItem("Tools/资源/资源字段批量填充")]
     private static void Open()
@@ -273,6 +377,14 @@ public class ResourceFieldFillWindow : EditorWindow
 
         EditorGUILayout.LabelField($"Project 面板已选 {Selection.objects.Length} 个资源", EditorStyles.miniLabel);
 
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            markAddressable = EditorGUILayout.ToggleLeft("填充后标为 Addressable", markAddressable, GUILayout.Width(180f));
+            groupName = EditorGUILayout.TextField(groupName, GUILayout.Width(110f));
+            if (GUILayout.Button("把已填引用全部标为 Addressable"))
+                AddressableMarker.MarkAll(target, groupName);
+        }
+
         scroll = EditorGUILayout.BeginScrollView(scroll);
         foreach (var field in ResourceFieldFiller.ResourceFields(target.GetType()))
             DrawRow(field);
@@ -295,7 +407,7 @@ public class ResourceFieldFillWindow : EditorWindow
             {
                 if (GUILayout.Button(single ? "取选中首个" : $"填入选中({picked})", GUILayout.Width(96f)))
                 {
-                    ResourceFieldFiller.Fill(target, field, false);
+                    ResourceFieldFiller.Fill(target, field, false, markAddressable, groupName);
                     Repaint();
                 }
             }
@@ -304,7 +416,7 @@ public class ResourceFieldFillWindow : EditorWindow
 
             if (GUILayout.Button("追加", GUILayout.Width(48f)))
             {
-                ResourceFieldFiller.Fill(target, field, true);
+                ResourceFieldFiller.Fill(target, field, true, markAddressable, groupName);
                 Repaint();
             }
             if (GUILayout.Button("清空", GUILayout.Width(48f)))
