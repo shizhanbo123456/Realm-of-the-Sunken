@@ -93,9 +93,7 @@ public class UIManager : MonoBehaviour
             ApplyResize();
             Debug.Log($"[UIManager] 适配完成：屏幕 {Screen.width}x{Screen.height}，面板宽 {home.PanelWidth:0}，缩放 {home.UiScale:0.00}，GRoot {GRoot.inst.width:0}x{GRoot.inst.height:0}");
 
-            currentPage = home;
-            home.Enter(null);
-            Debug.Log($"[UIManager] 首页已显示：home.visible={home.IsVisible}，children={GRoot.inst.numChildren}");
+            BeginStartupLoad();
 
             //切页事件（发送方在 NetworkManager）：连接成功→大厅、开战→战斗、断开/超时→首页
             EventManager.AddEvent(ClientEvent.OnConnect, OnConnect);
@@ -193,6 +191,36 @@ public class UIManager : MonoBehaviour
         loading.m_show_bar.selectedIndex = 1;
         loading.m_progressbar.value = Mathf.Clamp01(progress01) * loading.m_progressbar.max;
         loading.m_progress.text = text;
+    }
+
+    // 进入游戏：先挂加载界面把常驻资源拉齐（攻守角色/武器/两张布置图/地形素材表），完成后再进首页
+    private void BeginStartupLoad()
+    {
+        ShowLoading();
+        SetLoadingProgress(0f, "正在加载资源… 0%");
+
+        if (Tool.ResourceManager == null)
+        {
+            Debug.LogError("[UIManager] 场景缺少 ResourceManager：跳过资源预加载直接进首页");
+            EnterHome();
+            return;
+        }
+
+        Tool.ResourceManager.LoadNecessary(EnterHome, OnNecessaryProgress);
+    }
+
+    private void OnNecessaryProgress(float progress01)
+    {
+        SetLoadingProgress(progress01, $"正在加载资源… {Mathf.RoundToInt(progress01 * 100f)}%");
+    }
+
+    private void EnterHome()
+    {
+        HideLoading();
+        if (currentPage != null) return; // 加载期间已经被切到别的页
+        currentPage = home;
+        home.Enter(null);
+        Debug.Log($"[UIManager] 首页已显示：home.visible={home.IsVisible}，children={GRoot.inst.numChildren}");
     }
     #endregion
 

@@ -91,15 +91,24 @@ public class ResourceManager : MonoBehaviour
     #endregion
 
     #region 预加载
-    // 进游戏：攻守角色、武器、首页/大厅布置图、地形素材表。全部常驻，不参与卸载
-    public void LoadNecessary()
+    private bool necessaryStarted;
+    private bool necessaryLoaded;
+    private int necessaryTotal;
+    private int necessaryFinished;
+    private Action necessaryDoneCallbacks;
+    private Action<float> necessaryProgressCallbacks;
+
+    public bool IsNecessaryLoaded => necessaryLoaded;
+
+    // 进游戏：攻守角色、武器、首页/大厅布置图、地形素材表。全部常驻，不参与卸载。
+    // onProgress 在每项结束时回调 0~1，全部结束（含失败）后回调 onDone；重复调用只补挂回调
+    public void LoadNecessary(Action onDone = null, Action<float> onProgress = null)
     {
-        PreloadAll(ResourceType.AttackCharacterGraphics);
-        PreloadAll(ResourceType.DefenseCharacterGraphics);
-        PreloadAll(ResourceType.WeaponPrefabs);
-        Preload(ResourceType.HomeDisplayArranger, 0);
-        Preload(ResourceType.LobbyDisplayArranger, 0);
-        LoadBuildingKit(null);
+        if (onDone != null) necessaryDoneCallbacks += onDone;
+        if (onProgress != null) necessaryProgressCallbacks += onProgress;
+
+        if (!necessaryStarted) BeginNecessary();
+        if (necessaryLoaded) NotifyNecessaryDone();
     }
 
     // 进战斗：僵尸/精英僵尸、守护点、水晶与中立雕像、小/大珊瑚。加载完再放行开战
@@ -116,19 +125,67 @@ public class ResourceManager : MonoBehaviour
             ResourceType.CoralLargeGraphics);
     }
 
-    public void Preload(ResourceType type, int index)
+    private void BeginNecessary()
+    {
+        necessaryStarted = true;
+        // 布置图与地形素材表按 1 项计（未配置时也会走一次失败回调，保证计数收得回来）
+        necessaryTotal = CountOf(ResourceType.AttackCharacterGraphics)
+                       + CountOf(ResourceType.DefenseCharacterGraphics)
+                       + CountOf(ResourceType.WeaponPrefabs) + 3;
+        if (necessaryTotal <= 0)
+        {
+            necessaryLoaded = true;
+            return;
+        }
+
+        PreloadNecessary(ResourceType.AttackCharacterGraphics);
+        PreloadNecessary(ResourceType.DefenseCharacterGraphics);
+        PreloadNecessary(ResourceType.WeaponPrefabs);
+        PreloadNecessary(ResourceType.HomeDisplayArranger, 0);
+        PreloadNecessary(ResourceType.LobbyDisplayArranger, 0);
+        LoadBuildingKit(_ => NecessaryOneDone());
+    }
+
+    private void PreloadNecessary(ResourceType type)
+    {
+        int count = CountOf(type);
+        for (int index = 0; index < count; index++) PreloadNecessary(type, index);
+    }
+
+    private void PreloadNecessary(ResourceType type, int index)
     {
         int key = RefToInt(type, index);
         Entry entry = GetEntry(key);
         entry.preloadCount++;
         CancelUnload(entry);
+        if (entry.state == AssetState.Loaded)
+        {
+            NecessaryOneDone();
+            return;
+        }
+
+        entry.notify.Add(NecessaryOneDone);
         EnsureLoaded(key, entry);
     }
 
-    public void PreloadAll(ResourceType type)
+    private void NecessaryOneDone()
     {
-        int count = CountOf(type);
-        for (int index = 0; index < count; index++) Preload(type, index);
+        necessaryFinished++;
+        if (necessaryProgressCallbacks != null)
+            necessaryProgressCallbacks(Mathf.Clamp01((float)necessaryFinished / necessaryTotal));
+
+        if (necessaryFinished < necessaryTotal) return;
+        necessaryLoaded = true;
+        NotifyNecessaryDone();
+    }
+
+    private void NotifyNecessaryDone()
+    {
+        if (necessaryProgressCallbacks != null) necessaryProgressCallbacks(1f);
+
+        var callbacks = necessaryDoneCallbacks;
+        necessaryDoneCallbacks = null;
+        if (callbacks != null) callbacks();
     }
 
     private void PreloadGroup(Action onDone, params ResourceType[] types)
