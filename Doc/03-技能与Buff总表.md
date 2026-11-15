@@ -7,7 +7,7 @@
 
 ### 1.1 武器技能总览（0~49）
 
-> 技能与 id 的对应由 `SkillTypes` 枚举决定：段首显式锚定、段内连续、段间留空供插入。区间：刀 0~10 / 长枪 11~18 / 枪械 19~33 / 魔法球 34~49 / 防守方 60~77 / 僵尸 90~94 / 防御塔 110~112 / 中立雕像 113 / 空手 130~132。措辞取《特效清单分别表1019》的定稿描述。
+> 技能与 id 的对应由 `SkillTypes` 枚举决定：段首显式锚定、段内连续、段间留空供插入。区间：刀 0~10 / 长枪 11~18 / 枪械 19~33 / 魔法球 34~49 / 防守方 60~77 / 鲛人 90~94 / 防御塔 110~112 / 中立雕像 113 / 空手 130~132。措辞取《特效清单分别表1019》的定稿描述。
 > **发射点**：全部走实体骨骼锚点（`UpCenter` / `UpFront`；抛出武器、回旋武器用 `RightHand`）。**落点**：不索敌 = 朝自身面向、水平距离 = 技能射程、高度与起点同高；夹角 > 0 的（含 2 个雕像孢子）= 朝范围内最近敌人的体中心，水平距离仍取技能射程、高度取体中心。距离一律从施法者自身位置起算，不从发射锚点起算。
 
 #### 近战刀（0~10）
@@ -92,9 +92,9 @@
 | 63 | 白瞳凝视 | SkillEyeMark | 无 | EyeMark（小地图常显） |
 | 64 | 夜隐 | SkillNightMark | 无 | 自身挂 NightMark（不出现在敌方小地图） |
 | 65 | 长夜降临 | SkillForceNight | 无 | 无 |
-| 66 | 唤尸 | SkillSummonZombies | 无 | 无（5 只普通僵尸，等级跟随自然刷新等级） |
+| 66 | 唤尸 | SkillSummonZombies | 无 | 无（5 只普通鲛人，等级跟随自然刷新等级） |
 | 67 | 死境漫游 | SkillDeathStrollCast | 无 | DeathStroll（霸体 + 光环 DoT） |
-| 68 | 菁英尸潮 | SkillSummonElites | 无 | 无（3 只精英僵尸，等级跟随自然刷新等级） |
+| 68 | 菁英尸潮 | SkillSummonElites | 无 | 无（3 只精英鲛人，等级跟随自然刷新等级） |
 | 69 | 缄默之咒 | SkillSilenceCast | 无 | 自身 8m 内敌人挂 Silence |
 | 70 | 沉沼缚 | SkillMireCast | 无 | 全场敌人挂 Mire |
 | 71 | 荆棘回响 | SkillReflectCast | 无 | 守护雕像挂 Reflect |
@@ -105,7 +105,7 @@
 | 76 | 苍白蚀影 | SkillPaleDarkCast | Bullet[1] ×5 | 命中挂 PaleDark |
 | 77 | 蔽目之雾 | SkillFogCast | 无 | 敌人挂 Fog |
 
-**被动（不是技能、不占 id）**：暴击麻痹（`BattleManagerPassive.OnHitPassive`）、单次受伤不超过生命上限 5%（`AdjustIncomingDamage`）、命中类伤害结算后生命低于上限 10% 即挂 20s 10 级护盾并恢复 1000 生命值（`CheckLowHealthShield`，每角色 60s 一次）、光暗转化（`CheckPaleConversion`）、教皇守护 / 僵尸刷新等级提升等全局被动见策划案第二十章。
+**被动（不是技能、不占 id）**：暴击麻痹（`BattleManagerPassive.OnHitPassive`）、单次受伤不超过生命上限 5%（`AdjustIncomingDamage`）、命中类伤害结算后生命低于上限 10% 即挂 20s 10 级护盾并恢复 1000 生命值（`CheckLowHealthShield`，每角色 60s 一次）、光暗转化（`CheckPaleConversion`）、教皇守护 / 鲛人刷新等级提升等全局被动见策划案第二十章。
 
 ### 1.3 非玩家单位与空手（90~132）
 
@@ -129,34 +129,34 @@
 | Buff / 状态（EffectType） | 持续特效 | 主要来源 |
 | --- | --- | --- |
 | StatueReduce 贤者雕像减伤 | Shield[0] 红覆盖 | 守护雕像机制（存活外围点） |
-| StatueShield 岩石护盾 | MC[8] 红色防御增益 | 鹿铠怪人 主动1 |
-| PopeGuard 教皇守护 | Shield[12] 红熔岩 | 蒙面教皇 被动 |
+| StatueShield 岩石护盾 | MC[8] 红色防御增益 | 防守方角色3 主动1 |
+| PopeGuard 教皇守护 | Shield[12] 红熔岩 | 防守方角色2 被动 |
 | Shield 护盾 | Shield[2] 白厚实 | 光盾 / 枪阵屏障 / 奥术屏障 |
-| Stun 麻痹 | Buff[20] 麻痹黄 | 破霸重斩 / 麻痹弹 / 落雷术 / 鹿铠被动 |
-| StatueBlaze 灵火 | MC[3] 深红护盾 | 鹿铠怪人 大招 |
+| Stun 麻痹 | Buff[20] 麻痹黄 | 破霸重斩 / 麻痹弹 / 落雷术 / 防守方角色3 被动 |
+| StatueBlaze 灵火 | MC[3] 深红护盾 | 防守方角色3 大招 |
 | Burning 燃烧 | Buff[11] 火焰 | 燃烧弹 |
-| EyeMark 白眼标记 | Buff[23] 宇宙 | 白眼伯爵 主动1 |
-| NightMark 黑夜标记 | Buff[30] 紫色祝福（与 PlagueMark 共用） | 白眼伯爵 主动2 |
-| PlaguePollute 瘟疫污染 | Buff[22] | 瘟疫使者 主动2（挂珊瑚） |
-| PaleLight 苍白之光 | Buff[15] 黄色泛光 | 苍白舞者 主动1 |
-| PaleDark 苍白之暗 | Buff[4] 黑色缠绕 | 苍白舞者 主动2 |
-| PaleFire 苍白之火 | Buff[3] 血色缠绕 | 苍白舞者被动：光暗双 8 层转化 |
-| PaleIce 苍白之冰 | Buff[14] 绿色治愈 | 苍白舞者被动：光满 10 层转化 |
-| PaleThunder 苍白之雷 | Buff[20] 麻痹黄 | 苍白舞者被动：暗满 10 层转化 |
-| DeathStroll 死灵漫步 | Buff[29] 橙色祝福 | 死灵漫步者 主动2 |
-| DeathCurse 死灵诅咒 | Buff[0] 紫色雾团 | 死灵漫步者 主动2（尚未施加） |
-| Silence 沉默 | Buff[2] 科技紫 | 蒙面教皇 主动1 |
-| Mire 泥沼 | Buff[17] 黑绿喷发 | 蒙面教皇 主动2 |
-| Reflect 反伤 | MC[6] 深紫色 | 蒙面教皇 大招 |
+| EyeMark 白眼标记 | Buff[23] 宇宙 | 防守方角色0 主动1 |
+| NightMark 黑夜标记 | Buff[30] 紫色祝福（与 PlagueMark 共用） | 防守方角色0 主动2 |
+| PlaguePollute 瘟疫污染 | Buff[22] | 防守方角色1 主动2（挂珊瑚） |
+| PaleLight 苍白之光 | Buff[15] 黄色泛光 | 防守方角色4 主动1 |
+| PaleDark 苍白之暗 | Buff[4] 黑色缠绕 | 防守方角色4 主动2 |
+| PaleFire 苍白之火 | Buff[3] 血色缠绕 | 防守方角色4 被动：光暗双 8 层转化 |
+| PaleIce 苍白之冰 | Buff[14] 绿色治愈 | 防守方角色4 被动：光满 10 层转化 |
+| PaleThunder 苍白之雷 | Buff[20] 麻痹黄 | 防守方角色4 被动：暗满 10 层转化 |
+| DeathStroll 死灵漫步 | Buff[29] 橙色祝福 | 防守方角色5 主动2 |
+| DeathCurse 死灵诅咒 | Buff[0] 紫色雾团 | 防守方角色5 主动2（尚未施加） |
+| Silence 沉默 | Buff[2] 科技紫 | 防守方角色2 主动1 |
+| Mire 泥沼 | Buff[17] 黑绿喷发 | 防守方角色2 主动2 |
+| Reflect 反伤 | MC[6] 深紫色 | 防守方角色2 大招 |
 | Root 定身 | Buff[19] 麻痹蓝 | 捕获投掷 / 束缚钉 |
-| PlagueMark 瘟疫标记 | Buff[30] 紫色祝福 | 瘟疫使者 主动1 |
+| PlagueMark 瘟疫标记 | Buff[30] 紫色祝福 | 防守方角色1 主动1 |
 | Poison 中毒 | Buff[13] 绿色治愈 | 毒珠 / 毒气弹 / 引爆 |
 | Freeze 冰冻 | Buff[12] 冻结 | 冻结弹 / 冰锥术 / 冰霜新星 |
 | AnimSlowDown 减速 | Buff[17] 黑绿喷发 | 破甲重弹 |
 | AnimSpeedUp 加速 | Buff[27] 环绕风 | 激励弹 |
 | AngelBless 天使祝福 | MC[9] 蓝色攻击增益 | 攻占天使雕像 |
 | DemonBless 恶魔祝福 | MC[9] 蓝色攻击增益 | 攻占恶魔雕像 |
-| ZombieScreamBoost 僵尸嘶吼增益（攻击 +20%/级、暴击率 +100 点/级、移速 +20%/级） | MC[9] 蓝色攻击增益 | 精英僵尸·血嚎（自身 + 半径内同阵营） |
+| ZombieScreamBoost 鲛人嘶吼增益（攻击 +20%/级、暴击率 +100 点/级、移速 +20%/级） | MC[9] 蓝色攻击增益 | 精英鲛人·血嚎（自身 + 半径内同阵营） |
 | AttrAttackBoost | MC[0] 黄色力场 | 激励法阵等属性增益 |
 | AttrCritRateBoost / AttrCritDamageBoost | MC[1] 治愈绿 | 暴击 / 暴伤增益 |
 | AttrAttackDecrease / AttrCritRateDecrease / AttrCritDamageDecrease | MC[5] 深绿护盾 | 属性削弱类 |
@@ -177,7 +177,7 @@
 ## 三、实现口径
 
 Skills文件夹：
-**代码状态**：技能 80 个，按拥有者分文件：`SkillPoolWeapon`（武器 50）、`SkillPoolDefense`（防守方 18）、`SkillPoolNpc`（普通僵尸 2 + 精英僵尸 3 + 防御塔孢子 1 + 中立雕像孢子 1）、`SkillPoolUnarmed`（空手 3），统一由 `SkillPools.RegisterAll()` 注册。`SkillType` 的段首项显式锚定 id、段内按枚举顺序递增，段间留空供插入：刀 0~10 / 长枪 11~18 / 枪械 19~33 / 魔法球 34~49 / 防守方 60~77 / 僵尸 90~94 / 防御塔 110~112 / 中立雕像 113 / 空手 130~132。**段内不可断号**、**0~49 必须整段连续**（`Config.GetRandomWeaponSkillId` 按整段随机）；武器不跟技能绑定——武器由实体在 entity.csv 里固定持有，技能只声明攻击动画，与技能栏槽位无关（槽位顺序由客户端按 skillId 升序排列，玩家可在技能选择面板自选）。技能图标需按当前技能表重建（分配工具待重做）。
+**代码状态**：技能 80 个，按拥有者分文件：`SkillPoolWeapon`（武器 50）、`SkillPoolDefense`（防守方 18）、`SkillPoolNpc`（普通鲛人 2 + 精英鲛人 3 + 防御塔孢子 1 + 中立雕像孢子 1）、`SkillPoolUnarmed`（空手 3），统一由 `SkillPools.RegisterAll()` 注册。`SkillType` 的段首项显式锚定 id、段内按枚举顺序递增，段间留空供插入：刀 0~10 / 长枪 11~18 / 枪械 19~33 / 魔法球 34~49 / 防守方 60~77 / 鲛人 90~94 / 防御塔 110~112 / 中立雕像 113 / 空手 130~132。**段内不可断号**、**0~49 必须整段连续**（`Config.GetRandomWeaponSkillId` 按整段随机）；武器不跟技能绑定——武器由实体在 entity.csv 里固定持有，技能只声明攻击动画，与技能栏槽位无关（槽位顺序由客户端按 skillId 升序排列，玩家可在技能选择面板自选）。技能图标需按当前技能表重建（分配工具待重做）。
 [E]外部调用只向SkillManager传入技能id即可。
 技能双端执行模型：EntitySkillController.TryUseSkill 是全部释放路径（技能栏按键 / J 键空手 / AI / 非玩家）的唯一收口——释放瞬间调 `skill.BeginCast(entity, skillId)`：先摇攻击动画（类型读 skill.csv 第 12 列，留空则按下即施放），等动画到**攻击帧**（`EntityAnim.onAttack`）才调 `OnCast(caster)` 直接结算（此刻索敌/起点基于位移后的实时位置）；**攻击帧回调不一次性清空**，多段攻击动画的每个攻击帧各结算一次。表现是独立链路：技能在需要客户端复现的地方调 `SendWave(caster, 波次id, 写包)` 发一个**波次包**，客户端收到即经 `SkillManager.PlayWave(context)` 调同一技能的 `PlayWave(context)` 按波次 id 分派播放（不等自己的 onAttack）。动画由 `SkillBase.CastAnim`/`HasCastAnim` 统一读表。技能内禁止直接 Instantiate 特效，也不得引用两个资源管理器的特效列表（下标映射与加载集中在 VfxManager）。
 
@@ -207,7 +207,7 @@ Skills文件夹：
 
 `TargetSelect.AimPos(entity, 夹角, 半径, 射程)` 给非射击类索敌用（防守方 / 塔 / 树），取点口径与上面一致：同样按体中心、水平距离取射程。
 
-**自动索敌（第 17 列）**：填 1 时，释放瞬间先按射程做一次**不限方向**的最近敌搜索，把施法者立即转向该敌人（写逻辑朝向 yaw + 对齐 `transform.rotation`，无过渡），然后再走瞄准与攻击帧结算 —— 转向在算落点之前，所以「夹角 ≤ 0.1、弹道沿面向」的技能也会朝敌人打出去。射程内没有敌人时保持原朝向。转向只对真有朝向概念的实体生效（玩家 / 僵尸），雕像类不转。人机与 AI 操控的实体同样生效，但它们的朝向随后由自己的决策层接管。
+**自动索敌（第 17 列）**：填 1 时，释放瞬间先按射程做一次**不限方向**的最近敌搜索，把施法者立即转向该敌人（写逻辑朝向 yaw + 对齐 `transform.rotation`，无过渡），然后再走瞄准与攻击帧结算 —— 转向在算落点之前，所以「夹角 ≤ 0.1、弹道沿面向」的技能也会朝敌人打出去。射程内没有敌人时保持原朝向。转向只对真有朝向概念的实体生效（玩家 / 鲛人），雕像类不转。人机与 AI 操控的实体同样生效，但它们的朝向随后由自己的决策层接管。
 **轨迹构建**：扇形类各调 `Spread.Fan(origin, aim, 发数, 波数, 夹角, 波间隔, 时长, emit)`——`emit` 在服务器是「发一颗子弹」、在客户端是「播一次特效」，两端共用同一套角度展开与波次时序；发数或夹角随波变化的技能用 `shotsOfWave` / `spreadOfWave` 两个可选出参。不走扇形的（环绕 / 回旋 / 天降 / 弹跳 / 分裂 / 环绕扫射等）自己 new 对应轨迹类，轨迹类型见《02-代码架构》「轨迹」节，时长在构造时传入。
 **多目标**：客户端表现要用的目标串（如弹跳的 9 个点）由服务器算好后按自己的布局写进 payload；纯服务端结算用的目标集合，走 `CollectEnemies` / `CollectInRange` 收集后当场消费，不进包——这类技能根本不调 `SendWave`。多目标的上限与排序规则写进技能常量。
 **命中附加效果**：`AttackData.addEffectEvent`（命中挂 Buff）与 `AttackData.onHit`（命中额外逻辑），由子弹命中管线 `BattleManagerCombat.TryHitBullet` 统一消费（近战也走子弹）。`SkillBase` 提供 `ApplyEffect`（命中挂 Buff 回调）、`GiveEffect`（直接挂 Buff）、`PullTo`（命中拉拽）。**击退不是回调**：力度写在 `AttackData.knockbackPower` 上，由命中管线统一处理（见速度节⑥）。
@@ -236,6 +236,6 @@ Buff管理器（EntityEffectController）设计要点（对应策划案 11.3）�
 8. 破霸体：攻击数据（AttackData.breakEndure）命中带霸体的目标时进入受击；不破霸体的攻击只对无霸体目标生效，打中霸体目标不进受击、不停位移。进入受击则移除 MotionBase，并播受击动画（破霸体 = 长受击，否则短受击）+ 转身面向命中来源。**击退与受击解耦**：霸体与冰冻都不阻断击退，唯一阻断项是护盾（身上有任意护盾层则完全不推），且击退与受击动画并行。命中判定入口 = EntityData.ProcessHit（受击与打断位移在 enterHit 分支内，击退在其外，见速度节⑥）
 9. 沉默/强控期间无法释放技能（EntitySkillController.TryUseSkill 校验 `CanCastSkill` = 无「禁止技能输入」且无「禁止移动输入」的 Buff）
 10. Buff 数据使用 struct；标记类 Buff（瘟疫标记/苍白之光/暗）无自身效果，供其它逻辑读层数（苍白转化由被动订阅 Buff 变化实现；**转化出的苍白之冰/之雷/之火归属原施加者**——`AddEffect` 的苍白钩子把标记的施加者传给 `CheckPaleConversion`，多人叠同一目标时归属最后叠层者）。苍白之冰/之雷是独立强控类型（行为同冰冻/麻痹），苍白之火是独立 DoT（每跳同燃烧），三者只是类型不同、可与通用冰冻/麻痹/燃烧并存各算各的层数与时间
-11. 全局参数（僵尸刷新等级等）不是 Buff，实现于游戏逻辑控制器/Config（策划案第二十章）；其中僵尸刷新等级按战斗剩余时间实时计算（`BattleManagerPassive.GetZombieSpawnLevel`：每经过 7.5% 战斗时间 +1，死亡漫步者被动再 +4，普通/精英共用）。受击类被动（白眼伯爵单次受伤上限、瘟疫使者致命拦截）不进 Buff 系统，在 `EntityData.OnDamaged` 的伤害管线里即时判定。等级上限分三档：角色等级上限 `save_max_level=10`（对应 `exp_character.csv` 的 1~10 级）、战斗期生成等级 `battle_max_level=20`（`EntityData.OnCreate` 钳制，最高刷出 20 级）、玩家等级上限取 `exp_player.csv` 的最大主键（`Config.player_max_level` 由表推断，不写死）
+11. 全局参数（鲛人刷新等级等）不是 Buff，实现于游戏逻辑控制器/Config（策划案第二十章）；其中鲛人刷新等级按战斗剩余时间实时计算（`BattleManagerPassive.GetZombieSpawnLevel`：每经过 7.5% 战斗时间 +1，死亡漫步者被动再 +4，普通/精英共用）。受击类被动（防守方角色0 单次受伤上限、防守方角色1 致命拦截）不进 Buff 系统，在 `EntityData.OnDamaged` 的伤害管线里即时判定。等级上限分三档：角色等级上限 `save_max_level=10`（对应 `exp_character.csv` 的 1~10 级）、战斗期生成等级 `battle_max_level=20`（`EntityData.OnCreate` 钳制，最高刷出 20 级）、玩家等级上限取 `exp_player.csv` 的最大主键（`Config.player_max_level` 由表推断，不写死）
 12. 表现：持续型 Buff 特效**只由客户端播**——`EntityPlayerManager.ApplyBuffVfx` 按 `SCEntityDisplayInfo.buffs` 查 `Config.buff_vfx` 增删跟随特效（映射表按《特效清单分别表1019》定稿），**技能 `PlayWave` 内禁止播 buff 特效**。下发时同类型多层**聚合成一条**：`level` = 各层等级之和，按协议 4bit 截断在 15（超出部分客户端不可见，服务端效果照常按真实层数算）；客户端只按 type 表现，层级差异不体现在特效与图标上。
 13. 天使祝福（`AngelBless`）/ 恶魔祝福（`DemonBless`）：出伤 / 受伤乘区 Buff，与愈战愈勇同通道（`GetOutDamageMultiplier`：+25% / +100%；`GetInDamageMultiplier`：−25% / +25%），攻击方在伤害计算时读取；两者每跳分别回血 200 / 50，夹到生命上限。由 `NeutralStatueEntityData.OnKilled` 按雕像 value 挂给"把雕像血量清零那一次攻击的攻击者"；被 Buff/DoT（固定数值伤害）打死的没有归属。移速类单独一档，见"速度"节⑨
