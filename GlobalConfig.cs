@@ -67,7 +67,6 @@ public static class GlobalConfig
     #region 僵尸
     public const int zombie_variant_count = 5;
     public const int elite_zombie_variant_count = 1;
-    public const int zombie_spawn_level_passive_boost = 4;
 
     // —— AI 行为（策划案第九章只写了「无目标时游荡 / 发现目标后主动追击 / 设最大追击距离」，数值均为占位初值）——
     public const float zombie_decide_interval = 0.15f;
@@ -214,12 +213,9 @@ public static class GlobalConfig
     public const float buff_vfx_life_time = 3600f;
 
     #region 通用 Buff 数值（占位初值，待策划定稿后在此统一调整）
-    public const float buff_duration_control = 3f;
-    public const float buff_duration_debuff = 5f;
     public const float buff_attr_ratio = 0.2f;      // 攻击 / 视野 Buff 每级幅度 = 对应属性初始值 × 此系数
     public const int buff_crit_rate_points = 10;    // 暴击率 Buff 每级加点（百分点，线性叠加）
     public const int buff_crit_damage_points = 20;  // 暴击伤害 Buff 每级加点（百分点，线性叠加）
-    public const float shield_health_ratio = 0.1f;  // 护盾值 = 被施加者生命上限 × 此系数 × 等级
     public const float burning_damage_per_tick = 30f; // 燃烧每跳 = 此值 × 等级
     public const float poison_damage_ratio = 0.5f;  // 中毒每跳 = 施加者攻击 × 此系数 × 等级
     public const float reflect_rate = 0.1f;         // 反伤 = 实际受伤 × 此系数 × 等级（向下取整，min=1）
@@ -262,16 +258,4 @@ public static class GlobalConfig
     public const int defense_index_death_stroller = 5; // 死灵漫步者（4 = 苍白舞者，被动按标记判定，不引用下标）
     #endregion
 
-    #region 防守方被动数值（占位初值，待策划定稿；被动不占技能 id，见策划案 21.5）
-    public const float crit_paralysis_duration = 1.5f;
-    public const float pope_guard_reduce_rate = 0.3f;
-    public const int pale_full_stacks = 10;
-    public const int pale_mixed_stacks = 8;
-    public const float count_eye_damage_cap_ratio = 0.05f; // 白眼伯爵：单次受伤不超过生命上限的此比例
-    public const int plague_shield_level = 10;             // 瘟疫使者：低血触发时给自己挂的护盾等级
-    public const float plague_shield_duration = 20f;
-    public const float plague_shield_trigger_ratio = 0.1f; // 命中类伤害结算后生命低于上限的此比例即触发
-    public const float plague_shield_heal = 1000f;          // 触发时额外恢复的生命值（超出上限的部分丢弃）
-    public const float plague_shield_cooldown = 60f;        // 同一角色两次触发的最小间隔
-    #endregion
 }

@@ -248,7 +248,8 @@ public class EntityEffectController
     public float GetDamageReduceRate()
     {
         float rate = GetLevel(EffectType.StatueReduce) * 0.25f;
-        if (HasEffect(EffectType.PopeGuard)) rate += GlobalConfig.pope_guard_reduce_rate;
+        if (HasEffect(EffectType.PopeGuard))
+            rate += GlobalVariable.F(global_variablesEnum.passive_defense_pope_guard_reduce_rate);
         return Mathf.Clamp01(rate);
     }
 
@@ -676,7 +677,7 @@ public class EntityEffectController
     // 护盾每层初始值 = 被施加者生命值上限 × 系数 × 该层等级
     private float ShieldValueOf(int level)
     {
-        return owner != null ? owner.attributes.MaxHealth * GlobalConfig.shield_health_ratio * level : 0f;
+        return owner != null ? owner.attributes.MaxHealth * GlobalVariable.F(global_variablesEnum.buff_shield_health_ratio) * level : 0f;
     }
 
     private static AttrField FieldFromType(EffectType type)

@@ -119,20 +119,27 @@ public partial class BattleManager
         campCardBonus.Clear(); // 阵营聚合依赖个人聚合，一并失效
     }
 
-    // 角色被动折算成词条层数：层数 = 被动百分比 / global_variables 的每级系数
+    // 进攻方各角色被动对应的词条类型（顺序 = 角色 value，与 passive_attack_layer 一一对应）
+    private static readonly string[] AttackPassiveCardTypes =
+    {
+        CardType.DamageBelowHalfHp, // 瑟莱恩 绝地反击
+        CardType.Luck,              // 布洛克 命运眷顾
+        CardType.DamageVsPlayer,    // 摩洛克 恶魔侵蚀
+        CardType.DamageVsZombie,    // 艾瑟琳 斩首斗术
+        CardType.DamageVsBuilding,  // 霍里特 墟角秘术
+        CardType.DamageVsHigherHp,  // 戈拉姆 战斗意志
+    };
+
+    // 角色被动折算成词条层数，层数取自 global_variables 的 passive_attack_layer
     // 玩家级数据，复活沿用；目前只有进攻方角色带被动词条
     private void ApplyCharacterCardLevels(int clientId, EntityType character)
     {
         if (character.category != EntityCategory.Character_Attack) return;
-        switch (character.value)
-        {
-            case 0: SeedCardLevel(clientId, CardType.DamageBelowHalfHp, 5); break; // 瑟莱恩 40% / 8%
-            case 1: SeedCardLevel(clientId, CardType.Luck, 5); break;              // 布洛克 +5 / 1
-            case 2: SeedCardLevel(clientId, CardType.DamageVsPlayer, 5); break;    // 摩洛克 25% / 5%
-            case 3: SeedCardLevel(clientId, CardType.DamageVsZombie, 5); break;    // 艾瑟琳 50% / 10%
-            case 4: SeedCardLevel(clientId, CardType.DamageVsBuilding, 4); break;  // 霍里特 20% / 5%
-            case 5: SeedCardLevel(clientId, CardType.DamageVsHigherHp, 5); break;  // 戈拉姆 40% / 8%
-        }
+        if (character.value < 0 || character.value >= AttackPassiveCardTypes.Length) return; // 新增但未配被动的角色
+        var layers = GlobalVariable.L(global_variablesEnum.passive_attack_layer);
+        if (layers.Count != AttackPassiveCardTypes.Length)
+            throw new System.FormatException($"[配表] passive_attack_layer 需要 {AttackPassiveCardTypes.Length} 个值，实际 {layers.Count}");
+        SeedCardLevel(clientId, AttackPassiveCardTypes[character.value], Mathf.RoundToInt(layers[character.value]));
     }
 
     // 被动给的初始层数直接置位，与抽卡的累加语义分开，重复开战不会翻倍
