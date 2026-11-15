@@ -137,7 +137,7 @@ public abstract class EntityData : MonoBehaviour
         if (anim != null)
         {
             anim.Init(this);
-            anim.onHitProtction += BeginHitProtection;
+            anim.onHitProtection += BeginHitProtection;
         }
         if (anim != null)
         {

@@ -15,7 +15,7 @@ public class AnimHitEvent : AnimEvent
             if (anim.hitProtection >= 100)
             {
                 anim.hitProtection = 0;
-                anim.onHitProtction?.Invoke();
+                anim.onHitProtection?.Invoke();
             }
         }
     }
