@@ -51,8 +51,9 @@ public class HomePage : PageBase
     public override void Enter(ShowParam param)
     {
         base.Enter(param);
-        selectedSaveIndex = ClientSelection.homeDisplayedSaveIndex;
-        defenseTab = IsDefense(selectedSaveIndex);
+        // 每次进首页固定从进攻方已选角色开始展示，不沿用上次浏览到的角色
+        defenseTab = false;
+        selectedSaveIndex = ClientSelection.selectedAttackIndex;
         RefreshPlayerName();
         Refresh();
         RefreshPreview();
@@ -197,7 +198,7 @@ public class HomePage : PageBase
 
     private bool defenseTab;
 
-    // 当前浏览的角色；两侧真正选中的下标各自记在 ClientSelection 里
+    // 当前浏览的角色（仅本页内存状态，不进存档、不进 ClientSelection）
     private int selectedSaveIndex;
 
     private int CampOffset => defenseTab ? GlobalConfig.attack_character_count : 0;
@@ -273,7 +274,6 @@ public class HomePage : PageBase
     private void Browse(int saveIndex)
     {
         selectedSaveIndex = saveIndex;
-        ClientSelection.homeDisplayedSaveIndex = saveIndex;
         Refresh();
         RefreshPreview();
     }
