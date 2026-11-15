@@ -236,7 +236,7 @@ public class CameraController : MonoBehaviour
 
         if (dx != 0f) camYaw = Mathf.Repeat(camYaw + dx * GlobalConfig.mouse_yaw_sensitivity, 360f);
         if (!ClientSettings.AutoPitch && dy != 0f)
-            pitchTarget = Mathf.Clamp(pitchTarget + dy * GlobalConfig.mouse_pitch_sensitivity, pitchClamp.x, pitchClamp.y);
+            pitchTarget = Mathf.Clamp(pitchTarget - dy * GlobalConfig.mouse_pitch_sensitivity, pitchClamp.x, pitchClamp.y);
     }
 
     // 单轴平滑速率：带内 slow，带外 fast，过渡带内线性插值
