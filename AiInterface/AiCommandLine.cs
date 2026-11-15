@@ -1082,10 +1082,10 @@ public sealed class AiCommandLine : ClientSubManager
         switch (e.type)
         {
             case SCBattleEvent.Type.Nightfall:
-                hub.Push(AiInterruptKind.DayNight, "夜晚", "进度=" + EnvironmentManager.Time01.ToString("0.##"));
+                hub.Push(AiInterruptKind.DayNight, "夜晚", "进度=" + BattleManager.Time01.ToString("0.##"));
                 break;
             case SCBattleEvent.Type.Daybreak:
-                hub.Push(AiInterruptKind.DayNight, "白天", "进度=" + EnvironmentManager.Time01.ToString("0.##"));
+                hub.Push(AiInterruptKind.DayNight, "白天", "进度=" + BattleManager.Time01.ToString("0.##"));
                 break;
             case SCBattleEvent.Type.NeutralStatueRespawn:
                 hub.Push(AiInterruptKind.NeutralSpawn, "中立单位已刷新");

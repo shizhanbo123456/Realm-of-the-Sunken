@@ -450,8 +450,8 @@ public partial class BattleManager
     #region 小地图失联（昼夜事件驱动）
     private void InitVision()
     {
-        EnvironmentManager.DayNightFlipped -= OnDayNightFlippedVision;
-        EnvironmentManager.DayNightFlipped += OnDayNightFlippedVision;
+        DayNightFlipped -= OnDayNightFlippedVision;
+        DayNightFlipped += OnDayNightFlippedVision;
     }
 
     private void OnDayNightFlippedVision(bool isDay)
@@ -474,7 +474,7 @@ public partial class BattleManager
 
     private void ApplyMinimapLostOnSpawn(EntityData entity)
     {
-        if (!BattleStarted || EnvironmentManager.IsDay) return;
+        if (!BattleStarted || IsDay) return;
         if (entity == null || entity.camp != EntityCamp.Attack) return;
         SetMinimapLost(entity, true);
     }

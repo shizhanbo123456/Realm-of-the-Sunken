@@ -24,7 +24,7 @@ public partial class BattleManager
         zombieSpawnLevelBoosted = DefenseHas(GlobalConfig.defense_index_death_stroller);
 
         // 入夜才施加教皇守护，这里按当前昼夜补一次，避免开战即夜晚时漏掉
-        if (DefenseHas(GlobalConfig.defense_index_masked_pope)) ApplyPopeGuard(EnvironmentManager.IsDay);
+        if (DefenseHas(GlobalConfig.defense_index_masked_pope)) ApplyPopeGuard(IsDay);
     }
 
     private bool DefenseHas(int defenseValue) => defenseCharacters.Contains(defenseValue);

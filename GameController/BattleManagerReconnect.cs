@@ -76,7 +76,7 @@ public partial class BattleManager
         });
 
         // 昼夜快照（心跳 10s 也会补，但重连应当立即正确）
-        if (Tool.EnvironmentManager != null) Tool.NetworkManager.SendDayNightInfo(token, Tool.EnvironmentManager.BuildSnapshot());
+        Tool.NetworkManager.SendDayNightInfo(token, BuildSnapshot());
 
         // 仅在「已死、等复活」时补发：带上已积累的进度，客户端从这里继续本地推演
         // （活着时 reviveStates 里仍有残留记录、进度已归零，照发会让客户端把复活条显示成停在 0%）

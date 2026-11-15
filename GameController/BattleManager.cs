@@ -11,6 +11,7 @@ public partial class BattleManager : EnsBehaviour
     private void Awake()
     {
         Tool.BattleManager = this;
+        ApplyConfigDurations();
     }
 
     public static bool AtServer => EnsInstance.HasAuthority;
@@ -1082,14 +1083,11 @@ public partial class BattleManager : EnsBehaviour
 
         BattleStarted = true;
         BattleRemainTime = GlobalVariable.F(global_variablesEnum.battle_duration);
-        if (Tool.EnvironmentManager != null)
-        {
-            Tool.EnvironmentManager.ResetDayNight();
-            // 先退订再订阅：防御方被动（教皇守护）靠昼夜翻转驱动，重复订阅会导致同一次入夜施加多遍
-            EnvironmentManager.DayNightFlipped -= OnDayNightFlipped;
-            EnvironmentManager.DayNightFlipped += OnDayNightFlipped;
-            InitVision(); // 视野系统：小地图失联同样由昼夜翻转驱动
-        }
+        ResetDayNight();
+        // 先退订再订阅：防御方被动（教皇守护）靠昼夜翻转驱动，重复订阅会导致同一次入夜施加多遍
+        DayNightFlipped -= OnDayNightFlipped;
+        DayNightFlipped += OnDayNightFlipped;
+        InitVision(); // 视野系统：小地图失联同样由昼夜翻转驱动
 
         // 开战重置：计分清零、子弹/移动/复活/重生状态清空（id 源已在加载阶段重置并预留，这里不再重置）
         if (reservedEntityIds.Count == 0) ResetEntityIdSource(); // 未经加载阶段直接开战（GM/调试）时兜底
@@ -1152,10 +1150,7 @@ public partial class BattleManager : EnsBehaviour
         ApplyGlobalPassives();
 
         // 昼夜快照（周期时间 + 白天时长 + 晚上时长）：客户端据此自行推演，中途改时长会再补发
-        if (Tool.EnvironmentManager != null)
-        {
-            Tool.NetworkManager.SendDayNightInfo(Tool.EnvironmentManager.BuildSnapshot());
-        }
+        Tool.NetworkManager.SendDayNightInfo(BuildSnapshot());
 
         BroadcastLobbyInfo();
 
@@ -1234,6 +1229,10 @@ public partial class BattleManager : EnsBehaviour
     public override void ManagedUpdate()
     {
         Profiler.BeginSample(kManagedUpdateProfilerTag);
+
+        // 昼夜：两端各自推进，服务器负责广播快照
+        UpdateDayNight();
+
         if (!AtServer || !BattleStarted) { Profiler.EndSample(); return; }
 
         // 计时
@@ -1251,20 +1250,6 @@ public partial class BattleManager : EnsBehaviour
             }
         }
         Profiler.EndSample(); // kTimerTag
-
-        // 昼夜推进（服务器权威，见策划案 13 章）：周期值在 [0,2) 循环（0/2 午夜、1 正午），方向由周期值推导。
-        // 时长或时间被改动时立即补发快照；此外每 GlobalConfig.daynight_sync_interval 秒心跳一次，兜底两端漂移
-        Profiler.BeginSample(kDayNightTag);
-        if (Tool.EnvironmentManager != null)
-        {
-            Tool.EnvironmentManager.Tick(UnityEngine.Time.deltaTime);
-            if (Tool.EnvironmentManager.ConsumeSyncRequest() || dayNightTicker)
-            {
-                dayNightTicker.Reset();
-                Tool.NetworkManager.SendDayNightInfo(Tool.EnvironmentManager.BuildSnapshot());
-            }
-        }
-        Profiler.EndSample(); // kDayNightTag
 
         // 实体更新
         Profiler.BeginSample(kEntityUpdateTag);

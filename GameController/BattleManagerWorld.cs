@@ -95,7 +95,7 @@ public partial class BattleManager
         int max = GlobalVariable.I(global_variablesEnum.zombie_max);
         if (zombieCount >= max) return;
 
-        int times = EnvironmentManager.IsDay
+        int times = IsDay
             ? GlobalVariable.I(global_variablesEnum.zombie_refresh_rate_slow)
             : GlobalVariable.I(global_variablesEnum.zombie_refresh_rate_fast);
         for (int i = 0; i < times && zombieCount < max; i++) SpawnZombie();
@@ -149,7 +149,7 @@ public partial class BattleManager
         var list = TerrainSpawns.NeutralStatues;
         if (list.Count == 0) return; // 没有中立刷新点则不刷
         // 白天刷天使雕像、夜晚刷恶魔雕像（两者行为一致，只有外观与 value 不同）
-        EntityType statue = EnvironmentManager.IsDay ? EntityType.AngelStatue : EntityType.DemonStatue;
+        EntityType statue = IsDay ? EntityType.AngelStatue : EntityType.DemonStatue;
         SpawnEntity(statue, 1, TerrainSpawns.RandomOf(list), EntityCamp.Neutral);
 
         // 中立雕像刷新播报（首次出生与重生都算刷新）

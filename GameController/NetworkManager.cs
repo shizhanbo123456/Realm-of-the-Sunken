@@ -1004,7 +1004,7 @@ public partial class NetworkManager : EnsBehaviour
         if (info == null) return;
         var logic = Tool.ClientLogicManager;
         if (logic != null) logic.BattleTime.OnDayNightSync(info);
-        else if (Tool.EnvironmentManager != null) Tool.EnvironmentManager.ApplyServerSync(info.cycleTime, info.dayDuration, info.nightDuration);
+        else Tool.BattleManager.ApplyDayNightSync(info.cycleTime, info.dayDuration, info.nightDuration);
     }
 
     [Rpc]

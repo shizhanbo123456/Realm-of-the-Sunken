@@ -115,9 +115,10 @@ public class Tool : MonoBehaviour
         errors += CheckObject(nameof(NetworkManager), NetworkManager);
         errors += CheckObject(nameof(BattleManager), BattleManager);
         errors += CheckObject(nameof(InfoManager), InfoManager);
-        errors += CheckObject(nameof(EnvironmentManager), EnvironmentManager);
         if (!isServer)
         {
+            // 昼夜表现只在客户端，服务器没有 EnvironmentManager
+            errors += CheckObject(nameof(EnvironmentManager), EnvironmentManager);
             errors += CheckObject(nameof(InputManager), InputManager);
             errors += CheckObject(nameof(SaveManager), SaveManager);
             errors += CheckObject(nameof(CameraController), CameraController);

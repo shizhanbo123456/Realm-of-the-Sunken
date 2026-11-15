@@ -34,7 +34,7 @@ public class ClientBattleTimeManager : ClientSubManager
     public void OnDayNightSync(SCDayNightInfo info)
     {
         if (info == null) return;
-        if (Tool.EnvironmentManager != null) Tool.EnvironmentManager.ApplyServerSync(info.cycleTime, info.dayDuration, info.nightDuration);
+        Tool.BattleManager.ApplyDayNightSync(info.cycleTime, info.dayDuration, info.nightDuration);
     }
 
     public void OnScoreUpdate(SCScoreInfo info)

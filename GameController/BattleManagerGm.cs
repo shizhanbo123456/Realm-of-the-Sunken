@@ -40,16 +40,13 @@ public partial class BattleManager
                 break;
             case GmCommandId.SetDayTime:
                 // 0~1 全天进度 → 周期值 [0,2)
-                if (Tool.EnvironmentManager != null)
-                    Tool.EnvironmentManager.SetCycleTime(gm.v0 * EnvironmentManager.CycleLength);
+                SetCycleTime(gm.v0 * DayNightCycleLength);
                 break;
             case GmCommandId.SetDayLength:
-                if (Tool.EnvironmentManager != null)
-                    Tool.EnvironmentManager.dayDuration = Mathf.Max(0.01f, gm.i);
+                dayDuration = Mathf.Max(0.01f, gm.i);
                 break;
             case GmCommandId.SetNightLength:
-                if (Tool.EnvironmentManager != null)
-                    Tool.EnvironmentManager.nightDuration = Mathf.Max(0.01f, gm.i);
+                nightDuration = Mathf.Max(0.01f, gm.i);
                 break;
 
             // ===== 实体 =====
@@ -104,10 +101,10 @@ public partial class BattleManager
                 SendGmResult(clientId, gm.type, i: GmCountAliveEntities());
                 break;
             case GmCommandId.ServerDayLength:
-                if (Tool.EnvironmentManager != null) SendGmResult(clientId, gm.type, v: Tool.EnvironmentManager.dayDuration);
+                SendGmResult(clientId, gm.type, v: dayDuration);
                 break;
             case GmCommandId.ServerNightLength:
-                if (Tool.EnvironmentManager != null) SendGmResult(clientId, gm.type, v: Tool.EnvironmentManager.nightDuration);
+                SendGmResult(clientId, gm.type, v: nightDuration);
                 break;
             case GmCommandId.ServerZombieSpawnLevel:
                 SendGmResult(clientId, gm.type, i: GetZombieSpawnLevel());

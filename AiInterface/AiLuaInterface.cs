@@ -493,9 +493,9 @@ public sealed class AiLuaApi
         }
     }
 
-    public bool is_night() => !EnvironmentManager.IsDay;
+    public bool is_night() => !BattleManager.IsDay;
 
-    public float day_progress() => EnvironmentManager.Time01;
+    public float day_progress() => BattleManager.Time01;
     #endregion
 
     #region 写：意图与动作

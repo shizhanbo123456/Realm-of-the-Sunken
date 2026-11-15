@@ -131,7 +131,7 @@ namespace Ros.Skill
 
         protected override void OnCast(EntityData caster)
         {
-            if (Tool.EnvironmentManager != null) Tool.EnvironmentManager.SetCycleTime(0f);
+            Tool.BattleManager.SetCycleTime(0f);
         }
     }
     #endregion
