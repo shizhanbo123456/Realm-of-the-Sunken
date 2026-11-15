@@ -7,7 +7,7 @@ namespace Ros.UI.Main
     public partial class UI_DamageLabel
     {
         private const float Life = 0.8f;
-        private const int PageCount = 12;              // 与控制器页数一致，枚举加值须同步加页
+        private const int PageCount = 13;              // 与控制器页数一致，枚举加值须同步加页
         private const float RisePerSecond = 60f;       // 存活期内每秒上升的设计像素
         private const float ScatterX = 50f;            // 屏幕空间散布：世界空间散布远则仍叠、近则偏移过大
         private const float ScatterY = 10f;
@@ -34,8 +34,9 @@ namespace Ros.UI.Main
 
             var label = CreateInstance();
             label.m_type.selectedIndex = page; // 枚举值即 FGUI 页号
-            // 闪避 / 失效页不写数字，其余页统一写下发数值
-            if (type != CombatLabelType.Evade && type != CombatLabelType.Invalid) label.m_num_common.text = value.ToString();
+            // 闪避 / 失效 / 连击保护页不写数字（文本由 FGUI 页自带），其余页统一写下发数值
+            if (type != CombatLabelType.Evade && type != CombatLabelType.Invalid && type != CombatLabelType.ComboProtect)
+                label.m_num_common.text = value.ToString();
             layer.AddChild(label); // 挂在世界层：压在战斗界面各元素之下
 
             label.anchor = anchor;
