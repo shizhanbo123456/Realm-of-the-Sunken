@@ -992,11 +992,11 @@ public partial class BattleManager : EnsBehaviour
         return player != null;
     }
 
-    // 移动：参数是角色要转过头并前进的绝对朝向（客户端已按相机 yaw 合成好）
-    public void ReceiveMove(int clientId, float yaw)
+    // 移动：参数是角色要转过头并前进的绝对朝向（客户端已按相机 yaw 合成好）；newPress = 由按下 WASD 触发
+    public void ReceiveMove(int clientId, float yaw, bool newPress)
     {
         if (!TryGetInputPlayer(clientId, out var player)) return;
-        player.MoveTo(yaw);
+        player.MoveTo(yaw, newPress);
     }
 
     public void ReceiveMoveStop(int clientId)

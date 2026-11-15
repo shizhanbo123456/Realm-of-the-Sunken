@@ -153,6 +153,9 @@ public static class GlobalConfig
     // 移动中转动视角超过该角度就补发一次 CSMove，不逐帧上报
     public const float move_yaw_resend_threshold = 3f;
 
+    // 按住 WASD 期间的重发间隔：服务器朝向靠它持续对齐客户端，避免被自动索敌/受击转向带偏
+    public const float move_resend_interval = 0.1f;
+
     // 鼠标转视角灵敏度（度/屏幕像素）
     public const float mouse_yaw_sensitivity = 0.2f;
     public const float mouse_pitch_sensitivity = 0.15f;

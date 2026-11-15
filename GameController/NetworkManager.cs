@@ -230,11 +230,11 @@ public partial class NetworkManager : EnsBehaviour
     #endregion
 
     #region//发送封装：客户端 → 服务器
-    // 移动：yaw = 角色要转过头并前进的绝对朝向，移动中朝向变化时补发同一个包
-    public void SendMove(float yaw)
+    // 移动：yaw = 角色要转过头并前进的绝对朝向；newPress = 由按下 WASD 触发（心跳重发为 false）
+    public void SendMove(float yaw, bool newPress)
     {
         if (!CanSendWorldCommand) return;
-        CallFuncRpc(ServerReceiveMoveLocal, SendTo.RoomOwner, Delivery.Strive, new CSMove() { yaw = yaw }, LocalToken);
+        CallFuncRpc(ServerReceiveMoveLocal, SendTo.RoomOwner, Delivery.Strive, new CSMove() { yaw = yaw, newPress = newPress }, LocalToken);
     }
 
     public void SendMoveStop()
@@ -640,7 +640,7 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ServerReceiveMoveLocal(CSMove move, int clientId)
     {
-        if (Tool.BattleManager != null) Tool.BattleManager.ReceiveMove(clientId, move.yaw);
+        if (Tool.BattleManager != null) Tool.BattleManager.ReceiveMove(clientId, move.yaw, move.newPress);
     }
 
     [Rpc]

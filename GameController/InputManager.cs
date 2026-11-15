@@ -6,6 +6,7 @@ public class InputManager : MonoBehaviour
     private bool inputBlocked;   // GM 面板 / 文字输入期间屏蔽上行；进入屏蔽的那一帧先把手上的操作全部松开
     private bool moveSent;       // 服务器当前是否处于移动状态（决定发 CSMove 还是 CSMoveStop）
     private float lastSentYaw;
+    private float nextMoveSendTime; // 按住 WASD 期间下一次心跳重发的时刻
     private bool jumpHeld;       // 跳跃键（空格 / 左 Alt 合成一个）的按下态，飞行时是上升长按
     private bool slideHeld;      // 滑铲键的按下态，飞行时是下降长按
 
@@ -44,7 +45,8 @@ public class InputManager : MonoBehaviour
     }
 
     #region 键盘
-    // 移动：WASD 在相机参照系里合成方向，朝向 = 该方向的世界 yaw，移动中朝向变化超阈值才补发
+    // 移动：WASD 在相机参照系里合成方向，朝向 = 该方向的世界 yaw
+    // 上行时机：按下 WASD 那一帧、方向变化超阈值、按住期间每 move_resend_interval 一次心跳（服务器朝向以此为准）
     private void TickMove()
     {
         if (!HasBattleEntity())
@@ -72,10 +74,15 @@ public class InputManager : MonoBehaviour
         float z = -axis.x * Mathf.Sin(rad) + axis.y * Mathf.Cos(rad);
         float yaw = Mathf.Repeat(Mathf.Atan2(x, z) * Mathf.Rad2Deg, 360f);
 
-        if (moveSent && Mathf.Abs(Mathf.DeltaAngle(lastSentYaw, yaw)) < GlobalConfig.move_yaw_resend_threshold) return;
+        bool newPress = Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.A)
+            || Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.D);
+        bool turned = moveSent && Mathf.Abs(Mathf.DeltaAngle(lastSentYaw, yaw)) >= GlobalConfig.move_yaw_resend_threshold;
+        if (moveSent && !newPress && !turned && Time.time < nextMoveSendTime) return;
+
         moveSent = true;
         lastSentYaw = yaw;
-        Tool.NetworkManager.SendMove(yaw);
+        nextMoveSendTime = Time.time + GlobalConfig.move_resend_interval;
+        Tool.NetworkManager.SendMove(yaw, newPress);
     }
 
     // 空格与左 Alt 合成一个跳跃键：两键任一下都算按下，全部松开才算抬起（飞行模式借用这个长按态上升）

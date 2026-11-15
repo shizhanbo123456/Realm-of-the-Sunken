@@ -536,9 +536,7 @@ public class EntityAnim : MonoBehaviour
     }
     public void Move(bool moving)
     {
-        bool startMove = moving && !paramPack.moving; // 静止→向前移动的那一帧，重复调用不会重复触发
         SetBoolParam(ref paramPack.moving, moving, key_moving);
-        if (startMove) TryBreakCombo();
     }
     public void DoSlide()
     {
@@ -559,8 +557,8 @@ public class EntityAnim : MonoBehaviour
     public void SetAllowCombo(bool value) => AllowCombo = value;
     public void DoCombo() => SetTriggerAll(key_combo);
 
-    // 向前移动打断当前攻击段：只有 Forward 未被屏蔽的攻击段（普攻连招）可被打断
-    private void TryBreakCombo()
+    // 按下移动键打断当前攻击段：能否打断只看 Forward 是否被屏蔽（普攻连招不屏蔽 Forward）
+    public void BreakCombo()
     {
         if (currentState != AnimState.Attack) return;
         if (data == null || data.InputBlocked(InputBlockOp.Forward)) return;

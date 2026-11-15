@@ -41,13 +41,16 @@ public class PlayerEntityData : EntityData
 
     // 移动：瞬时转向 yaw（客户端按相机 yaw 合成好的世界朝向）后沿自身前方前进
     // 朝向被屏蔽时保持当前朝向继续前进（攻击动画中可以走、不转身）
-    public void MoveTo(float yaw)
+    // newPress = 客户端刚按下 WASD：视作新的移动意图，按 Forward 是否屏蔽决定能否打断当前攻击段
+    public void MoveTo(float yaw, bool newPress)
     {
         EnsureMoveState();
         if (InputBlocked(InputBlockOp.Forward)) return; // 前后被屏蔽：不接受新的移动
         if (!InputBlocked(InputBlockOp.Rotation)) moveState.yaw = Mathf.Repeat(yaw, 360f);
         SetMoveInput(Vector3.forward);
-        if (anim != null) anim.Move(true);
+        if (anim == null) return;
+        anim.Move(true);
+        if (newPress) anim.BreakCombo();
     }
 
     public void StopMove()
