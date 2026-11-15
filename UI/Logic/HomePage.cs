@@ -230,18 +230,20 @@ public class HomePage : PageBase
         Browse(ChosenSaveIndex);
     }
 
-    // 特殊能力：初始技能（攻守都有）+ 防守方被动（暂无配表，见 GuideCatalog）
+    // 特殊能力：初始技能 + 被动描述，均读配表（见 GuideCatalog）
     private void RefreshSpecialAbilities()
     {
         int saveIndex = selectedSaveIndex;
         entity info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
-        var entries = GuideCatalog.BuildCharacterAbilities(info, saveIndex, IsDefense(saveIndex));
+        var entries = GuideCatalog.BuildCharacterAbilities(info);
 
         var list = panel.m_character_attr_panel.m_special_ability_list;
         list.itemRenderer = (i, obj) =>
         {
             var item = (UI_HomeSpecialAbility)obj;
-            item.m_label.text = $"{entries[i].title}：{entries[i].description}";
+            item.m_label.text = string.IsNullOrEmpty(entries[i].description)
+                ? entries[i].title
+                : $"{entries[i].title}：{entries[i].description}";
         };
         list.numItems = entries.Count;
     }

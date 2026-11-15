@@ -47,6 +47,7 @@ namespace Ros.Config
                     for (int j13 = 0; j13 < n13; j13++) row.cardDropWeights.Add(r.ReadInt32());
                     row.expDrop = r.ReadInt32();
                     row.dropToCamp = r.ReadByte() != 0;
+                    row.passiveSkillDes = ConfigBinary.ReadString(r);
                     entityData.Add(row.key, row);
                 }
             }
@@ -71,5 +72,6 @@ namespace Ros.Config
         public List<int> cardDropWeights;  // 被击败时卡牌掉落权重
         public int expDrop;  // 被击败时掉落的经验
         public bool dropToCamp;  // 被击败时的掉落物生效范围：单人；1：击杀方阵营
+        public string passiveSkillDes;  // 被动描述：仅仅玩家角色有
     }
 }
