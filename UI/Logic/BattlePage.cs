@@ -64,6 +64,9 @@ public class BattlePage : PageBase
     // 技能栏挂在玩家栏里（UI_PlayerPanel.m_skill_list）
     private UI_SkillList SkillBar => panel.m_playerPanel != null ? panel.m_playerPanel.m_skill_list : null;
 
+    // 设置页签内容（SettingsPanel 里多包了一层遮罩容器）
+    private UI_SettingScrollView SettingView => panel.m_SettingsPanel.m_settings.m_settingsPanel;
+
     public BattlePage(UI_BattlePanel panel) : base(panel)
     {
         this.panel = panel;
@@ -76,10 +79,13 @@ public class BattlePage : PageBase
         battleInfo.m_btn_quick_message.onClick.Add(ToggleQuickMessage);
 
         var settings = panel.m_SettingsPanel;
-        settings.m_panel.m_close.onClick.Add(HideSettings);
-        settings.m_settings_scroll_view.m_back_to_fight.onClick.Add(HideSettings);
-        settings.m_settings_scroll_view.m_exit.onClick.Add(OnExitClicked); // 退出需二次确认（对局中退出不可逆）
+        settings.m_close2.onClick.Add(HideSettings);       // 关闭按钮（右上）
+        settings.m_close.onClick.Add(HideSettings);        // 关闭按钮（面板内）
+        settings.m_panel.m_close.onClick.Add(HideSettings); // 底框关闭按钮
+        SettingView.m_back_to_fight.onClick.Add(HideSettings);
+        SettingView.m_exit.onClick.Add(OnExitClicked); // 退出需二次确认（对局中退出不可逆）
         BuildSettingTips();
+        BindSettingToggles();
 
         // 快捷指令轮盘挂在战斗信息面板里，FGUI 侧还没命名
         quickMessagePanel = battleInfo.GetChild("n5") as UI_QuickMessagePanel;
@@ -119,7 +125,10 @@ public class BattlePage : PageBase
         panel.m_SettingsPanel.touchable = false;
     }
 
-    // 快捷指令轮盘：点信息面板上的按钮开关；展开时按键 = 发送并收起（按住 J 时附带相机瞄准点）
+    // 设置面板打开期间玩法输入整体让给 UI（UIManager.InputCaptured 读它）
+    public bool SettingsOpen => panel.m_SettingsPanel.visible;
+
+    // 快捷指令轮盘：点信息面板上的按钮开关；展开时按键 = 发送并收起
     private void ToggleQuickMessage()
     {
         if (quickMessagePanel == null) return;
@@ -146,27 +155,7 @@ public class BattlePage : PageBase
         float now = Time.time;
         if (now < nextQuickMessageTime) return; // 防刷：同玩家 1s 一条
         nextQuickMessageTime = now + GlobalConfig.ai_message_min_interval;
-
-        var message = new CSQuickMessage() { messageId = index };
-        if (Input.GetKey(GlobalConfig.melee_key) && TryGetAimPoint(out var aim))
-        {
-            message.hasTargetPosition = true;
-            message.targetPosition = aim;
-        }
-        if (Tool.NetworkManager != null) Tool.NetworkManager.SendQuickMessage(message);
-    }
-
-    // 相机屏幕中心射线与地面 y=0 的交点；取不到就按"无位置"发送
-    private static bool TryGetAimPoint(out Vector3 point)    {
-        point = default;
-        var cam = Tool.CameraController != null ? Tool.CameraController.WorldCamera : null;
-        if (cam == null) return false;
-        Ray ray = cam.ScreenPointToRay(new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 0f));
-        if (Mathf.Abs(ray.direction.y) < 0.0001f) return false;
-        float distance = -ray.origin.y / ray.direction.y;
-        if (distance <= 0f) return false;
-        point = ray.origin + ray.direction * distance;
-        return true;
+        if (Tool.NetworkManager != null) Tool.NetworkManager.SendQuickMessage(new CSQuickMessage() { messageId = index });
     }
 
     #region 快捷指令点位
@@ -247,7 +236,7 @@ public class BattlePage : PageBase
             settingTabTexts.Add(SettingTipsConfig.content[key].text.Replace(@"{\n}", "\n"));
         }
 
-        var view = panel.m_SettingsPanel.m_settings_scroll_view;
+        var view = SettingView;
         var tabs = view.m_rule_buttons;
         tabs.itemRenderer = (i, obj) =>
         {
@@ -265,10 +254,32 @@ public class BattlePage : PageBase
         if (settingTabKeys.Count > 0) SelectSettingTab(0);
     }
 
+    // 两个勾选直接写 ClientSettings，相机与输入每帧读它；默认都不勾选（俯视 + 鼠标控俯仰）
+    private void BindSettingToggles()
+    {
+        var view = SettingView;
+        view.m_toggle_third_person_perspctivee.selected = ClientSettings.ThirdPersonCamera;
+        view.m_toggle_auto_pitch.selected = ClientSettings.AutoPitch;
+        view.m_toggle_third_person_perspctivee.onChanged.Add(() =>
+            ClientSettings.ThirdPersonCamera = view.m_toggle_third_person_perspctivee.selected);
+        view.m_toggle_auto_pitch.onChanged.Add(() =>
+            ClientSettings.AutoPitch = view.m_toggle_auto_pitch.selected);
+    }
+
+    // C 键切模式会写回同一个开关，这里把勾选态跟过去（面板常驻，不重建）
+    private void SyncSettingToggles()
+    {
+        var view = SettingView;
+        if (view.m_toggle_third_person_perspctivee.selected != ClientSettings.ThirdPersonCamera)
+            view.m_toggle_third_person_perspctivee.selected = ClientSettings.ThirdPersonCamera;
+        if (view.m_toggle_auto_pitch.selected != ClientSettings.AutoPitch)
+            view.m_toggle_auto_pitch.selected = ClientSettings.AutoPitch;
+    }
+
     private void SelectSettingTab(int index)
     {
         settingTab = index;
-        var view = panel.m_SettingsPanel.m_settings_scroll_view;
+        var view = SettingView;
         for (int i = 0; i < view.m_rule_buttons.numChildren; i++)
             view.m_rule_buttons.GetChildAt(i).asButton.selected = i == index; // 页签选中态
 
@@ -367,8 +378,8 @@ public class BattlePage : PageBase
 
     public override void Tick(float deltaTime)
     {
-        // 键盘被 UI 占用（GM 面板 / 文字输入）时，技能选择、快捷消息与面板快捷键都不响应
-        if (!InputManager.KeysCapturedByUi)
+        // 输入被 UI 占用（GM 面板 / 文字输入 / 设置面板）时，技能选择、快捷消息与面板快捷键都不响应
+        if (!InputManager.InputCapturedByUi)
         {
             if (Input.GetKeyDown(GlobalConfig.skill_select_key)) ToggleSkillSelect();
             if (AnyQuickMessageKeyDown(out int quickMessageIndex)) HandleQuickMessageKey(quickMessageIndex);
@@ -377,6 +388,7 @@ public class BattlePage : PageBase
         //剩余时间（以快照校准的本地推演为准，重连/中途进入的起点由服务器补发）
         if (HasSession && BattleTime != null && panel.m_BattleInfoPanel.m_time_left != null)
             panel.m_BattleInfoPanel.m_time_left.text = FormatTime(Mathf.Max(0f, BattleTime.RemainTime));
+        SyncSettingToggles();
         RefreshTimeIcon();
         TickMinimap();
         TickMinimapPanels(deltaTime);
@@ -591,7 +603,7 @@ public class BattlePage : PageBase
                 unlimited || recharge == null ? 0 : recharge.GetStore(skillId),
                 unlimited));
         }
-        SkillBar.Refresh(skillSlots);
+        SkillBar.Refresh(skillSlots, Skills != null ? Skills.SelectedSlot : 0);
     }
 
     #region 技能选择面板

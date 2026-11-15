@@ -975,18 +975,46 @@ public partial class BattleManager : EnsBehaviour
     #endregion
 
     #region 输入与技能接收（服务器）
-    // AI 接管期间丢弃该客户端的键盘输入：控制权在客户端 Lua，键盘不应再影响实体
+    // AI 接管期间丢弃该客户端的操作：控制权在客户端 Lua，键盘/鼠标不应再影响实体
     private static bool KeyboardBlocked(EntityData entity)
     {
         return entity is PlayerEntityData player && player.aiControlled;
     }
 
-    public void ReceiveInput(int clientId, CSPlayerInput input)
+    // 输入包共用的取实体口径：取不到（观战/已死）或 AI 接管期间一律丢弃
+    private bool TryGetInputPlayer(int clientId, out PlayerEntityData player)
     {
-        if (!PlayerEntityId.TryGetValue(clientId, out var entityId)) return;
-        if (!EntityContainer.Entities.TryGetObject(entityId, out var entity)) return;
-        if (KeyboardBlocked(entity)) return;
-        entity.RecordInput(input);
+        player = null;
+        if (!PlayerEntityId.TryGetValue(clientId, out var entityId)) return false;
+        if (!EntityContainer.Entities.TryGetObject(entityId, out var entity)) return false;
+        if (KeyboardBlocked(entity)) return false;
+        player = entity as PlayerEntityData;
+        return player != null;
+    }
+
+    // 移动：参数是角色要转过头并前进的绝对朝向（客户端已按相机 yaw 合成好）
+    public void ReceiveMove(int clientId, float yaw)
+    {
+        if (!TryGetInputPlayer(clientId, out var player)) return;
+        player.MoveTo(yaw);
+    }
+
+    public void ReceiveMoveStop(int clientId)
+    {
+        if (!TryGetInputPlayer(clientId, out var player)) return;
+        player.StopMove();
+    }
+
+    public void ReceiveJump(int clientId, bool down)
+    {
+        if (!TryGetInputPlayer(clientId, out var player)) return;
+        player.SetJumpHeld(down);
+    }
+
+    public void ReceiveSlide(int clientId, bool down)
+    {
+        if (!TryGetInputPlayer(clientId, out var player)) return;
+        player.SetSlideHeld(down);
     }
 
     // 技能键：客户端已经把按键解析成技能 id（技能栏在服务器），这里只转发给实体的统一收口
@@ -1024,16 +1052,6 @@ public partial class BattleManager : EnsBehaviour
         if (entity == null || entity.skillController == null) return;
         if (RobotClients.Contains(clientId)) return;
         entity.skillController.EnableSlotBar(entity.attributes.WeaponSlotCount);
-    }
-
-    // 相机模式决定 WASD 的解释口径（俯视 = 四向），由客户端在切模式时同步
-    public void SetCameraMode(int clientId, bool topDown)
-    {
-        if (!PlayerEntityId.TryGetValue(clientId, out var entityId)) return;
-        if (!EntityContainer.Entities.TryGetObject(entityId, out var entity)) return;
-        var player = entity as PlayerEntityData;
-        if (player == null) return;
-        player.SetTopDown(topDown);
     }
     #endregion
 
@@ -1089,7 +1107,7 @@ public partial class BattleManager : EnsBehaviour
         coralSpawnTicker = new Ticker(GlobalVariable.F(global_variablesEnum.coral_spawn_attempt_interval));
         fallCheckTicker = new Ticker(GlobalConfig.entity_fall_check_interval);
 
-        // 玩家实体重与 AI 同路径（AI clientId 为负虚拟 id），仅输入来源不同：真人 CSPlayerInput、AI UpdateAI
+        // 玩家实体重与 AI 同路径（AI clientId 为负虚拟 id），仅输入来源不同：真人 CSMove/CSJump/CSSlide、AI UpdateAI
         foreach (var pair in PlayerInfoList)
         {
             int clientId = pair.Key;

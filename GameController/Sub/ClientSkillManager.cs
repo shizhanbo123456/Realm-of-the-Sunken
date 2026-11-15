@@ -14,12 +14,15 @@ public class ClientSkillManager : ClientSubManager
     private readonly SkillRecharge recharge = new(() => NetworkManager.ClientToServerTime(Time.time));
 
     private int slotCapacity;
+    private int selectedSlot;   // 滚轮选中的槽位（右键释放它），槽位表变化时夹紧
 
     public IReadOnlyList<int> HeldSkills => heldSkills;
 
     public IReadOnlyList<int> ActiveSkills => activeSkills;
 
     public int SlotCapacity => slotCapacity;
+
+    public int SelectedSlot => selectedSlot;
 
     public SkillRecharge Recharge => recharge;
 
@@ -37,6 +40,7 @@ public class ClientSkillManager : ClientSubManager
         activeSkills.Clear();
         recharge.Clear();
         slotCapacity = ResolveSlotCapacity();
+        selectedSlot = 0;
     }
     #endregion
 
@@ -69,6 +73,7 @@ public class ClientSkillManager : ClientSubManager
         activeSkills.Clear();
         if (skillIds != null) activeSkills.AddRange(skillIds);
         recharge.SetRoots(skillIds, roots);
+        ClampSelectedSlot();
         EventManager.TrigEvent(ClientEvent.OnSkillBarRefresh);
     }
 
@@ -94,15 +99,32 @@ public class ClientSkillManager : ClientSubManager
     #endregion
 
     #region 释放
-    // 技能键：槽位 → 技能 id 由服务器下发的槽位表决定，空槽不发包
+    // 滚轮切槽位：按角色槽位数循环（含尾部空槽），空槽可选中但右键不发包
+    public void SelectSlotDelta(int delta)
+    {
+        if (slotCapacity <= 0) return;
+        int next = (selectedSlot + delta) % slotCapacity;
+        selectedSlot = next < 0 ? next + slotCapacity : next;
+        EventManager.TrigEvent(ClientEvent.OnSkillBarRefresh);
+    }
+
+    // 右键：释放当前选中槽位
+    public void CastSelected()
+    {
+        CastSlot(selectedSlot);
+    }
+
+    // 技能槽位 → 技能 id 由服务器下发的槽位表决定，空槽不发包；无战斗实体（观战/未开局）一律不发
     public void CastSlot(int slot)
     {
+        var loading = ClientLoadingManager.Current;
+        if (loading == null || !loading.HasSession || loading.OwnEntityId == 0) return;
         int skillId = GetSlotSkillId(slot);
         if (skillId < 0) return;
         if (Tool.NetworkManager != null) Tool.NetworkManager.SendSkillCastInput(skillId);
     }
 
-    // 普攻（J）：移动与静止共用一个技能
+    // 普攻（鼠标左键）：移动与静止共用一个技能
     public void CastUnarmed()
     {
         var loading = ClientLoadingManager.Current;
@@ -121,6 +143,14 @@ public class ClientSkillManager : ClientSubManager
     #endregion
 
     #region//Local
+    // 选中槽位不能超出角色槽位数（槽位表变化、角色属性晚到都走这里）
+    private void ClampSelectedSlot()
+    {
+        int max = Mathf.Max(0, slotCapacity - 1);
+        if (selectedSlot > max) selectedSlot = max;
+        if (selectedSlot < 0) selectedSlot = 0;
+    }
+
     // 技能栏槽位数 = 本局角色属性（与服务器同一列 entity.csv 第 9 列）
     private static int ResolveSlotCapacity()
     {

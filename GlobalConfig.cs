@@ -141,17 +141,23 @@ public static class GlobalConfig
     public const float god_view_open_press_window = 1f;
     #endregion
 
-    #region 玩家操作（双手键盘无鼠标：W/S 前后 / A/D 左右 / 前后+左右同按渐转 / J 空手攻击 / K 跳跃 / 左 Shift 滑铲 / U I O L H Y 技能槽 / Tab 技能选择）
-    public static readonly KeyCode[] skill_slot_keys = { KeyCode.U, KeyCode.I, KeyCode.O, KeyCode.L, KeyCode.H, KeyCode.Y };
-    public const KeyCode melee_key = KeyCode.J;
-    public const KeyCode jump_key = KeyCode.K;
+    #region 玩家操作（鼠标 + 键盘：WASD 相对相机移动 / 空格·左Alt 跳跃 / 左 Shift 滑铲 / 左键普攻 / 右键放选中技能 / 滚轮切技能 / Tab 技能选择）
+    public const KeyCode jump_key = KeyCode.Space;
+    public const KeyCode jump_key_alt = KeyCode.LeftAlt; // 与空格等效，只为按着顺手
     public const KeyCode slide_key = KeyCode.LeftShift;
     public const KeyCode skill_select_key = KeyCode.Tab; // 技能选择面板开关
     public static readonly KeyCode[] quick_message_keys = { KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3, KeyCode.Alpha4, KeyCode.Alpha5, KeyCode.Alpha6, KeyCode.Alpha7, KeyCode.Alpha8 }; // 快捷消息面板：1~8 任键开关
     public const KeyCode camera_mode_key = KeyCode.C; // 相机模式切换（自由视角下按 C 回第三人称）
     public const float gm_teleport_height = 200f; // GM 传送的 Y（传送面板只给 x/z）
 
-    // 转向 / 飞行升降 / GM 极速倍率来自配表 global_variables
+    // 移动中转动视角超过该角度就补发一次 CSMove，不逐帧上报
+    public const float move_yaw_resend_threshold = 3f;
+
+    // 鼠标转视角灵敏度（度/屏幕像素）
+    public const float mouse_yaw_sensitivity = 0.2f;
+    public const float mouse_pitch_sensitivity = 0.15f;
+
+    // 飞行升降 / GM 极速倍率来自配表 global_variables
     #endregion
 
     #region 武器与技能

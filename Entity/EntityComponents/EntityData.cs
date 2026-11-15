@@ -6,16 +6,16 @@ using UnityEngine;
 using UnityEngine.AI;
 
 using Ros.Config;
-// 输入操作屏蔽类别：屏蔽"前后"=屏蔽 W；屏蔽"旋转"=屏蔽 A/D（不再逐个按键屏蔽）
+// 输入操作屏蔽类别：屏蔽"前后"=不接受移动；屏蔽"旋转"=不接受新的朝向
 [Flags]
 public enum InputBlockOp : byte
 {
     None = 0,
-    Forward = 1 << 0,  // 前后移动（W）
-    Rotation = 1 << 1, // 旋转（A/D）
-    Jump = 1 << 2,     // 跳跃（K）
-    Slide = 1 << 3,    // 滑铲（LShift）
-    Attack = 1 << 4,   // 攻击与技能（J + 技能槽 U/I/O/L/H/Y）
+    Forward = 1 << 0,  // 前后移动（CSMove）
+    Rotation = 1 << 1, // 朝向更新（CSMove 里的 yaw）
+    Jump = 1 << 2,     // 跳跃（空格 / 左 Alt）
+    Slide = 1 << 3,    // 滑铲（左 Shift）
+    Attack = 1 << 4,   // 攻击与技能（鼠标左键 / 右键）
 }
 
 public abstract class EntityData : MonoBehaviour
@@ -45,7 +45,7 @@ public abstract class EntityData : MonoBehaviour
 
     [HideInInspector] public Vector3 moveInput;
 
-    // 输入操作屏蔽：置位期间对应操作（前后/旋转）在 RecordInput 入口被抹除，实现输入阻断（外部直接置位/清位）
+    // 输入操作屏蔽：置位期间对应操作（前后/朝向）在 PlayerEntityData 的输入入口被拒绝，实现输入阻断（外部直接置位/清位）
     [HideInInspector] public InputBlockOp inputBlockOperations;
     [HideInInspector] public EndureType? EndureOverride;
     [HideInInspector] public EndureType defaultEndure;
@@ -331,15 +331,13 @@ public abstract class EntityData : MonoBehaviour
     }
     #endregion
 
-    public virtual void RecordInput(CSPlayerInput input) { }
-
-    // 设置输入操作屏蔽（None = 解除）；PlayerEntityData 在设置瞬间立即抬起对应操作涉及的键
+    // 设置输入操作屏蔽（None = 解除）；PlayerEntityData 在设置瞬间立即收手对应操作
     public virtual void SetInputBlock(InputBlockOp op)
     {
         inputBlockOperations = op;
     }
 
-    // 立即让指定操作涉及的键在服务器处于抬起状态（模拟服务器收到抬起边沿），不持续屏蔽
+    // 立即让指定操作在服务器处于松手状态（模拟服务器收到抬起边沿），不持续屏蔽
     public virtual void SetInputReleased(InputBlockOp op) { }
 
     // 查询某操作是否处于屏蔽状态（玩家与 AI 共用）

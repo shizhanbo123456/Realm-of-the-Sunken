@@ -28,6 +28,7 @@ namespace Ros.UI.Main
         private readonly List<Slot> slots = new();
         private Action<int, GObject> hoverEnter;
         private Action hoverExit;
+        private int selectedSlot; // 滚轮选中的槽位，用高光标出
 
         public bool IsBuilt { get; private set; }
 
@@ -48,9 +49,10 @@ namespace Ros.UI.Main
         }
 
         // 重画内容：条目数不变，按新数据逐个刷新（恢复进度靠这条周期性推进）
-        public void Refresh(IReadOnlyList<Slot> data)
+        public void Refresh(IReadOnlyList<Slot> data, int selected)
         {
             if (!IsBuilt || m_content == null) return;
+            selectedSlot = selected;
             slots.Clear();
             if (data != null)
                 for (int i = 0; i < data.Count; i++) slots.Add(data[i]);
@@ -60,13 +62,17 @@ namespace Ros.UI.Main
         private void RenderSlot(int index, GObject obj)
         {
             if (obj is not UI_SkillListItem slot) return;
-            // 键位：槽位顺序即 GlobalConfig.skill_slot_keys（U I O L H Y）
+            // 鼠标操作下没有键位标签，文本一律留空
             if (slot.m_key != null)
-                slot.m_key.text = index < GlobalConfig.skill_slot_keys.Length ? GlobalConfig.skill_slot_keys[index].ToString() : "";
+            {
+                slot.m_key.text = "";
+                slot.m_key.visible = false;
+            }
 
             Slot data = index < slots.Count ? slots[index] : new Slot(-1, 1f, 0, true);
             bool empty = data.skillId < 0;
             if (slot.m_empty != null) slot.m_empty.selectedIndex = empty ? 1 : 0;
+            if (slot.m_highlight != null) slot.m_highlight.selectedIndex = index == selectedSlot ? 1 : 0;
             if (empty) ClearSlot(slot);
             else FillSlot(slot, data);
 

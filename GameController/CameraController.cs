@@ -57,11 +57,22 @@ public class CameraController : MonoBehaviour
 
     public bool IsFree => Mode == CameraViewMode.Free;
 
+    // 移动输入的方向基准：第三人称取镜头 yaw，俯视 / 自由视角取世界轴向
+    public float MoveReferenceYaw => Mode == CameraViewMode.ThirdPerson ? camYaw : 0f;
+
     private float autoFrameTimer;
+
+    // 第三人称镜头偏航（度）：只由鼠标水平滑动驱动，与角色朝向无关
+    private float camYaw;
+
+    // 鼠标位移采样：切模式 / 被 UI 占用后先丢一帧，避免跨帧差值把镜头甩出去
+    private Vector3 lastMousePos;
+    private bool mousePosValid;
 
     // 俯仰偏转
     private float pitchTarget;
     private float pitchHoldTime;
+    private bool lastAutoPitch; // 自动俯仰角刚被打开时丢一次保持期，让俯仰回到自动取景口径
 
     // 自由视角位姿
     private float freeYaw;
@@ -72,15 +83,15 @@ public class CameraController : MonoBehaviour
     private Vector3 freeReportPos;
     private bool freeReportPending; // 进入自由视角后的首包（不等满一个上报周期）
 
-    // 会话跟踪：新一局回第三人称，复活换实体后补发一次模式
+    // 会话跟踪：新一局按设置面板的口径重建镜头模式
     private bool sessionActive;
-    private ushort lastOwnEntityId;
-    private bool pendingModeSync; // 待同步给服务器的相机模式（等视体建好再发）
 
     private void Awake()
     {
         Tool.CameraController = this;
         WorldCamera = GetComponent<Camera>();
+        camYaw = transform.eulerAngles.y;
+        lastAutoPitch = ClientSettings.AutoPitch;
     }
 
     public void SetLookTarget(Transform target, bool snap = true)
@@ -95,6 +106,7 @@ public class CameraController : MonoBehaviour
             NotifyCameraUpdated();
             return;
         }
+        camYaw = target.eulerAngles.y; // 绑定新角色时镜头回到角色正后方
         SnapToThirdPerson();
         NotifyCameraUpdated();
     }
@@ -102,13 +114,13 @@ public class CameraController : MonoBehaviour
     // 瞬移到第三人称稳态位姿（绑定/换绑/从自由视角返回）
     private void SnapToThirdPerson()
     {
-        Vector3 back = Quaternion.Euler(0f, lookTarget.eulerAngles.y, 0f) * Vector3.back;
+        Vector3 back = Quaternion.Euler(0f, camYaw, 0f) * Vector3.back;
         float yCenter = (yRange.x + yRange.y) * 0.5f;
         float zCenter = (zRange.x + zRange.y) * 0.5f;
         transform.position = lookTarget.position + Vector3.up * yCenter + back * zCenter;
 
         transform.LookAt(lookTarget.position);
-        UpdateAutoPitch();
+        if (ClientSettings.AutoPitch) UpdateAutoPitch();
         TickPitch();
     }
 
@@ -117,6 +129,7 @@ public class CameraController : MonoBehaviour
         if (Mode == mode) return;
         bool fromFree = Mode == CameraViewMode.Free;
         Mode = mode;
+        mousePosValid = false;
 
         if (mode == CameraViewMode.Free)
         {
@@ -129,10 +142,15 @@ public class CameraController : MonoBehaviour
         // 第三人称 ⇄ 俯视交给各自的 Tick 平滑过渡；从自由视角回来必须瞬移，否则会横穿整张地图
         if (fromFree) SendFreeCameraExit(); // 通知服务器把视野锚点交还跟随实体
         pitchHoldTime = 0f; // 丢弃切换前的取景保持，回第三人称时直接按当前几何重算俯仰
-        if (fromFree && mode == CameraViewMode.ThirdPerson && lookTarget != null)
+        if (mode == CameraViewMode.ThirdPerson)
         {
-            SnapToThirdPerson();
-            NotifyCameraUpdated();
+            // 进第三人称时镜头先落到角色正后方，之后完全交给鼠标
+            if (lookTarget != null) camYaw = lookTarget.eulerAngles.y;
+            if (fromFree && lookTarget != null)
+            {
+                SnapToThirdPerson();
+                NotifyCameraUpdated();
+            }
         }
     }
 
@@ -148,7 +166,7 @@ public class CameraController : MonoBehaviour
         if (!sessionActive) return;
 
         bool spectator = loading.IsSpectator;
-        bool keysBlocked = InputManager.KeysCapturedByUi; // 键盘被 UI 占用（GM 面板 / 打字）时相机也不收键
+        bool keysBlocked = InputManager.InputCapturedByUi; // 输入被 UI 占用（GM 面板 / 打字 / 设置面板）时相机也不收键
 
         if (!keysBlocked && spectator && Mode != CameraViewMode.Free && Input.GetKeyDown(KeyCode.W))
         {
@@ -163,46 +181,62 @@ public class CameraController : MonoBehaviour
                 case CameraViewMode.ThirdPerson: SetMode(CameraViewMode.TopDown); break;
                 case CameraViewMode.TopDown: SetMode(CameraViewMode.ThirdPerson); break;
             }
-            if (!spectator) pendingModeSync = true; // 视体已在的下一帧就会发出
+            ClientSettings.ThirdPersonCamera = Mode == CameraViewMode.ThirdPerson; // 与设置面板同一个开关
+        }
+
+        // 设置面板的勾选是模式口径：C 键切换时写回同一个值，两边永远一致
+        if (Mode == CameraViewMode.ThirdPerson || Mode == CameraViewMode.TopDown)
+        {
+            var wanted = ClientSettings.ThirdPersonCamera ? CameraViewMode.ThirdPerson : CameraViewMode.TopDown;
+            if (Mode != wanted) SetMode(wanted);
+        }
+
+        // 自动俯仰角刚打开：丢掉鼠标留下的保持期，让俯仰回到自动取景口径
+        if (ClientSettings.AutoPitch != lastAutoPitch)
+        {
+            lastAutoPitch = ClientSettings.AutoPitch;
+            pitchHoldTime = 0f;
         }
 
         if (Mode == CameraViewMode.Free) TickFreeKeys();
+        else TickMouseLook();
     }
 
-    // 会话起止与实体 id 变化：新一局回第三人称；复活/换实体后服务器侧模式需重建
+    // 会话起止：按设置面板的勾选重建镜头模式（结束时一并离开自由视角，避免继续上报相机位置）
     private void TickSession(ClientLoadingManager loading)
     {
         bool active = loading != null && loading.HasSession;
-        if (active != sessionActive)
-        {
-            sessionActive = active;
-            lastOwnEntityId = 0;
-            pendingModeSync = false;
-            Mode = CameraViewMode.ThirdPerson;
-        }
-        if (!active) return;
-
-        ushort ownId = loading.OwnEntityId;
-        if (ownId != lastOwnEntityId)
-        {
-            lastOwnEntityId = ownId;
-            pendingModeSync = ownId != 0;
-            return;
-        }
-        if (!pendingModeSync) return;
-        if (loading.IsSpectator) { pendingModeSync = false; return; }
-
-        // 视体真正建好后再发：实体尚未创建时服务器会丢弃这次同步（复活/开局都在换实体之后才建视体）
-        var players = Tool.ClientLogicManager != null ? Tool.ClientLogicManager.EntityPlayers : null;
-        if (players == null || players.GetView(ownId) == null) return;
-        pendingModeSync = false;
-        SendModeToServer();
+        if (active == sessionActive) return;
+        sessionActive = active;
+        Mode = ClientSettings.ThirdPersonCamera ? CameraViewMode.ThirdPerson : CameraViewMode.TopDown;
+        mousePosValid = false;
+        pitchHoldTime = 0f;
     }
 
-    private void SendModeToServer()
+    // 第三人称：鼠标水平滑动转镜头，纵向滑动改俯仰（勾选自动俯仰角时不接管）；俯视不响应鼠标
+    private void TickMouseLook()
     {
-        if (Tool.NetworkManager == null) return;
-        Tool.NetworkManager.SendCameraMode(Mode == CameraViewMode.TopDown);
+        if (Mode != CameraViewMode.ThirdPerson || InputManager.InputCapturedByUi)
+        {
+            mousePosValid = false;
+            return;
+        }
+
+        Vector3 pos = Input.mousePosition;
+        if (!mousePosValid)
+        {
+            lastMousePos = pos;
+            mousePosValid = true;
+            return;
+        }
+
+        float dx = pos.x - lastMousePos.x;
+        float dy = pos.y - lastMousePos.y;
+        lastMousePos = pos;
+
+        if (dx != 0f) camYaw = Mathf.Repeat(camYaw + dx * GlobalConfig.mouse_yaw_sensitivity, 360f);
+        if (!ClientSettings.AutoPitch && dy != 0f)
+            pitchTarget = Mathf.Clamp(pitchTarget + dy * GlobalConfig.mouse_pitch_sensitivity, pitchClamp.x, pitchClamp.y);
     }
 
     // 单轴平滑速率：带内 slow，带外 fast，过渡带内线性插值
@@ -246,8 +280,8 @@ public class CameraController : MonoBehaviour
 
     private void TickThirdPerson(float deltaTime)
     {
-        // 偏航不平滑：相机全程在角色正后方，自身偏航与角色一致
-        float yaw = lookTarget.eulerAngles.y;
+        // 偏航不平滑：相机全程在镜头的正后方（camYaw 由鼠标决定，与角色朝向无关）
+        float yaw = camYaw;
         Vector3 back = Quaternion.Euler(0f, yaw, 0f) * Vector3.back;
         Vector3 toCam = transform.position - lookTarget.position;
         toCam.y = 0f;
@@ -262,17 +296,22 @@ public class CameraController : MonoBehaviour
         float zNew = Mathf.Lerp(zCur, zCenter, 1f - Mathf.Exp(-zRate * deltaTime));
         float yNew = Mathf.Lerp(yCur, yCenter, 1f - Mathf.Exp(-yRate * deltaTime));
 
-        float x=Vector3.Dot(lookTarget.position - transform.position, lookTarget.right);
-        float xNew=Mathf.Lerp(x, 0, 1f - Mathf.Exp(-xSmooth * deltaTime));
+        // 横向偏移按镜头自身右方向修正（角色转向不再带动相机）
+        Vector3 camRight = Quaternion.Euler(0f, yaw, 0f) * Vector3.right;
+        float x = Vector3.Dot(lookTarget.position - transform.position, camRight);
+        float xNew = Mathf.Lerp(x, 0, 1f - Mathf.Exp(-xSmooth * deltaTime));
 
-        transform.position = lookTarget.position + Vector3.up * yNew + back * zNew - lookTarget.right * xNew;
+        transform.position = lookTarget.position + Vector3.up * yNew + back * zNew - camRight * xNew;
 
-        // 自动取景周期遍历
-        autoFrameTimer += deltaTime;
-        if (autoFrameTimer >= autoFrameInterval)
+        // 自动取景周期遍历（勾选自动俯仰角时才跑，否则俯仰归鼠标）
+        if (ClientSettings.AutoPitch)
         {
-            autoFrameTimer = 0f;
-            UpdateAutoPitch();
+            autoFrameTimer += deltaTime;
+            if (autoFrameTimer >= autoFrameInterval)
+            {
+                autoFrameTimer = 0f;
+                UpdateAutoPitch();
+            }
         }
         TickPitch();
     }
@@ -296,7 +335,7 @@ public class CameraController : MonoBehaviour
     // 键位固定：WASD 水平平移 / K 升 J 降 / Q 左转 E 右转 / Y 抬头 H 低头
     private void TickFreeKeys()
     {
-        if (InputManager.KeysCapturedByUi) return;
+        if (InputManager.InputCapturedByUi) return;
         float deltaTime = Time.deltaTime;
         if (Input.GetKey(KeyCode.Q)) freeYaw -= freeTurnSpeed * deltaTime;
         if (Input.GetKey(KeyCode.E)) freeYaw += freeTurnSpeed * deltaTime;
@@ -307,7 +346,7 @@ public class CameraController : MonoBehaviour
 
     private void TickFreeMove(float deltaTime)
     {
-        if (InputManager.KeysCapturedByUi) return;
+        if (InputManager.InputCapturedByUi) return;
         float yawRad = freeYaw * Mathf.Deg2Rad;
         Vector3 fwd = new Vector3(Mathf.Sin(yawRad), 0f, Mathf.Cos(yawRad));
         Vector3 right = new Vector3(Mathf.Cos(yawRad), 0f, -Mathf.Sin(yawRad));
@@ -371,9 +410,6 @@ public class CameraController : MonoBehaviour
         if (fwd.sqrMagnitude < 0.0001f) return;
         fwd.Normalize();
 
-        // 角色水平朝向：只对角色前方的实体做取景，身后的实体会贴到镜头上、不该拽俯仰角
-        Vector3 charFwd = Quaternion.Euler(0f, lookTarget.eulerAngles.y, 0f) * Vector3.forward;
-
         float pitchTop = float.MaxValue;    // 上限：最高的所需视线（数值最小，向下为正）
         float pitchBottom = float.MinValue; // 下限：最低的所需视线（数值最大）
         bool any = false;
@@ -389,8 +425,8 @@ public class CameraController : MonoBehaviour
             float dz = p.z - camPos.z;
             float dist = Mathf.Sqrt(dx * dx + dz * dz);
             if (dist < 0.05f) continue; // 与相机几乎同位置：水平视线角无定义
-            // 必须在角色前方（角色后方＝相机与角色之间或更远，全部跳过）
-            if ((p.x - lookTarget.position.x) * charFwd.x + (p.z - lookTarget.position.z) * charFwd.z < 0f) continue;
+            // 必须在镜头前方（身后＝相机与角色之间或更远，全部跳过）
+            if (dx * fwd.x + dz * fwd.z <= 0f) continue;
 
             // 俯仰近似为 0 的水平视野测试：只取水平视场中间 80% 的实体
             float angle = Vector2.SignedAngle(new Vector2(fwd.x, fwd.z), new Vector2(dx / dist, dz / dist));
@@ -432,23 +468,28 @@ public class CameraController : MonoBehaviour
         pitchHoldTime = duration;
     }
 
+    // 第三人称俯仰：勾选自动俯仰角时由自动取景给目标并自然回正；取消勾选时目标完全由鼠标累加
     private void TickPitch()
     {
-        if (pitchHoldTime > 0f)
+        if (ClientSettings.AutoPitch)
         {
-            pitchHoldTime -= Time.deltaTime;
+            if (pitchHoldTime > 0f)
+            {
+                pitchHoldTime -= Time.deltaTime;
+            }
+            else
+            {
+                var d = lookTarget.position - transform.position;
+                float dh = d.y;
+                float ds = Mathf.Sqrt(d.x * d.x + d.z * d.z);
+                pitchTarget = -Mathf.Atan(dh / ds) * Mathf.Rad2Deg;
+            }
+            pitchTarget = Mathf.Clamp(pitchTarget, pitchClamp.x, pitchClamp.y);
         }
-        else
-        {
-            var d = lookTarget.position - transform.position;
-            float dh = d.y;
-            float ds = Mathf.Sqrt(d.x * d.x + d.z * d.z);
-            pitchTarget = -Mathf.Atan(dh / ds)*Mathf.Rad2Deg;
-        }
-        pitchTarget = Mathf.Clamp(pitchTarget, pitchClamp.x, pitchClamp.y);
-        var eular = new Vector3(pitchTarget, lookTarget.rotation.eulerAngles.y);
+
+        var eular = new Vector3(pitchTarget, camYaw, 0f);
         var targetQuaternion = Quaternion.Euler(eular);
-        transform.rotation = Quaternion.Lerp(transform.rotation,targetQuaternion, 1f - Mathf.Exp(-pitchSmooth * Time.deltaTime));
+        transform.rotation = Quaternion.Lerp(transform.rotation, targetQuaternion, 1f - Mathf.Exp(-pitchSmooth * Time.deltaTime));
     }
 
     // Unity 要到渲染才重算 worldToCameraMatrix，同帧 WorldToScreenPoint 会用上一帧矩阵（血条/名字差一帧震颤）

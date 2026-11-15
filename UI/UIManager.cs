@@ -16,8 +16,8 @@ public class UIManager : MonoBehaviour
     // GM 面板打开期间接管键盘：角色操控、技能、指令面板、技能选择都不得响应
     public bool GmOpen => gm != null && gm.IsOpen;
 
-    // 键盘归 UI 的两种情况：GM 面板打开、正在文字输入框里打字（否则打字会同时驱动角色）
-    public bool KeyboardCaptured => GmOpen || IsTypingInTextField;
+    // 玩法输入归 UI 的三种情况：GM 面板打开、正在文字输入框里打字、战斗页设置面板打开（面板自带按钮，此时不该再操控角色）
+    public bool InputCaptured => GmOpen || IsTypingInTextField || (battle != null && battle.SettingsOpen);
 
     private static bool IsTypingInTextField => GRoot.inst != null && GRoot.inst.focus is GTextInput;
 

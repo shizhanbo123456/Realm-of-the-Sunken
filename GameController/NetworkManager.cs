@@ -230,10 +230,30 @@ public partial class NetworkManager : EnsBehaviour
     #endregion
 
     #region//发送封装：客户端 → 服务器
-    public void SendInput(CSPlayerInput input)
+    // 移动：yaw = 角色要转过头并前进的绝对朝向，移动中朝向变化时补发同一个包
+    public void SendMove(float yaw)
     {
         if (!CanSendWorldCommand) return;
-        CallFuncRpc(ServerReceiveInputLocal, SendTo.RoomOwner, Delivery.Strive, input, LocalToken);
+        CallFuncRpc(ServerReceiveMoveLocal, SendTo.RoomOwner, Delivery.Strive, new CSMove() { yaw = yaw }, LocalToken);
+    }
+
+    public void SendMoveStop()
+    {
+        if (!CanSendWorldCommand) return;
+        CallFuncRpc(ServerReceiveMoveStopLocal, SendTo.RoomOwner, Delivery.Strive, new CSMoveStop(), LocalToken);
+    }
+
+    // 跳跃与滑铲各自独立通道：down=true 按下，false 抬起（飞行升降复用这两个长按态）
+    public void SendJump(bool down)
+    {
+        if (!CanSendWorldCommand) return;
+        CallFuncRpc(ServerReceiveJumpLocal, SendTo.RoomOwner, Delivery.Strive, new CSJump() { down = down }, LocalToken);
+    }
+
+    public void SendSlide(bool down)
+    {
+        if (!CanSendWorldCommand) return;
+        CallFuncRpc(ServerReceiveSlideLocal, SendTo.RoomOwner, Delivery.Strive, new CSSlide() { down = down }, LocalToken);
     }
 
     // 技能键：客户端已把按键解析成技能 id，服务器只做持有/沉默/强控/冷却校验
@@ -306,13 +326,6 @@ public partial class NetworkManager : EnsBehaviour
     {
         if (!CanSendWorldCommand) return;
         CallFuncRpc(ServerReceiveMinimapRadiusSwitchLocal, SendTo.RoomOwner, Delivery.Reliable, new CSMinimapRadiusSwitch(), LocalToken);
-    }
-
-    // 相机模式属于移动语义的一部分（俯视 = 四向），切模式即同步一次
-    public void SendCameraMode(bool topDown)
-    {
-        if (!CanSendWorldCommand) return;
-        CallFuncRpc(ServerReceiveCameraModeLocal, SendTo.RoomOwner, Delivery.Reliable, new CSCameraMode() { topDown = topDown }, LocalToken);
     }
 
     // 观战自由视角：位置上报（仅纯观战方），由 CameraController 按 1s / 1m 阈值节流
@@ -625,9 +638,27 @@ public partial class NetworkManager : EnsBehaviour
     }
 
     [Rpc]
-    private void ServerReceiveInputLocal(CSPlayerInput input, int clientId)
+    private void ServerReceiveMoveLocal(CSMove move, int clientId)
     {
-        if (Tool.BattleManager != null) Tool.BattleManager.ReceiveInput(clientId, input);
+        if (Tool.BattleManager != null) Tool.BattleManager.ReceiveMove(clientId, move.yaw);
+    }
+
+    [Rpc]
+    private void ServerReceiveMoveStopLocal(CSMoveStop stop, int clientId)
+    {
+        if (Tool.BattleManager != null) Tool.BattleManager.ReceiveMoveStop(clientId);
+    }
+
+    [Rpc]
+    private void ServerReceiveJumpLocal(CSJump jump, int clientId)
+    {
+        if (Tool.BattleManager != null) Tool.BattleManager.ReceiveJump(clientId, jump.down);
+    }
+
+    [Rpc]
+    private void ServerReceiveSlideLocal(CSSlide slide, int clientId)
+    {
+        if (Tool.BattleManager != null) Tool.BattleManager.ReceiveSlide(clientId, slide.down);
     }
 
     [Rpc]
@@ -701,12 +732,6 @@ public partial class NetworkManager : EnsBehaviour
     private void ServerReceiveMinimapRadiusSwitchLocal(CSMinimapRadiusSwitch request, int clientId)
     {
         if (Tool.BattleManager != null) Tool.BattleManager.SwitchMinimapRadius(clientId);
-    }
-
-    [Rpc]
-    private void ServerReceiveCameraModeLocal(CSCameraMode request, int clientId)
-    {
-        if (Tool.BattleManager != null) Tool.BattleManager.SetCameraMode(clientId, request != null && request.topDown);
     }
 
     [Rpc]
