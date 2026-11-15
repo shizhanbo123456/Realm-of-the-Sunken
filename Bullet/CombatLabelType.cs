@@ -14,4 +14,5 @@ public enum CombatLabelType
     Reflect = 9,      // 反伤（反弹给攻击者的伤害）
     PlagueBurst = 10, // 瘟疫引爆
     Heal = 11,        // 治疗（数值为恢复量）
+    ComboProtect = 12, // 连击保护（受击累计触发的保护期内被命中，无任何结算）
 }

@@ -83,10 +83,11 @@ public class EntityAnim : MonoBehaviour
 
     private int currentAnimId = -1;
 
-    #region//事件
+    
     public Action<AttackType> onAttack;//动画中的攻击事件回调
     public Action<AnimState, AnimState> OnStateChange;
-    #endregion
+    public int hitProtection;
+    public Action onHitProtction;
 
     private List<Animator> animators;
     private Animator mainAnimator;

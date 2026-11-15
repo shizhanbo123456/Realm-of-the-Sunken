@@ -47,6 +47,9 @@ public abstract class EntityData : MonoBehaviour
     [HideInInspector] public Vector3 hitbackVelocity;
     private Vector3 lastHitback; // 上一帧写进刚体的击退分量，混合前先剔除，避免被惯性反复放大
 
+    private const float HitProtectDuration = 3f; // 连击保护持续时长
+    private float hitProtectEndTime;
+
     [HideInInspector] public Vector3 moveInput;
 
     // 输入操作屏蔽：置位期间对应操作（前后/朝向）在 PlayerEntityData 的输入入口被拒绝，实现输入阻断（外部直接置位/清位）
@@ -131,7 +134,11 @@ public abstract class EntityData : MonoBehaviour
         if (ModelInfo == null) Debug.LogError($"实体缺少 EntityModelInfo：{name}（{type}，id={id}）");
 
         // 动画类型与武器显示类型都挂在武器上：entity.csv 只给武器编号（预制体上不再配）
-        if (anim != null) anim.Init(this);
+        if (anim != null)
+        {
+            anim.Init(this);
+            anim.onHitProtction += BeginHitProtection;
+        }
         if (anim != null)
         {
             if (weaponId < 0)
@@ -548,6 +555,16 @@ public abstract class EntityData : MonoBehaviour
         away.y = 0f; // 纯水平：y 压平后不再有垂直分量
         Vector3 dir = away.sqrMagnitude > 0.0001f ? away.normalized : transform.forward;
         hitbackVelocity += dir * force; // 连续命中累加，衰减由 TickVelocity 每帧处理
+    }
+
+    // 连击保护：受击动画累计满触发，保护期内命中只飘字，不结算伤害/buff/击退/受击
+    private void BeginHitProtection() => hitProtectEndTime = Time.time + HitProtectDuration;
+
+    public bool TryBlockByHitProtection(Vector3 hitPos)
+    {
+        if (Time.time >= hitProtectEndTime) return false;
+        SendCombatLabelEvent(0f, CombatLabelType.ComboProtect, hitPos);
+        return true;
     }
 
     // 进入受击后转身面向命中来源（击退同时进行，不再二选一）

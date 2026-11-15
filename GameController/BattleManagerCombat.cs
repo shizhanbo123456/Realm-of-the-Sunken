@@ -119,9 +119,11 @@ public partial class BattleManager
                     (spec.interval <= 0f || now - lastHit < spec.interval)) continue;
                 b.lastHitTime[e.id] = now;
 
-                int damage = attack.GetDamage(e, out CombatLabelType type, spec.rates != null ? spec.rates[h] : 1f);
                 // 命中点取上一帧的命中球心：高速弹一帧穿过目标时用当前位置定方向会反转（也是无攻击者时的击退来源）
                 Vector3 floatPos = new Vector3(e.transform.position.x, prevCenter.y, e.transform.position.z);
+                if (e.TryBlockByHitProtection(floatPos)) continue; // 连击保护：只飘字，不结算伤害/buff/击退/受击
+
+                int damage = attack.GetDamage(e, out CombatLabelType type, spec.rates != null ? spec.rates[h] : 1f);
                 e.ProcessHit(attack, damage, type, prevCenter, floatPos);
                 if (attack.addEffectEvent != null && e.effectController != null)
                 {
