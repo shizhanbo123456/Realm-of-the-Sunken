@@ -3,7 +3,9 @@ using UnityEngine;
 public class AnimAttackEvent : AnimEvent
 {
     protected override EntityAnim.AnimState State => EntityAnim.AnimState.Attack;
-    protected override InputBlockOp blockOp => InputBlockOp.Rotation|InputBlockOp.Jump|InputBlockOp.Slide|InputBlockOp.Attack;
+    protected override InputBlockOp blockOp =>type== EntityAnim.AttackType.Combo? 
+        InputBlockOp.Rotation | InputBlockOp.Attack:
+        InputBlockOp.Forward|InputBlockOp.Rotation|InputBlockOp.Jump|InputBlockOp.Slide|InputBlockOp.Attack;
     protected override bool UseGravity => AttackClipUseGravity;
     public override EndureType? Endure => EndureType.Super;
     public override EntityAnim.WeaponPos ShowWeapon => WeaponInHand ? EntityAnim.WeaponPos.Hand : EntityAnim.WeaponPos.Show;
