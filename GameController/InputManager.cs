@@ -116,8 +116,8 @@ public class InputManager : MonoBehaviour
     {
         // 滚轮不看指针位置：技能栏本身就在界面上，压着它滚是最自然的操作
         float wheel = Input.GetAxis("Mouse ScrollWheel");
-        if (wheel > 0f) SelectSlot(1);
-        else if (wheel < 0f) SelectSlot(-1);
+        if (wheel > 0f) SelectSlot(-1);
+        else if (wheel < 0f) SelectSlot(1);
 
         if (PointerOnUi()) return; // 压在可点击控件上时左右键交给界面
 
