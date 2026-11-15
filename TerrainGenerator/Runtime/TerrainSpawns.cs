@@ -26,6 +26,11 @@ namespace TerrainGen
         public static Vector3 DefenseSpawn { get; private set; }
         public static Vector3 AttackSpawn { get; private set; }
 
+        // 地板格白名单：由烘焙数据里的 Ground 物件还原，刷新点必须落在真实地板上
+        private static bool[,] floorCells;
+        private static int floorSizeX, floorSizeZ;
+        private static float floorCellSize;
+
         public static void Build(TerrainPlanData data)
         {
             if (data == null)
@@ -35,6 +40,7 @@ namespace TerrainGen
             }
 
             Reset();
+            BuildFloorGrid(data);
 
             float cell = data.cellSize;
             var extras = new List<Vector3>();
@@ -98,6 +104,41 @@ namespace TerrainGen
             SubGuards.Clear();
             Towers.Clear();
             NeutralStatues.Clear();
+            floorCells = null;
+            floorSizeX = 0;
+            floorSizeZ = 0;
+            floorCellSize = 0f;
+        }
+
+        // 地面物件是每格一块、底面中心对齐格心，所以按它的坐标就能还原整张地板格表
+        private static void BuildFloorGrid(TerrainPlanData data)
+        {
+            floorCellSize = data.cellSize;
+            floorSizeX = data.sizeX;
+            floorSizeZ = data.sizeZ;
+            floorCells = new bool[floorSizeX, floorSizeZ];
+
+            for (int i = 0; i < data.items.Count; i++)
+            {
+                TerrainItemData item = data.items[i];
+                if (item.kind != TerrainItemKind.Ground) continue;
+                int x = Mathf.FloorToInt((item.position.x - MapMin) / floorCellSize);
+                int z = Mathf.FloorToInt((item.position.z - MapMin) / floorCellSize);
+                if (x < 0 || z < 0 || x >= floorSizeX || z >= floorSizeZ) continue;
+                floorCells[x, z] = true;
+            }
+        }
+
+        public static bool IsFloorCell(float x, float z)
+        {
+            if (floorCells == null)
+            {
+                LogOnceNoFloorGrid();
+                return false;
+            }
+            int gx = Mathf.FloorToInt((x - MapMin) / floorCellSize);
+            int gz = Mathf.FloorToInt((z - MapMin) / floorCellSize);
+            return gx >= 0 && gz >= 0 && gx < floorSizeX && gz < floorSizeZ && floorCells[gx, gz];
         }
 
         private static float SqrDistanceXZ(Vector3 a, Vector3 b)
@@ -113,6 +154,16 @@ namespace TerrainGen
         private const int MaxSampleAttempts = 32;
 
         private static bool warnedNoLayer;
+
+        // 地板格表缺失只在首次报错：Build 没跑（或烘焙数据里没有地面）时所有刷新点都会失败
+        private static void LogOnceNoFloorGrid()
+        {
+            if (warnedNoFloorGrid) return;
+            warnedNoFloorGrid = true;
+            Debug.LogError("[地形] 地板格表为空：TerrainSpawns.Build 没有拿到地面数据，刷新点全部不可用");
+        }
+
+        private static bool warnedNoFloorGrid;
 
         public static bool TrySampleGroundY(float x, float z, out float y)
         {
@@ -157,6 +208,8 @@ namespace TerrainGen
         {
             y = 0f;
             if (x < MapMin || x >= MapMax || z < MapMin || z >= MapMax) return false;
+            // 先过地板格表：射线会命中虚空上的建筑/障碍顶面，光凭"命中高度贴近地面"会把怪刷在半空
+            if (!IsFloorCell(x, z)) return false;
             if (!TrySampleGroundY(x, z, out y)) return false;
             return Mathf.Abs(y - SurfaceY) <= SurfaceTolerance;
         }

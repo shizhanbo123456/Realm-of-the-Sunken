@@ -145,11 +145,25 @@ namespace Ros.UI.Main
                 if (dx * dx + dz * dz > viewRadius * viewRadius) return false;
             }
 
-            // 雷达坐标：上方=世界Z+、右侧=世界X+，显示半径铺满 mapBase；减半宽高让图标几何居中，再换到遮罩局部
+            // 雷达坐标：上方=世界Z+、右侧=世界X+，显示半径铺满 mapBase；再减去居中偏移换到遮罩局部
             float scale = mapBase.width * 0.5f / viewRadius;
-            item.SetXY(mapBase.x + mapBase.width * 0.5f + dx * scale - item.width * 0.5f - m_mask.x,
-                mapBase.y + mapBase.height * 0.5f - dz * scale - item.height * 0.5f - m_mask.y);
+            Vector2 half = CenterOffset(item);
+            item.SetXY(mapBase.x + mapBase.width * 0.5f + dx * scale - half.x - m_mask.x,
+                mapBase.y + mapBase.height * 0.5f - dz * scale - half.y - m_mask.y);
             return true;
+        }
+
+        // xy 到图标中点的偏移：非锚点模式下 xy 是左上角，缩放朝右下长；锚点模式下 xy 本身就是中点。
+        // 按未缩放的宽高直接扣一半，会随上层缩放整体斜着偏出去
+        internal static Vector2 CenterOffset(GObject item)
+        {
+            float px = item.pivot.x;
+            float py = item.pivot.y;
+            float sx = item.scale.x;
+            float sy = item.scale.y;
+            return item.pivotAsAnchor
+                ? new Vector2(item.width * sx * (0.5f - px), item.height * sy * (0.5f - py))
+                : new Vector2(item.width * (px * (1f - sx) + 0.5f * sx), item.height * (py * (1f - sy) + 0.5f * sy));
         }
 
         // 实体类别 → 点位档位（0 自己 / 1 队友 / 2 敌人 / 3~9 场景与守卫），展开图与雷达共用

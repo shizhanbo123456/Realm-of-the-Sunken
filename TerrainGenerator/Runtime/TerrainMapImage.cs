@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace TerrainGen
 {
-    // 地形底板图：只表达每格有无地面，烘焙时写到 Resources/Map，小地图三处共用
+    // 地形底板图：每格有无地面 + 防御塔/守护点格的专用色，烘焙时写到 Resources/Map，小地图三处共用
     public static class TerrainMapImage
     {
         public const string Folder = "Assets/Resources/Map";
@@ -15,7 +15,8 @@ namespace TerrainGen
         static bool tried;
 
         // 每格按整数边界切方块，格子数变动也能铺满整张图；像素行序自下而上，正好对应世界 Z+
-        public static Texture2D Build(BuildingField field, Color floor, Color voidColor)
+        // 防御塔 / 守护点所在的格整块盖成专门的颜色，点位在小地图上一眼可见
+        public static Texture2D Build(BuildingField field, Color floor, Color voidColor, Color towerColor, Color guardColor)
         {
             if (field == null || field.SizeX <= 0 || field.SizeZ <= 0) return null;
 
@@ -26,19 +27,26 @@ namespace TerrainGen
 
             for (int x = 0; x < field.SizeX; x++)
             {
-                int px0 = x * Resolution / field.SizeX;
-                int px1 = (x + 1) * Resolution / field.SizeX;
                 for (int z = 0; z < field.SizeZ; z++)
                 {
                     Color32 c = field.Layer[x, z] >= 0 ? floorColor : voidPx;
-                    int pz0 = z * Resolution / field.SizeZ;
-                    int pz1 = (z + 1) * Resolution / field.SizeZ;
-                    for (int pz = pz0; pz < pz1; pz++)
-                    {
-                        int row = pz * Resolution;
-                        for (int px = px0; px < px1; px++) pixels[row + px] = c;
-                    }
+                    CellBounds(field, x, z, out int px0, out int px1, out int pz0, out int pz1);
+                    Fill(pixels, px0, px1, pz0, pz1, c);
                 }
+            }
+
+            Color32 towerPx = towerColor;
+            Color32 guardPx = guardColor;
+            foreach (MapPoint p in field.Points)
+            {
+                Color32 c;
+                if (p.Kind == PointKind.Tower) c = towerPx;
+                else if (p.Kind == PointKind.MainGuard || p.Kind == PointKind.SubGuard) c = guardPx;
+                else continue;
+
+                if (p.Cell.x < 0 || p.Cell.y < 0 || p.Cell.x >= field.SizeX || p.Cell.y >= field.SizeZ) continue;
+                CellBounds(field, p.Cell.x, p.Cell.y, out int px0, out int px1, out int pz0, out int pz1);
+                Fill(pixels, px0, px1, pz0, pz1, c);
             }
 
             tex.SetPixels32(pixels);
@@ -46,11 +54,30 @@ namespace TerrainGen
             return tex;
         }
 
-        public static bool Write(BuildingField field, Color floor, Color voidColor, out string assetPath)
+        static void CellBounds(BuildingField field, int x, int z,
+            out int px0, out int px1, out int pz0, out int pz1)
+        {
+            px0 = x * Resolution / field.SizeX;
+            px1 = (x + 1) * Resolution / field.SizeX;
+            pz0 = z * Resolution / field.SizeZ;
+            pz1 = (z + 1) * Resolution / field.SizeZ;
+        }
+
+        static void Fill(Color32[] pixels, int px0, int px1, int pz0, int pz1, Color32 c)
+        {
+            for (int pz = pz0; pz < pz1; pz++)
+            {
+                int row = pz * Resolution;
+                for (int px = px0; px < px1; px++) pixels[row + px] = c;
+            }
+        }
+
+        public static bool Write(BuildingField field, Color floor, Color voidColor, Color towerColor, Color guardColor,
+            out string assetPath)
         {
             assetPath = Folder + "/" + AssetName + ".png";
 
-            Texture2D tex = Build(field, floor, voidColor);
+            Texture2D tex = Build(field, floor, voidColor, towerColor, guardColor);
             if (tex == null)
             {
                 Debug.LogError("[地形] 底图生成失败：布局为空");

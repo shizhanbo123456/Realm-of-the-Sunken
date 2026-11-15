@@ -63,8 +63,10 @@ namespace Ros.UI.Main
             float mapSize = GlobalVariable.RangeLength(global_variablesEnum.terrain_size);
             float ppmX = m_loader.width / mapSize;
             float ppmY = m_loader.height / mapSize;
-            item.SetXY(m_loader.x + point.world.x * ppmX - item.width * 0.5f,
-                m_loader.y + (mapSize - point.world.y) * ppmY - item.height * 0.5f);
+            // 轴心与缩放决定 xy 到中点的偏移（见 UI_Minimap.CenterOffset），漏算会整体斜着偏
+            Vector2 half = UI_Minimap.CenterOffset(item);
+            item.SetXY(m_loader.x + point.world.x * ppmX - half.x,
+                m_loader.y + (mapSize - point.world.y) * ppmY - half.y);
         }
 
         private UI_MinimapItem EnsureItem(in UI_Minimap.Point point)

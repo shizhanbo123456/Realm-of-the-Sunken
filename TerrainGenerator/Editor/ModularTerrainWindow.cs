@@ -27,8 +27,12 @@ namespace TerrainGen.EditorTools
 
         const string FloorColorKey = "TerrainGen.MapFloorColor";
         const string VoidColorKey = "TerrainGen.MapVoidColor";
+        const string TowerColorKey = "TerrainGen.MapTowerColor";
+        const string GuardColorKey = "TerrainGen.MapGuardColor";
         Color mapFloorColor = new Color(0.72f, 0.68f, 0.60f, 1f);
         Color mapVoidColor = new Color(0.09f, 0.10f, 0.14f, 1f);
+        Color mapTowerColor = new Color(0.25f, 0.85f, 0.30f, 1f);
+        Color mapGuardColor = new Color(1f, 0.55f, 0.10f, 1f);
 
         [MenuItem("Tools/模块化地形/建筑生成器")]
         public static void Open()
@@ -45,6 +49,8 @@ namespace TerrainGen.EditorTools
             kit = AssetDatabase.LoadAssetAtPath<BuildingKitSet>(ConfigFolder + "/BuildingKitSet.asset");
             mapFloorColor = LoadColor(FloorColorKey, mapFloorColor);
             mapVoidColor = LoadColor(VoidColorKey, mapVoidColor);
+            mapTowerColor = LoadColor(TowerColorKey, mapTowerColor);
+            mapGuardColor = LoadColor(GuardColorKey, mapGuardColor);
         }
 
         void OnDisable() => DestroyImmediate(preview);
@@ -88,6 +94,11 @@ namespace TerrainGen.EditorTools
             {
                 mapFloorColor = EditorGUILayout.ColorField("底图地面色", mapFloorColor);
                 mapVoidColor = EditorGUILayout.ColorField("底图虚空色", mapVoidColor);
+            }
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                mapTowerColor = EditorGUILayout.ColorField("底图防御塔格", mapTowerColor);
+                mapGuardColor = EditorGUILayout.ColorField("底图守护点格", mapGuardColor);
             }
             if (EditorGUI.EndChangeCheck()) SaveMapColors();
 
@@ -269,7 +280,7 @@ namespace TerrainGen.EditorTools
                 return;
             }
 
-            bool mapOk = TerrainMapImage.Write(field, mapFloorColor, mapVoidColor, out string mapPath);
+            bool mapOk = TerrainMapImage.Write(field, mapFloorColor, mapVoidColor, mapTowerColor, mapGuardColor, out string mapPath);
             // 落盘后要等编辑器导入完才拿得到 importer，放到延迟回调里做
             if (mapOk) EditorApplication.delayCall += () =>
             {
@@ -281,7 +292,7 @@ namespace TerrainGen.EditorTools
                       + TerrainPlanData.PathFor(settings.seed, settings.version)
                       + "；进播放模式后由 Culler 按区块动态生成";
             summary += mapOk
-                ? $"\n底图 → {mapPath}（{TerrainMapImage.Resolution}×{TerrainMapImage.Resolution}，只画有无地面）"
+                ? $"\n底图 → {mapPath}（{TerrainMapImage.Resolution}×{TerrainMapImage.Resolution}，地面/虚空 + 防御塔格与守护点格着色）"
                 : "\n底图生成失败，小地图将缺少底板";
             summaryIsError = !mapOk;
             Log(summary);
@@ -291,6 +302,8 @@ namespace TerrainGen.EditorTools
         {
             EditorPrefs.SetString(FloorColorKey, "#" + ColorUtility.ToHtmlStringRGBA(mapFloorColor));
             EditorPrefs.SetString(VoidColorKey, "#" + ColorUtility.ToHtmlStringRGBA(mapVoidColor));
+            EditorPrefs.SetString(TowerColorKey, "#" + ColorUtility.ToHtmlStringRGBA(mapTowerColor));
+            EditorPrefs.SetString(GuardColorKey, "#" + ColorUtility.ToHtmlStringRGBA(mapGuardColor));
         }
 
         static Color LoadColor(string key, Color fallback)
