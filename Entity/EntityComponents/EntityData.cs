@@ -43,6 +43,10 @@ public abstract class EntityData : MonoBehaviour
 
     [HideInInspector] public Rigidbody rb;
 
+    // 当前击退速度（纯水平，y 恒 0）：命中瞬间累加，每帧朝 0 收敛，混合时并进刚体速度
+    [HideInInspector] public Vector3 hitbackVelocity;
+    private Vector3 lastHitback; // 上一帧写进刚体的击退分量，混合前先剔除，避免被惯性反复放大
+
     [HideInInspector] public Vector3 moveInput;
 
     // 输入操作屏蔽：置位期间对应操作（前后/朝向）在 PlayerEntityData 的输入入口被拒绝，实现输入阻断（外部直接置位/清位）
@@ -55,7 +59,7 @@ public abstract class EntityData : MonoBehaviour
     // 立即转向某个世界坐标（技能自动索敌用）：默认不转，只有真有朝向概念的实体才覆盖
     public virtual void FaceTowards(Vector3 worldPoint) { }
 
-    // 飞行模式（仅玩家实体启用，见 PlayerEntityData.SetFlightMode）：重力关闭、免疫击飞/打断/位移，动画按地面状态播放
+    // 飞行模式（仅玩家实体启用，见 PlayerEntityData.SetFlightMode）：重力关闭、免疫击退/打断/位移，动画按地面状态播放
     public virtual bool FlightMode => false;
 
     // 实体固定武器编号（一维，对应 AssetsManager 的武器列表；-1 = 无武器）
@@ -317,6 +321,8 @@ public abstract class EntityData : MonoBehaviour
         if (!NavMesh.SamplePosition(transform.position, out var rescuePoint, nav_rescue_search_radius, NavMesh.AllAreas)) return;
 
         rb.velocity = Vector3.zero; // 清掉惯性，避免下一次物理步又把它推回网格外
+        hitbackVelocity = Vector3.zero; // 传送后不保留击退，否则会带着惯性冲出网格
+        lastHitback = Vector3.zero;
         rb.position = rescuePoint.position;
         transform.position = rescuePoint.position;
         navLastPos = rescuePoint.position;
@@ -369,6 +375,9 @@ public abstract class EntityData : MonoBehaviour
     }
 
     #region//速度
+    private const float KnockbackDecay = 5f;       // 击退速度每秒衰减量
+    private const float KnockbackMinSpeed = 0.01f; // 低于该值视为不带击退
+
     private bool declaredForward;
     private float declaredForwardSpeed;
     private bool declaredHorizontal;
@@ -426,40 +435,48 @@ public abstract class EntityData : MonoBehaviour
         bool canInput = effectController == null || effectController.CanMove();
         OnTickMove(deltaTime, canInput);
 
-        // 混合写刚体
+        // 混合写刚体：先剔除上一帧的击退分量，避免惯性分支把击退反复读回来放大
+        Vector3 baseVel = rb.velocity - lastHitback;
         if (motion != null)
         {
             Vector3 final = Vector3.zero;
             if (declaredMotionEnter)
             {
-                final = motion.Enter(this, rb.velocity);
+                final = motion.Enter(this, baseVel);
             }
             else if (Time.time >= motion.endTime)
             {
-                final = motion.Exit(this, rb.velocity);
+                final = motion.Exit(this, baseVel);
                 motion = null; // 到期即移除：惯性随 Exit 返回值保留，下一帧交回声明/摩擦
             }
             else
             {
-                final = motion.Update(this, rb.velocity);
+                final = motion.Update(this, baseVel);
             }
 
             if (motion != null && motion.canMove) final += DeclaredVelocity();
-            rb.velocity = final;
+            rb.velocity = final + hitbackVelocity;
         }
         else if (declaredForward || declaredHorizontal || declaredVertical)
         {
             var declared= DeclaredVelocity();
             if (!grounded&&!declaredVertical)
             {
-                declared.y = rb.velocity.y;
+                declared.y = baseVel.y;
             }
-            rb.velocity = declared;
+            rb.velocity = declared + hitbackVelocity;
         }
         else if (grounded)
         {
-            rb.velocity = rb.velocity * Mathf.Min(0.9f, Time.deltaTime * 500);
+            rb.velocity = baseVel * Mathf.Min(0.9f, Time.deltaTime * 500) + hitbackVelocity;
         }
+        else
+        {
+            rb.velocity = baseVel + hitbackVelocity; // 空中无声明原本不写，现在要写，否则空中击退不生效
+        }
+        lastHitback = hitbackVelocity;
+        // 击退每秒衰减 5.0，归零后不再参与混合
+        hitbackVelocity = Vector3.MoveTowards(hitbackVelocity, Vector3.zero, KnockbackDecay * deltaTime);
 
         //区块索引刷新
         BattleManager.EntityContainer.Entities.UpdateObjectPosition(id);
@@ -502,43 +519,38 @@ public abstract class EntityData : MonoBehaviour
             OnDamaged(0f, damageType: CombatLabelType.Evade, hitPos: floatPos ?? hitOrigin);
             return;
         }
+        EntityData attacker = null;
+        if (BattleManager.EntityContainer.Entities.TryGetObject(attack.shooter, out var shooter)) attacker = shooter;
         EndureType endure = GetEndureLevel();
-        // 破霸体一律打断；不破霸体只对无霸体目标生效，打中霸体目标完全不打断（不进受击、不击飞、不停位移）
+        // 霸体只决定受击与打断：破霸体一律打断；不破霸体只对无霸体目标生效，打中霸体目标不进受击、不停位移
         bool enterHit = anim != null && (attack.breakEndure || endure == EndureType.None);
-        if (enterHit && FlightMode) enterHit = false; // 飞行免疫：不受击飞/被打断（伤害照常结算）
+        if (enterHit && FlightMode) enterHit = false; // 飞行免疫：不受击退/被打断（伤害照常结算）
         if (enterHit)
         {
             motion = null;  // 打断位移
-            // 击飞不播受击动画；没被击飞才播（破霸体 = 长受击，否则短受击）
-            if (!ApplyKnockback(attack, hitOrigin))
-            {
-                anim.DoHit(attack.breakEndure);
-                FaceHitOrigin(hitOrigin);
-            }
+            anim.DoHit(attack.breakEndure); // 击退不再阻断受击（破霸体 = 长受击，否则短受击）
+            FaceHitOrigin(hitOrigin);
         }
-        EntityData attacker = null;
-        if (BattleManager.EntityContainer.Entities.TryGetObject(attack.shooter, out var shooter)) attacker = shooter;
+        // 击退独立于受击判定：飞行与无刚体单位之外，只有护盾能挡住，霸体与冰冻都不挡
+        ApplyKnockback(attacker != null ? attacker.transform.position : hitOrigin, attack.knockbackPower);
         OnDamaged(damage, attacker, damageType: damageType, hitPos: floatPos ?? hitOrigin);
         Tool.BattleManager.OnHitPassive(attacker, this, damageType); // 攻击方被动（暴击麻痹），放在伤害结算之后
     }
 
-    //击飞
-    private bool ApplyKnockback(AttackData attack, Vector3 hitOrigin)
+    // 击退（命中与 GM 共用）：origin 为推力来源，force 为初速；只被护盾挡住，飞行与无刚体单位推不动
+    public void ApplyKnockback(Vector3 origin, float force)
     {
-        if (rb == null) return false;
-        float v = attack.knockbackPower;
-        if (v <= 0.01f) return false;
+        if (rb == null || force <= KnockbackMinSpeed) return;
+        if (FlightMode) return;
+        if (effectController != null && effectController.GetShieldAbsorb() > 0f) return;
 
-        Vector3 away = transform.position - hitOrigin;
-        away.y = 0f;
+        Vector3 away = transform.position - origin;
+        away.y = 0f; // 纯水平：y 压平后不再有垂直分量
         Vector3 dir = away.sqrMagnitude > 0.0001f ? away.normalized : transform.forward;
-        // 水平为 Vector2(x→世界X, y→世界Z)，必须显式取 (dir.x, dir.z)，否则 Vector3→Vector2 隐式转换会丢弃 dir.z（击飞变沿 ±X）
-        SetVelocityHorizontal(new Vector2(dir.x * v, dir.z * v), VelocitySource.Knockback); // 水平
-        SetVelocityVertical(v, VelocitySource.Knockback); // 垂直
-        return true;
+        hitbackVelocity += dir * force; // 连续命中累加，衰减由 TickVelocity 每帧处理
     }
 
-    // 被打断但没击飞：转身面向命中来源（受击动画已在 ProcessHit 里播）
+    // 进入受击后转身面向命中来源（击退同时进行，不再二选一）
     private void FaceHitOrigin(Vector3 hitOrigin)
     {
         Vector3 to = hitOrigin - transform.position;
@@ -814,7 +826,7 @@ public abstract class EntityData : MonoBehaviour
         // 出生动画期间状态机归 Spawn 子状态机接管，且出生点允许悬空 —— 此期间不写 InAir
         if (anim.CurrentState == EntityAnim.AnimState.Spawn) return;
 
-        // 先判垂直速度：仍有明显上升速度（起跳/击飞上升段）必然离地
+        // 先判垂直速度：仍有明显上升速度（起跳上升段）必然离地
         if (rb.velocity.y >= GroundMaxRiseSpeed)
         {
             if (grounded)
@@ -850,7 +862,7 @@ public abstract class EntityData : MonoBehaviour
 
         rb = GetComponent<Rigidbody>();
         if (rb == null) rb = gameObject.AddComponent<Rigidbody>();
-        rb.useGravity = true; //下落与被击飞依赖重力（单位自身 Collider 必须配好，否则会一直坠落）
+        rb.useGravity = true; //下落依赖重力（单位自身 Collider 必须配好，否则会一直坠落）
         rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
         rb.interpolation = RigidbodyInterpolation.None;
         rb.drag = GlobalConfig.rb_drag;

@@ -1599,7 +1599,7 @@ namespace Ros.Skill
         }
     }
 
-    // 自身位置爆炸：击飞 + 灼烧
+    // 自身位置爆炸：击退 + 灼烧
     public class SkillBlastKnockback : SkillBase
     {
         public override int Id => (int)SkillType.SkillBlastKnockback;

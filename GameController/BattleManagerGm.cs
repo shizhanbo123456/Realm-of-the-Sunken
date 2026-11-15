@@ -9,7 +9,7 @@ using UnityEngine;
 // 指令 id 与参数含义见配表 gm_command；纯客户端项（敌方聊天/雾气/结算演示/客户端调试）在 GmPanel 本地执行
 public partial class BattleManager
 {
-    // 击飞指令的固定作用半径
+    // 击退指令的固定作用半径
     private const float gmKickRadius = 5f;
 
     // 无敌实体（EntityData.OnDamaged 命中即按 0 伤害）
@@ -268,7 +268,7 @@ public partial class BattleManager
         }
     }
 
-    // 击飞：从 GM 自己实体向外推开 5 米内的实体；不判霸体；飞行与无刚体单位跳过
+    // 击退：以 GM 自身为原点把 5 米内的实体向外推；只被护盾挡住，飞行与无刚体单位推不动
     private readonly List<EntityData> gmTargetScratch = new();
 
     private void GmKick(int clientId, float force)
@@ -286,14 +286,7 @@ public partial class BattleManager
             gmTargetScratch.Add(e);
         }
 
-        foreach (var e in gmTargetScratch)
-        {
-            if (e.FlightMode || e.rb == null) continue;
-            Vector3 away = e.transform.position - origin;
-            away.y = 0f;
-            Vector3 dir = away.sqrMagnitude > 0.0001f ? away.normalized : e.transform.forward;
-            e.SetVelocityHorizontal(new Vector2(dir.x * force, dir.z * force), VelocitySource.Knockback);
-        }
+        foreach (var e in gmTargetScratch) e.ApplyKnockback(origin, force);
     }
 
     private static int GmCountAliveEntities()
