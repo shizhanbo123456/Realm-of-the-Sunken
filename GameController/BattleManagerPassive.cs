@@ -83,9 +83,9 @@ public partial class BattleManager
         // 鹿铠怪人 被动「攻击暴击时附加轻微麻痹」：目标已死则不再挂状态
         if (type != CombatLabelType.Crit || attacker == null || target == null || !target.Alive) return;
         if (attacker.type != EntityType.Defense(GlobalConfig.defense_index_deer_knight)) return;
+        // 麻痹等级固定 1 级：该 Buff 的等级不参与任何效果计算
         if (target.effectController != null)
-            target.effectController.AddEffect(EffectType.Stun,
-                GlobalVariable.I(global_variablesEnum.passive_defense_crit_paralysis_level),
+            target.effectController.AddEffect(EffectType.Stun, 1,
                 GlobalVariable.F(global_variablesEnum.passive_defense_crit_paralysis_duration), attacker);
     }
 

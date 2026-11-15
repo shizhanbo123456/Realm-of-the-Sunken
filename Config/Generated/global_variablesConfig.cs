@@ -141,7 +141,6 @@ namespace Ros.Config
         passive_defense_plague_shield_cooldown,
         passive_defense_pope_guard_reduce_rate,
         passive_defense_crit_paralysis_duration,
-        passive_defense_crit_paralysis_level,
         passive_defense_pale_full_stacks,
         passive_defense_pale_mixed_stacks,
         passive_defense_pale_control_duration,
