@@ -382,9 +382,6 @@ public abstract class EntityData : MonoBehaviour
     }
 
     #region//速度
-    private const float KnockbackDecay = 5f;       // 击退速度每秒衰减量
-    private const float KnockbackMinSpeed = 0.01f; // 低于该值视为不带击退
-
     private bool declaredForward;
     private float declaredForwardSpeed;
     private bool declaredHorizontal;
@@ -482,8 +479,11 @@ public abstract class EntityData : MonoBehaviour
             rb.velocity = baseVel + hitbackVelocity; // 空中无声明原本不写，现在要写，否则空中击退不生效
         }
         lastHitback = hitbackVelocity;
-        // 击退每秒衰减 5.0，归零后不再参与混合
-        hitbackVelocity = Vector3.MoveTowards(hitbackVelocity, Vector3.zero, KnockbackDecay * deltaTime);
+        // 击退按配表速率线性衰减，模的平方低于阈值即归零，不再参与混合
+        hitbackVelocity = Vector3.MoveTowards(hitbackVelocity, Vector3.zero,
+            GlobalVariable.F(global_variablesEnum.hitback_friction) * deltaTime);
+        if (hitbackVelocity.sqrMagnitude < GlobalVariable.F(global_variablesEnum.hitback_threshold_squared))
+            hitbackVelocity = Vector3.zero;
 
         //区块索引刷新
         BattleManager.EntityContainer.Entities.UpdateObjectPosition(id);
@@ -544,17 +544,18 @@ public abstract class EntityData : MonoBehaviour
         Tool.BattleManager.OnHitPassive(attacker, this, damageType); // 攻击方被动（暴击麻痹），放在伤害结算之后
     }
 
-    // 击退（命中与 GM 共用）：origin 为推力来源，force 为初速；只被护盾挡住，飞行与无刚体单位推不动
+    // 击退（命中与 GM 共用）：origin 为推力来源，force 为配表力度；只被护盾挡住，飞行与无刚体单位推不动
     public void ApplyKnockback(Vector3 origin, float force)
     {
-        if (rb == null || force <= KnockbackMinSpeed) return;
+        if (rb == null || force <= 0f) return;
         if (FlightMode) return;
         if (effectController != null && effectController.GetShieldAbsorb() > 0f) return;
 
         Vector3 away = transform.position - origin;
         away.y = 0f; // 纯水平：y 压平后不再有垂直分量
         Vector3 dir = away.sqrMagnitude > 0.0001f ? away.normalized : transform.forward;
-        hitbackVelocity += dir * force; // 连续命中累加，衰减由 TickVelocity 每帧处理
+        // 实际初速 = 配表力度 × 倍率；连续命中累加，衰减由 TickVelocity 每帧处理
+        hitbackVelocity += dir * (force * GlobalVariable.F(global_variablesEnum.hitback_force_multiplier));
     }
 
     // 连击保护：受击动画累计满触发，保护期内命中只飘字，不结算伤害/buff/击退/受击

@@ -147,5 +147,8 @@ namespace Ros.Config
         death_curse_duration,
         death_curse_tick_damage,
         death_curse_damage_taken_ratio,
+        hitback_force_multiplier,
+        hitback_friction,
+        hitback_threshold_squared,
     }
 }
