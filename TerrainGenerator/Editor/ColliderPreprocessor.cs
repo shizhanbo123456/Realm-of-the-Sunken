@@ -39,10 +39,7 @@ namespace TerrainGen.EditorTools
             new Entry("矮石柱", k => k.shortPosts, Mode.BoxDisabled),
             new Entry("高石柱", k => k.tallPosts, Mode.BoxDisabled),
             new Entry("支撑", k => k.supports, Mode.BoxDisabled),
-            new Entry("建筑物", k => k.buildings, Mode.BoxDisabled),
             new Entry("装饰", k => k.decorations, Mode.BoxDisabled),
-            new Entry("灌木", k => k.bushes, Mode.BoxDisabled),
-            new Entry("摆件", k => k.props, Mode.BoxDisabled),
             new Entry("藤蔓", k => k.vines, Mode.NoBounds),
             new Entry("障碍", k => k.obstacles, Mode.BoxDisabledExclusive),
             new Entry("障碍装饰", k => k.obstacleDecorations, Mode.NoBounds),
@@ -91,17 +88,8 @@ namespace TerrainGen.EditorTools
         [MenuItem("Tools/模块化地形/碰撞体预处理/支撑")]
         static void ProcessSupports() => RunOne("支撑");
 
-        [MenuItem("Tools/模块化地形/碰撞体预处理/建筑物")]
-        static void ProcessBuildings() => RunOne("建筑物");
-
         [MenuItem("Tools/模块化地形/碰撞体预处理/装饰")]
         static void ProcessDecorations() => RunOne("装饰");
-
-        [MenuItem("Tools/模块化地形/碰撞体预处理/灌木")]
-        static void ProcessBushes() => RunOne("灌木");
-
-        [MenuItem("Tools/模块化地形/碰撞体预处理/摆件")]
-        static void ProcessProps() => RunOne("摆件");
 
         [MenuItem("Tools/模块化地形/碰撞体预处理/藤蔓")]
         static void ProcessVines() => RunOne("藤蔓");

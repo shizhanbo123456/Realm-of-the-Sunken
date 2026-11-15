@@ -92,9 +92,6 @@ public class HomePreviewManager : ClientSubManager
         if (lobbyStage != null) PlaceCamera(lobbyStage.CameraPos);
     }
 
-    // 大厅 Arranger 实例；未创建时为 null（大厅 UI 取它的 UIPos 对齐阵营面板）
-    public LobbyDisplayArranger LobbyArranger => lobbyStage;
-
     // 进战斗前清掉两页的场景与角色（相机交给 CameraController）
     public void Hide()
     {

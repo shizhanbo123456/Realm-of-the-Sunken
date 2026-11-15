@@ -21,17 +21,8 @@ namespace TerrainGen
         [Header("支撑（放在高石柱下方，原点为支撑顶部中心）")]
         public List<GameObject> supports = new List<GameObject>();
 
-        [Header("建筑物（按面积密度随机摆放，底面对齐地面）")]
-        public List<GameObject> buildings = new List<GameObject>();
-
-        [Header("装饰（同上，避让建筑物）")]
+        [Header("装饰（按面积密度随机摆放，底面对齐地面）")]
         public List<GameObject> decorations = new List<GameObject>();
-
-        [Header("灌木（同上，避让建筑物和装饰）")]
-        public List<GameObject> bushes = new List<GameObject>();
-
-        [Header("摆件（同上，避让建筑物/装饰/灌木）")]
-        public List<GameObject> props = new List<GameObject>();
 
         [Header("藤蔓（贴在地块临空外墙侧面，高度随机）")]
         public List<GameObject> vines = new List<GameObject>();
@@ -85,10 +76,7 @@ namespace TerrainGen
                 case TerrainItemKind.PostShort: return shortPosts;
                 case TerrainItemKind.PostTall: return tallPosts;
                 case TerrainItemKind.Support: return supports;
-                case TerrainItemKind.Building: return buildings;
                 case TerrainItemKind.Decoration: return decorations;
-                case TerrainItemKind.Prop: return props;
-                case TerrainItemKind.Bush: return bushes;
                 case TerrainItemKind.Vine: return vines;
                 case TerrainItemKind.Obstacle: return obstacles;
                 case TerrainItemKind.ObstacleDecor: return obstacleDecorations;

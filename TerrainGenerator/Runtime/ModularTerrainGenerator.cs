@@ -5,8 +5,6 @@ namespace TerrainGen
     public class ModularTerrainGenerator : MonoBehaviour
     {
         public BuildingSettings settings;
-        [Tooltip("地面/围栏/石柱/支撑/植被摆件素材表")]
-        public BuildingKitSet kit;
 
         TerrainPropCuller culler;
         Transform contentRoot;
@@ -27,8 +25,7 @@ namespace TerrainGen
             if (Tool.Instance.isServer) GenerateServer();
         }
 
-        // 客户端：建内容根与点位，物件交给 Culler 按区块流式取还
-        // 编辑器非播放态：只把数据烘焙到 StreamingAssets/TerrainGenerator 并返回 null
+        // 客户端：素材表由 ResourceManager 装配，物件交给 Culler 按区块流式取还
         public TerrainPropCuller Generate(System.Action onGenerated = null)
         {
             if (settings == null)
@@ -36,20 +33,11 @@ namespace TerrainGen
                 Debug.LogError("[地形] 未指定生成参数 BuildingSettings", this);
                 return null;
             }
-
-            // 编辑器烘焙直接用 Inspector 里的 kit
             if (!Application.isPlaying)
             {
-                TerrainPropCuller baked = GenerateInternal();
+                Debug.LogError("[地形] 编辑器态请用 Tools/模块化地形/建筑生成器 烘焙数据，运行期入口不生成地形", this);
                 onGenerated?.Invoke();
-                return baked;
-            }
-
-            // 运行时客户端由 ResourceManager 加载素材表：kit 上直接引用会让预制体被重复打包，必须留空
-            if (kit != null)
-            {
-                Debug.LogError("[地形] 客户端场景不应直接挂 kit（地形预制体会被重复打包），请清空它并在 ResourceManager 配好 BuildingKit", this);
-                kit = null;
+                return null;
             }
             if (Tool.ResourceManager == null)
             {
@@ -65,21 +53,20 @@ namespace TerrainGen
                     onGenerated?.Invoke();
                     return;
                 }
-                kit = loaded;
-                GenerateInternal();
+                GenerateInternal(loaded);
                 onGenerated?.Invoke();
             });
             return null;
         }
 
-        private TerrainPropCuller GenerateInternal()
+        private TerrainPropCuller GenerateInternal(BuildingKitSet kit)
         {
             Clear();
             culler = TerrainGenerator.Generate(settings, kit, out contentRoot);
             return culler;
         }
 
-        // 服务器：一次性铺设整张地形，不建 Culler（服务器不做剔除）
+        // 服务器：素材表走 AssetsManager 的直接引用，一次性铺设整张地形，不建 Culler（服务器不做剔除）
         public void GenerateServer()
         {
             if (settings == null)
@@ -87,9 +74,10 @@ namespace TerrainGen
                 Debug.LogError("[地形] 未指定生成参数 BuildingSettings", this);
                 return;
             }
+            BuildingKitSet kit = Tool.AssetsManager != null ? Tool.AssetsManager.TerrainKit : null;
             if (kit == null)
             {
-                Debug.LogError("[地形] 服务器场景未指定素材表 kit：地形未生成", this);
+                Debug.LogError("[地形] AssetsManager 未配置 TerrainKit：服务器地形未生成", this);
                 return;
             }
 

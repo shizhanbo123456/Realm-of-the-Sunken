@@ -412,7 +412,7 @@ public partial class BattleManager : EnsBehaviour
         var info = new CSLobbyPlayerInfo()
         {
             // 名字由令牌推导：重建时令牌源归位，编号稳定且不与真人令牌冲突
-            name = $"AI玩家{robotClientId - ROBOT_TOKEN_BASE + 1}",
+            name = $"Robot{robotClientId - ROBOT_TOKEN_BASE + 1}",
         };
         if (camp == PlayerCampType.Attack)
         {
@@ -633,7 +633,7 @@ public partial class BattleManager : EnsBehaviour
     private static string NameOf(int clientId, CSLobbyPlayerInfo info)
     {
         if (info != null && !string.IsNullOrEmpty(info.name)) return info.name;
-        return IsRobotToken(clientId) ? $"AI玩家{clientId - ROBOT_TOKEN_BASE + 1}" : $"玩家{clientId}";
+        return IsRobotToken(clientId) ? $"Robot{clientId - ROBOT_TOKEN_BASE + 1}" : $"玩家{clientId}";
     }
 
     // 攻守真人全部回执完成后才真正开战；观战方不阻塞

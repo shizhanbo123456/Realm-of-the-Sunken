@@ -243,23 +243,51 @@ public class EntityAnim : MonoBehaviour
         {
             AttachToBone(prefab, EntityAnchor.RightHand);
             if (weaponDisplay == WeaponDisplayType.DualSword) AttachToBone(prefab, EntityAnchor.LeftHand);
-            return;
         }
         // 收起：长枪挂背，刀挂右腰，双刀左右腰各一把
-        switch (weaponDisplay)
+        else
         {
-            case WeaponDisplayType.Spear:
-                AttachToAnchor(prefab, EntityAnchor.WeaponBack);
-                break;
-            case WeaponDisplayType.Sword:
-                AttachToAnchor(prefab, EntityAnchor.WeaponHipRight);
-                break;
-            case WeaponDisplayType.DualSword:
-                AttachToAnchor(prefab, EntityAnchor.WeaponHipLeft);
-                AttachToAnchor(prefab, EntityAnchor.WeaponHipRight);
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(weaponDisplay), weaponDisplay, "未知武器显示类型");
+            switch (weaponDisplay)
+            {
+                case WeaponDisplayType.Spear:
+                    AttachToAnchor(prefab, EntityAnchor.WeaponBack);
+                    break;
+                case WeaponDisplayType.Sword:
+                    AttachToAnchor(prefab, EntityAnchor.WeaponHipRight);
+                    break;
+                case WeaponDisplayType.DualSword:
+                    AttachToAnchor(prefab, EntityAnchor.WeaponHipLeft);
+                    AttachToAnchor(prefab, EntityAnchor.WeaponHipRight);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(weaponDisplay), weaponDisplay, "未知武器显示类型");
+            }
+        }
+        RefreshWeaponTrail();
+    }
+
+    private const int WeaponTrailChildIndex = 1; // 刀光物体固定在武器预制体根的第 2 个子物体上
+
+    // 刀光只跟手上走：手部开、腰背关；缺子物体或 TrailRenderer 只报错，不做兜底搜索
+    private void RefreshWeaponTrail()
+    {
+        bool enable = weaponPos == WeaponPos.Hand;
+        for (int i = 0; i < weaponInstances.Count; i++)
+        {
+            Transform root = weaponInstances[i];
+            if (root == null) continue;
+            if (root.childCount <= WeaponTrailChildIndex)
+            {
+                Debug.LogError($"{gameObject.name} 的武器 {weaponId} 缺少第 {WeaponTrailChildIndex} 个子物体：刀光不生效，需调整预制体层级");
+                return;
+            }
+            TrailRenderer trail = root.GetChild(WeaponTrailChildIndex).GetComponent<TrailRenderer>();
+            if (trail == null)
+            {
+                Debug.LogError($"{gameObject.name} 的武器 {weaponId} 第 {WeaponTrailChildIndex} 个子物体没有 TrailRenderer：刀光不生效，需调整预制体层级");
+                return;
+            }
+            trail.enabled = enable;
         }
     }
 

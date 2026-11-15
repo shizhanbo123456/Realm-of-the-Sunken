@@ -144,7 +144,7 @@ namespace TerrainGen
                 prefabIndex = index,
                 position = pos,
                 yaw = yaw,
-                scale = scale,
+                scale = Vector3.one * scale,
             });
             return 1;
         }

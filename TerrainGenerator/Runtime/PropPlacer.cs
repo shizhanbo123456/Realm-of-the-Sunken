@@ -6,7 +6,7 @@ using Ros.Config;
 namespace TerrainGen
 {
 
-    // 建筑物/装饰/摆件/灌木按面积密度散落，之后是障碍、障碍装饰、漂浮装饰、鱼群，藤蔓贴外墙
+    // 装饰/藤蔓按面积密度散落，之后是障碍、障碍装饰、漂浮装饰、鱼群，藤蔓贴外墙
     public static class PropPlacer
     {
         struct Spot
@@ -14,6 +14,9 @@ namespace TerrainGen
             public Vector2 pos;
             public float radius;
         }
+
+        const float ObstacleMinSize = 5f; // 障碍包围盒每轴的目标长度下限（米）
+        const float ObstacleMaxSize = 8f;
 
         public static int PlacePlan(BuildingField f, BuildingKitSet kit, List<TerrainItemData> items, int seed)
         {
@@ -30,10 +33,7 @@ namespace TerrainGen
 
             int count = 0;
             var reserved = new HashSet<long>();
-            count += ScatterBuildings(f, kit, items, TerrainGeneration.I(terrain_generationEnum.cells_per_building), ox, oz, rng, spots, cache, reserved);
-            count += Scatter(f, kit, items, TerrainItemKind.Decoration, kit.decorations, TerrainGeneration.I(terrain_generationEnum.cells_per_decoration), false, TerrainGeneration.B(terrain_generationEnum.random_prop_position), ox, oz, rng, spots, cache, null);
-            count += Scatter(f, kit, items, TerrainItemKind.Prop, kit.props, TerrainGeneration.I(terrain_generationEnum.cells_per_prop), false, TerrainGeneration.B(terrain_generationEnum.random_prop_position), ox, oz, rng, spots, cache, null);
-            count += Scatter(f, kit, items, TerrainItemKind.Bush, kit.bushes, TerrainGeneration.I(terrain_generationEnum.cells_per_bush), true, TerrainGeneration.B(terrain_generationEnum.random_prop_position), ox, oz, rng, spots, cache, null);
+            count += Scatter(f, kit, items, TerrainItemKind.Decoration, kit.decorations, TerrainGeneration.I(terrain_generationEnum.cells_per_decoration), false, TerrainGeneration.B(terrain_generationEnum.random_prop_position), ox, oz, rng, spots, cache);
             count += PlaceVines(f, kit, items, ox, oz, rng);
 
             var obstacles = new List<Spot>();
@@ -44,60 +44,9 @@ namespace TerrainGen
             return count;
         }
 
-        // 建筑只落在虚空格：玩家看到的"建筑群"都长在地块之间的空隙里，底面与地块下表面平齐（y=0）。
-        // 压在地板格上的大件会被 NavMesh 当成障碍，把可行走面切成两块，所以这里连轮廓覆盖到的格都必须是虚空
-        static int ScatterBuildings(BuildingField f, BuildingKitSet kit, List<TerrainItemData> items, int cellsPer,
-            float ox, float oz, System.Random rng, List<Spot> spots, Dictionary<GameObject, Bounds> cache,
-            HashSet<long> reserved)
-        {
-            if (kit.buildings == null || kit.buildings.Count == 0 || cellsPer <= 0) return 0;
-
-            var voids = CollectVoidCells(f);
-            if (voids.Count == 0)
-            {
-                Debug.LogWarning("[地形] 地图里没有无地面格，建筑未生成（建筑只落在虚空上）");
-                return 0;
-            }
-
-            float c = TerrainGeneration.F(terrain_generationEnum.cell_size);
-            int target = Mathf.Max(1, Mathf.RoundToInt(voids.Count / (float)cellsPer));
-            for (int i = voids.Count - 1; i > 0; i--)
-            {
-                int j = rng.Next(i + 1);
-                Vector2Int tmp = voids[i];
-                voids[i] = voids[j];
-                voids[j] = tmp;
-            }
-
-            int made = 0;
-            for (int i = 0; i < voids.Count && made < target; i++)
-            {
-                Vector2Int cell = voids[i];
-                GameObject prefab = kit.PickFrom(kit.buildings, f.RegionGroup(cell.x, cell.y));
-                if (prefab == null) continue;
-                if (!PrefabBounds.TryGet(prefab, cache, out Bounds b)) continue;
-
-                float radius = Mathf.Max(b.extents.x, b.extents.z);
-                float cx = cell.x * c + ox;
-                float cz = cell.y * c + oz;
-                if (!AllCellsVoid(f, cx, cz, radius, ox, oz, c)) continue;
-                if (Blocked(new Vector3(cx, 0f, cz), radius, TerrainGeneration.F(terrain_generationEnum.prop_gap_padding), spots)) continue;
-
-                var pos = new Vector3(cx, -b.min.y, cz); // 底面贴地块下表面
-                float yaw = rng.Next(4) * 90f;
-                if (Add(kit, items, TerrainItemKind.Building, prefab, pos, yaw) == 0) continue;
-
-                spots.Add(new Spot { pos = new Vector2(cx, cz), radius = radius });
-                reserved.Add(CellKey(cell.x, cell.y));
-                made++;
-            }
-            return made;
-        }
-
         static int Scatter(BuildingField f, BuildingKitSet kit, List<TerrainItemData> items,
             TerrainItemKind kind, List<GameObject> list, int cellsPer, bool freeYaw, bool randomSpot,
-            float ox, float oz, System.Random rng, List<Spot> spots, Dictionary<GameObject, Bounds> cache,
-            HashSet<long> reserved = null)
+            float ox, float oz, System.Random rng, List<Spot> spots, Dictionary<GameObject, Bounds> cache)
         {
             if (list == null || list.Count == 0 || cellsPer <= 0) return 0;
 
@@ -141,7 +90,6 @@ namespace TerrainGen
                 if (Add(kit, items, kind, prefab, pos, yaw) == 0) continue;
 
                 spots.Add(new Spot { pos = new Vector2(pos.x, pos.z), radius = radius });
-                reserved?.Add(CellKey(cell.x, cell.y));
                 made++;
             }
             return made;
@@ -206,7 +154,7 @@ namespace TerrainGen
             return made;
         }
 
-        // 障碍：锚在虚空格上，允许压到地面，但不能整块都落在地面上；彼此允许重叠但不超过一半
+        // 障碍：锚在虚空格中心，包围盒逐轴缩放到 5~8m，只判定所在格；靠尺寸上限把压地面积限制在格边一带
         static int PlaceObstacles(BuildingField f, BuildingKitSet kit, List<TerrainItemData> items,
             float ox, float oz, System.Random rng, List<Spot> placed, HashSet<long> reserved, Dictionary<GameObject, Bounds> cache)
         {
@@ -220,25 +168,31 @@ namespace TerrainGen
             }
 
             int target = Mathf.Max(1, Mathf.RoundToInt(voids.Count / (float)TerrainGeneration.I(terrain_generationEnum.cells_per_obstacle)));
-            float half = TerrainGeneration.F(terrain_generationEnum.cell_size) * 0.5f;
+            float c = TerrainGeneration.F(terrain_generationEnum.cell_size);
             int made = 0;
 
             for (int i = 0; i < target * 40 + 200 && made < target; i++)
             {
                 Vector2Int cell = voids[rng.Next(voids.Count)];
-                if (reserved.Contains(CellKey(cell.x, cell.y))) continue; // 建筑已经占了这格虚空，不再叠障碍
+                if (reserved.Contains(CellKey(cell.x, cell.y))) continue; // 该格已被别的障碍占用
                 GameObject prefab = kit.PickFrom(kit.obstacles, f.RegionGroup(cell.x, cell.y));
                 if (prefab == null) continue;
                 if (!PrefabBounds.TryGet(prefab, cache, out Bounds b)) continue;
+                if (b.size.x <= 0f || b.size.y <= 0f || b.size.z <= 0f)
+                {
+                    Debug.LogError($"[地形] 障碍 {prefab.name} 的包围盒尺寸为 0：跳过，先跑碰撞体预处理");
+                    continue;
+                }
 
-                float scale = 1f + (float)(rng.NextDouble() * 2.0 - 1.0) * TerrainGeneration.F(terrain_generationEnum.prop_scale_range);
-                float radius = Mathf.Max(b.extents.x, b.extents.z) * scale;
-                float cx = cell.x * TerrainGeneration.F(terrain_generationEnum.cell_size) + ox + (float)(rng.NextDouble() * 2.0 - 1.0) * half;
-                float cz = cell.y * TerrainGeneration.F(terrain_generationEnum.cell_size) + oz + (float)(rng.NextDouble() * 2.0 - 1.0) * half;
-                var flat = new Vector2(cx, cz);
+                // 逐轴比例：三个方向的最终长度各自随机落在 5~8m
+                var scale = new Vector3(
+                    Mathf.Lerp(ObstacleMinSize, ObstacleMaxSize, (float)rng.NextDouble()) / b.size.x,
+                    Mathf.Lerp(ObstacleMinSize, ObstacleMaxSize, (float)rng.NextDouble()) / b.size.y,
+                    Mathf.Lerp(ObstacleMinSize, ObstacleMaxSize, (float)rng.NextDouble()) / b.size.z);
 
-                if (!TouchesVoid(f, cx, cz, radius, ox, oz, TerrainGeneration.F(terrain_generationEnum.cell_size))) continue;
-
+                var flat = new Vector2(cell.x * c + ox, cell.y * c + oz);
+                // 只判定生成位置所在格：格源就是虚空格，reserved 已排除占用，不再做足迹/地面覆盖判定
+                float radius = 0.5f * Mathf.Max(b.size.x * scale.x, b.size.z * scale.z); // XZ 投影半径（重叠判定用，忽略朝向）
                 bool mostlyOverlapped = false;
                 for (int k = 0; k < placed.Count; k++)
                     if (MostlyOverlaps(flat, radius, placed[k].pos, placed[k].radius))
@@ -249,7 +203,7 @@ namespace TerrainGen
                 if (mostlyOverlapped) continue;
 
                 float baseY = Mathf.Lerp(TerrainGeneration.F(terrain_generationEnum.obstacle_base_min_y), TerrainGeneration.F(terrain_generationEnum.obstacle_base_max_y), (float)rng.NextDouble());
-                var pos = new Vector3(cx, baseY - b.min.y * scale, cz);
+                var pos = new Vector3(flat.x, baseY - b.min.y * scale.y, flat.y);
                 float yaw = (float)rng.NextDouble() * 360f;
                 if (Add(kit, items, TerrainItemKind.Obstacle, prefab, pos, yaw, scale) == 0) continue;
 
@@ -367,40 +321,6 @@ namespace TerrainGen
             return voids;
         }
 
-        // 包围盒脚下的格子里至少有一个没有地面（含地图外），即"不是整个落在地面上"
-        static bool TouchesVoid(BuildingField f, float cx, float cz, float r, float ox, float oz, float cell)
-        {
-            int x0 = Mathf.FloorToInt((cx - r - ox) / cell + 0.5f);
-            int x1 = Mathf.FloorToInt((cx + r - ox) / cell + 0.5f);
-            int z0 = Mathf.FloorToInt((cz - r - oz) / cell + 0.5f);
-            int z1 = Mathf.FloorToInt((cz + r - oz) / cell + 0.5f);
-
-            for (int x = x0; x <= x1; x++)
-                for (int z = z0; z <= z1; z++)
-                {
-                    if (x < 0 || z < 0 || x >= f.SizeX || z >= f.SizeZ) return true;
-                    if (f.Layer[x, z] < 0) return true;
-                }
-            return false;
-        }
-
-        // 与 TouchesVoid 同一套格子换算，但要求覆盖到的格**全部**无地面（含地图外的越界一律算不合格）
-        static bool AllCellsVoid(BuildingField f, float cx, float cz, float r, float ox, float oz, float cell)
-        {
-            int x0 = Mathf.FloorToInt((cx - r - ox) / cell + 0.5f);
-            int x1 = Mathf.FloorToInt((cx + r - ox) / cell + 0.5f);
-            int z0 = Mathf.FloorToInt((cz - r - oz) / cell + 0.5f);
-            int z1 = Mathf.FloorToInt((cz + r - oz) / cell + 0.5f);
-
-            for (int x = x0; x <= x1; x++)
-                for (int z = z0; z <= z1; z++)
-                {
-                    if (x < 0 || z < 0 || x >= f.SizeX || z >= f.SizeZ) return false;
-                    if (f.Layer[x, z] >= 0) return false;
-                }
-            return true;
-        }
-
         static long CellKey(int x, int z) => ((long)x << 32) | (uint)z;
 
         // 按包围盒水平投影近似成正方形算重叠面积
@@ -421,6 +341,12 @@ namespace TerrainGen
 
         static int Add(BuildingKitSet kit, List<TerrainItemData> items, TerrainItemKind kind, GameObject prefab,
             Vector3 pos, float yaw, float scale = 1f)
+        {
+            return Add(kit, items, kind, prefab, pos, yaw, Vector3.one * scale);
+        }
+
+        static int Add(BuildingKitSet kit, List<TerrainItemData> items, TerrainItemKind kind, GameObject prefab,
+            Vector3 pos, float yaw, Vector3 scale)
         {
             if (prefab == null) return 0;
 

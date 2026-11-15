@@ -550,11 +550,14 @@ public class BattlePage : PageBase
         if (HasSession)
         {
             var units = Session.GetCombatants();
+            var myCamp = Session.Camp;
+            bool isCombatant = myCamp != EntityCamp.None; // None = 纯观战方，无阵营限制
             for (int i = 0; i < units.Count; i++)
             {
                 var unit = units[i];
                 if (unit == null) continue;
                 if (unit.clientId == NetworkManager.LocalToken) continue; // 自己不进观战列表
+                if (isCombatant && unit.camp != myCamp) continue; // 攻/守玩家只能观战同阵营（服务器同样拒绝异阵营）
                 names.Add(Session.GetName(unit.clientId));
                 values.Add(unit.clientId.ToString());
             }

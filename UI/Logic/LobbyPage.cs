@@ -46,7 +46,6 @@ public class LobbyPage : PageBase
         // 大厅展示真人成员所选角色的场景模型（战斗页 Enter 时会隐藏，故返回大厅需重建）
         if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
             Tool.ClientLogicManager.HomePreview.ResetLobbyView();
-        AlignCampPanels();
     }
 
     public override void Exit()
@@ -55,35 +54,7 @@ public class LobbyPage : PageBase
         EventManager.RemoveEvent<SCLobbyInfo>(ClientEvent.OnLobbyInfoUpdate, OnLobbyInfoUpdate);
     }
 
-    // 换分辨率后 UIScale 与相机投影都变了，阵营面板要按新投影重新落位
-    public override void OnResize(float width, float height)
-    {
-        base.OnResize(width, height);
-        AlignCampPanels();
-    }
-
     #region//Local
-    // 两块阵营面板按 Arranger 的 UIPos 世界坐标投影落位（对齐点由 FGUI 里的 pivot 决定，这里只管位置）
-    private void AlignCampPanels()
-    {
-        var preview = Tool.ClientLogicManager != null ? Tool.ClientLogicManager.HomePreview : null;
-        var stage = preview != null ? preview.LobbyArranger : null;
-        var cam = Tool.CameraController != null ? Tool.CameraController.WorldCamera : null;
-        if (stage == null || cam == null) return;
-
-        cam.ResetWorldToCameraMatrix(); // 相机刚摆到 CameraPos，不重置会沿用上一帧矩阵投影
-        PlaceCampPanel(panel.m_btn_joinAttack, stage.UIPos_AttackCamp, cam);
-        PlaceCampPanel(panel.m_btn_joinDefense, stage.UIPos_DefenseCamp, cam);
-    }
-
-    private void PlaceCampPanel(GComponent block, Transform uiPos, Camera cam)
-    {
-        if (block == null || uiPos == null) return;
-        // 面板根节点带缩放，先换算成根内坐标再转父级局部坐标
-        Vector2 local = block.parent.GlobalToLocal(Root.LocalToGlobal(WorldToPanel(uiPos.position, cam)));
-        block.SetXY(local.x, local.y);
-    }
-
     private void WireCamp(UI_LobbCampOperation block, PlayerCampType camp)
     {
         block.m_join.onClick.Add(() => JoinCamp(camp));

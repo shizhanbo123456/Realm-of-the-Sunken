@@ -38,6 +38,10 @@ public class AssetsManager : MonoBehaviour
     public List<GameObject> WeaponPrefabs = new();
     #endregion
 
+    #region 地形素材（服务器直接引用；客户端不挂本组件，改由 ResourceManager 的 BuildingKit 提供）
+    public TerrainGen.BuildingKitSet TerrainKit;
+    #endregion
+
     public bool TryGetGraphic(EntityType type, out GameObject graphic)
     {
         graphic = null;

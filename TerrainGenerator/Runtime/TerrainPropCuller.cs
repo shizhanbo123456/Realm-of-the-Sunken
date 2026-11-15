@@ -23,7 +23,7 @@ namespace TerrainGen
             public int prefabIndex;
             public Vector3 position;   // 相对内容根
             public float yaw;
-            public float scale;
+            public Vector3 scale;
         }
 
         readonly Dictionary<Vector2Int, List<ItemDef>> chunkDefs = new Dictionary<Vector2Int, List<ItemDef>>();
@@ -169,7 +169,7 @@ namespace TerrainGen
                 go.name = def.kind + "_" + prefab.name;
                 go.transform.position = rootPos + def.position;
                 go.transform.rotation = Quaternion.Euler(0f, def.yaw, 0f);
-                go.transform.localScale = Vector3.one * def.scale;
+                go.transform.localScale = def.scale;
                 go.SetActive(true);
                 list.Add(go);
             }

@@ -62,7 +62,7 @@ namespace TerrainGen
                 go.name = item.kind + "_" + prefab.name;
                 go.transform.position = root.position + item.position;
                 go.transform.rotation = Quaternion.Euler(0f, item.yaw, 0f);
-                go.transform.localScale = Vector3.one * item.scale;
+                go.transform.localScale = item.scale;
 
                 if (stripMeshes && item.kind != TerrainItemKind.Ground)
                 {

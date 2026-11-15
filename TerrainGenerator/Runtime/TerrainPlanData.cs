@@ -11,10 +11,7 @@ namespace TerrainGen
         PostShort,
         PostTall,
         Support,
-        Building,
         Decoration,
-        Prop,
-        Bush,
         Vine,
         Obstacle,
         ObstacleDecor,
@@ -28,14 +25,14 @@ namespace TerrainGen
         public int prefabIndex;   // 对应 BuildingKitSet 该类别列表里的下标
         public Vector3 position;  // 地图坐标：XZ 落在配表地形范围内，Y 自地块下表面起算
         public float yaw;
-        public float scale;
+        public Vector3 scale;     // 逐轴缩放，障碍按包围盒算成 5~8m
     }
 
     // 一次生成的完整结果：所有物件的摆放数据 + 战斗点位，二进制缓存到 StreamingAssets
     public class TerrainPlanData
     {
         const int Magic = 0x5447524E;
-        const int FormatVersion = 1;
+        const int FormatVersion = 2;
 
         public int seed;
         public int configVersion;
@@ -81,7 +78,9 @@ namespace TerrainGen
                         w.Write(item.position.y);
                         w.Write(item.position.z);
                         w.Write(item.yaw);
-                        w.Write(item.scale);
+                        w.Write(item.scale.x);
+                        w.Write(item.scale.y);
+                        w.Write(item.scale.z);
                     }
 
                     w.Write(points.Count);
@@ -143,7 +142,7 @@ namespace TerrainGen
                             prefabIndex = r.ReadInt32(),
                             position = new Vector3(r.ReadSingle(), r.ReadSingle(), r.ReadSingle()),
                             yaw = r.ReadSingle(),
-                            scale = r.ReadSingle(),
+                            scale = new Vector3(r.ReadSingle(), r.ReadSingle(), r.ReadSingle()),
                         });
                     }
 
