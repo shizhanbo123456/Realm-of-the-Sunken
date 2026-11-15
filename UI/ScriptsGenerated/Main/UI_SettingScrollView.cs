@@ -9,6 +9,8 @@ namespace Ros.UI.Main
     {
         public GButton m_toggle_caustic;
         public GButton m_toggle_camea_shake;
+        public GButton m_toggle_third_person_perspctivee;
+        public GButton m_toggle_auto_pitch;
         public GList m_rule_buttons;
         public GTextField m_rule_content;
         public GButton m_back_to_fight;
@@ -26,10 +28,12 @@ namespace Ros.UI.Main
 
             m_toggle_caustic = (GButton)GetChildAt(3);
             m_toggle_camea_shake = (GButton)GetChildAt(5);
-            m_rule_buttons = (GList)GetChildAt(9);
-            m_rule_content = (GTextField)GetChildAt(10);
-            m_back_to_fight = (GButton)GetChildAt(11);
-            m_exit = (GButton)GetChildAt(12);
+            m_toggle_third_person_perspctivee = (GButton)GetChildAt(7);
+            m_toggle_auto_pitch = (GButton)GetChildAt(9);
+            m_rule_buttons = (GList)GetChildAt(13);
+            m_rule_content = (GTextField)GetChildAt(14);
+            m_back_to_fight = (GButton)GetChildAt(15);
+            m_exit = (GButton)GetChildAt(16);
         }
     }
 }

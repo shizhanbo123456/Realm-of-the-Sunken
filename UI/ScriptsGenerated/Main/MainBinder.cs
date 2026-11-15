@@ -10,6 +10,7 @@ namespace Ros.UI.Main
         {
             UIObjectFactory.SetPackageItemExtension(UI_panel_2.URL, typeof(UI_panel_2));
             UIObjectFactory.SetPackageItemExtension(UI_EventBanner.URL, typeof(UI_EventBanner));
+            UIObjectFactory.SetPackageItemExtension(UI_SettingsScrollViewMask.URL, typeof(UI_SettingsScrollViewMask));
             UIObjectFactory.SetPackageItemExtension(UI_LargeMinimapPanel.URL, typeof(UI_LargeMinimapPanel));
             UIObjectFactory.SetPackageItemExtension(UI_PlayerCampIcon.URL, typeof(UI_PlayerCampIcon));
             UIObjectFactory.SetPackageItemExtension(UI_SkillTip.URL, typeof(UI_SkillTip));

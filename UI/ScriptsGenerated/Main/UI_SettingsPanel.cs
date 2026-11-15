@@ -7,8 +7,10 @@ namespace Ros.UI.Main
 {
     public partial class UI_SettingsPanel : GComponent
     {
+        public GButton m_close2;
+        public GButton m_close;
         public UI_panel_2 m_panel;
-        public UI_SettingScrollView m_settings_scroll_view;
+        public UI_SettingsScrollViewMask m_settings;
         public const string URL = "ui://q68vr2bfiq0omn";
 
         public static UI_SettingsPanel CreateInstance()
@@ -20,8 +22,10 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
-            m_panel = (UI_panel_2)GetChildAt(1);
-            m_settings_scroll_view = (UI_SettingScrollView)GetChildAt(2);
+            m_close2 = (GButton)GetChildAt(1);
+            m_close = (GButton)GetChildAt(2);
+            m_panel = (UI_panel_2)GetChildAt(3);
+            m_settings = (UI_SettingsScrollViewMask)GetChildAt(4);
         }
     }
 }
