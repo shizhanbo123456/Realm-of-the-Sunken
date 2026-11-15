@@ -1042,10 +1042,9 @@ public class BattlePage : PageBase
         UI_DamageLabel.Spawn(panel.m_world_element_container, value, type, anchor, labelDefaultSizeDistance);
     }
 
-    // 命中特效：直接伤害取命中点高度 + 实体所在列，buff/DoT 类贴实体中心；闪避与失效没有命中不播
+    // 命中特效：直接伤害取命中点高度 + 实体所在列，其余（buff/DoT/闪避/失效/连击保护）贴实体中心
     private void PlayHitVfx(CombatLabelType type, ushort targetId, bool hasHitPos, Vector3 hitPos)
     {
-        if (type == CombatLabelType.Evade || type == CombatLabelType.Invalid) return;
         if (Tool.VfxManager == null || Tool.ClientLogicManager == null || Tool.ClientLogicManager.EntityPlayers == null) return;
         var players = Tool.ClientLogicManager.EntityPlayers;
 
