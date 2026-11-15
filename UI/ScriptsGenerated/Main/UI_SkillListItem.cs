@@ -26,10 +26,10 @@ namespace Ros.UI.Main
 
             m_empty = GetControllerAt(0);
             m_highlight = GetControllerAt(1);
-            m_loader_iconBase = (GLoader)GetChildAt(3);
-            m_loader_icon = (GLoader)GetChildAt(4);
-            m_key = (GTextField)GetChildAt(5);
-            m_storeList = (GList)GetChildAt(6);
+            m_loader_iconBase = (GLoader)GetChildAt(4);
+            m_loader_icon = (GLoader)GetChildAt(5);
+            m_key = (GTextField)GetChildAt(6);
+            m_storeList = (GList)GetChildAt(7);
         }
     }
 }
