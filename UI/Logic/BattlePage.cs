@@ -25,6 +25,8 @@ public class BattlePage : PageBase
     private readonly List<UI_QuickMessagePointer> quickMessagePointers = new(); // 快捷指令点位（挂在世界层）
     private GTextField levelLabel;    // 玩家栏等级数字（FGUI 侧未命名，按 n12 取）
     private int localPlayerCamp = -1; // 本地玩家阵营（随本地实体摘要更新；小地图敌我识别用）
+    private EntityType localAvatarType;   // 玩家栏头像当前用的角色类型（同类型不重设贴图）
+    private bool localAvatarSet;
     private bool spectatorMode;       // 纯观战方玩家（无战斗实体）
     private bool localPlayerAlive = true; // 本地玩家实体是否在场（死亡观战期间 false，显示观战下拉）
     private bool reviveActive;        // 本地玩家死亡等待中：复活条由客户端按配表本地推演
@@ -308,6 +310,7 @@ public class BattlePage : PageBase
         if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated += OnCameraUpdated;
 
         localPlayerCamp = -1;
+        localAvatarSet = false;
         spectatorMode = Session != null && Session.IsSpectator;
         localPlayerAlive = !spectatorMode;
         panel.m_onlook.selectedIndex = spectatorMode ? 1 : 0; // onlook=1：FGUI 自动隐藏血条/技能等非观战元素
@@ -436,6 +439,7 @@ public class BattlePage : PageBase
             spectateTargetClientId = -1; // 本地实体出现（复活/正常出战）：服务器已退出观战，视角回自身
             spectateTargetEntityId = -1;
             UpdateLocalPlayerBar(info);
+            RefreshPlayerAvatar(info);
         }
         // 纯观战无本地实体：以观战目标阵营作为「我方」基准（名牌敌我配色、小地图点位敌我识别）
         else if (spectatorMode && info.entityId == spectateTargetEntityId) localPlayerCamp = (int)info.camp;
@@ -708,6 +712,18 @@ public class BattlePage : PageBase
             playerPanel.m_bar_health.m_fill.fillAmount = vitals.maxHealth > 0 ? Mathf.Clamp01((float)vitals.health / vitals.maxHealth) : 0f;
         if (playerPanel.m_label_health != null) playerPanel.m_label_health.text = $"{vitals.health}/{vitals.maxHealth}";
         if (info.hasBuffs) RefreshBuffList(playerPanel.m_buffList.m_list, localBuffs, info.buffs);
+    }
+
+    // 玩家栏头像：取图规则与上帝视角一致（按阵营选角色图标表，type.value 即角色编号）
+    private void RefreshPlayerAvatar(SCEntityDisplayInfo info)
+    {
+        if (localAvatarSet && localAvatarType.Equals(info.type)) return;
+        var icons = info.camp == EntityCamp.Defense
+            ? Tool.ResourceManager.DefenseCharacterIcons
+            : Tool.ResourceManager.AttackCharacterIcons;
+        panel.m_playerPanel.m_avater_icon_mask.m_content.texture = new NTexture(icons[info.type.value]);
+        localAvatarType = info.type;
+        localAvatarSet = true;
     }
 
     private void OnScoreUpdate(SCScoreInfo info)
