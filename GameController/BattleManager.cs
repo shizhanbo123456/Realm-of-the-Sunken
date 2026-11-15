@@ -1130,6 +1130,7 @@ public partial class BattleManager : EnsBehaviour
             if (entityId == 0) continue; // 服务器模板缺失（SpawnEntity 已告警）
             PlayerEntityId[clientId] = entityId;
             EntityOwnerClient[entityId] = clientId;
+            ApplyCharacterCardLevels(clientId, characterType); // 角色被动折算成初始词条层数
             Tool.NetworkManager.SendPlayerEntity(clientId, entityId);
             EnableSkillBar(clientId, GetEntity(entityId)); // 先建台账再下发技能，快照才有根戳可发
 

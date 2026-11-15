@@ -122,6 +122,7 @@ namespace Ros.Config
         card_coef_damage_vs_player,
         card_coef_damage_vs_coral,
         card_coef_damage_vs_building,
+        card_coef_damage_vs_zombie,
         card_coef_tower_attack_boost,
         card_coef_guard_reduction_boost,
         card_coef_instant_heal_boost,

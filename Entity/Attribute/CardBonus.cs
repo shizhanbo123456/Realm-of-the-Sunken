@@ -12,6 +12,7 @@ public static class CardType
     public const string DamageVsPlayer = "damage_vs_player";
     public const string DamageVsCoral = "damage_vs_coral";
     public const string DamageVsBuilding = "damage_vs_building";
+    public const string DamageVsZombie = "damage_vs_zombie";
     public const string TowerAttack = "tower_attack_boost";
     public const string GuardReduction = "guard_reduction_boost";
     public const string InstantHeal = "instant_heal_boost";
@@ -36,6 +37,7 @@ public class CardBonus
     public float damageVsPlayer;
     public float damageVsCoral;
     public float damageVsBuilding;
+    public float damageVsZombie;
     public int towerAttack;
     public float guardReduction;
     public float damageBelowHalfHp;
@@ -52,6 +54,7 @@ public class CardBonus
         damageVsPlayer = 0f;
         damageVsCoral = 0f;
         damageVsBuilding = 0f;
+        damageVsZombie = 0f;
         towerAttack = 0;
         guardReduction = 0f;
         damageBelowHalfHp = 0f;
@@ -73,6 +76,7 @@ public class CardBonus
             case CardType.DamageVsPlayer: damageVsPlayer += GlobalVariable.F(global_variablesEnum.card_coef_damage_vs_player) * level / 100f; break;
             case CardType.DamageVsCoral: damageVsCoral += GlobalVariable.F(global_variablesEnum.card_coef_damage_vs_coral) * level / 100f; break;
             case CardType.DamageVsBuilding: damageVsBuilding += GlobalVariable.F(global_variablesEnum.card_coef_damage_vs_building) * level / 100f; break;
+            case CardType.DamageVsZombie: damageVsZombie += GlobalVariable.F(global_variablesEnum.card_coef_damage_vs_zombie) * level / 100f; break;
             case CardType.TowerAttack: towerAttack += GlobalVariable.I(global_variablesEnum.card_coef_tower_attack_boost) * level; break;
             case CardType.GuardReduction: guardReduction += GlobalVariable.F(global_variablesEnum.card_coef_guard_reduction_boost) * level / 100f; break;
             case CardType.InstantHeal: healPercent += Mathf.RoundToInt(GlobalVariable.F(global_variablesEnum.card_coef_instant_heal_boost) * level); break;
@@ -99,6 +103,7 @@ public class CardBonus
         damageVsPlayer += other.damageVsPlayer;
         damageVsCoral += other.damageVsCoral;
         damageVsBuilding += other.damageVsBuilding;
+        damageVsZombie += other.damageVsZombie;
         towerAttack += other.towerAttack;
         guardReduction += other.guardReduction;
         damageBelowHalfHp += other.damageBelowHalfHp;

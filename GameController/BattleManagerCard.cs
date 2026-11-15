@@ -68,7 +68,7 @@ public partial class BattleManager
         return sum;
     }
 
-    // 出伤乘区：对玩家/珊瑚/建筑增伤、斗士、反击、等级压制（每级 ±5%，等级差夹 3 级）
+    // 出伤乘区：对玩家/僵尸/珊瑚/建筑增伤、斗士、反击、等级压制（每级 ±5%，等级差夹 3 级）
     // 等级压制写成一条式即可覆盖双方：高等级打低等级增伤，低等级打高等级减伤
     public float GetOutgoingDamageMultiplier(DamageStat stat, EntityData target)
     {
@@ -81,6 +81,10 @@ public partial class BattleManager
                 case EntityCategory.Character_Attack:
                 case EntityCategory.Character_Defense:
                     mult += card.damageVsPlayer;
+                    break;
+                case EntityCategory.Zombie:
+                case EntityCategory.EliteZombie:
+                    mult += card.damageVsZombie;
                     break;
                 case EntityCategory.Coral:
                     mult += card.damageVsCoral;
@@ -113,6 +117,34 @@ public partial class BattleManager
         bonus.Clear();
         foreach (var pair in cardLevels[clientId]) bonus.Add(pair.Key, pair.Value);
         campCardBonus.Clear(); // 阵营聚合依赖个人聚合，一并失效
+    }
+
+    // 角色被动折算成词条层数：层数 = 被动百分比 / global_variables 的每级系数
+    // 玩家级数据，复活沿用；目前只有进攻方角色带被动词条
+    private void ApplyCharacterCardLevels(int clientId, EntityType character)
+    {
+        if (character.category != EntityCategory.Character_Attack) return;
+        switch (character.value)
+        {
+            case 0: SeedCardLevel(clientId, CardType.DamageBelowHalfHp, 5); break; // 瑟莱恩 40% / 8%
+            case 1: SeedCardLevel(clientId, CardType.Luck, 5); break;              // 布洛克 +5 / 1
+            case 2: SeedCardLevel(clientId, CardType.DamageVsPlayer, 5); break;    // 摩洛克 25% / 5%
+            case 3: SeedCardLevel(clientId, CardType.DamageVsZombie, 5); break;    // 艾瑟琳 50% / 10%
+            case 4: SeedCardLevel(clientId, CardType.DamageVsBuilding, 4); break;  // 霍里特 20% / 5%
+            case 5: SeedCardLevel(clientId, CardType.DamageVsHigherHp, 5); break;  // 戈拉姆 40% / 8%
+        }
+    }
+
+    // 被动给的初始层数直接置位，与抽卡的累加语义分开，重复开战不会翻倍
+    private void SeedCardLevel(int clientId, string type, int level)
+    {
+        if (!cardLevels.TryGetValue(clientId, out var levels))
+        {
+            levels = new Dictionary<string, int>();
+            cardLevels[clientId] = levels;
+        }
+        levels[type] = level;
+        RebuildPlayerCardBonus(clientId);
     }
     #endregion
 
