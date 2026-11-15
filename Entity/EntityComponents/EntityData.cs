@@ -556,6 +556,8 @@ public abstract class EntityData : MonoBehaviour
         Vector3 dir = away.sqrMagnitude > 0.0001f ? away.normalized : transform.forward;
         // 实际初速 = 配表力度 × 倍率；连续命中累加，衰减由 TickVelocity 每帧处理
         hitbackVelocity += dir * (force * GlobalVariable.F(global_variablesEnum.hitback_force_multiplier));
+        // 累加后模不得超过上限（衰减只降模，故此处夹取即覆盖全时段）
+        hitbackVelocity = Vector3.ClampMagnitude(hitbackVelocity, GlobalVariable.F(global_variablesEnum.hitback_max_speed));
     }
 
     // 连击保护：受击动画累计满触发，保护期内命中只飘字，不结算伤害/buff/击退/受击
