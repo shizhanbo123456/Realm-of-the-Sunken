@@ -1,3 +1,6 @@
+电脑环境有openpyxl用于操作xlsx
+严禁项目中全量搜索，Assets也不行，必须列出子目录并不断尝试缩小范围
+
 代码目录：D:\Files\unityprojects\RevelryOfSepulcher\Assets\Scripts
 文档目录：D:\Files\unityprojects\RevelryOfSepulcher\Assets\Scripts\Doc
 配表数据目录：D:\Files\unityprojects\RevelryOfSepulcher\Config\Source
