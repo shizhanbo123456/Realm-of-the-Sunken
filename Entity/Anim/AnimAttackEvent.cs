@@ -24,6 +24,7 @@ public class AnimAttackEvent : AnimEvent
         canTrigAttack = true;   // 客户端无 EntityData：仍允许攻击帧触发 onAttack（特效/表现用），不依赖 data
         if (data == null) return;
         if (!main) return;
+        data.hitbackVelocity = Vector3.zero; // 起手清除击退，避免攻击时带惯性漂移
     }
     public override void OnStateUpdate(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
     {
