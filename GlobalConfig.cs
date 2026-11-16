@@ -66,14 +66,16 @@ public static class GlobalConfig
     public const int zombie_variant_count = 5;
     public const int elite_zombie_variant_count = 1;
 
-    // —— AI 行为（策划案第九章只写了「无目标时游荡 / 发现目标后主动追击 / 设最大追击距离」，数值均为占位初值）——
+    // —— AI 行为（策划案第九章只写了「无目标时游荡 / 发现目标后主动追击 / 索敌随游荡时长变大」，数值均为占位初值）——
     public const float zombie_decide_interval = 0.15f;
     public const float zombie_acquire_range = 12f;
     public const float zombie_attack_range = 2f;
     public const float zombie_roar_range = 10f;
+    // 1 倍索敌的夹取基准：视野夹到「16 - 余量」，攻击态退出要比进入距离大，避免在边界反复切状态
     public const float zombie_max_chase_distance = 16f;
-    // 同上：索敌要比追击上限小，攻击态退出要比进入距离大，避免在边界反复切状态
     public const float zombie_acquire_margin = 2f;
+    // 未锁定目标时索敌倍率按此速度线性增长（1 倍起步，每秒 +0.1，不设上限）
+    public const float zombie_acquire_scale_grow = 0.1f;
     public const float zombie_attack_exit_scale = 1.3f;
     public const float zombie_wander_radius = 8f;
     public const float zombie_wander_pause = 2f;

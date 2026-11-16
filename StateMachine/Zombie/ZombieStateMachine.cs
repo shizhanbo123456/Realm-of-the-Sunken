@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-// 僵尸：无目标在出生点附近游荡；有目标按距离分档——超追距放弃、远处嘶吼、贴身停下爪击
+// 僵尸：无目标在出生点附近游荡；游荡越久索敌越远；锁到目标就一路追到它死
 public class ZombieStateMachine : DecisionMachine, IBehaviorHost
 {
     private const int SlotClawRight = 0;
@@ -18,6 +18,7 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
     private Vector3 wanderPoint;
     private bool hasWanderPoint;
     private float wanderResumeTime;
+    private float noTargetSince;
 
     private ushort targetId;
     private EntityData currentTarget;
@@ -27,6 +28,7 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
     {
         Owner = owner;
         homePosition = owner.transform.position;
+        noTargetSince = Time.time;
         ThinkInterval = GlobalConfig.zombie_decide_interval;
 
         wanderState = new WanderState(this);
@@ -61,6 +63,8 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
         }
 
         currentTarget = AcquireTarget();
+        // 锁到目标就把计时清零：丢掉目标后从 1 倍重新累积
+        if (currentTarget != null) noTargetSince = Time.time;
     }
 
     private bool IsIgnored(EntityData entity)
@@ -69,9 +73,10 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
     private EntityData AcquireTarget()
     {
         float range = AcquireRange;
+        // 已锁定的目标只要还活着就一直追，不再按距离重新判定
         if (targetId != 0 && BattleManager.EntityContainer.Entities.TryGetObject(targetId, out var locked))
         {
-            if (locked != null && locked.Alive && !IsIgnored(locked) && FlatDistance(locked.transform.position) <= range) return locked;
+            if (locked != null && locked.Alive && !IsIgnored(locked)) return locked;
         }
 
         var nearest = BattleManager.EntityContainer.GetNearestEnemy(Owner, range);
@@ -80,7 +85,7 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
         return nearest;
     }
 
-    // 视野夹到「最大追击距离 - 余量」内：等于上限时刚索到就会超限放弃，追击/游荡每拍互踢
+    // 1 倍索敌 = 视野夹到「追击基准 - 余量」；未锁定时按秒线性放大，游荡 10s 两倍、20s 三倍，不设上限
     private float AcquireRange
     {
         get
@@ -88,7 +93,8 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
             float view = Owner.attributes.ViewDistance > 0f
                 ? Owner.attributes.ViewDistance
                 : GlobalConfig.zombie_acquire_range;
-            return Mathf.Min(view, GlobalConfig.zombie_max_chase_distance - GlobalConfig.zombie_acquire_margin);
+            float baseRange = Mathf.Min(view, GlobalConfig.zombie_max_chase_distance - GlobalConfig.zombie_acquire_margin);
+            return baseRange * (1f + (Time.time - noTargetSince) * GlobalConfig.zombie_acquire_scale_grow);
         }
     }
 
@@ -201,12 +207,8 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
             var target = machine.currentTarget;
             if (target == null) return machine.wanderState;
 
+            // 目标活着就一直追：不按距离放弃，避免刚锁到就被距离判回游荡
             float dist = machine.FlatDistance(target.transform.position);
-            if (dist > GlobalConfig.zombie_max_chase_distance)
-            {
-                machine.ClearTarget(); // 拉开太远：放弃，回出生点游荡
-                return machine.wanderState;
-            }
             if (dist <= GlobalConfig.zombie_attack_range) return machine.attackState;
 
             // 远处且嘶吼冷却好了：进攻击态放一嗓子，放完由攻击态切回追击
