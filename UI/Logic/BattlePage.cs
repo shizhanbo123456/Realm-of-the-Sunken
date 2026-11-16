@@ -531,11 +531,32 @@ public class BattlePage : PageBase
         else panel.m_skillSelectPanel.Open(Skills?.HeldSkills, Skills?.ActiveSkills, Skills != null ? Skills.SlotCapacity : 0);
     }
 
-    // 关闭回调：勾选集合按技能 id 升序进栏（排序在 ClientSkillManager 里做）
+    // 关闭回调：与当前技能栏一致就不上行（随手开一下就关不该清栏），否则交给服务器校验
     private void OnSkillSelectCommitted()
     {
-        if (Skills != null) Skills.TrySetActiveSkills(panel.m_skillSelectPanel.Selection);
+        if (Skills == null) return;
+        var selection = panel.m_skillSelectPanel.Selection;
+        if (SameSkillSet(selection, Skills.ActiveSkills)) return;
+        Skills.TrySetActiveSkills(selection);
         RefreshSkillBar();
+    }
+
+    // 栏内顺序由服务器按 id 升序排，勾选顺序无意义，按集合比
+    private static bool SameSkillSet(IReadOnlyList<int> a, IReadOnlyList<int> b)
+    {
+        if (a.Count != b.Count) return false;
+        for (int i = 0; i < a.Count; i++)
+        {
+            bool found = false;
+            for (int j = 0; j < b.Count; j++)
+            {
+                if (b[j] != a[i]) continue;
+                found = true;
+                break;
+            }
+            if (!found) return false;
+        }
+        return true;
     }
     #endregion
 

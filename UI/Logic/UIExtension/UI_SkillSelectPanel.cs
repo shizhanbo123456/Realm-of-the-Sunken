@@ -51,11 +51,10 @@ namespace Ros.UI.Main
             if (wasOpen) onCommit?.Invoke();
         }
 
-        // 只收起（进/出战斗重置用）
+        // 只收起（进/出战斗重置用）；勾选留到下次 Open 重置为当前技能栏，关闭回调还要读它
         public void Close()
         {
             IsOpen = false;
-            selection.Clear();
             visible = false;
             touchable = false;
         }
