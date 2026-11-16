@@ -49,7 +49,6 @@ public static class GlobalConfig
     #region 中立雕像（中立争抢单位）
     public const int neutral_statue_variant_count = 2;   // 0 天使雕像 / 1 恶魔雕像
     public const float neutral_statue_first_spawn_delay = 30f;
-    public const float neutral_statue_attack_range = 8f;
     public const float neutral_statue_respawn_delay = 60f;
     public const float neutral_statue_angry_health_ratio = 0.5f;    // 生命值低于该比例进入愤怒态
     public const float neutral_statue_angry_interval_ratio = 0.5f;  // 愤怒态施法间隔 = 普通间隔 × 该系数

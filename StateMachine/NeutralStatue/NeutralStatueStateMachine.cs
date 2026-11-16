@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using Ros.Config;
+using UnityEngine;
 
 // 中立雕像：技能冷却好了且范围内有敌人就随机放一个；不移动、不转向
 public class NeutralStatueStateMachine : DecisionMachine, IBehaviorHost
@@ -28,14 +29,28 @@ public class NeutralStatueStateMachine : DecisionMachine, IBehaviorHost
     }
 
     #region//Local
-    private bool HasEnemyInRange() =>
-        BattleManager.EntityContainer.GetNearestEnemy(Owner, GlobalConfig.neutral_statue_attack_range) != null;
+    // 索敌半径取技能配置射程（skill 表第 14 列）：与技能落点索敌同一口径，避免判定得到却打不到
+    private bool HasEnemyInRange(int skillId) =>
+        BattleManager.EntityContainer.GetNearestEnemy(Owner, SkillConfig.Get(skillId).castRange) != null;
+
+    // 有任一已就绪技能、且其射程内有敌人：技能是随机挑的，判定必须逐个按各自射程算
+    private bool AnyReadySkillHasTarget()
+    {
+        var sc = Owner.skillController;
+        if (sc == null || sc.SkillCount == 0) return false;
+        for (int i = 0; i < sc.SkillCount; i++)
+        {
+            int skillId = sc.GetSkillIdAt(i);
+            if (IsSkillReady(skillId) && HasEnemyInRange(skillId)) return true;
+        }
+        return false;
+    }
 
     private void RequestIdle() => arbiter.RequestIdle();
 
     private void RequestAttack() => arbiter.RequestAttack(null);
 
-    // 随机挑一个冷却好了的技能；全没好返回 false
+    // 随机挑一个冷却好了且射程内有敌人的技能；没有则返回 false
     private bool TryCastRandom()
     {
         var sc = Owner.skillController;
@@ -43,7 +58,9 @@ public class NeutralStatueStateMachine : DecisionMachine, IBehaviorHost
         int start = Random.Range(0, sc.SkillCount);
         for (int i = 0; i < sc.SkillCount; i++)
         {
-            if (TryUseSkill(sc.GetSkillIdAt((start + i) % sc.SkillCount))) return true;
+            int skillId = sc.GetSkillIdAt((start + i) % sc.SkillCount);
+            if (!IsSkillReady(skillId) || !HasEnemyInRange(skillId)) continue;
+            if (TryUseSkill(skillId)) return true;
         }
         return false;
     }
@@ -108,7 +125,7 @@ public class NeutralStatueStateMachine : DecisionMachine, IBehaviorHost
             }
             nextScanTime = Time.time + ScanInterval;
 
-            if (!machine.HasEnemyInRange())
+            if (!machine.AnyReadySkillHasTarget())
             {
                 machine.RequestIdle();
                 return null;
