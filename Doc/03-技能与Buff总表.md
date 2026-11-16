@@ -117,6 +117,7 @@
 | 93 | 裂骨爪·左 | SkillEliteZombieClawL | 无（手部骨骼判定球） | 无 |
 | 94 | 血嚎 | SkillEliteZombieScream | 无 | ZombieScreamBoost（自身 + 同阵营，半径读第16列） |
 | 110 | 孢毒喷吐·甲 | SkillCrystalStatueSporeA | Bullet[25] | 无 |
+| 111 | 灵火喷吐 | SkillCrystalStatueSporeBlaze | RangeMagic[6]（直接落在目标脚下，无子弹） | 无 |
 | 113 | 疫孢吐息 | SkillNeutralStatueSpore | RangeMagic[9] | 命中挂 Poison |
 | 130 | 直拳·左 | SkillPunchLeft | 无（手部骨骼判定球） | 无 |
 | 131 | 直拳·右 | SkillPunchRight | 无（手部骨骼判定球） | 无 |

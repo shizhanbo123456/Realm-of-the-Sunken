@@ -90,51 +90,37 @@ namespace Ros.Skill
             => Mathf.Max(MinFlight, Vector3.Distance(origin, aim) / BulletSpeed);
     }
 
-    // 灵火喷吐：塔带灵火时的普攻，子弹打敌人脚部，到点追加一次原地灵火爆炸（与 131 崩拳同一个 RM[6]）
-    // 第 11 列 = 子弹倍率|灵火倍率，第 9 列 = 子弹尺寸|灵火尺寸
+    // 灵火喷吐：塔带灵火时的普攻，直接在目标脚下炸一次灵火（与 131 崩拳同一个 RM[6]）
+    // 第 11 列 = 灵火倍率，第 9 列 = 灵火尺寸
     public class SkillCrystalStatueSporeBlaze : SkillBase
     {
         public override int Id => (int)SkillType.SkillCrystalStatueSporeBlaze;
 
-        private const int BulletVfx = 25;
         private const int BurstVfx = 6;
-        private const float BulletFlight = 0.6f;
         private const float BurstLife = 0.6f;
 
         protected override void OnCast(EntityData caster)
         {
-            Vector3 origin = EntityAnchor.UpCenter.GetTransform(caster.ModelInfo, caster.anim).position;
-            // 打敌人脚部：不按射程归一化，否则子弹会飞过目标、爆炸点落不到脚下
-            EntityData target = ResolveTarget(caster);
-            Vector3 aim = target != null
-                ? target.transform.position
-                : caster.transform.position + caster.transform.forward * CastRange;
+            Vector3 at = BurstPos(caster);
             Tool.BattleManager.ShootBullet(caster, BuildAttack(caster),
-                new SkillTrajectoryLine(origin, aim, BulletFlight), 0f,
-                HitSpec(SkillVfxKind.Bullet, BulletVfx, VfxScale(0), ConfigDamageRate(0)));
-            Burst(caster, aim);
-            SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
+                new SkillTrajectoryPoint(at, BurstLife), BurstLife,
+                HitSpec(SkillVfxKind.RangeMagic, BurstVfx, VfxScale()));
+            SendWave(caster, 0, context => context.WriteVector3(at));
         }
 
-        // 子弹到点的灵火爆炸：伤害取第 11 列第 2 项，两端同一时刻同一点位各自创建
-        private void Burst(EntityData caster, Vector3 at)
+        // 炸点 = 目标脚下；范围内没有敌人时退回「朝面向 × 射程」
+        private Vector3 BurstPos(EntityData caster)
         {
-            Timer.AddTimer(0, _ =>
-            {
-                if (caster == null) return;
-                Tool.BattleManager.ShootBullet(caster, BuildAttack(caster),
-                    new SkillTrajectoryPoint(at, BurstLife), BurstLife,
-                    HitSpec(SkillVfxKind.RangeMagic, BurstVfx, VfxScale(1), ConfigDamageRate(1)));
-            }, BulletFlight, 1, false);
+            EntityData target = ResolveTarget(caster);
+            return target != null
+                ? target.transform.position
+                : caster.transform.position + caster.transform.forward * CastRange;
         }
 
         public override void PlayWave(SCSkillDisplayContext context)
         {
-            Vector3 origin = context.ReadVector3();
             Vector3 at = context.ReadVector3();
-            VfxHelper.PlayOne(SkillVfxKind.Bullet, BulletVfx, new SkillTrajectoryLine(origin, at, BulletFlight), VfxScale(0));
-            Timer.AddTimer(0, _ => VfxHelper.PlayAt(SkillVfxKind.RangeMagic, BurstVfx, at, BurstLife, VfxScale(1)),
-                BulletFlight, 1, false);
+            VfxHelper.PlayAt(SkillVfxKind.RangeMagic, BurstVfx, at, BurstLife, VfxScale());
         }
     }
 
