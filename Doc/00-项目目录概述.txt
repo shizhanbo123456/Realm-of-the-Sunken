@@ -1,0 +1,7 @@
+代码目录：D:\Files\unityprojects\RevelryOfSepulcher\Assets\Scripts
+文档目录：D:\Files\unityprojects\RevelryOfSepulcher\Assets\Scripts\Doc
+配表数据目录：D:\Files\unityprojects\RevelryOfSepulcher\Config\Source
+配表工具目录：D:\Files\unityprojects\RevelryOfSepulcher\Config
+网络插件目录：D:\Files\unityprojects\RevelryOfSepulcher\Assets\ENS-Netcode
+unity运行时fairy gui目录：D:\Files\unityprojects\RevelryOfSepulcher\Assets\FairyGUI-unity-master
+项目shader目录（不含资源包的）：D:\Files\unityprojects\RevelryOfSepulcher\Assets\Files\Shaders
