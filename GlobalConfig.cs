@@ -79,6 +79,10 @@ public static class GlobalConfig
     public const float zombie_attack_exit_scale = 1.3f;
     public const float zombie_wander_radius = 8f;
     public const float zombie_wander_pause = 2f;
+    // 普通鲛人不按距离筛选索敌：半径直接取「不限距离」档位（> skill_target_unlimited_radius 即不限距离）
+    public const float zombie_acquire_unlimited = skill_target_unlimited_radius + 1f;
+    // 普通鲛人在追击态累计超过该时长仍未进入攻击态：判定卡死，帧末静默销毁
+    public const float zombie_chase_timeout = 30f;
     #endregion
 
     #region 人机玩家 AI（Doc/08；先写代码，测试后再迁配表）

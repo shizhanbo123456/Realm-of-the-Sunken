@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-// 僵尸：无目标时在进入游荡的位置附近游荡；游荡越久索敌越远；锁到目标就一路追到它死
+// 鲛人：无目标时在进入游荡的位置附近游荡；普通鲛人不限距离索敌、连续追击打不到就回收，精英鲛人索敌随游荡时长变远
 public class ZombieStateMachine : DecisionMachine, IBehaviorHost
 {
     private const int SlotClawRight = 0;
@@ -20,6 +20,11 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
     private float wanderResumeTime;
     private float noTargetSince;
 
+    // 普通鲛人不按距离筛选索敌；精英鲛人仍按视野基准 + 未锁定时间递增
+    private readonly bool noDistanceFilter;
+    private float chaseElapsed;  // 追击态累计时长（进入攻击态清零，中途回游荡不清零）
+    private float chaseTickTime; // 上一次累计时刻
+
     private ushort targetId;
     private EntityData currentTarget;
     private bool clawLeftNext;
@@ -28,6 +33,7 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
     {
         Owner = owner;
         noTargetSince = Time.time;
+        noDistanceFilter = owner.type.category == EntityCategory.Zombie;
         ThinkInterval = GlobalConfig.zombie_decide_interval;
 
         wanderState = new WanderState(this);
@@ -71,7 +77,7 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
 
     private EntityData AcquireTarget()
     {
-        float range = AcquireRange;
+        float range = noDistanceFilter ? GlobalConfig.zombie_acquire_unlimited : AcquireRange;
         // 已锁定的目标只要还活着就一直追，不再按距离重新判定
         if (targetId != 0 && BattleManager.EntityContainer.Entities.TryGetObject(targetId, out var locked))
         {
@@ -84,7 +90,7 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
         return nearest;
     }
 
-    // 1 倍索敌 = 视野夹到「追击基准 - 余量」；未锁定时按秒线性放大，游荡 10s 两倍、20s 三倍，不设上限
+    // 精英鲛人 1 倍索敌 = 视野夹到「追击基准 - 余量」；未锁定时按秒线性放大，游荡 10s 两倍、20s 三倍，不设上限
     private float AcquireRange
     {
         get
@@ -108,6 +114,16 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
     {
         targetId = 0;
         currentTarget = null;
+    }
+
+    // 追击累计只在追击态推进；追到上限说明一直追不上也打不到，判定卡死并回收
+    private bool ChaseTimedOut()
+    {
+        chaseElapsed += Time.time - chaseTickTime;
+        chaseTickTime = Time.time;
+        if (chaseElapsed < GlobalConfig.zombie_chase_timeout) return false;
+        Owner.Discard();
+        return true;
     }
 
     private bool CanUseSlot(int slot) => IsSkillReady(SkillIdAt(slot));
@@ -206,10 +222,17 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
 
         public ChaseState(ZombieStateMachine machine) { this.machine = machine; }
 
-        public override void Enter() => machine.Owner.SetFaceTarget(0); // 追击时朝向跟着行进方向
+        public override void Enter()
+        {
+            machine.Owner.SetFaceTarget(0); // 追击时朝向跟着行进方向
+            machine.chaseTickTime = Time.time;
+        }
 
         public override DecisionState Decide()
         {
+            // 普通鲛人：连续追击累计到上限仍未进入攻击态 → 直接回收
+            if (machine.noDistanceFilter && machine.ChaseTimedOut()) return null;
+
             var target = machine.currentTarget;
             if (target == null) return machine.wanderState;
 
@@ -230,6 +253,9 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
         private readonly ZombieStateMachine machine;
 
         public AttackState(ZombieStateMachine machine) { this.machine = machine; }
+
+        // 进攻击态即清零追击累计：卡死计时只统计"一直在追、始终打不到"的时段
+        public override void Enter() => machine.chaseElapsed = 0f;
 
         public override DecisionState Decide()
         {

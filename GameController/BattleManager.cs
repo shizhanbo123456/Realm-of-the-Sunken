@@ -156,7 +156,16 @@ public partial class BattleManager : EnsBehaviour
 
         public static EntityData GetNearestInCamp(Vector3 pos, float radius, EntityCamp camp, ushort excludeId = 0)
         {
-            Entities.GetIdsInRange(pos, radius, s_buffer);
+            // 半径 > skill_target_unlimited_radius = 不限距离（与带夹角的重载同约定）
+            if (radius > GlobalConfig.skill_target_unlimited_radius)
+            {
+                s_buffer.Clear();
+                foreach (var id in Entities.Keys) s_buffer.Add(id); // 不限距离：连地图外的实体一起算
+            }
+            else
+            {
+                Entities.GetIdsInRange(pos, radius, s_buffer); // 内部先清空缓冲
+            }
             EntityData target = null;
             float sqr = float.MaxValue;
             foreach (var id in s_buffer)
@@ -1311,6 +1320,16 @@ public partial class BattleManager : EnsBehaviour
         Profiler.BeginSample(kUpdateAITag);
         UpdateAI();
         Profiler.EndSample();
+
+        // 静默回收（鲛人卡死等）：AI 一拍内产出，本帧就移除并同步客户端，不算死亡、不结算掉落
+        if (EntityData.DiscardedList.Count > 0)
+        {
+            foreach (var entity in EntityData.DiscardedList)
+            {
+                if (entity != null) DestroyEntity(entity.id);
+            }
+            EntityData.ClearDiscarded();
+        }
 
         // 僵尸刷新（策划案第九章）：每满一个间隔做一批尝试，夜间次数多、白天次数少
         Profiler.BeginSample(kZombieRefreshTag);

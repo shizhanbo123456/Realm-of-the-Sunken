@@ -81,6 +81,13 @@ public abstract class EntityData : MonoBehaviour
 
     public static void ClearKilled() => KilledEntities.Clear();
 
+    // 静默回收队列：本帧末直接销毁，不走向死亡结算（不结算掉落、不算击杀）
+    protected static readonly List<EntityData> DiscardedEntities = new();
+
+    public static IReadOnlyList<EntityData> DiscardedList => DiscardedEntities;
+
+    public static void ClearDiscarded() => DiscardedEntities.Clear();
+
     public bool Alive => attributes.Alive;
 
     protected virtual void OnDamageApplied(float finalDamage, EntityData attacker) { }
@@ -748,6 +755,14 @@ public abstract class EntityData : MonoBehaviour
     {
         if (KilledEntities.Contains(this)) return;
         KilledEntities.Add(this); // 不播死亡动画：本帧末由 BattleManager 直接销毁
+    }
+
+    // 卡死等异常回收：不结算掉落与击杀，帧末直接销毁并同步客户端移除
+    public void Discard()
+    {
+        if (DiscardedEntities.Contains(this)) return;
+        attributes.Kill(); // 立刻失去存活资格，本帧内不再被索敌/结算
+        DiscardedEntities.Add(this);
     }
 
     #region 动态受击体积（人形实体：胶囊上下边界跟随脚/头骨骼的动画姿态）
