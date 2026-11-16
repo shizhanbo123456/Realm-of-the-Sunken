@@ -19,6 +19,7 @@ namespace Ros.UI.Main
         private Action onClose;
         private CardTier openedTier;
         private GTweener fadeTween;
+        private int revealToken; // 每换一组牌/收起时递增，作废还没到点的入场
 
         public bool IsOpen { get; private set; }
 
@@ -52,6 +53,7 @@ namespace Ros.UI.Main
             if (cards != null) rolls.AddRange(cards);
             openedTier = tier;
 
+            revealToken++;
             IsOpen = true;
             visible = true;
             touchable = true;
@@ -81,6 +83,7 @@ namespace Ros.UI.Main
         {
             fadeTween?.Kill();
             fadeTween = null;
+            revealToken++;
             visible = false;
             touchable = false;
             alpha = 1f;
@@ -131,6 +134,10 @@ namespace Ros.UI.Main
             var face = card.m_cardGraphic;
             if (face == null) return;
 
+            // 还没轮到的卡先隐去并禁点，否则会以完成态停在原位，看着像上一组卡没清掉
+            card.visible = false;
+            card.touchable = false;
+
             face.m_level.selectedIndex = (int)roll.tier;
             if (face.m_title != null) face.m_title.text = roll.title;
             if (face.m_des != null) face.m_des.text = roll.description;
@@ -144,7 +151,27 @@ namespace Ros.UI.Main
             }
 
             if (face.m_btn_select != null) face.m_btn_select.onClick.Set(() => Select(roll));
-            if (card.m_show != null) card.m_show.Play(1, index * CardShowStagger, null);
+            RevealAfter(card, index * CardShowStagger);
+        }
+
+        // 排队到点才现身：等待交给计时器，转场本身不再自带延迟
+        private void RevealAfter(UI_Card card, float delay)
+        {
+            int token = revealToken;
+            if (delay <= 0f)
+            {
+                Reveal(card, token);
+                return;
+            }
+            Timers.inst.Add(delay, 1, _ => Reveal(card, token));
+        }
+
+        private void Reveal(UI_Card card, int token)
+        {
+            if (token != revealToken || card.isDisposed) return;
+            card.visible = true;
+            card.touchable = true;
+            card.m_show.Play(1, 0f, null);
         }
 
         // 弃卡折算的经验值与服务器口径一致（同一份配表）
