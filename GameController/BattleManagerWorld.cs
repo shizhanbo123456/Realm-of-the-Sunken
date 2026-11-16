@@ -47,6 +47,20 @@ public partial class BattleManager
         CaptureGuardTotalHealth(); // 守护点总血量在此刻定死，经验增幅按已扣除比例算
     }
 
+    // 防御塔/守护点的初始血量人数修正：进攻方人数 /（防守方人数 × 2），夹 1~10 倍
+    public float GetBuildingHealthScale(EntityCategory category)
+    {
+        if (category != EntityCategory.CrystalStatue && category != EntityCategory.GuardStatue) return 1f;
+        int attack = 0, defense = 0;
+        foreach (var pair in PlayerCamps)
+        {
+            if (pair.Value == PlayerCampType.Attack) attack++;
+            else if (pair.Value == PlayerCampType.Defense) defense++;
+        }
+        if (attack <= 0 || defense <= 0) return 1f; // 不在对局中生成建筑（GM 直接生成）不做人数修正
+        return Mathf.Clamp(attack / (defense * 2f), 1f, 10f);
+    }
+
     #region 生成后摆方向
     // 生成完实体再单独摆方向：只写 Y 轴，不平移；两点重合即 0 度（不用 LookRotation，避开零向量报错）
     private static void FacePoint(ushort id, Vector3 point)

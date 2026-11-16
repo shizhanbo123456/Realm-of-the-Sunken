@@ -11,6 +11,8 @@ public class RuntimeEntityAttributes
     private CardBonus card = CardBonus.Empty;       // 所属玩家自己的词条（非玩家实体为空）
     private CardBonus campCard = CardBonus.Empty;   // 所属阵营玩家的词条累加（只给己方建筑用）
 
+    private readonly float buildingHealthScale;     // 建筑人数修正倍率：生成瞬间定值，非建筑恒 1
+
     private float health;
     private float maxHealth;
 
@@ -18,7 +20,8 @@ public class RuntimeEntityAttributes
     {
         this.owner = owner;
         config = Tool.InfoManager != null ? Tool.InfoManager.GetEntityConfig(type) : default;
-        maxHealth = config.health;
+        buildingHealthScale = Tool.BattleManager != null ? Tool.BattleManager.GetBuildingHealthScale(type.category) : 1f;
+        maxHealth = config.health * buildingHealthScale;
         health = maxHealth;
     }
 
@@ -39,7 +42,7 @@ public class RuntimeEntityAttributes
     public void Update()
     {
         RefreshCardBonus();
-        float newMax = Mathf.Max(1f, config.health * (1f + card.healthPercent));
+        float newMax = Mathf.Max(1f, config.health * buildingHealthScale * (1f + card.healthPercent));
         if (Mathf.Approximately(newMax, maxHealth)) return;
         float ratio = maxHealth > 0f ? health / maxHealth : 1f;
         maxHealth = newMax;
