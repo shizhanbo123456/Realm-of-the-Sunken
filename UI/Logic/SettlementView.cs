@@ -10,13 +10,16 @@ public class SettlementView
 {
     private const float DetailStartDelay = 0.5f;   // 面板转场后首条细节出现
     private const float DetailItemInterval = 0.3f; // 相邻两条细节的间隔
-    private const float DetailHoldDelay = 0.6f;    // 最后一条出现后的停留
-    private const float DetailFadeDuration = 0.5f; // 面板与明细同步淡出时长
+    private const float FadeDuration = 0.5f;       // 点关闭后整个面板的淡出时长
 
     private UI_SettlementPanel panel;
     private readonly List<UI_BattleResultDetailItem> items = new();
     private readonly List<string> rows = new();
     private Timer.TransitionHandle transition;
+    private int pendingAppear; // 还没播完出现动画的明细条数
+    private int showSerial;    // 每次显示递增，用来丢弃上一次面板残留的动画回调
+    private bool canClose;     // 出现动画全部播完才允许关闭
+    private bool closing;      // 淡出中，阻断再次点击
     private bool restoreLobby; // 战斗结束流程：关闭时恢复组队面板
 
     public void Construct()
@@ -87,7 +90,36 @@ public class SettlementView
         panel.visible = true;
         panel.alpha = 1f; // 每次显示从完全不透明开始
         result.m_t0.Play();
-        ScheduleAnimations(); // 含淡出与销毁
+        panel.m_close.onClick.Set(OnCloseClick);
+        canClose = false;
+        closing = false;
+        pendingAppear = items.Count;
+        if (pendingAppear == 0) canClose = true; // 没有明细就没有待播的出现动画
+        ScheduleAppear(++showSerial);
+    }
+
+    // 关闭按钮：出现动画没播完、或正在淡出时一律不响应
+    private void OnCloseClick()
+    {
+        if (!canClose || closing || panel == null) return;
+        closing = true;
+        FadeOut();
+    }
+
+    // 整体淡出：压面板 alpha，按钮随面板一起淡出；走完即销毁
+    private void FadeOut()
+    {
+        CancelAnimations();
+        transition = Timer.AddTransition(0, FadeDuration, (_, t01) =>
+        {
+            if (t01 >= 1f)
+            {
+                transition = null; // 自身已结束，避免在回调内 Cancel 自身
+                Close();
+                return;
+            }
+            if (panel != null) panel.alpha = 1f - t01;
+        });
     }
 
     private void BuildRows(SettlementResult r, EntityCamp camp)
@@ -113,35 +145,38 @@ public class SettlementView
         if (!items.Contains(item)) items.Add(item); // 动画序列按此顺序逐条播放
     }
 
-    // 总时长 = 淡出开始时刻 + 淡出时长，走完即销毁
-    private void ScheduleAnimations()
+    // 按间隔逐条放出明细的出现动画，最后一条播完才放开关闭
+    private void ScheduleAppear(int serial)
     {
         CancelAnimations();
+        if (items.Count == 0) return;
         int shown = 0;
-        float fadeStart = DetailStartDelay + items.Count * DetailItemInterval + DetailHoldDelay;
-        float total = fadeStart + DetailFadeDuration;
-        transition = Timer.AddTransition(0, total, (_, t01) =>
+        float span = DetailStartDelay + (items.Count - 1) * DetailItemInterval;
+        transition = Timer.AddTransition(0, span, (_, t01) =>
         {
-            if (t01 >= 1f)
-            {
-                transition = null; // 自身已结束，避免在回调内 Cancel 自身
-                Close();
-                return;
-            }
-            if (items.Count == 0) return;
-            float elapsed = t01 * total;
+            float elapsed = t01 * span;
             // 到达出现时刻的条目逐条播放自身动画（shown 指针保证每条只播一次）
             while (shown < items.Count && elapsed >= DetailStartDelay + shown * DetailItemInterval)
             {
                 var item = items[shown++];
-                if (item == null || item.displayObject == null) continue;
-                item.m_t0.Play();   // 淡入由 t0 的 Alpha 通道完成
-                item.alpha = 1f;    // 显示期间整体保持不透明
+                if (item == null || item.displayObject == null)
+                {
+                    OnItemShown(serial);
+                    continue;
+                }
+                item.alpha = 1f; // 显示期间整体保持不透明，淡入由 t0 的 Alpha 通道完成
+                item.m_t0.Play(() => OnItemShown(serial));
             }
-            // 面板与明细共用同一条 alpha 曲线：只压面板，明细随父级一起淡出
-            if (elapsed >= fadeStart && panel != null)
-                panel.alpha = 1f - Mathf.Clamp01((elapsed - fadeStart) / DetailFadeDuration);
+            if (t01 >= 1f) transition = null; // 自身已结束，避免在回调内 Cancel 自身
         });
+    }
+
+    // 单条明细的出现动画播完：全部播完才接受关闭点击；上一次面板的残留回调直接丢弃
+    private void OnItemShown(int serial)
+    {
+        if (serial != showSerial) return;
+        if (pendingAppear > 0) pendingAppear--;
+        if (pendingAppear == 0) canClose = true;
     }
 
     private void CancelAnimations()
@@ -150,7 +185,7 @@ public class SettlementView
         transition = null;
     }
 
-    // 淡出结束：销毁面板（标题与明细都是面板子对象，随面板一起销毁）；战斗结束流程再恢复组队面板
+    // 淡出结束：销毁面板（标题、明细与关闭按钮都是面板子对象，随面板一起销毁）；战斗结束流程再恢复组队面板
     private void Close()
     {
         CancelAnimations();
@@ -159,6 +194,10 @@ public class SettlementView
             panel.Dispose();
             panel = null;
         }
+        showSerial++; // 让仍在飞的明细出现回调全部失效
+        pendingAppear = 0;
+        canClose = false;
+        closing = false;
         items.Clear();
         rows.Clear();
         if (restoreLobby && Tool.UIManager != null) Tool.UIManager.SetLobbyPanelVisible(true);

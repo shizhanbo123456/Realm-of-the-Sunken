@@ -7,6 +7,7 @@ namespace Ros.UI.Main
 {
     public partial class UI_SettlementPanel : GComponent
     {
+        public GButton m_close;
         public UI_BattleResult m_battle_result;
         public UI_BattleResultDetail m_battle_result_detail;
         public const string URL = "ui://q68vr2bfv4rxs2";
@@ -20,8 +21,9 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
-            m_battle_result = (UI_BattleResult)GetChildAt(0);
-            m_battle_result_detail = (UI_BattleResultDetail)GetChildAt(1);
+            m_close = (GButton)GetChildAt(1);
+            m_battle_result = (UI_BattleResult)GetChildAt(2);
+            m_battle_result_detail = (UI_BattleResultDetail)GetChildAt(3);
         }
     }
 }
