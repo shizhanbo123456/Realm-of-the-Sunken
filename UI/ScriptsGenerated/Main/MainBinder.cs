@@ -85,6 +85,7 @@ namespace Ros.UI.Main
             UIObjectFactory.SetPackageItemExtension(UI_AttrItem.URL, typeof(UI_AttrItem));
             UIObjectFactory.SetPackageItemExtension(UI_LobbyPanel.URL, typeof(UI_LobbyPanel));
             UIObjectFactory.SetPackageItemExtension(UI_BuffTip.URL, typeof(UI_BuffTip));
+            UIObjectFactory.SetPackageItemExtension(UI_SettlementPanel.URL, typeof(UI_SettlementPanel));
             UIObjectFactory.SetPackageItemExtension(UI_HomePanel.URL, typeof(UI_HomePanel));
             UIObjectFactory.SetPackageItemExtension(UI_RoleHead.URL, typeof(UI_RoleHead));
         }

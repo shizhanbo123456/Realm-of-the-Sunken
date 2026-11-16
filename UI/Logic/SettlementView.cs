@@ -12,11 +12,8 @@ public class SettlementView
     private const float DetailItemInterval = 0.3f; // 相邻两条细节的间隔
     private const float DetailHoldDelay = 0.6f;    // 最后一条出现后的停留
     private const float DetailFadeDuration = 0.5f; // 面板与明细同步淡出时长
-    private const float PanelCenterRatio = 0.35f;  // 面板中心在屏幕高度上的位置
-    private const float DetailTopRatio = 0.55f;    // 明细列表顶部在屏幕高度上的位置
 
-    private UI_BattleResult panel;
-    private UI_BattleResultDetail detail;
+    private UI_SettlementPanel panel;
     private readonly List<UI_BattleResultDetailItem> items = new();
     private readonly List<string> rows = new();
     private Timer.TransitionHandle transition;
@@ -71,37 +68,26 @@ public class SettlementView
         restoreLobby = restoreLobbyAfterClose;
         if (panel == null)
         {
-            panel = UI_BattleResult.CreateInstance();
+            panel = UI_SettlementPanel.CreateInstance();
             GRoot.inst.AddChild(panel); // 挂全局层：结算要跨页面盖在组队界面之上
             panel.visible = false;
         }
-        panel.m_title.text = GetEndText(r.gameState, camp);
-        panel.m_content.text = $"战斗用时：{Mathf.RoundToInt(Mathf.Max(0f, GlobalVariable.F(global_variablesEnum.battle_duration) - r.remainTime))} 秒";
+        // 铺满屏幕：按 1080 高的逻辑尺寸摆放并整体缩放，标题与明细的居中交给面板内的对齐关系
+        float uiScale = Screen.height / 1080f;
+        panel.scale = new Vector2(uiScale, uiScale);
+        panel.SetSize(1080f * ((float)Screen.width / Screen.height), 1080f);
+        panel.SetXY(0f, 0f);
 
-        if (detail == null)
-        {
-            detail = UI_BattleResultDetail.CreateInstance();
-            panel.AddChild(detail);
-        }
+        var result = panel.m_battle_result;
+        result.m_title.text = GetEndText(r.gameState, camp);
+        result.m_content.text = $"战斗用时：{Mathf.RoundToInt(Mathf.Max(0f, GlobalVariable.F(global_variablesEnum.battle_duration) - r.remainTime))} 秒";
+
         BuildRows(r, camp);
-        Layout();
 
         panel.visible = true;
         panel.alpha = 1f; // 每次显示从完全不透明开始
-        panel.m_t0.Play();
+        result.m_t0.Play();
         ScheduleAnimations(); // 含淡出与销毁
-    }
-
-    // 锚点均为左上角：按根节点尺寸摆放，面板居中偏上，明细列表居中偏下
-    private void Layout()
-    {
-        float sw = GRoot.inst.width;
-        float sh = GRoot.inst.height;
-
-        panel.SetXY((sw - panel.width) * 0.5f, sh * PanelCenterRatio - panel.height * 0.5f);
-        // 明细是面板子对象，换回局部坐标后让列表首行落在 DetailTopRatio 高度
-        detail.SetXY((panel.width - detail.width) * 0.5f,
-                     sh * DetailTopRatio - panel.y - detail.m_resultList.y);
     }
 
     private void BuildRows(SettlementResult r, EntityCamp camp)
@@ -114,7 +100,7 @@ public class SettlementView
             ? $"对防守点伤害：{(int)r.expGain}"
             : $"防守点剩余血量：{(int)r.guardStatueHealth}");
 
-        var list = detail.m_resultList;
+        var list = panel.m_battle_result_detail.m_resultList;
         list.itemRenderer = RenderRow;
         list.numItems = rows.Count; // 非虚拟列表同步建条目并回调渲染器
     }
@@ -164,16 +150,15 @@ public class SettlementView
         transition = null;
     }
 
-    // 淡出结束：销毁面板与明细；战斗结束流程再恢复组队面板
+    // 淡出结束：销毁面板（标题与明细都是面板子对象，随面板一起销毁）；战斗结束流程再恢复组队面板
     private void Close()
     {
         CancelAnimations();
         if (panel != null)
         {
-            panel.Dispose(); // 明细挂在面板下，随面板一起销毁
+            panel.Dispose();
             panel = null;
         }
-        detail = null;
         items.Clear();
         rows.Clear();
         if (restoreLobby && Tool.UIManager != null) Tool.UIManager.SetLobbyPanelVisible(true);
