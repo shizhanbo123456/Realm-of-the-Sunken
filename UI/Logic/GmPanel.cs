@@ -13,9 +13,8 @@ public class GmPanel
 {
     private readonly UI_GmPanel panel;
 
-    private readonly List<string> groups = new();   // 一级菜单：配表 commandName
-    private readonly List<string> subs = new();     // 二级菜单：当前组下的 subcommand
-    private readonly List<int> subIds = new();      // 与 subs 一一对应的配表主键
+    private readonly List<string> groups = new();   // 一级菜单：配表 commandName（显示名取 menuName）
+    private readonly List<int> subIds = new();      // 二级菜单：当前组下的配表主键（显示名取 subMenuName）
     private string curGroup;
     private int curId = -1;
 
@@ -153,33 +152,29 @@ public class GmPanel
         }
         Refresh(panel.m_firstMenu.m_button_list, groups.Count);
         if (groups.Count > 0) SelectGroup(groups[0]);
-        else { subs.Clear(); subIds.Clear(); curId = -1; ClearItems(); }
+        else { subIds.Clear(); curId = -1; ClearItems(); }
     }
 
     private void SelectGroup(string group)
     {
         curGroup = group;
         Refresh(panel.m_firstMenu.m_button_list, groups.Count); // 重刷一级菜单，否则上一个组的高亮会残留
-        subs.Clear();
         subIds.Clear();
         foreach (var row in GmCommandConfig.ordered)
         {
             if (row.commandName != group || !Available(row)) continue;
-            subs.Add(row.subcommand);
             subIds.Add(row.key);
         }
-        Refresh(panel.m_secondMenu.m_button_list, subs.Count);
+        Refresh(panel.m_secondMenu.m_button_list, subIds.Count);
         if (subIds.Count > 0) SelectSub(0);
         else { curId = -1; ClearItems(); }
     }
-
-    private void SelectSub(string sub) => SelectSub(subs.IndexOf(sub));
 
     private void SelectSub(int index)
     {
         if (index < 0 || index >= subIds.Count) { curId = -1; ClearItems(); return; }
         curId = subIds[index];
-        Refresh(panel.m_secondMenu.m_button_list, subs.Count); // 重刷二级菜单，否则上一个子项的高亮会残留
+        Refresh(panel.m_secondMenu.m_button_list, subIds.Count); // 重刷二级菜单，否则上一个子项的高亮会残留
         var row = GmCommandConfig.Get(curId);
         Refresh(panel.m_GmItemList, row.paramType.HasValue ? 3 : 2);
     }
@@ -189,14 +184,14 @@ public class GmPanel
     private void RenderGroupButton(int index, GObject obj)
     {
         if (index >= groups.Count || obj is not GButton btn) return;
-        btn.title = groups[index];
+        btn.title = GmCommandConfig.GroupName(groups[index]);
         btn.selected = groups[index] == curGroup;
     }
 
     private void RenderSubButton(int index, GObject obj)
     {
-        if (index >= subs.Count || obj is not GButton btn) return;
-        btn.title = subs[index];
+        if (index >= subIds.Count || obj is not GButton btn) return;
+        btn.title = GmCommandConfig.Get(subIds[index]).subMenuName;
         btn.selected = index == subIds.IndexOf(curId);
     }
 
@@ -253,7 +248,7 @@ public class GmPanel
         string raw = row.paramType.HasValue && ItemAt(1) is UI_GmItem input ? input.m_input.text : string.Empty;
         if (!TryParseParam(row, raw, out GmArg arg, out string error))
         {
-            string msg = $"{row.subcommand} 参数解析失败：{error}（输入：{raw}）";
+            string msg = $"{row.subMenuName} 参数解析失败：{error}（输入：{raw}）";
             Output(msg);
             Debug.LogWarning("[GM] " + msg);
             return;
@@ -261,7 +256,7 @@ public class GmPanel
 
         if (RunLocal(row, arg)) return;
 
-        if (!Online) { Output($"{row.subcommand}：需要联网执行"); return; }
+        if (!Online) { Output($"{row.subMenuName}：需要联网执行"); return; }
         Tool.NetworkManager.SendGm(new CSGm { type = row.key, i = arg.i, v0 = arg.v0, v1 = arg.v1, v2 = arg.v2 });
     }
 

@@ -36,6 +36,8 @@ namespace Ros.Config
                     row.lobby = has6 == 1 ? (bool?)(r.ReadByte() != 0) : null;
                     byte has7 = r.ReadByte();
                     row.battle = has7 == 1 ? (bool?)(r.ReadByte() != 0) : null;
+                    row.menuName = ConfigBinary.ReadString(r);
+                    row.subMenuName = ConfigBinary.ReadString(r);
                     gm_commandData.Add(row.key, row);
                 }
             }
@@ -52,5 +54,7 @@ namespace Ros.Config
         public bool? home;  // Home可用
         public bool? lobby;  // Lobby可用
         public bool? battle;  // Battle可用
+        public string menuName;  // 一级菜单名：中文名，ui显示使用
+        public string subMenuName;  // 二级菜单名：中文名，ui显示使用
     }
 }

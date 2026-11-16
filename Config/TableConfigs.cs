@@ -350,17 +350,29 @@ namespace Ros.Config
         public static readonly Dictionary<int, gm_command> content = new();
         // 按主键升序：GM 面板的菜单分组与命令顺序都以它为准
         public static readonly List<gm_command> ordered = new();
+        // 一级菜单显示名：commandName -> menuName
+        private static readonly Dictionary<string, string> groupNames = new();
 
         internal static void Bake(ConfigManager m)
         {
             content.Clear();
             ordered.Clear();
+            groupNames.Clear();
             foreach (gm_command row in m.gm_commandData.Values) content.Add(row.key, row);
             ordered.AddRange(content.Values);
             ordered.Sort((a, b) => a.key.CompareTo(b.key));
+            foreach (gm_command row in ordered)
+            {
+                if (groupNames.ContainsKey(row.commandName)) continue;
+                if (row.menuName.Length == 0)
+                    throw new System.FormatException($"[配表] gm_command「{row.commandName}」缺少一级菜单名（menuName）");
+                groupNames.Add(row.commandName, row.menuName);
+            }
         }
 
         public static gm_command Get(int key) => ConfigBinary.Require(content, key, "gm_command");
+
+        public static string GroupName(string commandName) => groupNames[commandName];
     }
 
     public static class AiCommandConfig
