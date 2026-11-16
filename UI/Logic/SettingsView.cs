@@ -20,13 +20,14 @@ public class SettingsView
     private UI_SettingsPanel panel;
     private float uiScale = 1f;
 
-    private UI_SettingScrollView View => panel != null ? panel.m_settings.m_settingsPanel : null;
+    private UI_SettingScrollView View => panel != null ? panel.m_settings.GetChildAt(0) as UI_SettingScrollView : null;
 
     public bool IsOpen => panel != null && panel.visible;
 
     public void Construct()
     {
         panel = UI_SettingsPanel.CreateInstance();
+        panel.m_settings.numItems = 1; // 容器是列表，唯一元素即真正的设置面板
         panel.opaque = true;
         panel.touchable = true;
         GRoot.inst.AddChild(panel);
@@ -93,7 +94,6 @@ public class SettingsView
             int index = i;
             tab.onClick.Set(() => SelectTip(index));
         };
-        View.m_rule_content.UBBEnabled = true; // 配表内容带 UBB 标记（加粗 / 颜色）
 
         tabs.numItems = tipKeys.Count;
         if (tipKeys.Count > 0) SelectTip(0);
