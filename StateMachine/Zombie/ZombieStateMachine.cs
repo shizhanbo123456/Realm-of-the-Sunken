@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-// 僵尸：无目标在出生点附近游荡；游荡越久索敌越远；锁到目标就一路追到它死
+// 僵尸：无目标时在进入游荡的位置附近游荡；游荡越久索敌越远；锁到目标就一路追到它死
 public class ZombieStateMachine : DecisionMachine, IBehaviorHost
 {
     private const int SlotClawRight = 0;
@@ -14,7 +14,7 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
     private readonly ChaseState chaseState;
     private readonly AttackState attackState;
 
-    private readonly Vector3 homePosition;
+    private Vector3 wanderCenter;
     private Vector3 wanderPoint;
     private bool hasWanderPoint;
     private float wanderResumeTime;
@@ -27,7 +27,6 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
     public ZombieStateMachine(ZombieEntityData owner)
     {
         Owner = owner;
-        homePosition = owner.transform.position;
         noTargetSince = Time.time;
         ThinkInterval = GlobalConfig.zombie_decide_interval;
 
@@ -161,7 +160,14 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
 
         public WanderState(ZombieStateMachine machine) { this.machine = machine; }
 
-        public override void Enter() => machine.Owner.SetFaceTarget(0); // 已无目标，别再朝旧目标转
+        // 进入游荡时以当前位置为新圆心，丢掉上一轮的目标点：跑远后不会掉头回出生点
+        public override void Enter()
+        {
+            machine.Owner.SetFaceTarget(0); // 已无目标，别再朝旧目标转
+            machine.wanderCenter = machine.Owner.transform.position;
+            machine.hasWanderPoint = false;
+            machine.wanderResumeTime = 0f;
+        }
 
         public override DecisionState Decide()
         {
@@ -187,7 +193,7 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
             }
 
             Vector2 offset = Random.insideUnitCircle * GlobalConfig.zombie_wander_radius;
-            machine.wanderPoint = machine.homePosition + new Vector3(offset.x, 0f, offset.y);
+            machine.wanderPoint = machine.wanderCenter + new Vector3(offset.x, 0f, offset.y);
             machine.hasWanderPoint = true;
             machine.RequestMove(machine.wanderPoint);
             return null;
