@@ -49,7 +49,9 @@ public partial class BattleManager
     // ManagedUpdate 早退前调用：客户端本地推演，服务器权威推进并广播
     private void UpdateDayNight()
     {
-        if (!BattleStarted) return;
+        // 客户端从不置 BattleStarted，只能看组队快照里的 battleStarted
+        bool running = AtServer ? BattleStarted : NetworkManager.BattleRunning;
+        if (!running) return;
 
         Profiler.BeginSample(kDayNightTag);
 
