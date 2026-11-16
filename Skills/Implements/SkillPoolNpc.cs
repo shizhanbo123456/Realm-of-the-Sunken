@@ -63,14 +63,16 @@ namespace Ros.Skill
         public override int Id => (int)SkillType.SkillCrystalStatueSporeA;
 
         private const int BulletVfx = 25;
-        private const float BulletFlight = 0.6f;
+        // 匀速飞行：时长按起点到落点的实际距离换算（12m ≈ 0.6s），近身出手不会变成慢动作
+        private const float BulletSpeed = 20f;
+        private const float MinFlight = 0.1f; // 落点贴脸时避免时长为 0：寿命归零会在首帧前就被回收，判定不生效
 
         protected override void OnCast(EntityData caster)
         {
             Vector3 origin = EntityAnchor.UpCenter.GetTransform(caster.ModelInfo, caster.anim).position;
             Vector3 aim = TargetSelect.AimPos(caster, TargetSector, TargetRadius, CastRange, normalizeDistance: false);
             Tool.BattleManager.ShootBullet(caster, BuildAttack(caster),
-                new SkillTrajectoryLine(origin, aim, BulletFlight), 0f,
+                new SkillTrajectoryLine(origin, aim, FlightTime(origin, aim)), 0f,
                 HitSpec(SkillVfxKind.Bullet, BulletVfx, VfxScale()));
             SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
         }
@@ -79,8 +81,13 @@ namespace Ros.Skill
         {
             Vector3 origin = context.ReadVector3();
             Vector3 aim = context.ReadVector3();
-            VfxHelper.PlayOne(SkillVfxKind.Bullet, BulletVfx, new SkillTrajectoryLine(origin, aim, BulletFlight), VfxScale());
+            VfxHelper.PlayOne(SkillVfxKind.Bullet, BulletVfx,
+                new SkillTrajectoryLine(origin, aim, FlightTime(origin, aim)), VfxScale());
         }
+
+        // 两端用包里的同一对点位各自算时长，结果一致，不需要额外下发
+        private static float FlightTime(Vector3 origin, Vector3 aim)
+            => Mathf.Max(MinFlight, Vector3.Distance(origin, aim) / BulletSpeed);
     }
 
     // 灵火喷吐：塔带灵火时的普攻，子弹打敌人脚部，到点追加一次原地灵火爆炸（与 131 崩拳同一个 RM[6]）
