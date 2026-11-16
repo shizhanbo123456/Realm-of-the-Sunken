@@ -126,7 +126,14 @@ public class SettlementView
     {
         rows.Clear();
         items.Clear();
-        rows.Add($"战斗分数：进攻方 {(int)r.attackScore} ／ 防守方 {(int)r.defenseScore}");
+        // 分数只报本地阵营；观战方没有自己的分数，攻防拆成两条
+        if (camp == EntityCamp.Attack) rows.Add($"战斗分数：{(int)r.attackScore}");
+        else if (camp == EntityCamp.Defense) rows.Add($"战斗分数：{(int)r.defenseScore}");
+        else
+        {
+            rows.Add($"进攻方分数：{(int)r.attackScore}");
+            rows.Add($"防守方分数：{(int)r.defenseScore}");
+        }
         rows.Add($"击杀数：{r.killScore}");
         rows.Add(camp == EntityCamp.Attack
             ? $"对防守点伤害：{(int)r.expGain}"
