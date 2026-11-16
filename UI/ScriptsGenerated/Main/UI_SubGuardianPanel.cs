@@ -8,7 +8,7 @@ namespace Ros.UI.Main
     public partial class UI_SubGuardianPanel : GComponent
     {
         public Controller m_killed;
-        public GComponent m_bar;
+        public UI_BarGuardianSub m_bar;
         public GTextField m_guardian_name;
         public GTextField m_health_percentage;
         public const string URL = "ui://q68vr2bfisq1rc";
@@ -23,7 +23,7 @@ namespace Ros.UI.Main
             base.ConstructFromXML(xml);
 
             m_killed = GetControllerAt(0);
-            m_bar = (GComponent)GetChildAt(1);
+            m_bar = (UI_BarGuardianSub)GetChildAt(1);
             m_guardian_name = (GTextField)GetChildAt(3);
             m_health_percentage = (GTextField)GetChildAt(4);
         }

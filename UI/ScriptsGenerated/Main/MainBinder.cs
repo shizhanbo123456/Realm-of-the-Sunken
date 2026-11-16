@@ -19,6 +19,8 @@ namespace Ros.UI.Main
             UIObjectFactory.SetPackageItemExtension(UI_DayNight.URL, typeof(UI_DayNight));
             UIObjectFactory.SetPackageItemExtension(UI_BarHealth.URL, typeof(UI_BarHealth));
             UIObjectFactory.SetPackageItemExtension(UI_BarExp.URL, typeof(UI_BarExp));
+            UIObjectFactory.SetPackageItemExtension(UI_BarGrardian.URL, typeof(UI_BarGrardian));
+            UIObjectFactory.SetPackageItemExtension(UI_BarGuardianSub.URL, typeof(UI_BarGuardianSub));
             UIObjectFactory.SetPackageItemExtension(UI_SubGuardianPanel.URL, typeof(UI_SubGuardianPanel));
             UIObjectFactory.SetPackageItemExtension(UI_MainGuardianPanel.URL, typeof(UI_MainGuardianPanel));
             UIObjectFactory.SetPackageItemExtension(UI_SkillSelectPanel.URL, typeof(UI_SkillSelectPanel));

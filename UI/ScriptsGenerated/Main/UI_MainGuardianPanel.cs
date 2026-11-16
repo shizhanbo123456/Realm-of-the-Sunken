@@ -7,7 +7,7 @@ namespace Ros.UI.Main
 {
     public partial class UI_MainGuardianPanel : GComponent
     {
-        public GComponent m_bar;
+        public UI_BarGrardian m_bar;
         public GTextField m_health_label;
         public GTextField m_protection_layer_count;
         public GTextField m_Name;
@@ -23,7 +23,7 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
-            m_bar = (GComponent)GetChildAt(0);
+            m_bar = (UI_BarGrardian)GetChildAt(0);
             m_health_label = (GTextField)GetChildAt(2);
             m_protection_layer_count = (GTextField)GetChildAt(4);
             m_Name = (GTextField)GetChildAt(5);

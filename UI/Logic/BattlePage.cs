@@ -578,7 +578,7 @@ public class BattlePage : PageBase
         if (guardian.m_health_percentage != null) guardian.m_health_percentage.text = $"{Mathf.RoundToInt(ratio * 100f)}%";
         // 守护层数 = 还没被打掉的副点数量
         if (guardian.m_protection_layer_count != null) guardian.m_protection_layer_count.text = AliveSubCount().ToString();
-        SetGuardianBarFill(guardian.m_bar, ratio);
+        SetGuardianBarFill(guardian.m_bar?.m_fill, ratio);
     }
 
     private void ApplySubGuardian(UI_SubGuardianPanel guardian, int index)
@@ -588,7 +588,7 @@ public class BattlePage : PageBase
         if (guardian.m_guardian_name != null) guardian.m_guardian_name.text = GlobalConfig.GuardPointConfig(index).name;
         if (guardian.m_health_percentage != null) guardian.m_health_percentage.text = $"{Mathf.RoundToInt(ratio * 100f)}%";
         if (guardian.m_killed != null) guardian.m_killed.selectedIndex = ratio <= 0f ? 1 : 0;
-        SetGuardianBarFill(guardian.m_bar, ratio);
+        SetGuardianBarFill(guardian.m_bar?.m_fill, ratio);
     }
 
     // 血量未知（守护点还没生成）按满血算，避免开局显示成空槽
@@ -607,12 +607,11 @@ public class BattlePage : PageBase
         return alive;
     }
 
-    // 守护点血条没有 fillAmount，按横向缩放裁填充图（FGUI 里填充图没命名）
-    private static void SetGuardianBarFill(GComponent bar, float ratio)
+    // 血条填充走 UV 裁剪（fillAmount），不做几何缩放，避免压缩圆角/描边
+    private static void SetGuardianBarFill(GImage fill, float ratio)
     {
-        if (bar == null) return;
-        var fill = bar.GetChild("n0");
-        if (fill != null) fill.scale = new Vector2(ratio, fill.scale.y);
+        if (fill == null) return;
+        fill.fillAmount = ratio;
     }
     #endregion
 
