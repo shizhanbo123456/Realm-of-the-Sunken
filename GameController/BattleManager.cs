@@ -332,6 +332,7 @@ public partial class BattleManager : EnsBehaviour
             return;
         }
         NormalizeName(info, clientId);
+        if (info.aiTakeover) AiClients.Add(clientId); // 连接时已声明 AI 接管：记进会话，出战与复活都按它恢复
         PlayerInfoList[clientId] = info;
         PlayerCamps[clientId] = PlayerCampType.Spectator; // 进入大厅默认观战方
         SendLobbyPlayerNames(clientId); // 名字单独下发，先把映射铺好再播房间成员列表
@@ -1138,6 +1139,8 @@ public partial class BattleManager : EnsBehaviour
             {
                 spawnedPlayer.robotControlled = RobotClients.Contains(clientId);
                 spawnedPlayer.aiControlled = AiClients.Contains(clientId);
+                if (spawnedPlayer.aiControlled && spawnedPlayer.AiRelay == null)
+                    spawnedPlayer.AiRelay = new AiIntentRelay(spawnedPlayer, clientId); // 接管即挂行为状态机，不等第一条意图
             }
             Debug.Log($"{(RobotClients.Contains(clientId) ? "AI" : "玩家")} {clientId} 出战：{characterType} camp={camp} id={entityId}");
         }

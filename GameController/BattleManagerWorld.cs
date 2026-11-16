@@ -189,7 +189,7 @@ public partial class BattleManager
         for (int i = 0; i < times; i++) TrySpawnOneCoral();
     }
 
-    // 离最近存活玩家超过 coral_kill_distance 的珊瑚直接移除：不掉武器、不回血、不计分
+    // 离最近存活玩家超过 coral_kill_distance 的珊瑚直接移除：不回血、不计分
     private void DestroyFarCorals()
     {
         CollectAlivePlayerPositions();

@@ -94,8 +94,6 @@ namespace Ros.Config
         coral_spawn_rate_slow,
         coral_spawn_rate_rate,
         coral_spawn_as_large_chance,
-        coral_small_drop_chance,
-        coral_large_drop_chance,
         coral_small_regeneration,
         coral_large_regeneration,
         coral_kill_distance,

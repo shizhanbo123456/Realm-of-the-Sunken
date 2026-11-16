@@ -15,9 +15,6 @@ public static class AiBridgeCommands
         string line = args.GetString("line", "");
         if (line.Trim().Length == 0) return "错误：缺少参数 line";
 
-        // 桥一次调用一次响应，阻塞语义只能由 ai.wait 轮询实现
-        if (line.TrimStart().StartsWith("等待中断")) return "错误：「等待中断」请改用 ai.wait";
-
         string reply = null;
         ai.Submit(line, text => reply = text);
         return reply ?? "错误：命令没有立即返回";

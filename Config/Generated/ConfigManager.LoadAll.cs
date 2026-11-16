@@ -8,6 +8,7 @@ namespace Ros.Config
         {
             Loadcard_gain_upgradeConfig();
             Loadcard_optionConfig();
+            Loadai_commandConfig();
             Loadassistant_expressionConfig();
             Loadattr_rangeConfig();
             Loadbattle_fury_layerConfig();

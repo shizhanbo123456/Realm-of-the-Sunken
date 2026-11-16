@@ -12,6 +12,7 @@ namespace Ros.UI.Main
         public GTextField m_spectate_current_member_count;
         public UI_LobbCampOperation m_btn_joinDefense;
         public UI_LobbCampOperation m_btn_joinAttack;
+        public GButton m_btn_settings;
         public const string URL = "ui://q68vr2bftwqeh8";
 
         public static UI_LobbyPanel CreateInstance()
@@ -28,6 +29,7 @@ namespace Ros.UI.Main
             m_spectate_current_member_count = (GTextField)GetChildAt(4);
             m_btn_joinDefense = (UI_LobbCampOperation)GetChildAt(6);
             m_btn_joinAttack = (UI_LobbCampOperation)GetChildAt(7);
+            m_btn_settings = (GButton)GetChildAt(8);
         }
     }
 }

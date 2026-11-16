@@ -12,7 +12,7 @@ namespace Ros.UI.Main
         public GTextField m_label_character_name;
         public UI_CharacterSelectionPanel m_character_selection_panel;
         public UI_CharacterAttributePanel m_character_attr_panel;
-        public GButton m_btn_open_guide;
+        public GButton m_btn_settings;
         public const string URL = "ui://q68vr2bfvjeqgv";
 
         public static UI_HomePanel CreateInstance()
@@ -29,7 +29,7 @@ namespace Ros.UI.Main
             m_label_character_name = (GTextField)GetChildAt(2);
             m_character_selection_panel = (UI_CharacterSelectionPanel)GetChildAt(3);
             m_character_attr_panel = (UI_CharacterAttributePanel)GetChildAt(4);
-            m_btn_open_guide = (GButton)GetChildAt(5);
+            m_btn_settings = (GButton)GetChildAt(5);
         }
     }
 }

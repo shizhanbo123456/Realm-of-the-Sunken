@@ -13,13 +13,9 @@ public class HomePage : PageBase
     private const int AttrIndexHealth = 0;         // StatKeys 里生命的下标
     private const int RangeKeyHealthAttack = 6;    // attr_range：进攻方生命（两阵营血量量级不同，分开取区间）
     private const int RangeKeyHealthDefense = 7;   // attr_range：防守方生命
-    private static readonly string[] GuideMenuTitles = { "技能", "Buff" };
 
     private readonly UI_HomePanel panel;
     private UI_RemanePanel renamePanel; // 改名弹窗：设计自带全屏遮罩，挂 GRoot 置顶
-    private UI_GuidePanel guidePanel;   // 图鉴：独立面板，挂 GRoot
-    private readonly List<GuideCatalog.Entry> guideEntries = new();
-    private int guideTab;
 
     public HomePage(UI_HomePanel panel) : base(panel)
     {
@@ -41,8 +37,7 @@ public class HomePage : PageBase
 
         panel.m_character_attr_panel.m_btn_select_character.onClick.Add(ConfirmSelection);
 
-        panel.m_btn_open_guide.onClick.Add(OpenGuide);
-        BuildGuidePanel();
+        panel.m_btn_settings.onClick.Add(OpenSettings);
 
         panel.m_connectPanel.m_btn_connect.title = "连接";
         panel.m_connectPanel.m_btn_connect.onClick.Add(OnConnectClicked);
@@ -58,7 +53,6 @@ public class HomePage : PageBase
         Refresh();
         RefreshPreview();
         if (renamePanel != null) renamePanel.visible = false;
-        if (guidePanel != null) guidePanel.visible = false;
         if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
             Tool.ClientLogicManager.HomePreview.ResetHomeView();
     }
@@ -67,14 +61,12 @@ public class HomePage : PageBase
     {
         base.Exit();
         if (renamePanel != null) renamePanel.visible = false; // 弹窗挂 GRoot，不收起来会留在别的页面上
-        if (guidePanel != null) guidePanel.visible = false;
     }
 
     public override void OnResize(float width, float height)
     {
         base.OnResize(width, height);
         ApplyRenameTransform();
-        ApplyGuideTransform();
     }
 
     #region//Local
@@ -135,62 +127,10 @@ public class HomePage : PageBase
         renamePanel.SetXY(GRoot.inst.width * 0.5f, GRoot.inst.height * 0.5f);
     }
 
-    private void BuildGuidePanel()
+    // 设置面板是全局子界面，三个页面共用（UIManager 持有）
+    private static void OpenSettings()
     {
-        guidePanel = UI_GuidePanel.CreateInstance();
-        guidePanel.opaque = true;
-        GRoot.inst.AddChild(guidePanel);
-        guidePanel.visible = false;
-        guidePanel.m_btn_back.onClick.Set(CloseGuide);
-        guidePanel.m_menu_btn_list.itemRenderer = RenderGuideMenu;
-        guidePanel.m_menu_btn_list.numItems = GuideMenuTitles.Length;
-        guidePanel.m_item_list.itemRenderer = RenderGuideItem;
-        ApplyGuideTransform();
-    }
-
-    private void OpenGuide()
-    {
-        GRoot.inst.AddChild(guidePanel); // 每次弹出都重新置顶
-        guidePanel.visible = true;
-        ApplyGuideTransform();
-        SwitchGuideTab(guideTab);
-    }
-
-    private void CloseGuide() => guidePanel.visible = false;
-
-    private void ApplyGuideTransform()
-    {
-        if (guidePanel == null) return;
-        guidePanel.scale = new Vector2(UiScale, UiScale);
-        guidePanel.pivotAsAnchor = true;
-        guidePanel.pivot = new Vector2(0.5f, 0.5f);
-        guidePanel.SetXY(GRoot.inst.width * 0.5f, GRoot.inst.height * 0.5f);
-    }
-
-    private void RenderGuideMenu(int index, GObject obj)
-    {
-        var item = (UI_GuideMenuLabel)obj;
-        item.m_title.text = GuideMenuTitles[index];
-        item.touchable = true;
-        item.onClick.Set(() => { });
-        item.onClick.Add(() => SwitchGuideTab(index));
-    }
-
-    private void SwitchGuideTab(int tab)
-    {
-        guideTab = tab;
-        guideEntries.Clear();
-        guideEntries.AddRange(tab == 0 ? GuideCatalog.BuildSkillEntries() : GuideCatalog.BuildBuffEntries());
-        guidePanel.m_item_list.numItems = guideEntries.Count;
-    }
-
-    private void RenderGuideItem(int index, GObject obj)
-    {
-        var item = (UI_GuideItem)obj;
-        var entry = guideEntries[index];
-        item.m_icon.texture = entry.icon != null ? new NTexture(entry.icon) : null;
-        item.m_title.text = entry.title;
-        item.m_des.text = entry.description;
+        if (Tool.UIManager != null) Tool.UIManager.OpenSettings();
     }
 
     // 存档下标：0~5 进攻、6~11 防守；页签只列其中一侧

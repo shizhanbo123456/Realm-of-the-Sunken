@@ -9,7 +9,7 @@ public class CoralEntityData : EntityData
         var battle = Tool.BattleManager;
         if (battle == null) return;
 
-        battle.OnCoralDestroyed(this); // 回血 + 掉武器
+        battle.OnCoralDestroyed(this); // 击杀者回血
     }
 
     // 瘟疫污染：被打碎时给附近进攻方单位各挂 1 层瘟疫标记，归属施加污染的瘟疫使者

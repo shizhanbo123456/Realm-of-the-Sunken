@@ -87,6 +87,7 @@ public class GmPanel
     public void Tick()
     {
         if (panel.visible) { ResetPress(); return; } // 已打开时不再累计按键，避免重复重建
+        if (InputManager.PlayerInputBlocked) { ResetPress(); return; } // 输入被 UI 占用或 AI 接管时不响应
         if (GRoot.inst.focus is GTextInput) return; // 正在编辑输入框时不响应，避免 V 误开
         if (!Input.GetKeyDown(panelOpenKey)) return;
         if (pressCount == 0 || Time.unscaledTime - firstPressTime > panelOpenPressWindow)

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using FairyGUI;
 using Ros.UI.Main;
+using UnityRuntimeBridge;
 using UnityEngine;
 
 using Ros.Config;
@@ -12,12 +13,14 @@ public class UIManager : MonoBehaviour
     private BattlePage battle;
     private ChatPlugin chat;
     private GmPanel gm;
+    private SettingsView settings;
+    private GuideView guide;
 
     // GM 面板打开期间接管键盘：角色操控、技能、指令面板、技能选择都不得响应
     public bool GmOpen => gm != null && gm.IsOpen;
 
-    // 玩法输入归 UI 的三种情况：GM 面板打开、正在文字输入框里打字、战斗页设置面板打开（面板自带按钮，此时不该再操控角色）
-    public bool InputCaptured => GmOpen || IsTypingInTextField || (battle != null && battle.SettingsOpen);
+    // 玩法输入归 UI：GM 面板打开、正在文字输入框里打字、设置或图鉴打开
+    public bool InputCaptured => GmOpen || IsTypingInTextField || (settings != null && settings.IsOpen) || (guide != null && guide.IsOpen);
 
     private static bool IsTypingInTextField => GRoot.inst != null && GRoot.inst.focus is GTextInput;
 
@@ -72,6 +75,8 @@ public class UIManager : MonoBehaviour
             gm = new GmPanel(UI_GmPanel.CreateInstance());
             Settlement = new SettlementView();
             Confirm = new ConfirmView();
+            settings = new SettingsView();
+            guide = new GuideView();
 
             loading = UI_LoadingPanel.CreateInstance();
             loading.m_show_bar.selectedIndex = 0; // 未设置进度前不显示进度条
@@ -88,6 +93,11 @@ public class UIManager : MonoBehaviour
             gm.Construct();
             Settlement.Construct();
             Confirm.Construct();
+            settings.Construct();
+            guide.Construct();
+            settings.OnOpenGuide = OpenGuide;
+            settings.OnOpenBridge = OpenBridgeConfirm;
+            settings.OnExit = ExitFromSettings;
             Debug.Log("[UIManager] Construct 完成");
 
             ApplyResize();
@@ -134,6 +144,7 @@ public class UIManager : MonoBehaviour
         if (Screen.width != lastScreenWidth || Screen.height != lastScreenHeight) ApplyResize();
         if (currentPage != null) currentPage.Tick(Time.deltaTime);
         if (gm != null) gm.Tick();
+        if (settings != null) settings.Tick();
         if (robotTv != null) robotTv.Tick(Time.deltaTime);
         TickFloating();
     }
@@ -149,6 +160,8 @@ public class UIManager : MonoBehaviour
         if (chat != null) chat.OnResize(Screen.height / 1080f);
         if (gm != null) gm.OnResize(Screen.height / 1080f);
         if (Confirm != null) Confirm.OnResize(Screen.height / 1080f);
+        if (settings != null) settings.OnResize(Screen.height / 1080f);
+        if (guide != null) guide.OnResize(Screen.height / 1080f);
         if (loading != null)
         {
             float scale = Screen.height / 1080f;
@@ -251,9 +264,86 @@ public class UIManager : MonoBehaviour
     public void TurnPage(PageType type, ShowParam param = null)
     {
         if (Confirm != null) Confirm.Hide(); // 切页时收起未决的确认弹窗，避免残留遮罩挡住新页面
+        if (settings != null) settings.Hide(); // 设置/图鉴挂 GRoot，切页必须一起收起
+        if (guide != null) guide.Hide();
         if (currentPage != null) currentPage.Exit();
         currentPage = GetPage(type);
         if (currentPage != null) currentPage.Enter(param);
+    }
+
+    // 当前根页面：三个页面共用一个设置面板，面板里的跳转要按它判断去哪
+    public PageType CurrentPageType
+    {
+        get
+        {
+            if (currentPage == lobby) return PageType.Lobby;
+            if (currentPage == battle) return PageType.Battle;
+            return PageType.Home;
+        }
+    }
+
+    // 打开设置：三个页面上的设置按钮都走这里
+    public void OpenSettings()
+    {
+        if (guide != null) guide.Hide();
+        if (settings != null) settings.Show();
+    }
+
+    // 设置里的「图鉴」：先关设置再开图鉴；图鉴关闭只收起自己，回到当前根页面
+    private void OpenGuide()
+    {
+        if (settings != null) settings.Hide();
+        if (guide != null) guide.Show();
+    }
+
+    // notice.xlsx 主键：33 当前阶段不可启动桥接 / 34 桥接工具已经启动
+    private const int NoticeBridgeUnavailable = 33;
+    private const int NoticeBridgeRunning = 34;
+
+    // 设置里的「桥接」：只有 Home 能启动；已在跑就只提示；否则关设置 → 二次确认
+    private void OpenBridgeConfirm()
+    {
+        if (CurrentPageType != PageType.Home)
+        {
+            ShowFlyText(NoticeConfig.Get(NoticeBridgeUnavailable).text);
+            return;
+        }
+        if (RuntimeBridgeServer.IsRunning)
+        {
+            ShowFlyText(NoticeConfig.Get(NoticeBridgeRunning).text);
+            return;
+        }
+
+        if (settings != null) settings.Hide();
+        ShowConfirm("确定启动桥接工具吗？", StartBridge);
+    }
+
+    private void StartBridge()
+    {
+        RuntimeBridgeServer.Start();
+        if (!RuntimeBridgeServer.IsRunning)
+        {
+            Debug.LogError("[桥接] 启动失败：" + RuntimeBridgeServer.LastError);
+            ShowFlyText("桥接工具启动失败：" + RuntimeBridgeServer.LastError);
+            return;
+        }
+        ShowFlyText("桥接工具已启动");
+    }
+
+    // 设置里的「退出」：首页没有可退出的东西；大厅退房间、对局退本局
+    private void ExitFromSettings()
+    {
+        PageType page = CurrentPageType;
+        if (page == PageType.Home) return;
+
+        if (settings != null) settings.Hide();
+        string content = page == PageType.Battle ? "退出将放弃本局，确定退出吗？" : "确定离开房间吗？";
+        ShowConfirm(content, DoExit);
+    }
+
+    private static void DoExit()
+    {
+        if (Tool.NetworkManager != null) Tool.NetworkManager.ExitWorld();
     }
 
     //结算在大厅之上播放期间由结算流程控制大厅面板显隐

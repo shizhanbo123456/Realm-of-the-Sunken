@@ -44,9 +44,6 @@ public class BattlePage : PageBase
     private readonly Queue<string> importantBannerQueue = new(); // 待播的特殊技能播报文案，按到达顺序逐条播
     private bool importantBannerPlaying;                          // 当前 banner 动画是否在播
     private const string ImportantBannerPrefix = "特殊能力启动-";
-    private readonly List<int> settingTabKeys = new();   // 页签 → 配表 key（按 key 排序）
-    private readonly List<string> settingTabTexts = new(); // 每个页签对应的说明文本
-    private int settingTab; // 当前选中的页签下标
     private int godViewPressCount;        // 上帝视角连按计数
     private float godViewFirstPressTime;  // 本轮第一次按下的时刻（超窗口重算）
 
@@ -66,9 +63,6 @@ public class BattlePage : PageBase
     // 技能栏挂在玩家栏里（UI_PlayerPanel.m_skill_list）
     private UI_SkillList SkillBar => panel.m_playerPanel != null ? panel.m_playerPanel.m_skill_list : null;
 
-    // 设置页签内容（SettingsPanel 里多包了一层遮罩容器）
-    private UI_SettingScrollView SettingView => panel.m_SettingsPanel.m_settings.m_settingsPanel;
-
     public BattlePage(UI_BattlePanel panel) : base(panel)
     {
         this.panel = panel;
@@ -77,17 +71,8 @@ public class BattlePage : PageBase
     public override void Construct()
     {
         var battleInfo = panel.m_BattleInfoPanel;
-        battleInfo.m_btn_settings.onClick.Add(ShowSettings);
+        battleInfo.m_btn_settings.onClick.Add(OpenSettings);
         battleInfo.m_btn_quick_message.onClick.Add(ToggleQuickMessage);
-
-        var settings = panel.m_SettingsPanel;
-        settings.m_close2.onClick.Add(HideSettings);       // 关闭按钮（右上）
-        settings.m_close.onClick.Add(HideSettings);        // 关闭按钮（面板内）
-        settings.m_panel.m_close.onClick.Add(HideSettings); // 底框关闭按钮
-        SettingView.m_back_to_fight.onClick.Add(HideSettings);
-        SettingView.m_exit.onClick.Add(OnExitClicked); // 退出需二次确认（对局中退出不可逆）
-        BuildSettingTips();
-        BindSettingToggles();
 
         // 快捷指令轮盘挂在战斗信息面板里，FGUI 侧还没命名
         quickMessagePanel = battleInfo.GetChild("n5") as UI_QuickMessagePanel;
@@ -114,21 +99,11 @@ public class BattlePage : PageBase
         panel.m_godViewPanel.m_panel.m_close.onClick.Set(panel.m_godViewPanel.Close);
     }
 
-    // 设置面板常驻战斗界面，开关只改显隐与点击拦截
-    private void ShowSettings()
+    // 设置面板是全局子界面，三个页面共用（UIManager 持有）
+    private static void OpenSettings()
     {
-        panel.m_SettingsPanel.visible = true;
-        panel.m_SettingsPanel.touchable = true;
+        if (Tool.UIManager != null) Tool.UIManager.OpenSettings();
     }
-
-    private void HideSettings()
-    {
-        panel.m_SettingsPanel.visible = false;
-        panel.m_SettingsPanel.touchable = false;
-    }
-
-    // 设置面板打开期间玩法输入整体让给 UI（UIManager.InputCaptured 读它）
-    public bool SettingsOpen => panel.m_SettingsPanel.visible;
 
     // 快捷指令轮盘：点信息面板上的按钮开关；展开时按键 = 发送并收起
     private void ToggleQuickMessage()
@@ -227,67 +202,6 @@ public class BattlePage : PageBase
         return false;
     }
 
-    // 说明来自 setting_tips：规则页签按配表行生成，点页签把该行内容填进右上角的正文
-    private void BuildSettingTips()
-    {
-        var keys = new List<int>(SettingTipsConfig.content.Keys);
-        keys.Sort();
-        foreach (int key in keys)
-        {
-            settingTabKeys.Add(key);
-            settingTabTexts.Add(SettingTipsConfig.content[key].text.Replace(@"{\n}", "\n"));
-        }
-
-        var view = SettingView;
-        var tabs = view.m_rule_buttons;
-        tabs.itemRenderer = (i, obj) =>
-        {
-            var tab = obj.asButton;
-            // 页签标题写在条目自带的文本上（FGUI 里这个文本没命名）
-            var label = tab.GetChild("n3") as GTextField;
-            if (label != null) label.text = SettingTipsConfig.content[settingTabKeys[i]].name;
-            tab.selected = i == settingTab;
-            int index = i;
-            tab.onClick.Set(() => SelectSettingTab(index));
-        };
-        view.m_rule_content.UBBEnabled = true; // 配表内容带 UBB 标记（加粗 / 颜色）
-
-        tabs.numItems = settingTabKeys.Count;
-        if (settingTabKeys.Count > 0) SelectSettingTab(0);
-    }
-
-    // 两个勾选直接写 ClientSettings，相机与输入每帧读它；默认都不勾选（俯视 + 鼠标控俯仰）
-    private void BindSettingToggles()
-    {
-        var view = SettingView;
-        view.m_toggle_third_person_perspctivee.selected = ClientSettings.ThirdPersonCamera;
-        view.m_toggle_auto_pitch.selected = ClientSettings.AutoPitch;
-        view.m_toggle_third_person_perspctivee.onChanged.Add(() =>
-            ClientSettings.ThirdPersonCamera = view.m_toggle_third_person_perspctivee.selected);
-        view.m_toggle_auto_pitch.onChanged.Add(() =>
-            ClientSettings.AutoPitch = view.m_toggle_auto_pitch.selected);
-    }
-
-    // C 键切模式会写回同一个开关，这里把勾选态跟过去（面板常驻，不重建）
-    private void SyncSettingToggles()
-    {
-        var view = SettingView;
-        if (view.m_toggle_third_person_perspctivee.selected != ClientSettings.ThirdPersonCamera)
-            view.m_toggle_third_person_perspctivee.selected = ClientSettings.ThirdPersonCamera;
-        if (view.m_toggle_auto_pitch.selected != ClientSettings.AutoPitch)
-            view.m_toggle_auto_pitch.selected = ClientSettings.AutoPitch;
-    }
-
-    private void SelectSettingTab(int index)
-    {
-        settingTab = index;
-        var view = SettingView;
-        for (int i = 0; i < view.m_rule_buttons.numChildren; i++)
-            view.m_rule_buttons.GetChildAt(i).asButton.selected = i == index; // 页签选中态
-
-        view.m_rule_content.text = settingTabTexts[index];
-    }
-
     public override void Enter(ShowParam param)
     {
         base.Enter(param);
@@ -320,7 +234,6 @@ public class BattlePage : PageBase
         if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
             Tool.ClientLogicManager.HomePreview.Hide();
         ResetGuardStatues();
-        HideSettings(); // 设置面板每局从收起状态开始
         HideQuickMessage(); // 快捷消息面板每局从收起状态开始
         ResetGodViewPress(); // 连按计数每局清零
         HideImportantBanner(); // 重要事件 banner 每局从隐藏状态开始
@@ -381,8 +294,8 @@ public class BattlePage : PageBase
 
     public override void Tick(float deltaTime)
     {
-        // 输入被 UI 占用（GM 面板 / 文字输入 / 设置面板）时，技能选择、快捷消息与面板快捷键都不响应
-        if (!InputManager.InputCapturedByUi)
+        // 输入被 UI 占用或 AI 接管时，技能选择、快捷消息与面板快捷键都不响应
+        if (!InputManager.PlayerInputBlocked)
         {
             if (Input.GetKeyDown(GlobalConfig.skill_select_key)) ToggleSkillSelect();
             if (AnyQuickMessageKeyDown(out int quickMessageIndex)) HandleQuickMessageKey(quickMessageIndex);
@@ -391,7 +304,6 @@ public class BattlePage : PageBase
         //剩余时间（以快照校准的本地推演为准，重连/中途进入的起点由服务器补发）
         if (HasSession && BattleTime != null && panel.m_BattleInfoPanel.m_time_left != null)
             panel.m_BattleInfoPanel.m_time_left.text = FormatTime(Mathf.Max(0f, BattleTime.RemainTime));
-        SyncSettingToggles();
         RefreshTimeIcon();
         TickMinimap();
         TickMinimapPanels(deltaTime);
@@ -1136,18 +1048,6 @@ public class BattlePage : PageBase
         HideBuffTip();
     }
     #endregion
-
-    // 退出确认：确认后 ExitWorld → NetworkManager 触发 OnExitWorld → UIManager 切回主界面
-    private void OnExitClicked()
-    {
-        if (Tool.UIManager != null) Tool.UIManager.ShowConfirm("退出将放弃本局，确定退出吗？", DoExit);
-        else DoExit();
-    }
-
-    private static void DoExit()
-    {
-        if (Tool.NetworkManager != null) Tool.NetworkManager.ExitWorld();
-    }
     #endregion
 
     #region 抽卡（悬浮按钮 → 抽卡界面 → 选/弃）

@@ -35,6 +35,13 @@ public class LobbyPage : PageBase
         WireCamp(panel.m_btn_joinDefense, PlayerCampType.Defense);
         panel.m_btn_prepare.onClick.Add(ToggleReady);
         panel.m_btn_exit.onClick.Add(OnExitClicked);
+        panel.m_btn_settings.onClick.Add(OpenSettings);
+    }
+
+    // 设置面板是全局子界面，三个页面共用（UIManager 持有）
+    private static void OpenSettings()
+    {
+        if (Tool.UIManager != null) Tool.UIManager.OpenSettings();
     }
 
     public override void Enter(ShowParam param)

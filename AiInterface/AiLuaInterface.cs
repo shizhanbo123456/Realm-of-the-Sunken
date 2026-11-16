@@ -108,6 +108,11 @@ public sealed class AiLuaInterface : ClientSubManager
             onTick.Dispose();
             onTick = null;
         }
+        ClearCommands();
+    }
+
+    private void ClearCommands()
+    {
         foreach (var pair in extensions) pair.Value.Dispose();
         extensions.Clear();
         commandNames.Clear();
@@ -204,7 +209,7 @@ public sealed class AiLuaInterface : ClientSubManager
         if (!extensionsLoaded && !LoadExtensions()) return "错误：拓展脚本加载失败（详见控制台）";
         if (!extensions.TryGetValue(name, out var fn))
         {
-            return "错误：没有名为 " + name + " 的拓展命令（用 获取命令列表 查看）";
+            return "错误：没有名为 " + name + " 的拓展命令（用 listCommands 查看）";
         }
 
         object[] result;
@@ -220,6 +225,15 @@ public sealed class AiLuaInterface : ClientSubManager
 
         if (result == null || result.Length == 0 || result[0] == null) return "（无返回）";
         return result[0].ToString();
+    }
+
+    // 只重载拓展命令：清空注册表后重跑 extensions.lua，不动状态机
+    public string ReloadExtensions()
+    {
+        if (!EnsureEnv()) return "错误：LuaManager 未就绪";
+        ClearCommands();
+        extensionsLoaded = false;
+        return LoadExtensions() ? "已重载 lua 拓展命令" : "错误：拓展脚本加载失败（详见控制台）";
     }
 
     private bool LoadExtensions()
@@ -495,7 +509,9 @@ public sealed class AiLuaApi
 
     public bool is_night() => !BattleManager.IsDay;
 
-    public float day_progress() => BattleManager.Time01;
+    // 当前周期时间：0~2 单调递增，0/2 午夜、1 正午、白天是 0.5~1.5
+    // 不要拿折返量当进度（会 0→1→0 来回跑）；判断昼夜直接看 is_night()
+    public float cycle_time() => BattleManager.CycleTime;
     #endregion
 
     #region 写：意图与动作

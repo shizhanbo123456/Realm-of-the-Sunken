@@ -12,9 +12,12 @@ public partial class BattleManager
     // 0/2 午夜、1 正午
     public static float CycleTime { get; private set; } = 1f;
 
-    public static int Direction => CycleTime < 1f ? 1 : -1;
+    // 时间行进方向：+1 走向正午、-1 走向午夜；只在昼夜推演内部使用
+    private static int Direction => CycleTime < 1f ? 1 : -1;
 
-    public static float Time01 => 1f - Mathf.Abs(CycleTime - 1f);
+    // 白天程度：0 = 午夜、1 = 正午，一整天会 0→1→0 折返，同一个值对应上行/下行两个时刻
+    // 只服务 IsDay / DayFactor；对外要"时间"一律读 CycleTime（0~2 单调），拿它当进度会来回跳
+    private static float Time01 => 1f - Mathf.Abs(CycleTime - 1f);
 
     public static bool IsDay => Time01 >= DayNightBoundary;
 

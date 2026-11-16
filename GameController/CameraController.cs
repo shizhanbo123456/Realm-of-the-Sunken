@@ -166,7 +166,7 @@ public class CameraController : MonoBehaviour
         if (!sessionActive) return;
 
         bool spectator = loading.IsSpectator;
-        bool keysBlocked = InputManager.InputCapturedByUi; // 输入被 UI 占用（GM 面板 / 打字 / 设置面板）时相机也不收键
+        bool keysBlocked = InputManager.PlayerInputBlocked; // 输入被 UI 占用或 AI 接管时相机也不收键
 
         if (!keysBlocked && spectator && Mode != CameraViewMode.Free && Input.GetKeyDown(KeyCode.W))
         {
@@ -216,7 +216,7 @@ public class CameraController : MonoBehaviour
     // 第三人称：鼠标水平滑动转镜头，纵向滑动改俯仰（勾选自动俯仰角时不接管）；俯视不响应鼠标
     private void TickMouseLook()
     {
-        if (Mode != CameraViewMode.ThirdPerson || InputManager.InputCapturedByUi)
+        if (Mode != CameraViewMode.ThirdPerson || InputManager.PlayerInputBlocked)
         {
             mousePosValid = false;
             return;
@@ -335,7 +335,7 @@ public class CameraController : MonoBehaviour
     // 键位固定：WASD 水平平移 / K 升 J 降 / Q 左转 E 右转 / Y 抬头 H 低头
     private void TickFreeKeys()
     {
-        if (InputManager.InputCapturedByUi) return;
+        if (InputManager.PlayerInputBlocked) return;
         float deltaTime = Time.deltaTime;
         if (Input.GetKey(KeyCode.Q)) freeYaw -= freeTurnSpeed * deltaTime;
         if (Input.GetKey(KeyCode.E)) freeYaw += freeTurnSpeed * deltaTime;
@@ -346,7 +346,7 @@ public class CameraController : MonoBehaviour
 
     private void TickFreeMove(float deltaTime)
     {
-        if (InputManager.InputCapturedByUi) return;
+        if (InputManager.PlayerInputBlocked) return;
         float yawRad = freeYaw * Mathf.Deg2Rad;
         Vector3 fwd = new Vector3(Mathf.Sin(yawRad), 0f, Mathf.Cos(yawRad));
         Vector3 right = new Vector3(Mathf.Cos(yawRad), 0f, -Mathf.Sin(yawRad));

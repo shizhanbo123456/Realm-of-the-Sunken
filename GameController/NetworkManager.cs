@@ -224,6 +224,7 @@ public partial class NetworkManager : EnsBehaviour
             attackCharacter = EntityType.Attack(Mathf.Clamp(ClientSelection.selectedAttackIndex, 0, GlobalConfig.attack_character_count - 1)),
             defenseCharacter = EntityType.Defense(Mathf.Clamp(ClientSelection.selectedDefenseIndex, 0, GlobalConfig.defense_character_count - 1)),
             name = ClientSelection.playerName,
+            aiTakeover = InputManager.IsAiControl, // Home 阶段定下的控制模式，服务器据此决定是否给实体挂 AI 行为状态机
         };
         CallFuncRpc(ServerReceivePlayerInfoLocal, SendTo.RoomOwner, Delivery.Reliable, info, LocalToken);
     }

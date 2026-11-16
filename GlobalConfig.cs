@@ -163,15 +163,9 @@ public static class GlobalConfig
     #endregion
 
     #region 武器与技能
-    #region 武器技能 id 区间（珊瑚掉落在这段技能里均匀随机；段长与顺序不可随意调整）
+    #region 武器技能 id 区间（抽卡按品质在这段技能里筛；段长与顺序不可随意调整）
     public const int weapon_skill_id_min = (int)SkillType.SkillFanIceCone;
     public const int weapon_skill_id_max = (int)SkillType.SkillAllyShieldTwentyFive;
-
-    public static int GetRandomWeaponSkillId()
-    {
-        // 四个武器技能段在 SkillType 里连续（刀 11 / 长枪 8 / 枪械 15 / 魔法球 16 = 50），整段随机即均匀随机
-        return Random.Range(weapon_skill_id_min, weapon_skill_id_max + 1);
-    }
     #endregion
     #endregion
 

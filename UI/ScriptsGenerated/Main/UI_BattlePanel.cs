@@ -24,7 +24,6 @@ namespace Ros.UI.Main
         public UI_GodViewMinimapPanel m_godViewPanel;
         public UI_LargeMinimapPanel m_largeMinimapPanel;
         public UI_SelectCardPanel m_selectCardPanel;
-        public UI_SettingsPanel m_SettingsPanel;
         public Transition m_showBanner;
         public Transition m_showHit;
         public const string URL = "ui://q68vr2bfjtpbhd";
@@ -55,7 +54,6 @@ namespace Ros.UI.Main
             m_godViewPanel = (UI_GodViewMinimapPanel)GetChildAt(18);
             m_largeMinimapPanel = (UI_LargeMinimapPanel)GetChildAt(19);
             m_selectCardPanel = (UI_SelectCardPanel)GetChildAt(20);
-            m_SettingsPanel = (UI_SettingsPanel)GetChildAt(21);
             m_showBanner = GetTransitionAt(0);
             m_showHit = GetTransitionAt(1);
         }

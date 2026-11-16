@@ -1,6 +1,13 @@
 ﻿using FairyGUI;
 using UnityEngine;
 
+// 本机控制模式：Home 阶段可切换，连接服务器时随 CSLobbyPlayerInfo 上报，连上后不允许再改
+public enum PlayerControlMode
+{
+    Player,
+    Ai,
+}
+
 public class InputManager : MonoBehaviour
 {
     private bool inputBlocked;   // GM 面板 / 文字输入期间屏蔽上行；进入屏蔽的那一帧先把手上的操作全部松开
@@ -17,17 +24,39 @@ public class InputManager : MonoBehaviour
 
     private void Update()
     {
+        ApplyUiTouch();
         SendInput();
     }
 
-    // 唯一的输入占用判定：UI 占用期间（GM 面板 / 文字输入 / 战斗页设置面板），角色、相机、技能与普攻都不再收输入
+    public static PlayerControlMode Mode { get; private set; } = PlayerControlMode.Player;
+
+    public static bool IsAiControl => Mode == PlayerControlMode.Ai;
+
+    public static void SetControlMode(PlayerControlMode mode)
+    {
+        if (Mode == mode) return;
+        Mode = mode;
+        ApplyUiTouch();
+    }
+
+    // AI 接管期间 FGUI 不吃任何指针输入，解除后恢复；GRoot 迟到由 Update 每帧补（同值赋值无副作用）
+    private static void ApplyUiTouch()
+    {
+        if (GRoot.inst == null || GRoot.inst.touchable != IsAiControl) return;
+        GRoot.inst.touchable = !IsAiControl;
+        if (IsAiControl && Stage.inst != null) Stage.inst.SetFocus(null, true); // 顺手收掉接管前留下的文字焦点
+    }
+
+    // 唯一的输入占用判定：UI 占用（GM 面板 / 打字 / 设置页）或 AI 接管期间，角色、相机、技能与快捷键都不收输入
+    public static bool PlayerInputBlocked => InputCapturedByUi || IsAiControl;
+
     public static bool InputCapturedByUi => Tool.UIManager != null && Tool.UIManager.InputCaptured;
 
     private void SendInput()
     {
         if (Tool.NetworkManager == null) return;
 
-        if (InputCapturedByUi)
+        if (PlayerInputBlocked)
         {
             if (!inputBlocked)
             {

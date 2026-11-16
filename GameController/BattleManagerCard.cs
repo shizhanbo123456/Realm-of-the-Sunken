@@ -356,7 +356,6 @@ public partial class BattleManager
         sync.skills.Add(skillId);
         Tool.NetworkManager.SendSkillSync(clientId, sync);
         SendSkillRecharge(clientId); // 新技能可能自动进栏
-        NotifyPlayer(clientId, 14);
     }
 
     private void HealByPercent(int clientId, float percent)

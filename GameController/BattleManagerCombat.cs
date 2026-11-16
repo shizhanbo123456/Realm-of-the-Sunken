@@ -216,11 +216,10 @@ public partial class BattleManager
         EndBattle(AttackScore >= DefenseScore() ? 1 : 2);
     }
 
-    // 珊瑚被摧毁：先按尺寸给击杀者回血（与是否掉落、掉落结果无关），再走掉落
+    // 珊瑚被摧毁：按尺寸给击杀者回血
     public void OnCoralDestroyed(EntityData coral)
     {
         HealCoralKiller(coral);
-        TryDropCoralWeapon(coral);
     }
 
     // 击败珊瑚的玩家角色实体（含 AI 代打）；击杀者未归属任何客户端时返回 null
@@ -245,38 +244,6 @@ public partial class BattleManager
         if (heal <= 0f) return;
         player.attributes.Heal(heal);
         player.healthDirty = true;
-    }
-
-    // 掉武器：服务器只记持有，已持有就不重复加；能装进技能栏几个由客户端决定
-    public void TryDropCoralWeapon(EntityData coral)
-    {
-        var player = GetCoralKillerPlayer(coral, out int clientId);
-        if (player == null || player.skillController == null) return;
-
-        float chance = coral.type.value <= 0
-            ? GlobalVariable.F(global_variablesEnum.coral_small_drop_chance)
-            : GlobalVariable.F(global_variablesEnum.coral_large_drop_chance);
-        if (UnityEngine.Random.value > chance) return;
-
-        int weaponId = GlobalConfig.GetRandomWeaponSkillId(); // 掉的是技能：武器技能段内均匀随机
-        var ids = player.skillController.GetSkillIds();
-        if (ids.Contains(weaponId)) return;
-        player.skillController.AddSkill(weaponId);
-        var sync = new SCSkillSync { full = false };
-        sync.skills.Add(weaponId);
-        Tool.NetworkManager.SendSkillSync(clientId, sync); // 增量下发：技能不再跟随实体表现包
-        SendSkillRecharge(clientId); // 拾取的新武器可能自动进栏，槽位与根戳跟着补
-        NotifyPlayer(clientId, 14); // 获得新武器
-    }
-
-    // 战斗事件列表的纯文字提示（文本走 notice.csv）
-    private void NotifyPlayer(int clientId, int messageId)
-    {
-        Tool.NetworkManager.SendBattleEvent(clientId, new SCBattleEvent()
-        {
-            type = SCBattleEvent.Type.Notice,
-            textId = messageId,
-        });
     }
 
     private void TickRevive()
@@ -338,6 +305,8 @@ public partial class BattleManager
         {
             player.robotControlled = RobotClients.Contains(clientId);
             player.aiControlled = AiClients.Contains(clientId); // 复活换实体：接管状态按会话恢复
+            if (player.aiControlled && player.AiRelay == null)
+                player.AiRelay = new AiIntentRelay(player, clientId); // 新实体同样默认挂上行为状态机
         }
         SendSkillRecharge(clientId); // 新实体满库存：把重生后的技能栏快照同步给本人
 

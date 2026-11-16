@@ -5,18 +5,18 @@ AI 实时操控交互（命令行 + Lua）
 ----------------------------------------------------
 
 控制权：决策在客户端，执行在服务器。
-  客户端：命令行（外部 AI 的入口）+ Lua（状态机脚本 + 命令行拓展脚本）
+  客户端：命令行（外部 AI 的入口，命令集来自配表）+ Lua（状态机脚本 + 命令行拓展脚本）
   服务器：意图转发 + 行为层，不做任何决策
 
 三条链路：
   1. 命令行 → 本地 C#（房间流程、聊天、查询类，不联网也能取）
   2. Lua 状态机 → 本地 C# → 意图上行 → 服务器意图转发器 → 行为层
-  3. 服务器事件 → 中断原因列表 → 命令行「等待中断」整批返回
+  3. 服务器事件 / 用户操作 → 中断原因列表 → ai.interrupts（外部 ai.wait 轮询）
 
 行为层复用现有三件套，不新写状态机：
   BehaviorArbiter + IBehaviorHost + IdleBehavior / MoveBehavior / AttackBehavior
   停步、朝向、动作未播完不许切（AttackBehavior.CanInterrupt = !host.IsActing）全部归行为层
-服务器侧只新增一个「意图转发器」，做「客户端意图 → BehaviorArbiter 请求」的翻译，不含决策
+服务器侧只有「意图转发器」，做「客户端意图 → BehaviorArbiter 请求」的翻译，不含决策
 
 复用边界：
   不复用 GM 指令通道（CSGm / ExecuteGm）
@@ -25,357 +25,283 @@ AI 实时操控交互（命令行 + Lua）
   复用项目基础设施：BehaviorArbiter / IBehaviorHost / Behavior、EntitySkillController、Timer、EventManager
 
 坐标与时间口径：
-  位置只给 XZ（地形是平的），单位米，地图范围取配表 terrain_size 的「最小;最大」（当前 0 ~ 384）
+  位置只给 XZ（地形是平的），单位米；不传高度，服务器按地面吸附
   朝向为 yaw 度数，0° = +Z，与 PlayerEntityData 的 moveState.yaw 同口径
-  不传高度：服务器按地面吸附
+  昼夜用 BattleManager.CycleTime（0~2 单调，0/2 午夜、1 正午），白天落在 0.5~1.5
 
 交互语义：
-  除「等待中断」外，所有命令立即返回
-  失败不返回原因：失败提示走「提示消息」中断，AI 中断后自己看
-  移动不做「到达」中断：中途大概率遇到敌人而中断，到没到由 AI 自己判位置
+  命令一律立即返回（结果作为返回文本），没有阻塞式命令
+  失败以「错误：…」文本返回，不抛出协议错误
+  移动不做「到达」中断：到没到由 AI 自己查坐标，走不到会收到 MoveFailed
+  无命令 = 服务器保持最后一个动作，不设超时兜底
 
-战斗期分工：
-  战斗节奏快，命令行不参与操作，一律由客户端 Lua 状态机驱动
-  命令行只在战斗外做编排、查询与调试
-
-二、命令行可控内容
+二、命令行：ai_command 配表驱动
 ----------------------------------------------------
 
-通用（不联网也可用，除注明）
-  发送聊天(channel, content)
-      联网后有效；channel 0 全频道 / 1 阵营频道
-      落点：NetworkManager.SendChat(CSChat)
-  读取聊天记录(数量 N)
-      返回最近 N 条，每条：消息类型（全局 / 阵营 / 系统）、发送者阵营、发送者名称、内容
-      收发都要：自己发的（本地回显）与他人的都算
-      系统消息来自 SCPrompt / SCBattleEvent，不含伤害飘字
-  获取本地玩家名称
-      落点：ClientSelection.playerName
-  等待中断(可加定时)
-      唯一的阻塞命令：先取中断原因列表的积压，非空立即整批返回；空则挂起等待
-      带定时时，超时也作为一种中断原因返回
-  设置可选中断(开关集合)
-      全局生效，未开启的可选中断不记录（避免列表被无用条件灌满）
+2.1 表结构（Config/Source/ai_command.xlsx，表名 ai_command）
+  列：key / command / commandHelp / home / lobby / battle /
+      param1Name / param1Type / param1Desc（param2、param3 同构）
+  home / lobby / battle 为 bool?：填 1 = 该相位可用，留空 = 不可用
+  参数类型只允许 int / float / bool / string / List<int>
+  一张表 33 行，主键即命令 id
 
-Home
-  选择角色(进攻方下标, 防守方下标)
-      落点：ClientSelection.selectedAttackIndex / selectedDefenseIndex
-      进房时随 CSLobbyPlayerInfo 上报，含等级与名字
-  连接服务器(ip)
-      落点：NetworkManager.TryConnect → 成功后 EnterWorld()
-      失败提示由服务器/本地弹提示，AI 通过「提示消息」中断看到
-  设置本地玩家名称(名称)
-      落点：ClientSelection.playerName，进房时上报
+2.2 代码接线
+  configtool.py 生成 ai_commandConfig.cs + ai_command.bytes，并写入 ConfigManager.LoadAll
+  Config/AiCommandConfig（TableConfigs.cs）：content 字典 + ordered（按 key 升序）
+  ConfigManager.InitExtensions 里 Bake，早于 ClientLogicManager.Awake（DefaultExecutionOrder -200）
+  AiInterface/AiCommandId.cs：主键常量，配表增删或改 id 时同步改
+  AiCommandLine.RegisterFromConfig：按 ordered 建命令表（名称 / 相位 / 用法串），byName 字典查表
+  AiCommandLine.Dispatch：按 row.key switch 到具体处理函数
+  配表有行但代码没接：返回「错误：命令 id=N 没有对应的处理逻辑」
 
-Lobby
-  选择阵营(camp)        0 进攻 / 1 防守 / 2 观战
-  准备(ready)           true / false
-  离开房间
-      落点：NetworkManager.SendLobbyUpdate(CSLobbyUpdate) / ExitWorld()
+2.3 参数规则
+  全部在客户端校验，类型或个数不对直接本地拦截，不发服务器
+  int / float：严格解析；float 拒绝 NaN / Infinity
+  bool：true / false / 1 / 0
+  string：单个 token；「最后一个且不是第一个」的 string 吃掉剩余全部 token（聊天内容、lua 参数）
+  List<int>：吃掉剩余全部 token，空格或分号分隔，允许为空
+  命令名大小写敏感
 
-Battle
-  站立                      停步并保持朝向，见「四、意图与行为层映射」
-  移动到目标(x, z)           走向静止坐标，到达后停在原地
-  攻击珊瑚                  攻击最近的珊瑚（内部等价于「攻击目标(珊瑚 id)」）
-  释放指定技能(skillId)      不走意图，直接让行为层停步+施法，见第四节
-  计算移动路程的预计路径长度(x, z)
-      客户端用 NavMesh 算；返回路径长度与是否可达
-      仅作预估：客户端与服务器是两份独立烘焙数据，可达性以服务器的「移动失败」为准
-  激活客户端 lua 状态机      激活时自动重载一次状态机脚本
-  停止客户端 lua 状态机      停决策 + 发一次站立（避免角色保持上一个动作继续跑）
-  执行 lua 拓展内容(命令名, 参数…)
-      调用 lua 拓展脚本里注册的命令，见第七节
-  获取小地图显示的实体
-      返回小地图当前实际显示的点：实体 id、类型、阵营、坐标、白眼标记
-      口径 = 小地图显示内容本身（已按显示半径裁剪、已剔除超时与消亡）
-  截屏
-      返回文件路径 + 当前位置 + 朝向；图片单独存盘
-      会临时开启相机渲染至少一帧再截（与「设置相机开关」互斥）
-  获取技能列表（含库存）
-      槽位内技能：技能 id + 当轮恢复进度 + 剩余库存（-1 = 无限）
-      槽位外技能：只给 id 列表
-  设置技能栏的技能(id 列表)
-      服务器校验后回推快照，本地不预演
-      作用不止于按键顺序：栏外技能冷却冻结不恢复，故「进栏」= 让它持续恢复
-  设置相机开关(开 / 关)
-      指是否启用相机渲染（关闭省帧），不是切换视角模式
-      关闭时坐标换算、射线的能力不受影响：停渲染不停 Camera 组件
-  守护点血量信息
-      四个守护点 main / sub1 / sub2 / sub3 的 0~100 开采进度（被打掉的血量百分比），
-      不是实体生命值；是否被摧毁看 StatueDestroyed 事件
-  本地玩家血条和技能状态
-      血量当前/上限、buff 列表、技能槽位与冷却进度、库存
+2.4 相位
+  Offline = 未连上服务器（Home）
+  Lobby   = 已连上、战斗未开始
+  Battle  = 战斗进行中
+  用错相位返回「错误：命令 X 在当前相位 Y 不可用」
 
-三、Lua 可控内容
+2.5 命令清单（33 条，参数见括号）
+  Home（Offline）
+    setMyPlayerName(name:string)      设置本地玩家名称
+    getMyPlayerName()                 读取本地玩家名称（三相位都可用）
+    selectCharacter(camp:int,index:int) camp 0 进攻 / 1 防守，index 为该侧角色下标
+    connectToServer(ip:string)        连接服务器，ip 必填
+    takeover(enabled:bool)            true = AI 接管并锁本地输入，false = 还给人
+  Lobby
+    joinCamp(camp:int)                0 进攻 / 1 防守 / 2 观战
+    lobbyPrepare(prepared:bool)       准备 / 取消准备
+    exitRoom()                        离开房间
+  通讯（Lobby + Battle）
+    sendChatMessage(channel:int,message:string)  0 全频道 / 1 阵营 / 2 附近
+    readChatMessage(channel:int,count:int)       0 全部 / 1 阵营 / 2 附近 / 3 系统
+    quickMessage(messageId:int)                  对应 quick_message 主键 0~7
+    quickMessageWithPosition(messageId:int,x:float,z:float)
+  Battle 操作
+    moveTo(x:float,z:float)
+    collectCoral()                    攻击小地图上最近的珊瑚
+    castSkill(skillId:int)            走 CSAiSkillCast 专用通道
+    calculatePath(x:float,z:float)    客户端 NavMesh 预估
+    startLuaStateMachine()            激活即整份重载拓展脚本 + 状态机脚本
+    stopLuaStateMachine()             停决策并下发一次站立
+  Battle 查询
+    getSkillList()                    槽位 + 冷却进度 + 库存
+    setSkillColumn(skillIds:List<int>) 服务器校验后回推快照，空列表 = 清空
+    getInfo()                         自身 / 守护点 / 阵营人数 / 昼夜 / 小地图条数
+    currentPos()
+    getSelfStatus()                   实体 / 阵营 / 血量 / 坐标 / 朝向 / buff
+    getGuardProgress()                四个守护点当前血量（上限读 entity.csv）
+    getMinimapEntities()              小地图缓存逐条
+    getDayNightInfo()                 昼夜 + CycleTime
+    getCampCount()                    双方存活/总数 + 观战人数
+    getPointInfo()                    守护点 / 防御塔 / 中立雕像 / 出生点
+    setCameraRender(enabled:bool)     相机渲染开关
+    screenshot()                      存到 <项目根>/Screenshots
+  Lua（三相位都可用）
+    reloadLuaCommand()                只重载 extensions.lua，不动状态机
+    execLuaCommand(command:string,args:string)
+    listCommands()                    当前相位可用命令 + lua 拓展命令名
+
+2.6 错误口径
+  空命令        → 错误：空命令
+  未知命令      → 错误：未知命令 X（用 listCommands 查看）
+  相位不符      → 错误：命令 X 在当前相位 Y 不可用
+  参数个数不符  → 错误：参数数量不符，用法 <command> <name>:<type>…
+  参数类型不符  → 错误：参数 X 必须是 Y
+  业务前置不满足→ 错误：未联网 / 没有战斗会话 / 本地玩家实体未就绪 等
+
+三、对外入口（StreamingAssets/AiCmd）
 ----------------------------------------------------
 
-操控服务器状态机(意图, 目标)
-  意图集合：站立 / 移动到位置(x, z) / 攻击目标(entityId) / 停止
-  「攻击珊瑚」为命令别名，内部解析成「攻击目标(最近珊瑚 id)」
-  敌我单位与珊瑚都走「攻击目标」，不再按类别分命令
-  意图按需下发，不逐帧发：由 C# 侧比较后只在变化时上行，Lua 每帧调也不会刷包
+传输：本机 TCP 127.0.0.1:21928（runtime-bridge，随游戏自动开服，ini 在
+      StreamingAssets/unity-python-bridge-runtime/runtime_bridge.ini）
 
-释放指定技能(skillId)
-  不经过意图与决策，直接让行为层停步 + 施法（见第四节）
-  技能合法性全部由服务器的 EntitySkillController 收口，Lua 不需要自己算冷却
+目录：
+  exec.bat       exec <命令> [参数...]，所有命令的统一入口
+  ping.bat       连通性检测
+  wait.bat       轮询 ai.interrupts 模拟阻塞等待
+  _env.bat       公共前置：定位桥客户端与 python，导出 PYDIR / PY
+  _call.py       exec 的实现：读 AI_LINE 环境变量，调 ai.exec
+  wait.py        wait 的实现
 
-信号发出(消息类型, 可选位置)
-  对应现有 8 种快捷消息：集结 / 解除信号 / 进攻 / 危险警告 / 请求上报 / 上报状况 / 争夺中立 / 请求护送
-  位置缺省表示不携带（动态锚点，跟随发送者）
+实现要点：
+  exec.bat 把整条命令行塞进 AI_LINE 环境变量再交给 _call.py，
+  不在 bat 里做嵌套引号转义（带空格的聊天内容原样保留给 C# 的 SplitArgs）
+  _env.bat 依次探测打包布局与编辑器布局，都找不到时用 AI_BRIDGE_PY，
+  解释器优先随包的 ../python/python.exe，再退系统 python / py -3
+  桥侧命令只有两个：ai.exec（执行一条命令行）与 ai.interrupts（取走中断）
+  bat 必须 CRLF、正文纯 ASCII；中文只作为命令行参数传入
+  退出码：0 正常（含超时）/ 1 连接或调用失败 / 2 参数错误
 
-触发中断(原因文本)
-  Lua 主动往中断原因列表写一条，供下一次「等待中断」取走
-
-命令行拓展
-  Lua 侧注册命令，供命令行按需调用，见第七节
-
-四、服务器：意图转发器与行为层
+四、Lua 接口
 ----------------------------------------------------
 
-职责：只把客户端意图翻译成 BehaviorArbiter 的请求，不做任何判断、不索敌、不选技能。
+环境：
+  借用 LuaManager 的 LuaEnv（不自建），Env 重建后重挂 ai 全局
+  AddLoader 把 require("a.b") 映射到 StreamingAssets/LuaInterface/a/b.lua
+  入口脚本：state_machine.lua（必须定义 on_tick(dt)）、extensions.lua
+  激活/停止/重载都整份重新执行入口脚本，不清理 package.loaded（require 的用户模块沿用缓存）
+  脚本抛错 → LogError + LuaError 中断 + 停状态机 + 下发一次站立
 
-每帧：
-  1. 收到上行意图 → 立即写入请求（不等下一拍）
-  2. arbiter.Tick(deltaTime) 每帧执行
-  转发层不做节流：ThinkInterval 必须为 0，否则命令最多延迟一个间隔才落到行为层
+ai 表（读：零成本，可每帧调）
+  phase() / connected() / self_id() / self_camp() / self_alive()
+  self_hp() / self_max_hp() / self_x() / self_z() / self_yaw()
+  buff_count() / buff(i)
+  map_count()（顺带刷新缓存）/ map_id(i) / map_cat(i) / map_val(i) / map_camp(i) / map_x(i) / map_z(i) / map_marked(i)
+  slot_count() / slot_skill(slot) / slot_progress(slot) / slot_store(slot)
+  held_count() / held_skill(i) / skill_info(skillId)
+  guard_progress(index) 0~100 被打掉的血量百分比，index 0 主 / 1~3 副；无数据 -1
+  is_night() / cycle_time()（0~2 单调，0/2 午夜、1 正午）
 
-意图 → 行为层映射（行为层共三个行为：Idle / Move / Attack）
-  站立            → RequestIdle(朝向点)
-  移动到位置      → RequestMove(point)         请求只在变化时下发，行为层只在请求变化时 MoveTo
-  攻击目标(id)    → RequestAttack(target)      停步 + 面朝 + 按技能栏节奏出手
-  停止            → RequestIdle() 并清空意图
+ai 表（写：只在值变化时上行）
+  stand() / stop() / move_to(x,z) / attack(entityId)
+  cast_skill(skillId)        走 CSAiSkillCast，不做技能注册校验
+  signal(messageId) / signal_at(messageId,x,z)   8 种快捷消息，位置可选
+  interrupt(text)            推一条 LuaTrigger 中断
+  register_command(name,fn) / command_count() / command_name(i)
 
-释放指定技能：
-  走独立的 AI 专用协议（CSAiSkillCast → ReceiveAiSkillCast），与键盘技能键分开：
-  接管期间键盘包被服务器丢弃，不影响这条通道
-  不算意图，属于插队行为：停步 + 面朝（若有目标）+ TryUseSkill(skillId)
-  释放后保留原意图，下一拍回到原行为（放技能不打断走位意图）
-  技能被拒（未持有 / 沉默 / 强控 / 冷却）：由服务器的既有提示与技能快照处理，Lua 不另做判断
+去重：移动/站立/攻击同值不重发；自身实体 id 变化（复活换实体）时缓存作废
 
-攻击类不判距离：
-  EntitySkillController.TryUseSkill 没有施法距离门闸，超距也会放出去（按射程给落点）
-  「攻击目标」只做停步+面朝+出手，走到射程内是客户端状态机的职责
+五、服务器：接管与意图转发
+----------------------------------------------------
 
-移动失败要回传：
-  MoveBehavior 在目的地算不出路时会 Stop + NotifyStuck
-  转发器把它转成一条中断原因（移动失败：目标不可达），否则客户端会对着走不到的点反复下命令
+接管来源：
+  客户端在 Home 阶段用 takeover 选定控制模式，连接时随 CSLobbyPlayerInfo.aiTakeover 上报
+  BattleManager.AddPlayer 按该标记把 clientId 记进会话级 AiClients
+  出战与复活置 aiControlled 后立即 new AiIntentRelay（不等第一条意图）
+  进房后不能再改模式（takeover 只在 Offline 相位注册）
 
-无命令 = 保持最后一个动作（设计如此，服务器不做超时兜底）：
-  行为层的 None 语义是「本拍没意见，保持当前动作」，停发命令后角色会一直保持上一个动作
-  需要停下时由客户端显式下发「站立」：停止状态机与 lua 崩溃路径已带站立下发，断线则保持到重连
+接管效果：
+  PlayerEntityData.aiControlled 决定 OnTickMove 走 TickRobotMove 的自动驱动分支
+  KeyboardBlocked 为真 → 该客户端的键盘移动、技能键一律丢弃
+  AiClients 只在玩家退场时移除
 
-实现注意：
-  1. 被 AI 操控的玩家实体不能标 robotControlled（那是 RobotAi 的入口，会连带技能栏与快捷消息），
-     需要独立开关；但 OnTickMove 里「自动移动分支」（FaceDirection + SetMoveInput）要复用同一份，
-     建议把该分支的判据泛化为「自动驱动」，不要复制一份移动逻辑
-  2. RequestIdle 目前只接受实体作为朝向目标，「站立并面向某个点」要补一个点重载
-  3. 转发器的 Tick 挂在 PlayerEntityData.TickAuto()，与 RobotAi 同层互斥
-  4. AI 接管期间服务器丢弃该客户端的键盘输入（ReceiveInput / ReceiveSkillCast 各一处判断），
-     接管状态记在会话上（BattleManager.AiClients）：复活重建实体时按会话恢复，只在玩家退场时清除
+意图转发（AiIntentRelay，DecisionMachine + IBehaviorHost）：
+  ThinkInterval = 0，RelayState 每拍重申意图，命令到达当帧就落到行为层
+  站立 / 停止 → RequestIdle；移动到位置 → RequestMove；攻击目标 → RequestAttack
+  出手顺序：持有技能按品质降序、同品质 id 降序；全不可用退空手拳
+  目的地算不出路 → Stop + NotifyStuck → SCAiFeedback(kind=0) → 客户端 MoveFailed 中断
 
-五、默认 Lua 状态机（实现于 StreamingAssets/LuaInterface/state_machine.lua）
+协议：
+  CSAiIntent{intent 0 站立/1 移动到位置/2 攻击目标/3 停止, posX, posZ, targetId}
+  CSAiSkillCast{skillId}                     AI 专用，接管期间键盘包被丢弃也不影响它
+  SCAiFeedback{kind, posX, posZ, targetId}   目前只有 kind=0 移动失败
+
+释放技能属于插队行为：停步 + 面朝（若有目标）+ TryUseSkill，保留原意图
+攻击类不判距离：超距也会放出去，走到射程内是客户端状态机的职责
+无命令 = 行为层「本拍没意见」，保持当前动作，服务器不做超时兜底
+
+六、默认状态机（StreamingAssets/LuaInterface/state_machine.lua）
 ----------------------------------------------------
 
 状态：站立、移动到位置、攻击敌人、逃跑、寻找珊瑚、追击珊瑚、攻击珊瑚
-参数（脚本顶部常量，暂定值，实测后调整）：
-  追击阈值 12m ｜ 脱离阈值 18m ｜ 攻击性 0~1（0.5）｜ 攻击距离 8m ｜ 意图重发节拍 0.2s
+参数（脚本顶部常量）：CHASE_RANGE 12 / BREAK_RANGE 18 / AGGRESSION 0.5 / UNARMED_RANGE 2 / PULSE 0.2
 
-规则（每 0.2s 一拍，感知全部来自小地图即雷达半径内）：
-  血量 < (1 − 攻击性 × 0.7) 且附近有敌人 → 逃跑：朝背离敌人撤到脱离阈值外，拉开或脱战即结束
-  敌人进入追击阈值 → 攻击：先 move_to 贴近，进攻击距离后每拍重发 attack（持续出招的节拍）
-  敌人拉出到脱离阈值或消失 → 回站立
-  视野内有珊瑚 → 攻击距离内 attack、距离外 move_to（真敌人的判定在珊瑚之前）
+规则（每 0.2 秒一拍，感知全部来自小地图）：
+  血量 < (1 − 攻击性 × 0.7) 且附近有敌人 → 逃跑：朝背离敌人方向撤到脱离阈值外
+  敌人进入仇恨范围（max(追击阈值, 当前有效射程)）→ 射程内 attack、射程外 move_to
+  敌人拉出脱离阈值或消失 → 回站立
+  视野内有珊瑚 → 射程内 attack、射程外 move_to（真敌人优先于珊瑚）
   都没有 → 站立
-敌我判定 = 阵营不同且非中立（鲛人属防守阵营，天然被进攻方当敌人）
-注意：状态机激活期间，命令行的 站立/移动到位置/攻击珊瑚 会被状态机节拍覆盖；手动控制先停状态机
+有效射程 = 有库存技能里最远的射程（ai.skill_info 的「射程=」），全部无库存时按空手拳 2m
 
-六、中断系统
+注意：状态机激活期间，命令行的 move_to / collectCoral 会被状态机节拍覆盖；手动控制先 stopLuaStateMachine
+
+七、中断系统
 ----------------------------------------------------
 
 结构：
-  C# 端维护一个中断原因列表，每条 = 类型 + 若干上下文段（多段字符串）
-  列表有界（16 条），同类型在 2 秒窗口内连续触发合并为一条：保留首次时间、最后一次的值与次数
+  C# 维护中断原因列表，每条 = 类型 + 若干上下文段；上限 16 条
+  同类型在 2 秒窗口内合并为一条：保留最后一次的字段并带「×N」
+  ai.interrupts 一次取走全部积压并清空；没有则返回空串
+
+类型（只有这 6 种）：
+  BattleStart   阵营
+  BattleEnd     结算状态码
+  ChatMention   发送者、频道、内容（内容里出现 @自己的名字）
+  LuaTrigger    Lua 主动 ai.interrupt(text)
+  LuaError      脚本名、错误消息
+  MoveFailed    坐标、目标
 
 语义：
-  任何已开启的中断条件成立 → 追加一条，不打断当前动作、不打断 Lua 执行
-  「等待中断」执行时先取积压：非空立即整批返回并清空；为空才挂起，下次有中断时一次取走全部
-  未开启的可选中断不记录，避免列表被无用条件灌满
-  这样 AI 思考期间发生的中断不会丢，也不会被同一个条件反复打断
+  中断只记录，不打断角色当前动作，也不打断 Lua 执行
+  外部阻塞等待由 ai.wait（wait.bat）轮询 ai.interrupts 实现，超时文本由脚本侧合成
 
-每条原因必须自带上下文（AI 靠它判断现场，不再单独查询）：
-  遇到敌人        实体 id、类型、阵营、坐标、距离、同屏数量
-  提示消息        notice id + 已解析文案（含技能被沉默/被控制/冷却中）
-  昼夜切换        现在白天/夜晚、当轮进度
-  获得技能        技能 id 列表、来源（掉落 / GM / 复活继承）
-  战斗开始/结束   我方阵营、实体 id、结算结果
-  定时            等待时长与超时点
-  lua 报错         脚本名、行号、错误消息
-  移动失败        目标坐标、失败原因
-  特殊能力播报    技能 id + 名称
-  中立单位刷新    中立单位实体 id、坐标
-
-中断条件与数据来源：
-  命令行结束      本地（命令返回）
-  定时            本地（Timer）
-  聊天@           本地（OnChatMessage + 文本匹配）
-  lua 触发        本地（Lua 主动写）
-  lua 报错        本地（LuaEnv 错误回调）
-  战斗开始/结束   本地（OnBattleStart 10210 / OnBattleEnd 10211）
-  他人信号        快捷消息（OnQuickMessage 10313，按 QuickMessageType 区分，带发送者与可选坐标）
-  遇到敌人        本地（小地图出现新的敌对单位；0.5s 检查间隔 + 中断列表同类型合并）
-  特殊能力播报    SCBattleEvent.SkillBroadcast(10)，textId = 技能 id
-  中立单位刷新    SCBattleEvent.NeutralStatueRespawn(4)
-  昼夜切换        SCBattleEvent.Nightfall(5) / Daybreak(6)
-  获得技能        OnSkillBarRefresh(10221)；该事件也被选栏与快照触发，需按持有表变化去重
-  提示消息        OnShowPrompt(10305) + SCPrompt（notice.csv id）
-
-七、Lua 命令行拓展
+八、Lua 命令行拓展
 ----------------------------------------------------
 
-用途：让 Lua 按需扩展命令行工具，外部 AI 通过命令行调用这些命令
+注册：Lua 侧 ai.register_command(命令名, 处理函数)，处理函数收一整串参数字符串、返回字符串
+调用：execLuaCommand <命令名> <参数...>，与内置命令同一套切分
+重载：reloadLuaCommand 清空注册表后重跑 extensions.lua，不动状态机与 on_tick
+枚举：listCommands 末尾会列出已注册的拓展命令名
+报错：拓展命令抛错进 LuaError 中断并作为返回文本，不影响状态机
 
-注册：Lua 侧向宿主注册命令（命令名 + 处理函数），处理函数接收参数表并返回字符串
-调用：统一走「执行lua拓展内容 <命令名> <参数…>」，与内置命令同一套解析
-枚举：提供一条命令列出当前已注册的拓展命令，供 AI 先查询再调用
-重载：重载拓展脚本时清空并重建注册表；正在执行的拓展命令先跑完再重建
-报错：拓展命令抛错进「lua 报错」中断，只记录与上报，不影响状态机与其他命令继续运行
-
-八、数据来源对照
+九、数据来源对照
 ----------------------------------------------------
 
 连接 / 进房        NetworkManager.TryConnect · EnterWorld · ExitWorld
 阵营 / 准备        NetworkManager.SendLobbyUpdate(CSLobbyUpdate)
 选择角色           ClientSelection.selectedAttackIndex / selectedDefenseIndex
 本地玩家名         ClientSelection.playerName
-发送聊天           NetworkManager.SendChat(CSChat{channel, content})
-接收聊天           OnChatMessage(10310) ← SCChat{senderClientId, channel, camp, characterIndex, name, content}
-                   自发的本地回显另有独立入口，需一并纳入记录
-技能列表 / 库存    ClientSkillManager.HeldSkills（全量 id）+ Recharge.GetCycleProgress / GetStore（槽位技能）
-                   未装备技能客户端没有冷却与库存数据
-设置技能栏         ClientSkillManager.TrySetActiveSkills → CSSkillSelection → 服务器回推 SCSkillRecharge
-小地图实体         OnMinimapUpdate(10233) ← SCMinimapEntity{entityId, type, camp, posX, posZ, marked}
-                   缓存由命令行自建：订阅 OnMinimapUpdate + minimap_entity_timeout 超时剔除，未复刻半径裁剪
-守护点进度         OnDefensePointProgress(10217) ← SCDefensePointProgress{main, sub1~3}，0~100
-本地玩家实体状态   OnEntityDisplayUpdate(10230) ← SCEntityDisplayInfo（血量、buff、持有技能）
+发送聊天           NetworkManager.SendChat(CSChat{channel, content})，channel 0~2
+接收聊天           OnChatMessage ← SCChat{senderClientId, channel, camp, characterIndex, name, content}
+                   自己的消息服务器不回送，本地补一条（保证收发都有）
+快捷消息           NetworkManager.SendQuickMessage(CSQuickMessage)
+技能列表 / 库存    ClientSkillManager.HeldSkills + Recharge.GetCycleProgress / GetStore
+设置技能栏         ClientSkillManager.TrySetActiveSkills → CSSkillSelection → 服务器回推快照
+小地图实体         OnMinimapUpdate ← SCMinimapEntity{entityId, type, camp, posX, posZ, marked}
+                   自建缓存 + minimap_entity_timeout（1.5s）超时剔除
+守护点血量         OnDefensePointProgress ← SCDefensePointProgress{main, sub1~3}
+本地玩家状态       OnEntityDisplayUpdate ← SCEntityDisplayInfo（血量、buff）
+阵营人数           NetworkManager.LatestCampAliveCount（值变更时下发）
 会话身份           ClientLoadingManager.HasSession / Camp / OwnEntityId
-昼夜               EnvironmentManager.Time01 / IsDay / dayDuration / nightDuration
-锚点               TerrainSpawns（副守护点 / 主守护点 / 防御塔位 / 中立 / 进攻出生 / 防守出生）
-路径长度           NavMesh.CalculatePath（客户端场景已烘焙）
-意图上行           CSAiIntent → NetworkManager.SendAiIntent → 服务器 AiIntentRelay 翻译成行为层请求
-AI 技能释放        CSAiSkillCast → NetworkManager.SendAiSkillCast → 服务器 ReceiveAiSkillCast（不受键盘拦截）
-服务器回执         SCAiFeedback（移动失败）→ 命令行 OnServerFeedback → 中断原因 MoveFailed
+昼夜               BattleManager.CycleTime / IsDay（客户端本地推演，SCDayNightInfo 纠偏）
+                   Time01 是折返的白天程度，只在 IsDay / DayFactor 内部使用
+点位               TerrainSpawns（主/副守护点、防御塔、中立雕像、双方出生点）
+路径长度           NavMesh.CalculatePath（客户端场景已烘焙，仅预估）
+意图上行           CSAiIntent → NetworkManager.SendAiIntent → 服务器 AiIntentRelay
+AI 技能释放        CSAiSkillCast → NetworkManager.SendAiSkillCast → ReceiveAiSkillCast
+服务器回执         SCAiFeedback（移动失败）→ AiCommandLine.OnServerFeedback → MoveFailed 中断
 
-九、待确认与不一致
+十、已知限制
 ----------------------------------------------------
 
-1. 「释放指定技能」的强停语义已按「插队、保留原意图」实现，若实际要「真停」需改写第四节。
-2. 「重载命令行拓展」：拓展脚本现按需加载、随「激活lua状态机」整份重载；
-   运行中单独重载拓展的入口仍缺，需补一条命令或并入激活流程。
-3. 「他人信号」按快捷消息（8 种）理解，与「聊天@」区分；若还包含其他信号需补充来源。
-4. 系统消息范围按 SCPrompt + SCBattleEvent 理解，不含伤害飘字；需确认。
-5. 小地图缓存由命令行自建（订阅 OnMinimapUpdate + minimap_entity_timeout 超时剔除），
-   未复刻 UI 的显示半径裁剪，边界点位可能比小地图多，需实测对齐。
-6. 安全：服务器是否校验「该客户端被授权做 AI 操控」（当前设计默认不校验，任何客户端都能发意图）。
-7. 「等待中断」已按方案 a 实现：C# 只提供非阻塞的 ai.interrupts，ai.wait.bat 内部轮询后
-   对 AI 表现为一次阻塞调用；超时由 Python 侧合成 [Timeout] 输出，与 C# 的 Timeout 中断同格式。
-   若以后要桥本身阻塞，需要扩展 runtime-bridge 支持延迟响应。
-8. 「连接服务器」的最终结果回不到调用方：Submit 立即回「已发起连接」，成功/失败在 TickConnect
-   里二次回调，那时 ai.exec 早已返回。当前只能靠 BattleStart / 提示消息中断间接判断，
-   若要精确回执，需要给连接结果单独记状态并提供查询命令。
-9. CommandEnd 中断类型只登记在默认开启集合里，没有任何生产者（没有「命令结束」这条中断），
-   要么补生产者，要么从枚举里删掉。
+1. 连接/进房的最终结果不回传：connectToServer 立即返回「已发起连接」，成功失败都不是返回值；
+   判断方式是过几秒发一条 lobby 命令，返回「相位不可用」说明还没进房
+2. connectToServer 的 ip 必填，没有「省略就走本机」的写法
+3. selectCharacter 是 camp + index：一次只设一侧的角色下标
+4. takeover 只在 Offline 相位可用；接管期间本机键鼠、相机、战斗页快捷键、GM 快捷键全部失效，
+   FGUI 也不响应点击；解除只能靠 exec takeover false
+5. 攻击不判距离，超距会空放并进冷却
+6. 移动没有「到达」通知，也只在意图变化时下发；失败后同一意图不重发
+7. 状态机激活期间会覆盖手动移动/攻击命令
+8. 停发命令 = 保持最后一个动作，不会自动停下
+9. 小地图数据有延迟（1.5s 超时剔除），坐标是近似值
+10. 昼夜是 0~2 的周期值，不是 0~1 的百分比；不要拿折返量当进度
 
-十、文档内容（给 AI 的静态资料）
+十一、实现状态
 ----------------------------------------------------
 
-随程序提供，不通过命令行查询（命令行只查实时状态）：
+已完成：
+  配表与代码           ai_command.xlsx → ai_commandConfig.cs / ai_command.bytes / LoadAll
+                       AiCommandConfig、AiCommandId、AiCommandLine 表驱动注册与分发
+  命令行               33 条命令，参数按表类型校验，相位与参数数量在本地拦截
+  客户端 Lua           AiLuaInterface：ai 表读写、状态机驱动、拓展命令注册与重载
+  默认状态机           StreamingAssets/LuaInterface/state_machine.lua
+  服务器转发器         AiIntentRelay + BattleManager.ReceiveAiIntent / ReceiveAiSkillCast
+  接管与拦截           CSLobbyPlayerInfo.aiTakeover → AiClients → aiControlled
+                       InputManager.PlayerInputBlocked + GRoot.inst.touchable
+  协议                 Transport/CSAiIntent.cs、CSAiSkillCast.cs、SCAiFeedback.cs
+                       三条 RPC 已在 NetworkManager.Generated.cs 中（22 / 23 / 53）
+  外部调用             StreamingAssets/AiCmd：exec / ping / wait + _env / _call.py / wait.py
 
-角色属性
-  角色 id / 阵营 / 名称、初始血量、移速、视野、武器槽位数量、初始技能、体型与命中半径、霸体等级
-
-技能属性
-  技能 id / 名称 / 品质、冷却、存储上限、射程（兼作索敌半径）、索敌夹角、伤害倍率、是否需要目标、
-  是否自动索敌、释放动作与动画时长
-  其中技能配表项可用 Lua 的 ai.skill_info(skillId) 现查（返回 id / 名称 / 品质 / 射程 / 夹角 /
-  自动索敌 / CD / 存储上限），配合 ai.slot_store(slot) 即可算出「当前真实有效的攻击范围」=
-  有库存的技能里最远的射程；全部无库存时按空手拳 2m 兜底。默认状态机 state_machine.lua 已按此判定
-
-常用位置
-  副守护点 ×3、主守护点、水晶雕像点、中立雕像候选点、进攻方出生/复活点、防守方出生/复活点
-  （均为世界坐标 XZ，来源 TerrainSpawns）
-
-所有可被 lua 调用的内容
-  可读：自身状态（位置/朝向/血量/buff/技能冷却与库存）、小地图实体、守护点进度、昼夜
-  可写：意图（站立/移动到位置/攻击目标/停止）、释放指定技能、信号发出、触发中断
-  读调用零成本、可每帧调；写调用只在值变化时上行
-
-十一、实现状态与接入方式
-----------------------------------------------------
-
-已完成
-  客户端命令行      AiInterface/AiCommandLine.cs
-                    命令注册 / 解析 / 相位校验 / 参数校验；内置命令 + 「等待中断」特判
-                    中断原因列表（16 条上限、同类型 2s 合并、等待时整批取走、可选中断默认关闭）
-                    自维护缓存：小地图点、自身血量与 buff、守护点进度、聊天记录（含自发回显）
-                    「获取命令列表」可枚举全部命令与用法
-  客户端 Lua        AiInterface/AiLuaInterface.cs
-                    借用 LuaManager 的 LuaEnv（不自建）；两个入口脚本按需加载、激活时整份重载
-                    每帧 on_tick；ai 表读写 API；报错 → LogError + 中断 + 停状态机并下发站立
-  默认状态机        StreamingAssets/LuaInterface/state_machine.lua（7 态、5 参数、0.2s 节拍）
-  拓展示例          StreamingAssets/LuaInterface/extensions.lua（ai_hello）
-  服务器转发器      AiInterface/AiIntentRelay.cs（DecisionMachine + IBehaviorHost，ThinkInterval = 0）
-                    移动失败回执；partial BattleManager.ReceiveAiIntent / ReceiveAiSkillCast
-  协议              Transport/CSAiIntent.cs、CSAiSkillCast.cs、SCAiFeedback.cs
-  接管与拦截        BattleManager.AiClients（会话级）+ KeyboardBlocked（输入与技能键各一处判断）
-  LuaEnv 生命周期   LuaManager 全局唯一：Awake 创建、Update 驱动、OnDestroy 销毁
-  外部调用入口      AiInterface/AiBridgeCommands.cs（runtime-bridge 适配，ai.exec / ai.interrupts）
-                    StreamingAssets/AiCmd/ai.ping.bat · ai.exec.bat · ai.wait.bat · ai_wait.py · README.md（AI 手册）
-
-未完成
-  1. Ens 代码生成未跑：Assets/ENS-Netcode/Gen/NetworkManager.Generated.cs 里还没有
-     CSAiIntent / CSAiSkillCast / SCAiFeedback 三条 RPC，不生成则收发不成立
-  2. 新增 .cs 的 .meta 未生成（Unity 导入后补提交）
-  3. 「站立并面向某点」不支持：RequestIdle 只接受实体作朝向目标
-  4. 拓展脚本无运行中单独重载的命令（只有「激活lua状态机」时整份重载）
-  5. 未做接入授权校验：任何客户端都能发意图
-  6. 小地图缓存未按显示半径裁剪，可能比 UI 实际显示的点多
-  7. 全链路未编译、未联调（尚未在 Unity 里跑过一次端到端）
-
-外部调用入口（AI 一律调 bat，不直接调 python）
-  目录：Assets/StreamingAssets/AiCmd（打包后 <Game>_Data/StreamingAssets/AiCmd）
-  把该目录加进 PATH 或先 cd 进去，然后：
-    call ai.ping                                  连通性检测：桥在跑则退出码 0；可据此判断打包版是否开了 bridge
-    call ai.exec --arg line="移动到位置 12 8"     执行一条立即返回的命令，直接打印返回文本
-    call ai.wait 30                               等待中断，30 秒无中断输出 [Timeout] 后返回
-    call ai.wait 0                                一直等到有中断为止
-  ai.wait 内部的轮询间隔默认 0.2s，可用 --interval 0.05 调整
-  退出码：0 正常（含超时）/ 1 连接或调用失败 / 2 参数错误
-  两级排查：ai.ping 只验桥是否在监听；若 ai.ping 成功而 ai.exec 报「未知命令: ai.exec」，
-  说明当前运行的版本里没有 AiBridgeCommands（没重新编译或打的是旧包）
-  bat 自己不产出数据，只做路径发现与转调；找不到桥客户端时可用 AI_BRIDGE_PY 指定 ...\unity-python-bridge-runtime\python
-
-  Python 环境：StreamingAssets/python 是随包携带的精简 CPython（去掉 site-packages 等，约 29MB / 580 文件）
-    bat 优先用它；没有才回退系统 python，再回退 py -3
-    自检：设 AI_DEBUG=1 会先打印实际使用的 python 与桥客户端路径
-  维护注意：bat 必须存成 CRLF（LF 下 goto 标签失效），正文保持纯 ASCII，中文只作为参数传入
-
-  桥客户端的两种布局（bat 自动探测，先打包布局、后编辑器布局）：
-    打包后  <Game>_Data/StreamingAssets/unity-python-bridge-runtime/python
-    编辑器  Assets/unity-python-bridge-runtime/StreamingAssets/unity-python-bridge-runtime/python
-
-  给外部 AI 的完整手册：StreamingAssets/AiCmd/README.md
-    含命令速查（参数与实际返回格式）、相位可用性、中断类型与字段、推荐驱动循环、已知限制、排障
-    本节只记实现侧口径；命令的用法细节以该手册为准
-
-接入方式
-  第一步  回 Unity 跑 Ens 代码生成，让 Unity 导入新文件生成 .meta，确认编译通过
-  第二步  起 Unity（Play 模式或出包），桥会按 ini 的 autostart 自动监听 127.0.0.1:21928
-          （[RuntimeInitializeOnLoadMethod(AfterSceneLoad)] 静态入口 → RuntimeBridgeServer.Start() →
-            建隐藏常驻物体挂 RuntimeBridgePump，由它的 Update 把命令队列在主线程执行；切场景不掉）
-          先 call ai.ping 验连通，再用三个 bat 驱动；「等待中断」= call ai.wait（C# 侧只做非阻塞取中断）
-          关闭方式：包内 ini 改 autostart=false，或代码里显式 RuntimeBridgeServer.Start()/Stop()
-          注意默认 bind=127.0.0.1 且 token 为空，本机任何进程都能驱动角色，外发版本应关闭或设 token
-  第三步  外部 AI 的驱动循环：
-            连接服务器 → 选择角色/阵营 → 准备 → 等待「战斗开始」中断
-            → 激活lua状态机 → 等待中断 → 按中断内容决策 → 再等待
-          命令行与状态机共用同一套意图通道；状态机激活期间手动命令会被状态机节拍覆盖
+未做：
+  客户端与服务器的整链路实机联调（含 NavMesh 与触屏/键鼠混合操作）
+  服务器侧未校验「该客户端是否被授权做 AI 操控」，任何客户端都能发意图

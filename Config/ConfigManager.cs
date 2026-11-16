@@ -66,6 +66,7 @@ namespace Ros.Config
             GlobalVariable.Bake(this);
             TerrainGeneration.Bake(this);
             GmCommandConfig.Bake(this);
+            AiCommandConfig.Bake(this);
         }
 
         private string Summary()

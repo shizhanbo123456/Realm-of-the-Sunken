@@ -25,6 +25,7 @@ namespace Ros.Config
                     notice row;
                     row.key = r.ReadInt32();
                     row.text = ConfigBinary.ReadString(r);
+                    row.trigInterrupt = r.ReadByte() != 0;
                     noticeData.Add(row.key, row);
                 }
             }
@@ -34,5 +35,6 @@ namespace Ros.Config
     {
         public int key;  // 主键
         public string text;  // 提示文本：界面上显示的提示文本
+        public bool trigInterrupt;  // 触发中断：AI接管时是否触发中断
     }
 }

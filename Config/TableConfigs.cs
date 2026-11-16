@@ -362,4 +362,22 @@ namespace Ros.Config
 
         public static gm_command Get(int key) => ConfigBinary.Require(content, key, "gm_command");
     }
+
+    public static class AiCommandConfig
+    {
+        public static readonly Dictionary<int, ai_command> content = new();
+        // 按主键升序：命令注册顺序与「获取命令列表」的排列都以它为准
+        public static readonly List<ai_command> ordered = new();
+
+        internal static void Bake(ConfigManager m)
+        {
+            content.Clear();
+            ordered.Clear();
+            foreach (ai_command row in m.ai_commandData.Values) content.Add(row.key, row);
+            ordered.AddRange(content.Values);
+            ordered.Sort((a, b) => a.key.CompareTo(b.key));
+        }
+
+        public static ai_command Get(int key) => ConfigBinary.Require(content, key, "ai_command");
+    }
 }
