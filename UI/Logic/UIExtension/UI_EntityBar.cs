@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using FairyGUI;
 using UnityEngine;
@@ -25,7 +24,7 @@ namespace Ros.UI.Main
 
         // 一次摘要刷新；buffData 为 null = 这条包没带 buff 字段，列表保持原样
         public void Bind(int health, int maxHealth, EntityCamp camp, EntityCamp myCamp, string entityName,
-            IReadOnlyList<Buff> buffData, Action<int, GObject> onBuffHoverEnter, Action onBuffHoverOut)
+            IReadOnlyList<Buff> buffData)
         {
             m_campIcon.m_player_camp.selectedIndex = (int)ToPlayerCamp(camp); // 档位即 PlayerCampIcon 页序
             m_is_enemy.selectedIndex = IsEnemy(camp, myCamp) ? 1 : 0;
@@ -42,7 +41,7 @@ namespace Ros.UI.Main
                 for (int i = 0; i < buffData.Count; i++) buffs.Add(buffData[i]);
                 var list = m_buff_list.m_list;
                 // 必须先设渲染器再设 numItems
-                list.itemRenderer = (i, obj) => ((UI_buffItem)obj).Fill(buffs[i].type, buffs[i].level, onBuffHoverEnter, onBuffHoverOut);
+                list.itemRenderer = (i, obj) => ((UI_buffItem)obj).Fill(buffs[i].type, buffs[i].level);
                 list.numItems = buffs.Count;
             }
             visible = true;

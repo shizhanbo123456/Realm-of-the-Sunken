@@ -125,6 +125,7 @@ namespace Ros.Config
         card_discard_exp_gold,
         card_discard_exp_holo,
         chat_nearby_radius,
+        chat_message_length,
         passive_attack_layer,
         passive_defense_count_eye_damage_cap_ratio,
         passive_defense_plague_shield_trigger_ratio,

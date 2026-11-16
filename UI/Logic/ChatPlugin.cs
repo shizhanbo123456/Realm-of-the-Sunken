@@ -15,7 +15,6 @@ public class ChatPlugin
 
     private const int MaxEntries = 50;      // 聊天只保留最近 50 条
     private const float SendInterval = 1f;  // 最快 1s 一条
-    private const int MaxLength = 50;       // 消息长度 1~50
 
     private class ChatEntry
     {
@@ -144,12 +143,19 @@ public class ChatPlugin
 
     private void TrySend()
     {
-        string content = panel.m_input.text;
-        if (string.IsNullOrWhiteSpace(content)) return; // 空消息不发送
-        content = content.Trim();
-        if (content.Length > MaxLength)
+        string content = (panel.m_input.text ?? "").Trim();
+        // 长度按协议字节数算：StringSerializer.GetLength 含 1 字节长度头，减掉才是正文字节数
+        int byteLength = StringSerializer.GetLength(content) - 1;
+        int minLength = (int)GlobalVariable.RangeMin(global_variablesEnum.chat_message_length);
+        int maxLength = (int)GlobalVariable.RangeMax(global_variablesEnum.chat_message_length);
+        if (byteLength < minLength)
         {
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText($"消息过长，最多{MaxLength}字");
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText("发送的消息太短");
+            return;
+        }
+        if (byteLength > maxLength)
+        {
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText("发送的消息太长");
             return;
         }
         // 附近频道按「操控的实体」算距离，观战/未开战没有实体

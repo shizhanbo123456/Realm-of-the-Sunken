@@ -7,6 +7,7 @@ namespace Ros.UI.Main
 {
     public partial class UI_SettingScrollView : GComponent
     {
+        public Controller m_in_server;
         public GButton m_toggle_caustic;
         public GButton m_toggle_camea_shake;
         public GButton m_toggle_third_person_perspctivee;
@@ -17,6 +18,7 @@ namespace Ros.UI.Main
         public GButton m_open_guide;
         public GButton m_back_to_fight;
         public GButton m_exit;
+        public GButton m_back;
         public const string URL = "ui://q68vr2bfkqn8rq";
 
         public static UI_SettingScrollView CreateInstance()
@@ -28,6 +30,7 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
+            m_in_server = GetControllerAt(0);
             m_toggle_caustic = (GButton)GetChildAt(3);
             m_toggle_camea_shake = (GButton)GetChildAt(5);
             m_toggle_third_person_perspctivee = (GButton)GetChildAt(7);
@@ -38,6 +41,7 @@ namespace Ros.UI.Main
             m_open_guide = (GButton)GetChildAt(19);
             m_back_to_fight = (GButton)GetChildAt(22);
             m_exit = (GButton)GetChildAt(23);
+            m_back = (GButton)GetChildAt(24);
         }
     }
 }

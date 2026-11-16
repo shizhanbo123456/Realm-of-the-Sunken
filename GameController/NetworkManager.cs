@@ -36,6 +36,9 @@ public partial class NetworkManager : EnsBehaviour
 
     public static bool CanSendWorldCommand => connected && hasLobbyInfo;
 
+    // 传输层是否已连上服务器
+    public static bool IsConnected => connected;
+
     // 本机玩家令牌（存档持有，跨断线/跨进程不变）：协议里的玩家标识一律是它，连接 id 只用于寻址
     public static int LocalToken { get; private set; }
 
@@ -93,6 +96,7 @@ public partial class NetworkManager : EnsBehaviour
 
         EnsInstance.OnServerDisconnect += () =>
         {
+            connected = false;
             if (intentionalExitWorld)
             {
                 intentionalExitWorld = false;

@@ -151,6 +151,8 @@ public partial class BattleManager
         var skills = GetGmSkillController(clientId);
         if (skills == null) return;
         skills.AddSkill(skillId);
+        var held = PlayerSkillList(clientId);
+        if (!held.Contains(skillId)) held.Add(skillId); // 玩家级持有表同步，死亡复活后仍在
         var sync = new SCSkillSync { full = false };
         sync.skills.Add(skillId);
         Tool.NetworkManager.SendSkillSync(clientId, sync);
@@ -168,6 +170,7 @@ public partial class BattleManager
         var skills = GetGmSkillController(clientId);
         if (skills == null) return;
         skills.SetSkillList(null);
+        ClearPlayerSkills(clientId); // 玩家级持有表一起清，否则复活会把技能带回来
         Tool.NetworkManager.SendSkillSync(clientId, new SCSkillSync { full = true });
         SendSkillRecharge(clientId);
     }

@@ -10,7 +10,7 @@ namespace Ros.UI.Main
         public GButton m_close2;
         public GButton m_close;
         public UI_panel_2 m_panel;
-        public UI_SettingsScrollViewMask m_settings;
+        public GList m_settings;
         public const string URL = "ui://q68vr2bfiq0omn";
 
         public static UI_SettingsPanel CreateInstance()
@@ -25,7 +25,7 @@ namespace Ros.UI.Main
             m_close2 = (GButton)GetChildAt(1);
             m_close = (GButton)GetChildAt(2);
             m_panel = (UI_panel_2)GetChildAt(3);
-            m_settings = (UI_SettingsScrollViewMask)GetChildAt(4);
+            m_settings = (GList)GetChildAt(4);
         }
     }
 }

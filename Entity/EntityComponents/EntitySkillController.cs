@@ -141,26 +141,17 @@ public class EntitySkillController
     #endregion
 
     #region 复活继承
-    public struct Loadout
+    // 死亡瞬间只抓槽位选择：持有表是玩家级数据（BattleManager.playerSkills），不在实体上
+    public List<int> CaptureSlots()
     {
-        public List<int> skillIds;
-        public List<int> slotSkills;
+        return new List<int>(slotSkills);
     }
 
-    public Loadout CaptureLoadout()
+    // 复活重建实体：持有表按玩家级数据回灌（死亡期间也可能新得技能），槽位沿用死亡前的选择
+    public void ApplyLoadout(List<int> heldSkills, List<int> slotIds)
     {
-        return new Loadout
-        {
-            skillIds = new List<int>(skillIds),
-            slotSkills = new List<int>(slotSkills),
-        };
-    }
-
-    // 复活重建实体后归还持有技能与槽位选择；冷却随新实体从满库存起算
-    public void ApplyLoadout(Loadout loadout)
-    {
-        SetSkillList(loadout.skillIds);
-        RestoreSlots(loadout.slotSkills);
+        SetSkillList(heldSkills);
+        RestoreSlots(slotIds);
     }
     #endregion
 
@@ -252,14 +243,21 @@ public class EntitySkillController
         RefreshAdvancing();
     }
 
-    // 复活沿用死亡前的槽位选择（与 CaptureLoadout 同源，只需过滤掉已失去的技能）
+    // 复活沿用死亡前的槽位顺序，剩余空位按持有顺序补（死亡期间新得的技能）
     private void RestoreSlots(List<int> ids)
     {
-        if (!slotBarEnabled || ids == null) return;
+        if (!slotBarEnabled) return;
         slotSkills.Clear();
-        foreach (var skillId in ids)
+        if (ids != null)
         {
-            if (skillIds.Contains(skillId) && !slotSkills.Contains(skillId)) slotSkills.Add(skillId);
+            foreach (var skillId in ids)
+            {
+                if (skillIds.Contains(skillId) && !slotSkills.Contains(skillId)) slotSkills.Add(skillId);
+            }
+        }
+        for (int i = 0; i < skillIds.Count && slotSkills.Count < slotCapacity; i++)
+        {
+            if (!slotSkills.Contains(skillIds[i])) slotSkills.Add(skillIds[i]);
         }
         slotSkills.Sort();
         RefreshAdvancing();

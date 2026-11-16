@@ -7,8 +7,8 @@ namespace Ros.Transport
         // full = true：全量快照（进房 / 重连建立成员表）；false：增量，members 只含本次变化的成员
         public bool full;
         public List<LobbyMemberInfo> members = new();
-        public int attackAICount;
-        public int defenseAICount;
+        public int attackRobotCount;   // 进攻方人机数量（人机 = 服务器侧虚拟玩家，不是 AI 接管）
+        public int defenseRobotCount;  // 防守方人机数量
         public bool battleStarted;
 
         public class LobbyMemberInfo
@@ -28,8 +28,8 @@ namespace Ros.Transport
             if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
             if (value == null) return true;
             if (!BoolSerializer.Serialize(value.full, result, ref indexStart)) return false;
-            if (!IntSerializer.Serialize(value.attackAICount, result, ref indexStart)) return false;
-            if (!IntSerializer.Serialize(value.defenseAICount, result, ref indexStart)) return false;
+            if (!IntSerializer.Serialize(value.attackRobotCount, result, ref indexStart)) return false;
+            if (!IntSerializer.Serialize(value.defenseRobotCount, result, ref indexStart)) return false;
             if (!BoolSerializer.Serialize(value.battleStarted, result, ref indexStart)) return false;
 
             int count = value.members != null ? value.members.Count : 0;
@@ -56,8 +56,8 @@ namespace Ros.Transport
             var info = new SCLobbyInfo()
             {
                 full = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
-                attackAICount = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
-                defenseAICount = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
+                attackRobotCount = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
+                defenseRobotCount = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
                 battleStarted = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
             };
             int count = IntSerializer.Deserialize(data, ref indexStart, invalidIndex);

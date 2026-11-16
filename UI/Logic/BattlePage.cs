@@ -19,8 +19,6 @@ public class BattlePage : PageBase
     private readonly List<SCEntityDisplayInfo.BuffRuntime> localBuffs = new();                      // 本地玩家左上角血条的 buff 数据源
     private readonly float barDefaultSizeDistance = GlobalVariable.I(global_variablesEnum.distance_of_bar_default_size); // 血条 scale=(1,1) 时的相机距离
     private readonly float labelDefaultSizeDistance = GlobalVariable.I(global_variablesEnum.distance_of_label_default_size); // 飘字 scale=(1,1) 时的相机距离
-    private UI_SkillTip skillTip;     // 技能悬浮提示（技能栏条目）
-    private UI_BuffTip buffTip;       // buff 悬浮提示（任意 buff 图标）
     private UI_QuickMessagePanel quickMessagePanel; // 快捷指令轮盘（挂在战斗信息面板里）
     private readonly List<UI_QuickMessagePointer> quickMessagePointers = new(); // 快捷指令点位（挂在世界层）
     private GTextField levelLabel;    // 玩家栏等级数字（FGUI 侧未命名，按 n12 取）
@@ -82,7 +80,7 @@ public class BattlePage : PageBase
 
         panel.m_showRegenerationBar.selectedIndex = 0; // 复活进度默认隐藏
         panel.m_playerPanel.m_buffList.m_list.itemRenderer =
-            (i, obj) => ((UI_buffItem)obj).Fill(localBuffs[i].type, localBuffs[i].level, ShowBuffTip, HideBuffTip);
+            (i, obj) => ((UI_buffItem)obj).Fill(localBuffs[i].type, localBuffs[i].level);
         levelLabel = panel.m_playerPanel.GetChild("n12") as GTextField; // 等级数字在 FGUI 侧还没命名
         panel.m_skillSelectPanel.Build(OnSkillSelectCommitted);
         panel.m_skillSelectPanel.Close();
@@ -94,7 +92,7 @@ public class BattlePage : PageBase
         panel.m_largeMinimapPanel.m_panel.m_close.onClick.Set(panel.m_largeMinimapPanel.Close);
         if (panel.m_Minimap != null && panel.m_Minimap.m_minimapButton != null)
             panel.m_Minimap.m_minimapButton.onClick.Set(OpenLargeMinimap); // 点小地图打开大地图，关闭走底框按钮
-        panel.m_godViewPanel.Init(ShowBuffTip, HideBuffTip, ShowSkillTip, HideSkillTip);
+        panel.m_godViewPanel.Init();
         panel.m_godViewPanel.Close();
         panel.m_godViewPanel.m_panel.m_close.onClick.Set(panel.m_godViewPanel.Close);
     }
@@ -241,7 +239,7 @@ public class BattlePage : PageBase
         reviveActive = false; // 复活条每局从收起状态开始，重新由 SCReviveInfo 驱动
         ClearEntityBars();
         ClearQuickMessagePointers(); // 快捷指令点位只属于本局
-        HideAllTips();
+        TipHost.Hide();
         localBuffs.Clear();
         panel.m_playerPanel.m_buffList.m_list.numItems = 0;
         panel.m_Minimap?.Reset(GlobalVariable.L(global_variablesEnum.minimap_view_radius)[0]); //每局回到默认档（首档），与服务器 ClearBattleState 对齐
@@ -285,7 +283,7 @@ public class BattlePage : PageBase
         panel.m_skillSelectPanel.Close();
         panel.m_selectCardPanel.CloseImmediately();
         ResetCardState();
-        HideAllTips();
+        TipHost.Hide();
         HideImportantBanner();
         ClearQuickMessagePointers();
         // 离开战斗界面即销毁地形场景（Culler 与内容根一起销毁，点位数据一并复位）
@@ -496,7 +494,7 @@ public class BattlePage : PageBase
     {
         int count = Skills != null ? Skills.SlotCapacity : 0;
         if (count <= 0) count = 1; // 观战/属性取不到时至少露出一格
-        SkillBar?.Build(count, ShowSkillTip, HideSkillTip);
+        SkillBar?.Build(count);
         RefreshSkillBar();
     }
 
@@ -898,7 +896,7 @@ public class BattlePage : PageBase
         string name = withName && HasSession ? Session.GetNameByEntity(info.entityId) : "";
         var vitals = ResolveVitals(info);
         bar.Bind(vitals.health, vitals.maxHealth, info.camp, (EntityCamp)localPlayerCamp, name,
-            info.hasBuffs ? ToBarBuffs(info.buffs) : null, ShowBuffTip, HideBuffTip);
+            info.hasBuffs ? ToBarBuffs(info.buffs) : null);
     }
 
     // 血量段只在置脏/全量包携带：带则刷新缓存，不带则沿用上次值（首见包必为全量）
@@ -1019,35 +1017,6 @@ public class BattlePage : PageBase
         return $"{s / 60:D2}:{s % 60:D2}";
     }
 
-    #region 悬浮提示
-    private void ShowSkillTip(int skillId, GObject anchor)
-    {
-        HideBuffTip();
-        if (skillTip == null) skillTip = UI_SkillTip.CreateInstance();
-        if (skillTip.parent == null) Root.AddChild(skillTip);
-        skillTip.Fill(skillId);
-        skillTip.ShowAt(anchor);
-    }
-
-    private void ShowBuffTip(int buffType, GObject anchor)
-    {
-        HideSkillTip();
-        if (buffTip == null) buffTip = UI_BuffTip.CreateInstance();
-        if (buffTip.parent == null) Root.AddChild(buffTip);
-        buffTip.Fill(buffType);
-        buffTip.ShowAt(anchor);
-    }
-
-    private void HideSkillTip() => skillTip?.Hide();
-
-    private void HideBuffTip() => buffTip?.Hide();
-
-    private void HideAllTips()
-    {
-        HideSkillTip();
-        HideBuffTip();
-    }
-    #endregion
     #endregion
 
     #region 抽卡（悬浮按钮 → 抽卡界面 → 选/弃）
@@ -1057,6 +1026,7 @@ public class BattlePage : PageBase
     private int cardLevel = 1;        // 局内等级（左上角等级 + 经验条）
     private int cardExp;              // 当前等级内已积累的经验
     private CardTier currentCardTier; // 最近一次打开的档位（弃卡按它上报）
+    private readonly HashSet<int> justPickedSkills = new(); // 本局已选中、服务器还没回包的技能，抽卡时先排除
 
     // 服务器只下发「幸运 + 每档有多少次」，抽到什么在这里算
     private void OnPlayerProgress(SCPlayerProgress info)
@@ -1111,10 +1081,18 @@ public class BattlePage : PageBase
     private void OpenCardPanel(CardTier tier)
     {
         if (cardPending[(int)tier] <= 0) return;
-        var held = Skills != null ? new List<int>(Skills.HeldSkills) : null;
+        ShowCardSet(tier);
+    }
+
+    // 抽一组卡铺进界面：入口点击与「选完还有次数、就地换下一组」共用
+    private void ShowCardSet(CardTier tier)
+    {
+        var held = Skills != null ? new List<int>(Skills.HeldSkills) : new List<int>();
+        held.AddRange(justPickedSkills); // 刚选中的技能服务器还没回包，先本地排掉，免得下一组再出现一次
         var rolls = CardCatalog.Roll(tier, cardLuck, CardCampForRoll(), 3, held);
         if (rolls.Count == 0)
         {
+            panel.m_selectCardPanel.Close();
             if (Tool.UIManager != null) Tool.UIManager.ShowFlyText("该档暂无可抽的卡");
             return;
         }
@@ -1134,18 +1112,36 @@ public class BattlePage : PageBase
             cardId = roll.cardId,
             skillId = roll.IsSkill ? roll.skillId : -1,
         });
+
+        // 本地先扣一次次数（服务器回 SCPlayerProgress 时以它为准覆盖）：这一档还有剩就直接出下一组，不再退回战斗界面重点
+        int tier = (int)roll.tier;
+        if (cardPending[tier] > 0) cardPending[tier]--;
+        if (roll.IsSkill) justPickedSkills.Add(roll.skillId);
+        RefreshCardButtons();
+
+        if (cardPending[tier] > 0) ShowCardSet(roll.tier);
+        else panel.m_selectCardPanel.Close();
     }
 
     private void OnCardDiscarded()
     {
         if (Tool.NetworkManager == null) return;
         Tool.NetworkManager.SendDiscardCard(new CSDiscardCard { tier = (byte)currentCardTier });
+
+        // 弃卡同样本地先扣一次：这一档还有剩就直接出下一组，否则收起
+        int tier = (int)currentCardTier;
+        if (cardPending[tier] > 0) cardPending[tier]--;
+        RefreshCardButtons();
+
+        if (cardPending[tier] > 0) ShowCardSet(currentCardTier);
+        else panel.m_selectCardPanel.Close();
     }
 
     private void ResetCardState()
     {
         for (int i = 0; i < cardPending.Length; i++) cardPending[i] = 0;
         pendingTiers.Clear();
+        justPickedSkills.Clear();
         cardLuck = 0;
         cardLevel = 1;
         cardExp = 0;

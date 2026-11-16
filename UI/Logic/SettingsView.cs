@@ -37,6 +37,7 @@ public class SettingsView
         panel.m_close.onClick.Set(Hide);         // 关闭按钮（面板内）
         panel.m_panel.m_close.onClick.Set(Hide); // 底框关闭按钮
         View.m_back_to_fight.onClick.Set(Hide);
+        View.m_back.onClick.Set(Hide);
         View.m_exit.onClick.Set(() => OnExit?.Invoke());
         View.m_open_guide.onClick.Set(() => OnOpenGuide?.Invoke());
         View.m_open_bridge.onClick.Set(() => OnOpenBridge?.Invoke());
@@ -50,6 +51,7 @@ public class SettingsView
         if (panel == null) return;
         GRoot.inst.AddChild(panel); // 每次弹出都重新置顶
         panel.visible = true;
+        View.m_in_server.selectedIndex = NetworkManager.IsConnected ? 1 : 0; // 0 未连服务器 / 1 已连服务器
         ApplyTransform();
         SyncToggles();
         if (tipKeys.Count > 0) SelectTip(tipTab);

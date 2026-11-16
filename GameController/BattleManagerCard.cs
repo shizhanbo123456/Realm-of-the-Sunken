@@ -19,6 +19,8 @@ public partial class BattleManager
     }
 
     private readonly Dictionary<int, PlayerProgress> playerProgress = new();
+    // 玩家级技能持有表：不挂实体，角色死亡（实体销毁）期间抽到的技能也存在，复活时回灌给新实体
+    private readonly Dictionary<int, List<int>> playerSkills = new();
     private float guardTotalHealth; // 开战瞬间守护点总血量，经验增幅按「已扣除比例」算
 
     #region 词条
@@ -291,6 +293,35 @@ public partial class BattleManager
     private static readonly List<int> s_rewardClients = new();
     #endregion
 
+    #region 玩家级技能持有
+    // 玩家持有的技能（按 clientId）：唯一真源；实体上的 skillController 只是它在场时的运行副本
+    private List<int> PlayerSkillList(int clientId)
+    {
+        if (!playerSkills.TryGetValue(clientId, out var list))
+        {
+            list = new List<int>();
+            playerSkills[clientId] = list;
+        }
+        return list;
+    }
+
+    // 开局生成玩家实体时把角色自带技能打底进玩家级表（之后这张表就是唯一真源）
+    private void SeedPlayerSkills(int clientId, IReadOnlyList<int> entitySkills)
+    {
+        if (entitySkills == null) return;
+        var list = PlayerSkillList(clientId);
+        foreach (int skillId in entitySkills)
+        {
+            if (!list.Contains(skillId)) list.Add(skillId);
+        }
+    }
+
+    private void ClearPlayerSkills(int clientId)
+    {
+        if (playerSkills.TryGetValue(clientId, out var list)) list.Clear();
+    }
+    #endregion
+
     #region 卡牌结算
     // 选卡：消耗该档一次待抽次数，按类型立刻生效
     public void ApplyCard(int clientId, int tier, int cardId, int skillId)
@@ -309,7 +340,8 @@ public partial class BattleManager
             case CardType.SkillB:
             case CardType.SkillA:
             case CardType.SkillS:
-                GrantSkill(clientId, skillId);
+                // 已持有（重复选择）：这次按弃卡折算经验，不让次数白扣
+                if (!GrantSkill(clientId, skillId)) GrantDiscardExp(clientId, tier);
                 break;
             case CardType.InstantHeal:
                 HealByPercent(clientId, GlobalVariable.F(global_variablesEnum.card_coef_instant_heal_boost) * card.value / 100f);
@@ -334,6 +366,13 @@ public partial class BattleManager
         if (p.pending[tier] <= 0) return;
 
         p.pending[tier]--;
+        GrantDiscardExp(clientId, tier);
+        SendProgress(clientId);
+    }
+
+    // 弃卡折算经验：重复选择已持有的技能卡也走这里
+    private void GrantDiscardExp(int clientId, int tier)
+    {
         int exp = tier switch
         {
             0 => GlobalVariable.I(global_variablesEnum.card_discard_exp_silver),
@@ -341,21 +380,28 @@ public partial class BattleManager
             _ => GlobalVariable.I(global_variablesEnum.card_discard_exp_holo),
         };
         GainExp(clientId, exp, applyMultiplier: false);
-        SendProgress(clientId);
     }
 
-    // 技能卡：服务器只记持有，进不进技能栏由客户端决定
-    private void GrantSkill(int clientId, int skillId)
+    // 技能卡：先落玩家级持有表（死亡期间也算数），实体在场时再同步进技能栏
+    // 返回 false = 该技能已持有（调用方按弃卡折算）
+    private bool GrantSkill(int clientId, int skillId)
     {
-        if (!TryGetPlayerEntity(clientId, out var player) || player.skillController == null) return;
-        if (skillId < 0) return;
-        if (player.skillController.GetSkillIds().Contains(skillId)) return;
+        if (skillId < 0) return false;
+        var skills = PlayerSkillList(clientId);
+        if (skills.Contains(skillId)) return false;
+        skills.Add(skillId);
 
-        player.skillController.AddSkill(skillId);
+        // 客户端持有表与实体无关：死亡期间也要下发，选择面板才不会把刚拿的技能再抽出来
         var sync = new Ros.Transport.SCSkillSync { full = false };
         sync.skills.Add(skillId);
         Tool.NetworkManager.SendSkillSync(clientId, sync);
-        SendSkillRecharge(clientId); // 新技能可能自动进栏
+
+        if (TryGetPlayerEntity(clientId, out var player) && player.skillController != null)
+        {
+            player.skillController.AddSkill(skillId);
+            SendSkillRecharge(clientId); // 新技能可能自动进栏
+        }
+        return true;
     }
 
     private void HealByPercent(int clientId, float percent)
@@ -397,6 +443,7 @@ public partial class BattleManager
         playerCardBonus.Clear();
         campCardBonus.Clear();
         playerProgress.Clear();
+        playerSkills.Clear();
         guardTotalHealth = 0f;
     }
 

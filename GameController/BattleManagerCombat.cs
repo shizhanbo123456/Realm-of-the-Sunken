@@ -140,7 +140,7 @@ public partial class BattleManager
     {
         public int deathCount;
         public float progress;
-        public EntitySkillController.Loadout? loadout; // 死亡瞬间的技能快照，复活重建实体后归还
+        public List<int> slotSkills; // 死亡瞬间的技能栏选择，复活重建实体后沿用
     }
     private readonly Dictionary<int, ReviveState> reviveStates = new();
 
@@ -192,7 +192,7 @@ public partial class BattleManager
             }
             rs.deathCount++;
             rs.progress = 0f;
-            if (entity.skillController != null) rs.loadout = entity.skillController.CaptureLoadout();
+            if (entity.skillController != null) rs.slotSkills = entity.skillController.CaptureSlots();
             SendReviveState(owner, rs, 0, ready: false); // 只报死亡次数，进度由客户端按配表本地推演
         }
 
@@ -297,9 +297,10 @@ public partial class BattleManager
 
         var data = GetEntity(entityId);
         EnableSkillBar(clientId, data); // 先启用栏位，复活才能沿用死亡前的槽位选择
-        if (data != null && data.skillController != null && rs.loadout.HasValue)
+        if (data != null && data.skillController != null)
         {
-            data.skillController.ApplyLoadout(rs.loadout.Value); // 死亡无损失：技能与槽位带走，冷却按上限回满
+            // 技能不随死亡丢失：持有表取玩家级（死亡期间抽到的也算），槽位沿用死亡前的选择
+            data.skillController.ApplyLoadout(PlayerSkillList(clientId), rs.slotSkills);
         }
         if (data is PlayerEntityData player)
         {

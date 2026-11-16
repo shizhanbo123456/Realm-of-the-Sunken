@@ -15,8 +15,8 @@ public class LobbyPage : PageBase
 
     private PlayerCampType myCamp = PlayerCampType.Spectator;
     private bool myReady;
-    private int attackAI;
-    private int defenseAI;
+    private int attackRobot;   // 进攻方人机数量（不是 AI 接管人数）
+    private int defenseRobot;  // 防守方人机数量
     private int humanAttack;
     private int humanDefense;
 
@@ -66,8 +66,8 @@ public class LobbyPage : PageBase
     {
         block.m_join.onClick.Add(() => JoinCamp(camp));
         block.m_quit.onClick.Add(() => JoinCamp(PlayerCampType.Spectator));
-        block.m_add_ai.onClick.Add(() => ChangeAICount(camp, +1));
-        block.m_remove_ai.onClick.Add(() => ChangeAICount(camp, -1));
+        block.m_add_ai.onClick.Add(() => ChangeRobotCount(camp, +1));
+        block.m_remove_ai.onClick.Add(() => ChangeRobotCount(camp, -1));
     }
 
     private void OnLobbyInfoUpdate(SCLobbyInfo info) => ApplyLobbyInfo(info);
@@ -99,11 +99,11 @@ public class LobbyPage : PageBase
             }
         }
 
-        attackAI = info != null ? info.attackAICount : 0;
-        defenseAI = info != null ? info.defenseAICount : 0;
+        attackRobot = info != null ? info.attackRobotCount : 0;
+        defenseRobot = info != null ? info.defenseRobotCount : 0;
 
-        RefreshCampBlock(panel.m_btn_joinAttack, PlayerCampType.Attack, attackAI);
-        RefreshCampBlock(panel.m_btn_joinDefense, PlayerCampType.Defense, defenseAI);
+        RefreshCampBlock(panel.m_btn_joinAttack, PlayerCampType.Attack, attackRobot);
+        RefreshCampBlock(panel.m_btn_joinDefense, PlayerCampType.Defense, defenseRobot);
         panel.m_btn_prepare.title = myReady ? "取消准备" : "准备";
         panel.m_spectate_current_member_count.text = SpectateCount(info).ToString();
 
@@ -151,22 +151,22 @@ public class LobbyPage : PageBase
         return false;
     }
 
-    private void ChangeAICount(PlayerCampType camp, int delta)
+    private void ChangeRobotCount(PlayerCampType camp, int delta)
     {
         if (camp == PlayerCampType.Spectator || BlockedByReady()) return;
         bool defense = camp == PlayerCampType.Defense;
         int limit = defense
             ? GlobalVariable.I(global_variablesEnum.player_limit_defenser_AI)
             : GlobalVariable.I(global_variablesEnum.player_limit_attacker_AI);
-        int current = defense ? defenseAI : attackAI;
+        int current = defense ? defenseRobot : attackRobot;
         if (delta > 0 && current >= limit)
         {
             if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(defense ? "防守方 AI 已达上限" : "进攻方 AI 已达上限");
             return;
         }
         int next = Mathf.Clamp(current + delta, 0, limit);
-        if (defense) defenseAI = next;
-        else attackAI = next;
+        if (defense) defenseRobot = next;
+        else attackRobot = next;
         RefreshCampBlock(defense ? panel.m_btn_joinDefense : panel.m_btn_joinAttack, camp, next);
         RaiseState();
     }
@@ -200,8 +200,8 @@ public class LobbyPage : PageBase
         {
             camp = (int)myCamp,
             ready = myReady,
-            attackAICount = attackAI,
-            defenseAICount = defenseAI,
+            attackRobotCount = attackRobot,
+            defenseRobotCount = defenseRobot,
         });
     }
 

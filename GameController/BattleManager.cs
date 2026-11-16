@@ -36,9 +36,9 @@ public partial class BattleManager : EnsBehaviour
     public readonly Dictionary<int, ushort> PlayerEntityId = new();
     public readonly Dictionary<ushort, int> EntityOwnerClient = new();
 
-    // AI 玩家令牌段：与真人令牌（[1, 1e9)）不重叠，且 PlayerNameBase + token 仍在 int 内不溢出
+    // 人机玩家令牌段：与真人令牌（[1, 1e9)）不重叠，且 PlayerNameBase + token 仍在 int 内不溢出
     public const int ROBOT_TOKEN_BASE = 1_000_000_000;
-    private int nextAIToken = ROBOT_TOKEN_BASE;
+    private int nextRobotToken = ROBOT_TOKEN_BASE;
     public readonly HashSet<int> RobotClients = new();
 
     // 被外部 AI 接管的真人客户端：会话级，只在客户端退场时移除（实体重建不影响接管状态）
@@ -50,8 +50,8 @@ public partial class BattleManager : EnsBehaviour
     // 已预分配的实体 id（尚未 Spawn），分配器跳过它们，避免重复
     private readonly HashSet<ushort> reservedEntityIds = new();
 
-    public int AttackAICount { get; private set; }
-    public int DefenseAICount { get; private set; }
+    public int AttackRobotCount { get; private set; }
+    public int DefenseRobotCount { get; private set; }
 
     public readonly Dictionary<int, float> HarvestByClient = new();
 
@@ -69,7 +69,7 @@ public partial class BattleManager : EnsBehaviour
         foreach (var pair in HarvestByClient)
         {
             if (pair.Value <= bestValue) continue;
-            if (IsRobotToken(pair.Key)) continue; // AI 不参与采集榜首
+            if (IsRobotToken(pair.Key)) continue; // 人机不参与采集榜首
             if (!PlayerEntityId.TryGetValue(pair.Key, out var entityId)) continue;
             if (!EntityContainer.Entities.TryGetObject(entityId, out var e) || e == null) continue;
             if (e.camp != EntityCamp.Attack) continue;
@@ -353,7 +353,7 @@ public partial class BattleManager : EnsBehaviour
         info.name = name.Length < min ? $"玩家{clientId}" : name;
     }
 
-    // 新玩家进房：新玩家名字广播给所有人，再把房间里已有玩家的名字逐条发给新玩家（AI 不下发名字）
+    // 新玩家进房：新玩家名字广播给所有人，再把房间里已有玩家的名字逐条发给新玩家（人机不下发名字）
     private void SendLobbyPlayerNames(int newClientId)
     {
         if (PlayerInfoList.TryGetValue(newClientId, out var me))
@@ -361,7 +361,7 @@ public partial class BattleManager : EnsBehaviour
 
         foreach (var pair in PlayerInfoList)
         {
-            if (IsRobotToken(pair.Key)) continue; // AI 无名字
+            if (IsRobotToken(pair.Key)) continue; // 人机无名字
             Tool.NetworkManager.SendLobbyPlayerName(newClientId, new SCLobbyPlayerName { clientId = pair.Key, name = pair.Value.name });
         }
     }
@@ -393,7 +393,7 @@ public partial class BattleManager : EnsBehaviour
         Debug.Log($"玩家 {clientId} 退场");
     }
 
-    private void RebuildAIPlayers()
+    private void RebuildRobotPlayers()
     {
         foreach (var robotClientId in RobotClients)
         {
@@ -402,14 +402,14 @@ public partial class BattleManager : EnsBehaviour
         }
         RobotClients.Clear();
 
-        nextAIToken = ROBOT_TOKEN_BASE;
-        for (int i = 0; i < AttackAICount; i++) AddAIPlayer(PlayerCampType.Attack);
-        for (int i = 0; i < DefenseAICount; i++) AddAIPlayer(PlayerCampType.Defense);
+        nextRobotToken = ROBOT_TOKEN_BASE;
+        for (int i = 0; i < AttackRobotCount; i++) AddRobotPlayer(PlayerCampType.Attack);
+        for (int i = 0; i < DefenseRobotCount; i++) AddRobotPlayer(PlayerCampType.Defense);
     }
 
-    private void AddAIPlayer(PlayerCampType camp)
+    private void AddRobotPlayer(PlayerCampType camp)
     {
-        int robotClientId = nextAIToken++;
+        int robotClientId = nextRobotToken++;
         var info = new CSLobbyPlayerInfo()
         {
             // 名字由令牌推导：重建时令牌源归位，编号稳定且不与真人令牌冲突
@@ -441,20 +441,20 @@ public partial class BattleManager : EnsBehaviour
         // 准备状态（任意玩家可随时切换，全员准备后进入开战倒计时）
         SetReady(clientId, update.ready);
 
-        // AI 数量：房间共享，任意玩家可编辑，上限按配表钳制。数量变化时重建 AI 玩家（= AI 进场随机选角）
-        int attackAI = Mathf.Clamp(update.attackAICount, 0, GlobalVariable.I(global_variablesEnum.player_limit_attacker_AI));
-        int defenseAI = Mathf.Clamp(update.defenseAICount, 0, GlobalVariable.I(global_variablesEnum.player_limit_defenser_AI));
-        if (attackAI != AttackAICount || defenseAI != DefenseAICount)
+        // 人机数量：房间共享，任意玩家可编辑，上限按配表钳制。数量变化时重建人机玩家（= 人机进场随机选角）
+        int attackRobot = Mathf.Clamp(update.attackRobotCount, 0, GlobalVariable.I(global_variablesEnum.player_limit_attacker_AI));
+        int defenseRobot = Mathf.Clamp(update.defenseRobotCount, 0, GlobalVariable.I(global_variablesEnum.player_limit_defenser_AI));
+        if (attackRobot != AttackRobotCount || defenseRobot != DefenseRobotCount)
         {
-            AttackAICount = attackAI;
-            DefenseAICount = defenseAI;
-            RebuildAIPlayers();
+            AttackRobotCount = attackRobot;
+            DefenseRobotCount = defenseRobot;
+            RebuildRobotPlayers();
         }
 
         BroadcastLobbyInfo();
     }
 
-    // 真人名额（不含 AI）：已在该阵营直接放行，避免重复上报/重连被挡
+    // 真人名额（不含人机）：已在该阵营直接放行，避免重复上报/重连被挡
     private bool CanJoinCamp(int clientId, PlayerCampType camp)
     {
         if (PlayerCamps.TryGetValue(clientId, out var current) && current == camp) return true;
@@ -494,7 +494,7 @@ public partial class BattleManager : EnsBehaviour
             return;
         }
         if (startCountdownHandle != null || !AllHumansReady()) return;
-        // 全员准备：双方（人类 + AI）均需 > 0 才进入开始倒计时
+        // 全员准备：双方（真人 + 人机）均需 > 0 才进入开始倒计时
         if (PlayerCamps.Values.Count(c => c == PlayerCampType.Attack) <= 0
             || PlayerCamps.Values.Count(c => c == PlayerCampType.Defense) <= 0)
         {
@@ -602,7 +602,7 @@ public partial class BattleManager : EnsBehaviour
         Tool.NetworkManager.SendLoadingAiUnitResponse(clientId,
             new SCLoadingAiUnitResponse { list = BuildLoadingUnits(null) });
 
-    // humanCamp = null 表示 AI 单位（虚拟负数 clientId）
+    // humanCamp = null 表示人机（服务器侧虚拟令牌，无真实连接）
     private List<LoadingUnitEntry> BuildLoadingUnits(PlayerCampType? humanCamp)
     {
         var list = new List<LoadingUnitEntry>();
@@ -628,7 +628,7 @@ public partial class BattleManager : EnsBehaviour
         return list;
     }
 
-    // AI 令牌落在 [ROBOT_TOKEN_BASE, …) 段，与真人令牌段互不重叠
+    // 人机令牌落在 [ROBOT_TOKEN_BASE, …) 段，与真人令牌段互不重叠
     public static bool IsRobotToken(int clientId) => clientId >= ROBOT_TOKEN_BASE;
 
     private static string NameOf(int clientId, CSLobbyPlayerInfo info)
@@ -674,8 +674,8 @@ public partial class BattleManager : EnsBehaviour
 
     // 组队期成员快照：clientId → 上次广播的席位信息，用于算增量（首次广播前为空 = 全量自然下发）
     private readonly Dictionary<int, SCLobbyInfo.LobbyMemberInfo> lobbyMemberSnapshot = new();
-    private int lobbySnapshotAttackAI = -1;
-    private int lobbySnapshotDefenseAI = -1;
+    private int lobbySnapshotAttackRobot = -1;
+    private int lobbySnapshotDefenseRobot = -1;
     private bool lobbySnapshotBattleStarted;
     private static readonly List<SCLobbyInfo.LobbyMemberInfo> s_lobbyMembers = new();
 
@@ -685,8 +685,8 @@ public partial class BattleManager : EnsBehaviour
         var info = new SCLobbyInfo
         {
             full = true,
-            attackAICount = AttackAICount,
-            defenseAICount = DefenseAICount,
+            attackRobotCount = AttackRobotCount,
+            defenseRobotCount = DefenseRobotCount,
             battleStarted = BattleStarted,
         };
         CollectLobbyMembers(info.members);
@@ -698,7 +698,7 @@ public partial class BattleManager : EnsBehaviour
         into.Clear();
         foreach (var pair in PlayerInfoList)
         {
-            if (IsRobotToken(pair.Key)) continue; // AI 不进成员列表，只通过两个数量表达
+            if (IsRobotToken(pair.Key)) continue; // 人机不进成员列表，只通过两个数量表达
             int campValue = PlayerCamps.TryGetValue(pair.Key, out var camp) ? (int)camp : (int)PlayerCampType.Spectator;
             //所选角色：按成员最终阵营取 CSLobbyPlayerInfo 里对应一侧（首页选择随加入上报）
             int characterIndex = -1;
@@ -724,12 +724,12 @@ public partial class BattleManager : EnsBehaviour
         var info = new SCLobbyInfo
         {
             full = false,
-            attackAICount = AttackAICount,
-            defenseAICount = DefenseAICount,
+            attackRobotCount = AttackRobotCount,
+            defenseRobotCount = DefenseRobotCount,
             battleStarted = BattleStarted,
         };
-        bool changed = AttackAICount != lobbySnapshotAttackAI
-            || DefenseAICount != lobbySnapshotDefenseAI
+        bool changed = AttackRobotCount != lobbySnapshotAttackRobot
+            || DefenseRobotCount != lobbySnapshotDefenseRobot
             || BattleStarted != lobbySnapshotBattleStarted;
 
         foreach (var member in s_lobbyMembers)
@@ -750,8 +750,8 @@ public partial class BattleManager : EnsBehaviour
 
         lobbyMemberSnapshot.Clear();
         foreach (var member in s_lobbyMembers) lobbyMemberSnapshot[member.clientId] = member;
-        lobbySnapshotAttackAI = AttackAICount;
-        lobbySnapshotDefenseAI = DefenseAICount;
+        lobbySnapshotAttackRobot = AttackRobotCount;
+        lobbySnapshotDefenseRobot = DefenseRobotCount;
         lobbySnapshotBattleStarted = BattleStarted;
 
         if (changed) Tool.NetworkManager.SendLobbyInfo(info);
@@ -1131,10 +1131,12 @@ public partial class BattleManager : EnsBehaviour
             EntityOwnerClient[entityId] = clientId;
             ApplyCharacterCardLevels(clientId, characterType); // 角色被动折算成初始词条层数
             Tool.NetworkManager.SendPlayerEntity(clientId, entityId);
-            EnableSkillBar(clientId, GetEntity(entityId)); // 先建台账再下发技能，快照才有根戳可发
+            var spawned = GetEntity(entityId);
+            if (spawned != null && spawned.skillController != null)
+                SeedPlayerSkills(clientId, spawned.skillController.GetSkillIds()); // 玩家级持有表：角色自带技能打底
+            EnableSkillBar(clientId, spawned); // 先建台账再下发技能，快照才有根戳可发
 
             // AI 接管 / 人机：置位后实体走对应的自动驱动分支（真人不受影响，输入仍来自网络）
-            var spawned = GetEntity(entityId);
             if (spawned is PlayerEntityData spawnedPlayer)
             {
                 spawnedPlayer.robotControlled = RobotClients.Contains(clientId);
@@ -1142,7 +1144,7 @@ public partial class BattleManager : EnsBehaviour
                 if (spawnedPlayer.aiControlled && spawnedPlayer.AiRelay == null)
                     spawnedPlayer.AiRelay = new AiIntentRelay(spawnedPlayer, clientId); // 接管即挂行为状态机，不等第一条意图
             }
-            Debug.Log($"{(RobotClients.Contains(clientId) ? "AI" : "玩家")} {clientId} 出战：{characterType} camp={camp} id={entityId}");
+            Debug.Log($"{(RobotClients.Contains(clientId) ? "人机" : "真人")} {clientId} 出战：{characterType} camp={camp} id={entityId}");
         }
 
         // 对局世界：雕像×4 / 珊瑚 / 防御塔 / 中立雕像（位置来自地形点位 TerrainSpawns）
@@ -1166,7 +1168,7 @@ public partial class BattleManager : EnsBehaviour
             SendSkillSyncFull(clientId); // 必须在 BattleStart 之后：客户端进战斗页会先清空技能表
         }
         SendProgressToAll(); // 开局把等级/幸运/待抽次数（全 0）推一次，客户端据此建立按钮列表
-        Debug.Log($"战斗开始：人类 {PlayerInfoList.Count - RobotClients.Count}，AI {RobotClients.Count}");
+        Debug.Log($"战斗开始：真人 {PlayerInfoList.Count - RobotClients.Count}，人机 {RobotClients.Count}");
     }
 
     public void EndBattle(int gameState)

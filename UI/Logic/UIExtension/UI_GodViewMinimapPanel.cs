@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using FairyGUI;
 using Ros.Transport;
 using TerrainGen;
@@ -32,10 +31,6 @@ namespace Ros.UI.Main
         private readonly List<UI_SkillList.Slot> detailHeldSkills = new();
         private readonly List<SCGodViewEntityDetail.Buff> detailBuffs = new();
 
-        private Action<int, GObject> buffHoverEnter;
-        private Action buffHoverExit;
-        private Action<int, GObject> skillHoverEnter;
-        private Action skillHoverExit;
         private NTexture mapTexture;
         private Vector2 center;
         private int scaleIndex;
@@ -51,14 +46,9 @@ namespace Ros.UI.Main
 
         public bool IsOpen => visible;
 
-        // 悬浮提示回调由战斗页提供（与血条 buff 图标、战斗技能栏同一套提示面板）
-        public void Init(Action<int, GObject> onBuffHoverEnter, Action onBuffHoverExit,
-            Action<int, GObject> onSkillHoverEnter, Action onSkillHoverExit)
+        // 悬浮提示由条目自发弹出，这里只绑拖拽
+        public void Init()
         {
-            buffHoverEnter = onBuffHoverEnter;
-            buffHoverExit = onBuffHoverExit;
-            skillHoverEnter = onSkillHoverEnter;
-            skillHoverExit = onSkillHoverExit;
             m_largeMinimapContainer.onTouchBegin.Set(OnDragBegin);
             m_largeMinimapContainer.onTouchMove.Set(OnDragMove);
             m_largeMinimapContainer.onTouchEnd.Set(OnDragEnd);
@@ -174,7 +164,7 @@ namespace Ros.UI.Main
                 return;
             }
             m_show_character_detail.selectedIndex = 1;
-            HideTips(); // 换实体后旧提示内容已失效
+            TipHost.Hide(); // 换实体后旧提示内容已失效
             FillHead(info);
             FillHealth(info);
             FillBuffs(info);
@@ -392,7 +382,7 @@ namespace Ros.UI.Main
         #region 详情面板
         private void ClearDetail()
         {
-            HideTips();
+            TipHost.Hide();
             m_show_character_detail.selectedIndex = 0; // 0 = 收起 / 1 = 展开
             detailSkills.Clear();
             detailHeldSkills.Clear();
@@ -402,12 +392,6 @@ namespace Ros.UI.Main
             if (m_buff_list != null && m_buff_list.m_list != null) m_buff_list.m_list.numItems = 0;
             if (m_entity_name != null) m_entity_name.text = "";
             if (m_label_health != null) m_label_health.text = "";
-        }
-
-        private void HideTips()
-        {
-            buffHoverExit?.Invoke();
-            skillHoverExit?.Invoke();
         }
 
         private void FillHead(SCGodViewEntityDetail info)
@@ -443,7 +427,7 @@ namespace Ros.UI.Main
                 for (int i = 0; i < info.buffs.Count; i++) detailBuffs.Add(info.buffs[i]);
             var list = m_buff_list.m_list;
             list.itemRenderer = (index, obj) =>
-                ((UI_buffItem)obj).Fill(detailBuffs[index].type, detailBuffs[index].level, buffHoverEnter, buffHoverExit);
+                ((UI_buffItem)obj).Fill(detailBuffs[index].type, detailBuffs[index].level);
             list.numItems = detailBuffs.Count;
         }
 
@@ -478,34 +462,14 @@ namespace Ros.UI.Main
             }
         }
 
-        private void RenderSkillSlot(int index, GObject obj) => RenderSlot(obj, detailSkills, index, true);
+        private void RenderSkillSlot(int index, GObject obj) => FillSkillItem(obj, detailSkills, index);
 
-        private void RenderHeldSkillSlot(int index, GObject obj) => RenderSlot(obj, detailHeldSkills, index, false);
+        private void RenderHeldSkillSlot(int index, GObject obj) => FillSkillItem(obj, detailHeldSkills, index);
 
-        private void RenderSlot(GObject obj, List<UI_SkillList.Slot> source, int index, bool withRecharge)
+        private static void FillSkillItem(GObject obj, List<UI_SkillList.Slot> source, int index)
         {
             if (obj is not UI_SkillListItem slot) return;
-            var data = index < source.Count ? source[index] : new UI_SkillList.Slot(-1, 1f, 0, true);
-            bool empty = data.skillId < 0;
-            if (slot.m_key != null) slot.m_key.text = ""; // 别人的技能没有玩家键位
-            if (slot.m_empty != null) slot.m_empty.selectedIndex = empty ? 1 : 0;
-            Texture icon = empty ? null : UI_SkillList.ResolveIcon(data.skillId);
-            if (slot.m_loader_icon != null)
-            {
-                slot.m_loader_icon.texture = icon != null ? new NTexture(icon) : null;
-                slot.m_loader_icon.visible = icon != null;
-                slot.m_loader_icon.fillAmount = !withRecharge || data.unlimited || empty ? 1f : data.recharge01;
-            }
-            if (slot.m_loader_iconBase != null)
-            {
-                slot.m_loader_iconBase.texture = icon != null ? new NTexture(icon) : null;
-                slot.m_loader_iconBase.visible = icon != null;
-            }
-            // 未装备的技能不下发冷却与库存，次数按 0 显示
-            if (slot.m_storeList != null) slot.m_storeList.numItems = withRecharge && !data.unlimited && !empty ? data.store : 0;
-            // 空槽不弹提示，但离开时照常收起
-            slot.onRollOver.Set(() => { if (data.skillId >= 0) skillHoverEnter?.Invoke(data.skillId, slot); });
-            slot.onRollOut.Set(() => skillHoverExit?.Invoke());
+            slot.Fill(index < source.Count ? source[index] : new UI_SkillList.Slot(-1, 1f, 0, true));
         }
         #endregion
 

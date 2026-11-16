@@ -87,16 +87,11 @@ public partial class BattleManager
         InvalidateBroadcastSnapshots();
     }
 
-    // 持有技能全量下发：无实体（观战 / 已死）发空表，客户端据此清空重登技能
+    // 持有技能全量下发：取玩家级表，死亡（无实体）期间也照发，观战方本来就没有技能
     private void SendSkillSyncFull(int clientId)
     {
         var info = new SCSkillSync { full = true };
-        if (PlayerEntityId.TryGetValue(clientId, out var entityId))
-        {
-            var entity = GetEntity(entityId);
-            if (entity != null && entity.skillController != null)
-                info.skills = entity.skillController.GetSkillIds();
-        }
+        info.skills = new List<int>(PlayerSkillList(clientId));
         Tool.NetworkManager.SendSkillSync(clientId, info);
         SendSkillRecharge(clientId); // 持有表换了，槽位与根戳一起补一份
     }
