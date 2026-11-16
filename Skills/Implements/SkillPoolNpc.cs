@@ -68,7 +68,7 @@ namespace Ros.Skill
         protected override void OnCast(EntityData caster)
         {
             Vector3 origin = EntityAnchor.UpCenter.GetTransform(caster.ModelInfo, caster.anim).position;
-            Vector3 aim = TargetSelect.AimPos(caster, TargetSector, TargetRadius, CastRange);
+            Vector3 aim = TargetSelect.AimPos(caster, TargetSector, TargetRadius, CastRange, normalizeDistance: false);
             Tool.BattleManager.ShootBullet(caster, BuildAttack(caster),
                 new SkillTrajectoryLine(origin, aim, BulletFlight), 0f,
                 HitSpec(SkillVfxKind.Bullet, BulletVfx, VfxScale()));
