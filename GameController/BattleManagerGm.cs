@@ -77,6 +77,7 @@ public partial class BattleManager
             case GmCommandId.ClearSkill: GmClearSkill(clientId); break;
             case GmCommandId.AddBuff: GmAddBuff(clientId, (EffectType)gm.i); break;
             case GmCommandId.ClearBuff: GmRemoveAllBuff(clientId); break;
+            case GmCommandId.Heal: GmHeal(clientId, gm.i); break;
             case GmCommandId.Fly:
                 if (GetGmPlayerEntity(clientId) is PlayerEntityData flight) flight.SetFlightMode(gm.i != 0);
                 break;
@@ -185,6 +186,15 @@ public partial class BattleManager
     {
         var effect = GetGmEffectController(clientId);
         if (effect != null) effect.RemoveAll();
+    }
+
+    // 回血：夹到生命上限；死亡/复活中取不到实体，指令静默失败
+    private void GmHeal(int clientId, int amount)
+    {
+        if (amount <= 0) return;
+        var target = GetGmPlayerEntity(clientId);
+        if (target == null) return;
+        target.attributes.Heal(amount);
     }
 
     private void GmSetInvincible(int clientId, bool on)

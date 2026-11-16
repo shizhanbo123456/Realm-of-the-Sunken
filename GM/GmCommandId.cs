@@ -29,6 +29,7 @@ namespace Ros.Gm
         public const int ClearSkill = 18;
         public const int AddBuff = 19;
         public const int ClearBuff = 20;
+        public const int Heal = 38;
 
         // 外挂
         public const int Fly = 21;
