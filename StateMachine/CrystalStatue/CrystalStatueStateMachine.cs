@@ -1,4 +1,5 @@
-﻿using Ros.Skill;
+﻿using Ros.Config;
+using Ros.Skill;
 using UnityEngine;
 
 // 水晶守护塔：技能冷却好了且范围内有敌人就放一发；不移动、不转向、不复活
@@ -41,8 +42,9 @@ public class CrystalStatueStateMachine : DecisionMachine, IBehaviorHost
 
     private bool SkillReady => IsSkillReady(CurrentSkillId);
 
+    // 开火判定距离取当前技能的配置射程（skill 表第 14 列）：与技能落点索敌同一口径，避免判定得到却打不到
     private bool HasEnemyInRange() =>
-        BattleManager.EntityContainer.GetNearestEnemy(Owner, GlobalConfig.crystal_statue_attack_range) != null;
+        BattleManager.EntityContainer.GetNearestEnemy(Owner, SkillConfig.Get(CurrentSkillId).castRange) != null;
 
     private void RequestIdle() => arbiter.RequestIdle();
 

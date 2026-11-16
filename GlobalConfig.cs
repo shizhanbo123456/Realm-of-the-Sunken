@@ -45,7 +45,6 @@ public static class GlobalConfig
 
     #region 资源与中立单位
     public const int crystal_statue_count = 3;          // 场景 3 座水晶雕像，value 0~2
-    public const float crystal_statue_attack_range = 20f;
 
     #region 中立雕像（中立争抢单位）
     public const int neutral_statue_variant_count = 2;   // 0 天使雕像 / 1 恶魔雕像
