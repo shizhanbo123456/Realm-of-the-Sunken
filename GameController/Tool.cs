@@ -16,6 +16,7 @@ public class Tool : MonoBehaviour
         Instance = this;
     }
 
+    private const float FrameLogInterval = 5f; // 帧率日志间隔（秒）
     private int _frameCount;
     private float _frameTimer;
 
@@ -26,11 +27,11 @@ public class Tool : MonoBehaviour
 
         _frameCount++;
         _frameTimer += Time.unscaledDeltaTime;
-        if (_frameTimer >= 1f)
+        if (_frameTimer >= FrameLogInterval)
         {
-            Debug.Log($"[FPS] 每秒经过帧数: {_frameCount}");
+            Debug.Log($"[FPS] 平均帧率: {_frameCount / _frameTimer:0}");
             _frameCount = 0;
-            _frameTimer -= 1f;
+            _frameTimer = 0f;
         }
     }
 

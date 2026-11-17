@@ -24,8 +24,6 @@ public class EntityPlayerManager : ClientSubManager
         public Vector3 moveTarget; // 上一次 MovePosition 的目标，用于取物理解算位移（推到墙外的那一段）
         public float lastSeenTime; // 最近一次收到同步的时间（超时移除用）
 
-        public string pendingForcedSwitch;
-
         public int pendingPlayHash;
         public float pendingPlayFrame;
         public int pendingPlayTick;
@@ -94,16 +92,6 @@ public class EntityPlayerManager : ClientSubManager
                 cameraAnchor.rotation = transform.rotation;
             }
 
-            // 强制切换日志（延后一帧：Play 生效后片段名与落地进度才读得到）
-            if (pendingForcedSwitch != null)
-            {
-                string actual = animator != null
-                    ? $"片段={ResolvePlayingClips()} 进度={animator.GetCurrentAnimatorStateInfo(0).normalizedTime % 1f:F2}"
-                    : "片段=?";
-                Debug.LogWarning($"{pendingForcedSwitch} → {actual}");
-                pendingForcedSwitch = null;
-            }
-
             // 片段切换**延后一帧**执行：参数已在收到事件时写入，先让状态机用它自己的转换走一帧；
             // 若下一帧本地已经（或正在）切到目标状态，就不硬切——让控制器配的过渡时长生效。
             if (pendingPlayHash != 0 && animator != null && Time.frameCount > pendingPlayTick)
@@ -115,10 +103,6 @@ public class EntityPlayerManager : ClientSubManager
                 if (!IsHeadingTo(target))
                 {
                     animator.Play(target, 0, progress);
-                    if (logForcedAnimSwitch)
-                    {
-                        pendingForcedSwitch = $"[动画强制切换] 实体{id}({type}) hash={target} 要求进度={progress:F2}";
-                    }
                 }
             }
         }
@@ -129,21 +113,6 @@ public class EntityPlayerManager : ClientSubManager
             if (animator.GetCurrentAnimatorStateInfo(0).fullPathHash == targetHash) return true;
             return animator.IsInTransition(0)
                 && animator.GetNextAnimatorStateInfo(0).fullPathHash == targetHash;
-        }
-
-        private string ResolvePlayingClips()
-        {
-            if (animator == null) return "?";
-            var infos = animator.GetCurrentAnimatorClipInfo(0);
-            if (infos == null || infos.Length == 0) return "?";
-            var sb = new System.Text.StringBuilder();
-            foreach (var ci in infos)
-            {
-                if (ci.clip == null) continue;
-                if (sb.Length > 0) sb.Append('+');
-                sb.Append(ci.clip.name);
-            }
-            return sb.Length > 0 ? sb.ToString() : "?";
         }
     }
 
@@ -171,8 +140,6 @@ public class EntityPlayerManager : ClientSubManager
     public IEnumerable<ClientEntityView> AllViews => views.Values;
 
     private readonly Dictionary<ushort, SCEntityAnimInfo> pendingAnim = new();
-
-    private static bool logForcedAnimSwitch = true;
 
     private const float ViewTimeoutSeconds = 3f;
 
