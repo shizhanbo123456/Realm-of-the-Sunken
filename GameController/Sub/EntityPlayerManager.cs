@@ -155,6 +155,7 @@ public class EntityPlayerManager : ClientSubManager
 
     public override void Tick(float deltaTime)
     {
+        SyncOwnCamera();
         float now = Time.time;
         List<ushort> expired = null;
         foreach (var pair in views)
@@ -170,6 +171,26 @@ public class EntityPlayerManager : ClientSubManager
         {
             OnRemoveEntity(id);
         }
+    }
+
+    // 本地实体在场时镜头必须跟随它：复活换实体、观战结束、跟随点被清空都在这里逐帧纠正
+    private void SyncOwnCamera()
+    {
+        var loading = ClientLoadingManager.Current;
+        var cam = Tool.CameraController;
+        if (cam == null || loading == null || !loading.HasSession || loading.OwnEntityId == 0) return;
+        var view = GetView(loading.OwnEntityId);
+        if (view == null) return;
+
+        if (view.cameraAnchor == null)
+        {
+            view.cameraAnchor = new GameObject("CameraAnchor").transform;
+            view.cameraAnchor.position = view.anim != null
+                ? EntityAnchor.Camera.GetTransform(view.modelInfo, view.anim).position
+                : view.transform.position;
+            view.cameraAnchor.rotation = view.transform.rotation;
+        }
+        if (cam.lookTarget != view.cameraAnchor) cam.SetLookTarget(view.cameraAnchor);
     }
 
     public void OnEntityDisplay(SCEntityDisplayInfo info)
@@ -199,24 +220,19 @@ public class EntityPlayerManager : ClientSubManager
         // UI/逻辑层事件：本包携带了 health/buff 变化时触发（完整快照必带 health 段）
         if (info.hasHealth || info.hasBuffs) EventManager.TrigEvent(ClientEvent.OnEntityDisplayUpdate, info);
 
-        // 本地玩家：绑定相机跟随（注视点 = EntityAnchor.Camera，每帧由视图刷新）
+        // 本地玩家：相机跟随点 = EntityAnchor.Camera（逐帧由视图刷新），绑定与纠偏见 SyncOwnCamera
         var loading = ClientLoadingManager.Current;
         if (loading != null && loading.HasSession && info.entityId == loading.OwnEntityId
-            && Tool.CameraController != null)
+            && view.cameraAnchor == null && info.hasTransform && Tool.CameraController != null)
         {
-            if (view.cameraAnchor == null && info.hasTransform)
-            {
-                // 视体位姿由 rb.MovePosition 施加，要到下一个物理步才生效；此刻读骨骼会得到"假位置"上的锚点，
-                // 故先用权威位姿摆正一次（仅建视体这一次，之后仍由 MovePosition 驱动，不破坏碰撞解析）
-                view.transform.position = info.position;
-                view.transform.rotation = Quaternion.Euler(0f, info.yaw, 0f);
-                view.cameraAnchor = new GameObject("CameraAnchor").transform;
-                view.cameraAnchor.position = EntityAnchor.Camera.GetTransform(view.modelInfo, view.anim).position;
-                view.cameraAnchor.rotation = view.transform.rotation;
-            }
-            // 复活换实体 / 观战结束：镜头还挂在别处就夺回跟随；每包校验，错过首包也能自愈
-            if (view.cameraAnchor != null && Tool.CameraController.lookTarget != view.cameraAnchor)
-                Tool.CameraController.SetLookTarget(view.cameraAnchor);
+            // 视体位姿由 rb.MovePosition 施加，要到下一个物理步才生效；此刻读骨骼会得到"假位置"上的锚点，
+            // 故先用权威位姿摆正一次（仅建视体这一次，之后仍由 MovePosition 驱动，不破坏碰撞解析）
+            view.transform.position = info.position;
+            view.transform.rotation = Quaternion.Euler(0f, info.yaw, 0f);
+            view.cameraAnchor = new GameObject("CameraAnchor").transform;
+            view.cameraAnchor.position = EntityAnchor.Camera.GetTransform(view.modelInfo, view.anim).position;
+            view.cameraAnchor.rotation = view.transform.rotation;
+            Tool.CameraController.SetLookTarget(view.cameraAnchor);
         }
     }
 
