@@ -56,6 +56,7 @@ public class HomePage : PageBase
     public override void Enter(ShowParam param)
     {
         base.Enter(param);
+        Tool.EnvironmentManager.SetTime(GlobalConfig.home_env_time); // 固定首页昼夜，不沿用对局结束时的时刻
         // 每次进首页固定从进攻方已选角色开始展示，不沿用上次浏览到的角色
         defenseTab = false;
         selectedSaveIndex = ClientSelection.selectedAttackIndex;

@@ -47,6 +47,7 @@ public class LobbyPage : PageBase
     public override void Enter(ShowParam param)
     {
         base.Enter(param);
+        Tool.EnvironmentManager.SetTime(GlobalConfig.lobby_env_time); // 固定大厅昼夜，不沿用对局结束时的时刻
         EventManager.AddEvent<SCLobbyInfo>(ClientEvent.OnLobbyInfoUpdate, OnLobbyInfoUpdate);
         // 有缓存立即回显（服务器只在事件时广播，错过就没了）
         ApplyLobbyInfo(NetworkManager.LatestLobbyInfo);

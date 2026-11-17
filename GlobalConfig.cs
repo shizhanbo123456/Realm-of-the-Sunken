@@ -126,6 +126,10 @@ public static class GlobalConfig
     #region 昼夜
     // 昼夜时长取配表 global_variables 的 day_duration / night_duration；时间用归一化周期值（[0,2)：0/2 = 午夜，1 = 正午）循环推演
     public const float daynight_sync_interval = 10f;
+
+    // 首页/大厅的固定环境时间：进页面即覆盖，避免把战斗结束那一刻的昼夜带到局外
+    public const float home_env_time = 0.7f;
+    public const float lobby_env_time = 1.4f;
     #endregion
 
     #region 视野与小地图（策划案第十五章）
