@@ -136,7 +136,11 @@ public partial class NetworkManager : EnsBehaviour
 
     public async Task<ConnectResult> TryConnect(string ipAddress)
     {
-        if (connecting) return ConnectResult.TooFrequent;
+        if (connecting)
+        {
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.connect_in_progress);
+            return ConnectResult.TooFrequent;
+        }
         if (Tool.SaveManager == null)
         {
             Debug.LogError("未找到存档管理器，无法取得玩家令牌");
@@ -160,6 +164,7 @@ public partial class NetworkManager : EnsBehaviour
             EnsInstance.Corr.IP = ipAddress;
             // ShutDown 会拿上次连接残留的未握手标记补发一次 OnConnectionRejected，先关再挂监听，避免被假拒绝打断
             EnsInstance.Corr.ShutDown();
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.connect_trying);
             bool rejected = false;
             void OnRejected() => rejected = true;
             EnsInstance.OnConnectionRejected += OnRejected;
