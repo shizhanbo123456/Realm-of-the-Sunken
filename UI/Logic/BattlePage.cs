@@ -29,6 +29,7 @@ public class BattlePage : PageBase
     private bool localAvatarSet;
     private bool spectatorMode;       // 纯观战方玩家（无战斗实体）
     private bool localPlayerAlive = true; // 本地玩家实体是否在场（死亡观战期间 false，显示观战下拉）
+    private ushort lastOwnEntityId;   // 最近一次有效的自身实体 id：死亡时 OwnEntityId 已被清 0，判定死亡只能靠它
     private bool reviveActive;        // 本地玩家死亡等待中：复活条由客户端按配表本地推演
     private float reviveDuration;     // 本段复活总时长（revive_time.csv，按死亡次数与阵营取）
     private float reviveElapsed;      // 本段已等待时长（起点由服务器包里的 progress 折算）
@@ -244,6 +245,7 @@ public class BattlePage : PageBase
         localPlayerCamp = -1;
         localAvatarSet = false;
         spectatorMode = Session != null && Session.IsSpectator;
+        lastOwnEntityId = Session != null ? Session.OwnEntityId : (ushort)0;
         localPlayerAlive = !spectatorMode;
         panel.m_onlook.selectedIndex = spectatorMode ? 1 : 0; // onlook=1：FGUI 自动隐藏血条/技能等非观战元素
         if (panel.m_onlookComboBox != null) panel.m_onlookComboBox.onChanged.Set(OnOnlookComboBoxChanged);
@@ -297,6 +299,7 @@ public class BattlePage : PageBase
         if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated -= OnCameraUpdated;
         spectatorMode = false;
         localPlayerAlive = true;
+        lastOwnEntityId = 0;
         spectateTargetClientId = -1;
         spectateTargetEntityId = -1;
         if (panel.m_onlook != null) panel.m_onlook.selectedIndex = 0;
@@ -315,6 +318,7 @@ public class BattlePage : PageBase
 
     public override void Tick(float deltaTime)
     {
+        if (OwnEntityId != 0) lastOwnEntityId = OwnEntityId;
         // 输入被 UI 占用或 AI 接管时，技能选择、快捷消息与面板快捷键都不响应
         if (!InputManager.PlayerInputBlocked)
         {
@@ -384,7 +388,7 @@ public class BattlePage : PageBase
         entityVitals.Remove((ushort)entityId);
         panel.m_Minimap?.Remove((ushort)entityId);
 
-        if (IsOwnEntity(entityId))
+        if (lastOwnEntityId != 0 && entityId == lastOwnEntityId)
         {
             localPlayerAlive = false; // 本地死亡：显示观战下拉，进入死亡观战
             panel.m_onlook.selectedIndex = 1; // 死亡等待复活：由 FGUI gear 收起血条与技能栏

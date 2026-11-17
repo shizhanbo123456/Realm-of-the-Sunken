@@ -203,6 +203,8 @@ public partial class BattleManager
         {
             EntityOwnerClient.Remove(entity.id);
             PlayerEntityId.Remove(owner); // 复活时重建并重新绑定
+            // 归属已在这里摘除，DestroyEntity 里再查就查不到：死亡必须在此把 -1 发出去
+            Tool.NetworkManager.SendPlayerEntity(owner, -1);
 
             if (!reviveStates.TryGetValue(owner, out var rs))
             {
