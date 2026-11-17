@@ -99,15 +99,17 @@ public class CameraController : MonoBehaviour
         lookTarget = target;
         if (target == null) return;
 
-        // 俯视/自由视角下不摆位：俯视由 TickTopDown 平滑追新目标，自由视角不能被跟随点拽走
+        // 自由视角不能被跟随点拽走：只记引用不摆位
         if (!snap || Mode == CameraViewMode.Free) return;
         if (Mode == CameraViewMode.TopDown)
         {
-            NotifyCameraUpdated();
-            return;
+            SnapToTopDown();
         }
-        camYaw = target.eulerAngles.y; // 绑定新角色时镜头回到角色正后方
-        SnapToThirdPerson();
+        else
+        {
+            camYaw = target.eulerAngles.y; // 绑定新角色时镜头回到角色正后方
+            SnapToThirdPerson();
+        }
         NotifyCameraUpdated();
     }
 
@@ -122,6 +124,22 @@ public class CameraController : MonoBehaviour
         transform.LookAt(lookTarget.position);
         if (ClientSettings.AutoPitch) UpdateAutoPitch();
         TickPitch();
+    }
+
+    // 瞬移到俯视稳态位姿（绑定/换绑）：位置与朝向都取 TickTopDown 的收敛目标，否则下一帧会被平滑拉走
+    private void SnapToTopDown()
+    {
+        transform.position = lookTarget.position + topDownOffset;
+        transform.rotation = TopDownRotation();
+    }
+
+    // 俯视朝向：偏航恒为 0，俯角由相机与跟随点的相对位置推出
+    private Quaternion TopDownRotation()
+    {
+        Vector3 d = lookTarget.position - transform.position;
+        float flat = Mathf.Sqrt(d.x * d.x + d.z * d.z);
+        float pitch = -Mathf.Atan2(d.y, flat) * Mathf.Rad2Deg;
+        return Quaternion.Euler(pitch, 0f, 0f);
     }
 
     public void SetMode(CameraViewMode mode)
@@ -324,10 +342,7 @@ public class CameraController : MonoBehaviour
         float k = topDownSmooth > 0f ? 1f - Mathf.Exp(-topDownSmooth * deltaTime) : 1f;
         transform.position = Vector3.Lerp(transform.position, target, k);
 
-        Vector3 d = lookTarget.position - transform.position;
-        float flat = Mathf.Sqrt(d.x * d.x + d.z * d.z);
-        float pitch = -Mathf.Atan2(d.y, flat) * Mathf.Rad2Deg;
-        var targetRotation = Quaternion.Euler(pitch, 0f, 0f);
+        var targetRotation = TopDownRotation();
         transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, 1f - Mathf.Exp(-pitchSmooth * deltaTime));
     }
 
