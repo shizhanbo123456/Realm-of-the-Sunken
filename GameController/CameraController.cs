@@ -53,6 +53,13 @@ public class CameraController : MonoBehaviour
     public float freeReportInterval = 1f;
     public float freeReportDistance = 1f;
 
+    // 视角震动：强度档位由配表 camera_shake_* 给，这里只放形状参数（幅度上限按模式分、衰减、噪声频率）
+    public float shakeOffsetThirdPerson = 0.18f;
+    public float shakeOffsetTopDown = 0.12f;
+    public float shakeMaxRoll = 0.5f;
+    public float shakeDecay = 1.4f;
+    public float shakeFrequency = 22f;
+
     public CameraViewMode Mode { get; private set; } = CameraViewMode.ThirdPerson;
 
     public bool IsFree => Mode == CameraViewMode.Free;
@@ -86,12 +93,29 @@ public class CameraController : MonoBehaviour
     // 会话跟踪：新一局按设置面板的口径重建镜头模式
     private bool sessionActive;
 
+    // 震动状态：trauma 累积到 1，位移取 trauma² 保证小伤害几乎不动
+    private float trauma;
+    private readonly float[] shakeSeed = new float[3];
+    private Vector3 shakeBasePos;
+    private Quaternion shakeBaseRot = Quaternion.identity;
+    private Vector3 shakeAppliedPos;
+    private Quaternion shakeAppliedRot = Quaternion.identity;
+    private bool shakeBaseReady;
+
     private void Awake()
     {
         Tool.CameraController = this;
         WorldCamera = GetComponent<Camera>();
         camYaw = transform.eulerAngles.y;
         lastAutoPitch = ClientSettings.AutoPitch;
+        for (int i = 0; i < shakeSeed.Length; i++) shakeSeed[i] = Random.value * 100f;
+    }
+
+    // 外部震源入口：强度档位由调用方按配表给（受击 / 命中），这里只负责累积与衰减
+    public void AddTrauma(float amount)
+    {
+        if (!ClientSettings.CameraShake || amount <= 0f) return;
+        trauma = Mathf.Clamp01(trauma + amount);
     }
 
     public void SetLookTarget(Transform target, bool snap = true)
@@ -275,10 +299,13 @@ public class CameraController : MonoBehaviour
 
     private void LateUpdate()
     {
+        RestoreShakeBase();
+
         if (Mode == CameraViewMode.Free)
         {
             TickFreeMove(Time.deltaTime);
             TickFreeReport(Time.deltaTime);
+            ApplyShake();
             NotifyCameraUpdated();
             return;
         }
@@ -287,12 +314,14 @@ public class CameraController : MonoBehaviour
         if (Mode == CameraViewMode.TopDown)
         {
             TickTopDown(Time.deltaTime);
+            ApplyShake();
             NotifyCameraUpdated();
             return;
         }
 
         TickThirdPerson(Time.deltaTime);
 
+        ApplyShake();
         NotifyCameraUpdated();
     }
 
@@ -505,6 +534,47 @@ public class CameraController : MonoBehaviour
         var eular = new Vector3(pitchTarget, camYaw, 0f);
         var targetQuaternion = Quaternion.Euler(eular);
         transform.rotation = Quaternion.Lerp(transform.rotation, targetQuaternion, 1f - Mathf.Exp(-pitchSmooth * Time.deltaTime));
+    }
+
+    // 把上帧叠加的震动偏移退回去，让平滑逻辑读到未震动的基准位姿；期间被外部瞬移改写则直接放弃回退
+    private void RestoreShakeBase()
+    {
+        if (!shakeBaseReady) return;
+        shakeBaseReady = false;
+        if (transform.position != shakeAppliedPos) return;
+        if (transform.rotation != shakeAppliedRot) return;
+        transform.position = shakeBasePos;
+        transform.rotation = shakeBaseRot;
+    }
+
+    // 在最终位姿之上叠加震动：偏移按镜头自身的 right/up 给，roll 绕视线轴；渲染与 UI 投影都用这个位姿
+    private void ApplyShake()
+    {
+        if (trauma > 0f) trauma = Mathf.Max(0f, trauma - shakeDecay * Time.unscaledDeltaTime);
+
+        shakeBasePos = transform.position;
+        shakeBaseRot = transform.rotation;
+        shakeBaseReady = true;
+
+        if (trauma <= 0f)
+        {
+            shakeAppliedPos = shakeBasePos;
+            shakeAppliedRot = shakeBaseRot;
+            return;
+        }
+
+        float strength = trauma * trauma;
+        float t = Time.unscaledTime * shakeFrequency;
+        float nx = Mathf.PerlinNoise(shakeSeed[0], t) * 2f - 1f;
+        float ny = Mathf.PerlinNoise(shakeSeed[1], t) * 2f - 1f;
+        float nr = Mathf.PerlinNoise(shakeSeed[2], t) * 2f - 1f;
+        float maxOffset = Mode == CameraViewMode.TopDown ? shakeOffsetTopDown : shakeOffsetThirdPerson;
+
+        transform.position = shakeBasePos + (transform.right * nx + transform.up * ny) * (maxOffset * strength);
+        transform.rotation = shakeBaseRot * Quaternion.Euler(0f, 0f, nr * shakeMaxRoll * strength);
+
+        shakeAppliedPos = transform.position;
+        shakeAppliedRot = transform.rotation;
     }
 
     // Unity 要到渲染才重算 worldToCameraMatrix，同帧 WorldToScreenPoint 会用上一帧矩阵（血条/名字差一帧震颤）

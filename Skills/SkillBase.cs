@@ -102,8 +102,8 @@ namespace Ros.Skill
         private static readonly HashSet<int> s_weaponHitWarned = new();
         private static readonly HashSet<int> s_weaponVisualWarned = new();
 
-        // 近战判定窗（秒）：隐形子弹的存活时长，覆盖整段挥刀动作
-        private const float MeleeBulletLife = 0.5f;
+        // 近战判定窗（秒）：隐形子弹的存活时长，覆盖整段挥刀动作；客户端近战打击感按同一个值开窗
+        private static float MeleeBulletLife => GlobalVariable.F(global_variablesEnum.melee_bullet_life);
 
         // 起点 = 实体骨骼锚点 + 实体朝向下的固定偏移
         protected static Vector3 OriginPos(EntityData entity, EntityAnchor anchor, Vector3 offset)

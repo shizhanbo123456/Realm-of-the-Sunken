@@ -110,15 +110,18 @@ public class SettingsView
         View.m_rule_content.text = tipTexts[index];
     }
 
-    // 视角两个勾选直接写 ClientSettings，相机与输入每帧读它
+    // 三个勾选直接写 ClientSettings，相机、输入与打击感每帧读它
     private void BindToggles()
     {
         View.m_toggle_third_person_perspctivee.selected = ClientSettings.ThirdPersonCamera;
         View.m_toggle_auto_pitch.selected = ClientSettings.AutoPitch;
+        View.m_toggle_camea_shake.selected = ClientSettings.CameraShake;
         View.m_toggle_third_person_perspctivee.onChanged.Add(() =>
             ClientSettings.ThirdPersonCamera = View.m_toggle_third_person_perspctivee.selected);
         View.m_toggle_auto_pitch.onChanged.Add(() =>
             ClientSettings.AutoPitch = View.m_toggle_auto_pitch.selected);
+        View.m_toggle_camea_shake.onChanged.Add(() =>
+            ClientSettings.CameraShake = View.m_toggle_camea_shake.selected);
     }
 
     private void SyncToggles()
@@ -128,6 +131,8 @@ public class SettingsView
             View.m_toggle_third_person_perspctivee.selected = ClientSettings.ThirdPersonCamera;
         if (View.m_toggle_auto_pitch.selected != ClientSettings.AutoPitch)
             View.m_toggle_auto_pitch.selected = ClientSettings.AutoPitch;
+        if (View.m_toggle_camea_shake.selected != ClientSettings.CameraShake)
+            View.m_toggle_camea_shake.selected = ClientSettings.CameraShake;
     }
 
     // 与确认弹窗同规则：按中心锚点居中缩放（面板带全屏拦截层，尺寸不等于弹窗本体）

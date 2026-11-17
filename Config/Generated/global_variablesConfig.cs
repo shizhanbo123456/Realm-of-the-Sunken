@@ -152,5 +152,11 @@ namespace Ros.Config
         hitback_max_speed,
         quick_message_pointer_scale,
         charge_max,
+        camera_shake_hurt_normal,
+        camera_shake_hurt_crit,
+        camera_shake_hurt_shield,
+        camera_shake_hit_normal,
+        camera_shake_hit_crit,
+        melee_bullet_life,
     }
 }

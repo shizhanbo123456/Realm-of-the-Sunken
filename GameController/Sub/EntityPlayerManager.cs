@@ -31,6 +31,7 @@ public class EntityPlayerManager : ClientSubManager
         public int pendingPlayTick;
 
         public EntityModelInfo modelInfo; // 烘焙包围盒（CreateView 时缓存，发射点/头顶锚点共用）
+        public CapsuleCollider capsule;   // 判定胶囊（客户端近战命中预测按它算目标半径与圆心）
         public Transform cameraAnchor;    // 相机注视点 = EntityAnchor.Camera；旋转取实体根，供相机偏航同步
 
         public readonly Dictionary<int, GameObject> buffVfx = new();
@@ -108,16 +109,23 @@ public class EntityPlayerManager : ClientSubManager
             // 若下一帧本地已经（或正在）切到目标状态，就不硬切——让控制器配的过渡时长生效。
             if (pendingPlayHash != 0 && animator != null && Time.frameCount > pendingPlayTick)
             {
-                int target = pendingPlayHash;
-                float progress = pendingPlayFrame;
-                pendingPlayHash = 0;
-                animHash = target; // 该目标已被"记账"，避免重复请求
-                if (!IsHeadingTo(target))
+                if (anim != null && anim.InHitStop)
                 {
-                    animator.Play(target, 0, progress);
-                    if (logForcedAnimSwitch)
+                    pendingPlayTick = Time.frameCount; // 卡肉期间不切状态，解冻后这一帧再执行
+                }
+                else
+                {
+                    int target = pendingPlayHash;
+                    float progress = pendingPlayFrame;
+                    pendingPlayHash = 0;
+                    animHash = target; // 该目标已被"记账"，避免重复请求
+                    if (!IsHeadingTo(target))
                     {
-                        pendingForcedSwitch = $"[动画强制切换] 实体{id}({type}) hash={target} 要求进度={progress:F2}";
+                        animator.Play(target, 0, progress);
+                        if (logForcedAnimSwitch)
+                        {
+                            pendingForcedSwitch = $"[动画强制切换] 实体{id}({type}) hash={target} 要求进度={progress:F2}";
+                        }
                     }
                 }
             }
@@ -371,7 +379,7 @@ public class EntityPlayerManager : ClientSubManager
             }
 
             // 客户端表现刚体：dynamic + 关重力，逐帧 MovePosition 喂位姿；只有 dynamic 才与场景静态碰撞体做穿透解算
-            view.modelInfo.BuildCapsuleCollider();
+            view.capsule = view.modelInfo.BuildCapsuleCollider();
             view.rb = go.GetComponent<Rigidbody>();
             if (view.rb == null) view.rb = go.AddComponent<Rigidbody>();
             view.rb.isKinematic = false;
