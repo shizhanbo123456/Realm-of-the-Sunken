@@ -48,6 +48,7 @@ namespace Ros.Config
                     row.expDrop = r.ReadInt32();
                     row.dropToCamp = r.ReadByte() != 0;
                     row.passiveSkillDes = ConfigBinary.ReadString(r);
+                    row.hitProtection = r.ReadInt32();
                     entityData.Add(row.key, row);
                 }
             }
@@ -73,5 +74,6 @@ namespace Ros.Config
         public int expDrop;  // 被击败时掉落的经验
         public bool dropToCamp;  // 被击败时的掉落物生效范围：单人；1：击杀方阵营
         public string passiveSkillDes;  // 被动描述：仅仅玩家角色有
+        public int hitProtection;  // 击打保护分积累速率：受到多少比例的伤害进入保护
     }
 }

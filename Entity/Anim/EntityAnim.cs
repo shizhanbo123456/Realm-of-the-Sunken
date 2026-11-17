@@ -87,8 +87,6 @@ public class EntityAnim : MonoBehaviour
     
     public Action<AttackType> onAttack;//动画中的攻击事件回调
     public Action<AnimState, AnimState> OnStateChange;
-    public int hitProtection;
-    public Action onHitProtection;
 
     private List<Animator> animators;
     private Animator mainAnimator;

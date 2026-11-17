@@ -47,7 +47,10 @@ public abstract class EntityData : MonoBehaviour
     [HideInInspector] public Vector3 hitbackVelocity;
     private Vector3 lastHitback; // 上一帧写进刚体的击退分量，混合前先剔除，避免被惯性反复放大
 
-    private const float HitProtectDuration = 3f; // 连击保护持续时长
+    private const float HitProtectDuration = 3f; // 击打保护持续时长
+    private const float HitProtectionScoreMax = 100f; // 击打保护分满值
+    private int hitProtectionRate; // entity.csv「击打保护分积累速率」：掉血 1/速率 的生命上限即满一条保护
+    private float hitProtectionScore;
     private float hitProtectEndTime;
 
     [HideInInspector] public Vector3 moveInput;
@@ -128,6 +131,7 @@ public abstract class EntityData : MonoBehaviour
             var config = Tool.InfoManager.GetEntityConfig(type);
             defaultEndure = config.endureLevel == true ? EndureType.Super : EndureType.None; // entity.csv「霸体等级」列：霸体下限
             weaponId = config.weaponId ?? -1;         // entity.csv「武器编号」列：实体固定武器
+            hitProtectionRate = config.hitProtection;  // entity.csv「击打保护分积累速率」列：0 = 无击打保护
         }
         effectController = new EntityEffectController();
         effectController.Init(this);
@@ -141,11 +145,7 @@ public abstract class EntityData : MonoBehaviour
         if (ModelInfo == null) Debug.LogError($"实体缺少 EntityModelInfo：{name}（{type}，id={id}）");
 
         // 动画类型与武器显示类型都挂在武器上：entity.csv 只给武器编号（预制体上不再配）
-        if (anim != null)
-        {
-            anim.Init(this);
-            anim.onHitProtection += BeginHitProtection;
-        }
+        if (anim != null) anim.Init(this);
         if (anim != null)
         {
             if (weaponId < 0)
@@ -547,7 +547,8 @@ public abstract class EntityData : MonoBehaviour
         }
         // 击退独立于受击判定：飞行与无刚体单位之外，只有护盾能挡住，霸体与冰冻都不挡
         ApplyKnockback(attacker != null ? attacker.transform.position : hitOrigin, attack.knockbackPower);
-        OnDamaged(damage, attacker, damageType: damageType, hitPos: floatPos ?? hitOrigin);
+        float applied = OnDamaged(damage, attacker, damageType: damageType, hitPos: floatPos ?? hitOrigin);
+        AddHitProtection(applied);
         Tool.BattleManager.OnHitPassive(attacker, this, damageType); // 攻击方被动（暴击麻痹），放在伤害结算之后
     }
 
@@ -567,9 +568,17 @@ public abstract class EntityData : MonoBehaviour
         hitbackVelocity = Vector3.ClampMagnitude(hitbackVelocity, GlobalVariable.F(global_variablesEnum.hitback_max_speed));
     }
 
-    // 连击保护：受击动画累计满触发，保护期内命中只飘字，不结算伤害/buff/击退/受击
-    private void BeginHitProtection() => hitProtectEndTime = Time.time + HitProtectDuration;
+    // 击打保护：只有直接挨打计分，按本次实际掉血占生命上限的比例积累（速率 10 = 掉 10% 生命进入保护）
+    private void AddHitProtection(float appliedDamage)
+    {
+        if (hitProtectionRate <= 0 || appliedDamage <= 0f || attributes.MaxHealth <= 0f || !Alive) return;
+        hitProtectionScore += appliedDamage / attributes.MaxHealth * HitProtectionScoreMax * hitProtectionRate;
+        if (hitProtectionScore < HitProtectionScoreMax) return;
+        hitProtectionScore = 0f;
+        hitProtectEndTime = Time.time + HitProtectDuration;
+    }
 
+    // 击打保护期内命中只飘字，不结算伤害/buff/击退/受击
     public bool TryBlockByHitProtection(Vector3 hitPos)
     {
         if (Time.time >= hitProtectEndTime) return false;
@@ -586,11 +595,11 @@ public abstract class EntityData : MonoBehaviour
         transform.rotation = Quaternion.LookRotation(to.normalized);
     }
 
-    // 受伤计算（hitPos = 命中位置，飘字优先显示在命中处；DoT/反伤等无范围伤害传 null 回退实体头顶）
-    public virtual void OnDamaged(float damage, EntityData attacker = null, bool fixedDamage = false, bool canReflect = true, CombatLabelType damageType = CombatLabelType.Normal, Vector3? hitPos = null)
+    // 受伤计算，返回结算后的实际掉血（hitPos = 命中位置，飘字优先显示在命中处；DoT/反伤等无范围伤害传 null 回退实体头顶）
+    public virtual float OnDamaged(float damage, EntityData attacker = null, bool fixedDamage = false, bool canReflect = true, CombatLabelType damageType = CombatLabelType.Normal, Vector3? hitPos = null)
     {
-        if (!Alive) return;
-        if (BattleManager.IsGmInvincible(id)) return; // GM 无敌：伤害按 0 处理（见 BattleManagerGm）
+        if (!Alive) return 0f;
+        if (BattleManager.IsGmInvincible(id)) return 0f; // GM 无敌：伤害按 0 处理（见 BattleManagerGm）
         if (attacker != null) lastAttacker = attacker; // 记录伤害来源（掉落归属判定）
         float finalDamage = damage;
         if (Tool.BattleManager != null) finalDamage = Tool.BattleManager.AdjustIncomingDamage(this, finalDamage); // 白眼伯爵：单次受伤上限
@@ -638,6 +647,7 @@ public abstract class EntityData : MonoBehaviour
             if (reflect > 0f) attacker.OnDamaged(reflect, this, fixedDamage: true, canReflect: false, damageType: CombatLabelType.Reflect);
         }
         if (!attributes.Alive) MarkAsKilled();
+        return finalDamage;
     }
 
     private void SendCombatLabelEvent(float shownAmount, CombatLabelType labelType, Vector3? hitPos)
