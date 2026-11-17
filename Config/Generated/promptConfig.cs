@@ -62,5 +62,6 @@ namespace Ros.Config
         cancel_ready_first,
         skill_select_limit,
         bridge_start_failed,
+        connect_failed,
     }
 }

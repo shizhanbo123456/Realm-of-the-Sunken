@@ -34,6 +34,7 @@ public partial class NetworkManager : EnsBehaviour
     private static bool hasLobbyInfo;
     private static bool intentionalExitWorld;
     private static bool kicked;      // 被同令牌的新连接顶掉：提示语与普通断线区分
+    private static bool connectFailed;  // 连接失败后 ShutDown 的回流：跳过断线提示与回主界面
 
     public static bool CanSendWorldCommand => connected && hasLobbyInfo;
 
@@ -52,6 +53,7 @@ public partial class NetworkManager : EnsBehaviour
         hasLobbyInfo = false;
         tryingEnterWorld = false;
         intentionalExitWorld = false;
+        connectFailed = false;
         LatestLobbyInfo = null; // 跨连接清空，防止重连后大厅显示上一局成员
         lobbyMembers.Clear();
         lobbyPlayerNames.Clear();
@@ -103,6 +105,8 @@ public partial class NetworkManager : EnsBehaviour
                 intentionalExitWorld = false;
                 return;
             }
+            // 连接失败：FailConnect 已飘字，日志与提示都不重复，也不回主界面重开
+            if (connectFailed) return;
             if (kicked)
             {
                 kicked = false;
@@ -118,6 +122,16 @@ public partial class NetworkManager : EnsBehaviour
             if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.disconnected);
             EventManager.TrigEvent(ClientEvent.OnRestartGame);
         };
+    }
+
+    // 连接失败：立即断掉残留连接并飘字；传输层已连上时 ShutDown 会同步回调断线，靠 connectFailed 抑制
+    private static ConnectResult FailConnect()
+    {
+        if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.connect_failed);
+        connectFailed = true;
+        EnsInstance.Corr.ShutDown();
+        connectFailed = false;
+        return ConnectResult.Failed;
     }
 
     public async Task<ConnectResult> TryConnect(string ipAddress)
@@ -141,7 +155,7 @@ public partial class NetworkManager : EnsBehaviour
             else if (!IPAddress.TryParse(ipAddress, out IPAddress _))
             {
                 Debug.LogError("输入IP地址错误");
-                return ConnectResult.Failed;
+                return FailConnect();
             }
             EnsInstance.Corr.IP = ipAddress;
             // ShutDown 会拿上次连接残留的未握手标记补发一次 OnConnectionRejected，先关再挂监听，避免被假拒绝打断
@@ -165,7 +179,7 @@ public partial class NetworkManager : EnsBehaviour
             if (!connected)
             {
                 Debug.LogError($"Ens层连接失败 rejected={rejected}");
-                return ConnectResult.Failed;
+                return FailConnect();
             }
             ClientRoomManagerEventCenter.TrigRpcEvent(Delivery.Reliable, 0, LocalToken.ToString());
             float helloDeadline = Time.time + 5f;
@@ -176,7 +190,7 @@ public partial class NetworkManager : EnsBehaviour
             if (serverHello == null)
             {
                 Debug.LogError("服务器信息获取失败");
-                return ConnectResult.Failed;
+                return FailConnect();
             }
             EventManager.TrigEvent(ClientEvent.OnConnect);
             return ConnectResult.Success;
