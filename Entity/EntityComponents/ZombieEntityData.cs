@@ -32,6 +32,12 @@ public class ZombieEntityData : EntityData
     public void Stop()
     {
         StopMoving();
+        Halt();
+    }
+
+    // 只停动作与移动输入，保留目的地：到达后状态机要靠 DistanceToNavDestination 判「已到」，清掉会让它以为还没到
+    private void Halt()
+    {
         yawSpeed = 0f;
         SetMoveInput(Vector3.zero);
         if (anim != null) anim.Move(false);
@@ -54,7 +60,7 @@ public class ZombieEntityData : EntityData
         to.y = 0f;
         if (to.sqrMagnitude <= ArriveRadius * ArriveRadius)
         {
-            Stop();
+            Halt();
             return;
         }
 
