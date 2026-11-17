@@ -9,8 +9,8 @@ namespace Ros.Config
 {
     public partial class ConfigManager
     {
-        public Dictionary<int, system_message> system_messageData;
-        public system_message Getsystem_messageConfig(int key)
+        public Dictionary<system_messageEnum, system_message> system_messageData;
+        public system_message Getsystem_messageConfig(system_messageEnum key)
         {
             return ConfigBinary.Require(system_messageData, key, "system_message");
         }
@@ -19,11 +19,11 @@ namespace Ros.Config
             using (BinaryReader r = ConfigBinary.Open("system_message"))
             {
                 int count = r.ReadInt32();
-                system_messageData = new Dictionary<int, system_message>(count);
+                system_messageData = new Dictionary<system_messageEnum, system_message>(count);
                 for (int i = 0; i < count; i++)
                 {
                     system_message row;
-                    row.key = r.ReadInt32();
+                    row.key = (system_messageEnum)r.ReadInt32();
                     row.text = ConfigBinary.ReadString(r);
                     row.trigInterrupt = r.ReadByte() != 0;
                     system_messageData.Add(row.key, row);
@@ -33,8 +33,21 @@ namespace Ros.Config
     }
     public struct system_message
     {
-        public int key;  // 主键
+        public system_messageEnum key;  // 主键
         public string text;  // 提示文本：界面上显示的提示文本
         public bool trigInterrupt;  // 触发中断：AI接管时是否触发中断
+    }
+    public enum system_messageEnum
+    {
+        player_kill,
+        player_defeated,
+        king_statue_destroyed,
+        sage_statue_1_destroyed,
+        sage_statue_2_destroyed,
+        sage_statue_3_destroyed,
+        neutral_statue_respawn,
+        neutral_statue_captured,
+        nightfall,
+        daybreak,
     }
 }

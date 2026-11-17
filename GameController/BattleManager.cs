@@ -270,15 +270,18 @@ public partial class BattleManager : EnsBehaviour
         {
             Tool.NetworkManager.SendRemoveEntity(clientId, id);
         }
-        // 雕像被摧毁事件（事件列表 icon=其它）：textId 区分哪一座（19 中心 / 24~26 外围）
+        // 雕像被摧毁事件（事件列表 icon=其它）：textId 区分哪一座（国王 / 贤者一~三）
         if (BattleStarted && data.type.category == EntityCategory.GuardStatue)
         {
             MarkDefensePointDestroyed(data); // 实体销毁后算不出血量，进度在这里定死 100
-            int textId = data.type == EntityType.KingStatue ? 19 : 24 + data.type.value; // GuardStatue(0~2) → 24~26
+            // 贤者雕像 1~3 的枚举成员连续，value 直接当偏移用
+            var textId = data.type == EntityType.KingStatue
+                ? system_messageEnum.king_statue_destroyed
+                : system_messageEnum.sage_statue_1_destroyed + data.type.value;
             Tool.NetworkManager.SendBattleEvent(new SCBattleEvent
             {
                 type = SCBattleEvent.Type.StatueDestroyed,
-                textId = textId,
+                textId = (int)textId,
             });
         }
 
@@ -385,7 +388,7 @@ public partial class BattleManager : EnsBehaviour
         if (startCountdownHandle != null && !AllHumansReady())
         {
             CancelStartCountdown();
-            SendPromptToAll(29);
+            SendPromptToAll(promptEnum.battle_start_canceled);
         }
         // 加载阶段有人退场：剩下的人若已全部回执，直接开战，不再等退场者
         if (LoadingStarted && !BattleStarted && AllCombatClientsLoaded()) StartBattle();
@@ -489,7 +492,7 @@ public partial class BattleManager : EnsBehaviour
             if (startCountdownHandle != null)
             {
                 CancelStartCountdown();
-                SendPromptToAll(29); // 有玩家取消了准备
+                SendPromptToAll(promptEnum.battle_start_canceled); // 有玩家取消了准备
             }
             return;
         }
@@ -498,10 +501,10 @@ public partial class BattleManager : EnsBehaviour
         if (PlayerCamps.Values.Count(c => c == PlayerCampType.Attack) <= 0
             || PlayerCamps.Values.Count(c => c == PlayerCampType.Defense) <= 0)
         {
-            SendPromptToAll(17);
+            SendPromptToAll(promptEnum.battle_need_both_camps);
             return;
         }
-        SendPromptToAll(28); // 全员已准备，战斗即将开始
+        SendPromptToAll(promptEnum.battle_starting); // 全员已准备，战斗即将开始
         startCountdownHandle = Timer.AddTimer(0, _ => TryFireStartBattle(), GlobalVariable.F(global_variablesEnum.ready_start_delay), 1, false);
     }
 
@@ -522,7 +525,7 @@ public partial class BattleManager : EnsBehaviour
             || PlayerCamps.Values.Count(c => c == PlayerCampType.Attack) <= 0
             || PlayerCamps.Values.Count(c => c == PlayerCampType.Defense) <= 0)
         {
-            SendPromptToAll(17);
+            SendPromptToAll(promptEnum.battle_need_both_camps);
             return;
         }
         BeginLoading();
@@ -666,9 +669,9 @@ public partial class BattleManager : EnsBehaviour
     }
     #endregion
 
-    private void SendPromptToAll(int messageId)
+    private void SendPromptToAll(promptEnum messageId)
     {
-        foreach (var clientId in PlayerInfoList.Keys) Tool.NetworkManager.SendPrompt(clientId, messageId);
+        foreach (var clientId in PlayerInfoList.Keys) Tool.NetworkManager.SendPrompt(clientId, (int)messageId);
     }
     #endregion
 

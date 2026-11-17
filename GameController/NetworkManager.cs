@@ -109,13 +109,13 @@ public partial class NetworkManager : EnsBehaviour
                 if (Tool.UIManager != null)
                 {
                     Tool.UIManager.HideLoading();
-                    Tool.UIManager.ShowFlyText(PromptId.AccountKicked);
+                    Tool.UIManager.ShowFlyText(promptEnum.account_kicked);
                 }
                 EventManager.TrigEvent(ClientEvent.OnRestartGame);
                 return;
             }
             // 任何断开都直接回初始界面：会话在服务器端按令牌保留，由玩家自己重新连接
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(PromptId.Disconnected);
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.disconnected);
             EventManager.TrigEvent(ClientEvent.OnRestartGame);
         };
     }

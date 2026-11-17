@@ -170,7 +170,7 @@ public partial class BattleManager
         Tool.NetworkManager.SendBattleEvent(new SCBattleEvent()
         {
             type = SCBattleEvent.Type.NeutralStatueRespawn,
-            textId = 20,
+            textId = (int)system_messageEnum.neutral_statue_respawn,
         });
     }
 
@@ -184,7 +184,7 @@ public partial class BattleManager
         Tool.NetworkManager.SendBattleEvent(new SCBattleEvent()
         {
             type = SCBattleEvent.Type.NeutralStatueCaptured,
-            textId = 23,
+            textId = (int)system_messageEnum.neutral_statue_captured,
         });
     }
 

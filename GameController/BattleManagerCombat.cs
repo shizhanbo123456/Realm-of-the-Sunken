@@ -423,24 +423,24 @@ public partial class BattleManager
             if (!EntityOwnerClient.TryGetValue(entity.id, out var coolingClientId)) return;
             if (Tool.NetworkManager != null)
                 Tool.NetworkManager.SendSkillRecharge(coolingClientId, entity.skillController.BuildRecharge());
-            SendFailPrompt(coolingClientId, 32);
+            SendFailPrompt(coolingClientId, promptEnum.skill_cooling);
             return;
         }
 
-        int messageId;
-        if (result == EntitySkillController.UseResult.Silenced) messageId = 30;
-        else if (result == EntitySkillController.UseResult.Controlled) messageId = 31;
+        promptEnum messageId;
+        if (result == EntitySkillController.UseResult.Silenced) messageId = promptEnum.silenced;
+        else if (result == EntitySkillController.UseResult.Controlled) messageId = promptEnum.controlled;
         else return;
 
         if (!EntityOwnerClient.TryGetValue(entity.id, out var clientId)) return; // AI / 非玩家没有客户端
         SendFailPrompt(clientId, messageId);
     }
 
-    private void SendFailPrompt(int clientId, int messageId)
+    private void SendFailPrompt(int clientId, promptEnum messageId)
     {
         if (skillFailPromptTime.TryGetValue(clientId, out var last) && Time.time - last < SkillFailPromptInterval) return;
         skillFailPromptTime[clientId] = Time.time;
-        if (Tool.NetworkManager != null) Tool.NetworkManager.SendPrompt(clientId, messageId);
+        if (Tool.NetworkManager != null) Tool.NetworkManager.SendPrompt(clientId, (int)messageId);
     }
 
     // 受理成功：服务器已扣过库存，把新快照推给施法者本人（AI / 无主实体没有客户端，直接跳过）

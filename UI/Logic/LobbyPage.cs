@@ -148,7 +148,7 @@ public class LobbyPage : PageBase
         int count = attack ? humanAttack : humanDefense;
         if (count < limit) return true;
         if (Tool.UIManager != null)
-            Tool.UIManager.ShowFlyText(attack ? PromptId.AttackerFull : PromptId.DefenseFull);
+            Tool.UIManager.ShowFlyText(attack ? promptEnum.attacker_full : promptEnum.defense_full);
         return false;
     }
 
@@ -163,7 +163,7 @@ public class LobbyPage : PageBase
         if (delta > 0 && current >= limit)
         {
             if (Tool.UIManager != null)
-                Tool.UIManager.ShowFlyText(defense ? PromptId.DefenseAiFull : PromptId.AttackAiFull);
+                Tool.UIManager.ShowFlyText(defense ? promptEnum.defense_ai_full : promptEnum.attack_ai_full);
             return;
         }
         int next = Mathf.Clamp(current + delta, 0, limit);
@@ -177,7 +177,7 @@ public class LobbyPage : PageBase
     private bool BlockedByReady()
     {
         if (!myReady) return false;
-        if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(PromptId.CancelReadyFirst);
+        if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.cancel_ready_first);
         return true;
     }
 

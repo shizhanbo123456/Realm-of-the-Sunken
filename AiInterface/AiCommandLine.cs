@@ -1436,7 +1436,7 @@ public sealed class AiCommandLine : ClientSubManager
         }
     }
 
-    // 事件文本 id：≥10000 是玩家名，<10000 查 system_message.csv
+    // 事件文本 id：≥10000 是玩家名，<10000 按 system_message 枚举查表
     private static string ResolveText(int id)
     {
         if (id >= SCBattleEvent.PlayerNameBase)
@@ -1446,23 +1446,25 @@ public sealed class AiCommandLine : ClientSubManager
             string name = loading != null ? loading.GetName(clientId) : null;
             return string.IsNullOrEmpty(name) ? "#" + clientId : name;
         }
-        if (!SystemMessageConfig.content.ContainsKey(id))
+        var key = (system_messageEnum)id;
+        if (!SystemMessageConfig.content.ContainsKey(key))
         {
-            Debug.LogError($"[AI] system_message.csv 缺少文本 id={id}");
+            Debug.LogError($"[AI] system_message 缺少枚举 id={id}");
             return "#" + id;
         }
-        return SystemMessageConfig.Get(id).text;
+        return SystemMessageConfig.Get(key).text;
     }
 
-    // 飘字提示 id 查 prompt.csv
+    // 飘字提示 id 按 prompt 枚举查表
     private static string ResolvePrompt(int messageId)
     {
-        if (!PromptConfig.content.ContainsKey(messageId))
+        var key = (promptEnum)messageId;
+        if (!PromptConfig.content.ContainsKey(key))
         {
-            Debug.LogError($"[AI] prompt.csv 缺少文本 id={messageId}");
+            Debug.LogError($"[AI] prompt 缺少枚举 id={messageId}");
             return "#" + messageId;
         }
-        return PromptConfig.Get(messageId).text;
+        return PromptConfig.Get(key).text;
     }
     #endregion
 }

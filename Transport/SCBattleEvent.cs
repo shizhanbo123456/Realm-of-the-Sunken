@@ -12,11 +12,11 @@ namespace Ros.Transport
             public const byte Nightfall = 5;           // 天黑
             public const byte Daybreak = 6;            // 天亮
             public const byte StatueDestroyed = 7;     // 雕像被摧毁：textId 区分哪一座（驱动对应血条）
-            public const byte Notice = 9;              // 纯文字提示：textId=system_message.csv 消息 id
+            public const byte Notice = 9;              // 纯文字提示：textId=system_messageEnum 序号
             public const byte SkillBroadcast = 10;     // 特殊技能播报：textId=技能 id（名称由客户端查 skill.csv）
         }
 
-        // 文本 id：<10000 查 system_message.csv；≥10000 为玩家名（clientId = id - PlayerNameBase）
+        // 文本 id：<10000 为 system_messageEnum 序号；≥10000 为玩家名（clientId = id - PlayerNameBase）
         public const int PlayerNameBase = 10000;
 
         public byte type;

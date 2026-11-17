@@ -462,7 +462,7 @@ public partial class BattleManager
         Tool.NetworkManager.SendBattleEvent(new SCBattleEvent()
         {
             type = isDay ? SCBattleEvent.Type.Daybreak : SCBattleEvent.Type.Nightfall,
-            textId = isDay ? 22 : 21,
+            textId = (int)(isDay ? system_messageEnum.daybreak : system_messageEnum.nightfall),
         });
 
         foreach (var entity in EntityContainer.Entities)

@@ -238,7 +238,7 @@ public class UIManager : MonoBehaviour
     #endregion
 
     // 飘字只按 prompt 表主键取文案；文案带 {0} 的用 args 填充
-    public void ShowFlyText(int promptId, params object[] args)
+    public void ShowFlyText(promptEnum promptId, params object[] args)
     {
         string text = PromptConfig.Get(promptId).text;
         if (args != null && args.Length > 0) text = string.Format(text, args);
@@ -305,12 +305,12 @@ public class UIManager : MonoBehaviour
     {
         if (CurrentPageType != PageType.Home)
         {
-            ShowFlyText(PromptId.BridgeUnavailable);
+            ShowFlyText(promptEnum.bridge_unavailable);
             return;
         }
         if (RuntimeBridgeServer.IsRunning)
         {
-            ShowFlyText(PromptId.BridgeRunning);
+            ShowFlyText(promptEnum.bridge_running);
             return;
         }
 
@@ -324,10 +324,10 @@ public class UIManager : MonoBehaviour
         if (!RuntimeBridgeServer.IsRunning)
         {
             Debug.LogError("[桥接] 启动失败：" + RuntimeBridgeServer.LastError);
-            ShowFlyText(PromptId.BridgeStartFailed, RuntimeBridgeServer.LastError);
+            ShowFlyText(promptEnum.bridge_start_failed, RuntimeBridgeServer.LastError);
             return;
         }
-        ShowFlyText(PromptId.BridgeRunning);
+        ShowFlyText(promptEnum.bridge_running);
     }
 
     // 设置里的「退出」：首页没有可退出的东西；大厅退房间、对局退本局
@@ -407,7 +407,7 @@ public class UIManager : MonoBehaviour
     // 服务器提示是通用功能：与当前页面无关，收到即显示
     private void OnShowPrompt(int messageId)
     {
-        ShowFlyText(messageId);
+        ShowFlyText((promptEnum)messageId);
     }
 
     private void ReturnToHome()

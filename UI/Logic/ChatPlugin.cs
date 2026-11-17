@@ -10,10 +10,6 @@ public class ChatPlugin
 {
     public const int TabSystem = 3; // 页签 = 频道值 0/1/2，3 是本地系统消息页签（不上协议）
 
-    // system_message 表主键：1 玩家击败（两个占位符）/ 2 玩家被击败（一个占位符）
-    private const int SystemMessagePlayerKill = 1;
-    private const int SystemMessagePlayerDefeated = 2;
-
     // GM 开关「敌方对话」：开启后阵营频道额外显示敌方阵营的消息
     public static bool ShowEnemyDialog;
 
@@ -154,18 +150,18 @@ public class ChatPlugin
         int maxLength = (int)GlobalVariable.RangeMax(global_variablesEnum.chat_message_length);
         if (byteLength < minLength)
         {
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(PromptId.ChatTooShort);
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.chat_too_short);
             return;
         }
         if (byteLength > maxLength)
         {
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(PromptId.ChatTooLong);
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.chat_too_long);
             return;
         }
         // 附近频道按「操控的实体」算距离，观战/未开战没有实体
         if (sendChannel == (int)ChatChannel.Nearby && OwnEntityId == 0)
         {
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(PromptId.ChatNearbyNoEntity);
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.chat_nearby_no_entity);
             return;
         }
         if (Time.time - lastSendTime < SendInterval) return; // 1s 冷却
@@ -315,11 +311,11 @@ public class ChatPlugin
         switch (e.type)
         {
             case SCBattleEvent.Type.PlayerKill:
-                systemEntries.Add(string.Format(SystemMessageConfig.Get(SystemMessagePlayerKill).text,
+                systemEntries.Add(string.Format(SystemMessageConfig.Get(system_messageEnum.player_kill).text,
                     ResolveEventText(e.textId), ResolveEventText(e.textId2)));
                 break;
             case SCBattleEvent.Type.DeathUnattributed:
-                systemEntries.Add(string.Format(SystemMessageConfig.Get(SystemMessagePlayerDefeated).text,
+                systemEntries.Add(string.Format(SystemMessageConfig.Get(system_messageEnum.player_defeated).text,
                     ResolveEventText(e.textId)));
                 break;
             case SCBattleEvent.Type.SkillBroadcast:
@@ -331,11 +327,11 @@ public class ChatPlugin
         if (viewTab == TabSystem) RefreshList();
     }
 
-    // 事件文本统一按数字 id 解析：>=PlayerNameBase 映射为玩家名，否则查 system_message.csv
+    // 事件文本统一按数字 id 解析：>=PlayerNameBase 映射为玩家名，否则按 system_message 枚举查表
     private static string ResolveEventText(int id)
     {
         if (id >= SCBattleEvent.PlayerNameBase) return GetUnitName(id - SCBattleEvent.PlayerNameBase);
-        return SystemMessageConfig.Get(id).text;
+        return SystemMessageConfig.Get((system_messageEnum)id).text;
     }
 
     private static string GetUnitName(int clientId)

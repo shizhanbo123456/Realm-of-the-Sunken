@@ -52,7 +52,7 @@ namespace Ros.Config
 
     public static class PromptConfig
     {
-        public static readonly Dictionary<int, prompt> content = new();
+        public static readonly Dictionary<promptEnum, prompt> content = new();
 
         internal static void Bake(ConfigManager m)
         {
@@ -60,34 +60,12 @@ namespace Ros.Config
             foreach (prompt row in m.promptData.Values) content.Add(row.key, row);
         }
 
-        public static prompt Get(int key) => ConfigBinary.Require(content, key, "prompt");
-    }
-
-    // prompt 表主键：飘字文案只认 id，文字一律在表里改
-    public static class PromptId
-    {
-        public const int BridgeUnavailable = 33;
-        public const int BridgeRunning = 34;
-        public const int ChatTooShort = 35;
-        public const int ChatTooLong = 36;
-        public const int ChatNearbyNoEntity = 37;
-        public const int AccountKicked = 38;
-        public const int Disconnected = 39;
-        public const int NoCardInTier = 40;
-        public const int NameLength = 41;
-        public const int CharacterSelected = 42;
-        public const int AttackerFull = 43;
-        public const int DefenseFull = 44;
-        public const int DefenseAiFull = 45;
-        public const int AttackAiFull = 46;
-        public const int CancelReadyFirst = 47;
-        public const int SkillSelectLimit = 48;
-        public const int BridgeStartFailed = 49;
+        public static prompt Get(promptEnum key) => ConfigBinary.Require(content, key, "prompt");
     }
 
     public static class SystemMessageConfig
     {
-        public static readonly Dictionary<int, system_message> content = new();
+        public static readonly Dictionary<system_messageEnum, system_message> content = new();
 
         internal static void Bake(ConfigManager m)
         {
@@ -95,7 +73,7 @@ namespace Ros.Config
             foreach (system_message row in m.system_messageData.Values) content.Add(row.key, row);
         }
 
-        public static system_message Get(int key) => ConfigBinary.Require(content, key, "system_message");
+        public static system_message Get(system_messageEnum key) => ConfigBinary.Require(content, key, "system_message");
     }
 
     public static class QuickMessageConfig

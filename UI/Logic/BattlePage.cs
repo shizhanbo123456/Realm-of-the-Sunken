@@ -1113,7 +1113,7 @@ public class BattlePage : PageBase
         if (rolls.Count == 0)
         {
             panel.m_selectCardPanel.Close();
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(PromptId.NoCardInTier);
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.no_card_in_tier);
             return;
         }
         currentCardTier = tier;

@@ -96,7 +96,7 @@ namespace Ros.UI.Main
             }
             else if (selection.Count >= capacity)
             {
-                if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(PromptId.SkillSelectLimit);
+                if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.skill_select_limit);
                 return;
             }
             else

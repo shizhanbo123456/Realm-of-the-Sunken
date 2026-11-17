@@ -9,8 +9,8 @@ namespace Ros.Config
 {
     public partial class ConfigManager
     {
-        public Dictionary<int, prompt> promptData;
-        public prompt GetpromptConfig(int key)
+        public Dictionary<promptEnum, prompt> promptData;
+        public prompt GetpromptConfig(promptEnum key)
         {
             return ConfigBinary.Require(promptData, key, "prompt");
         }
@@ -19,11 +19,11 @@ namespace Ros.Config
             using (BinaryReader r = ConfigBinary.Open("prompt"))
             {
                 int count = r.ReadInt32();
-                promptData = new Dictionary<int, prompt>(count);
+                promptData = new Dictionary<promptEnum, prompt>(count);
                 for (int i = 0; i < count; i++)
                 {
                     prompt row;
-                    row.key = r.ReadInt32();
+                    row.key = (promptEnum)r.ReadInt32();
                     row.text = ConfigBinary.ReadString(r);
                     row.trigInterrupt = r.ReadByte() != 0;
                     promptData.Add(row.key, row);
@@ -33,8 +33,34 @@ namespace Ros.Config
     }
     public struct prompt
     {
-        public int key;  // 主键
+        public promptEnum key;  // 主键
         public string text;  // 提示文本：界面上显示的提示文本
         public bool trigInterrupt;  // 触发中断：AI接管时是否触发中断
+    }
+    public enum promptEnum
+    {
+        battle_need_both_camps,
+        battle_starting,
+        battle_start_canceled,
+        silenced,
+        controlled,
+        skill_cooling,
+        bridge_unavailable,
+        bridge_running,
+        chat_too_short,
+        chat_too_long,
+        chat_nearby_no_entity,
+        account_kicked,
+        disconnected,
+        no_card_in_tier,
+        name_length_invalid,
+        character_selected,
+        attacker_full,
+        defense_full,
+        defense_ai_full,
+        attack_ai_full,
+        cancel_ready_first,
+        skill_select_limit,
+        bridge_start_failed,
     }
 }
