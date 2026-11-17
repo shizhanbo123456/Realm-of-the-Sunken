@@ -57,8 +57,8 @@ namespace Ros.UI.Main
             IsOpen = true;
             visible = true;
             touchable = true;
-            if (m_discard_description != null) m_discard_description.text = $"弃卡换经验 +{DiscardExp(tier)}";
-            if (m_current_luck != null) m_current_luck.text = $"幸运 {luck}";
+            if (m_discard_description != null) m_discard_description.text = MessageVariable.F(message_variablesEnum.card_discardExp, DiscardExp(tier));
+            if (m_current_luck != null) m_current_luck.text = MessageVariable.F(message_variablesEnum.card_luck, luck);
 
             // 条目数不变时列表不会重渲染，先清空再铺，保证每组卡都从池里新建并重播入场
             if (m_list != null)

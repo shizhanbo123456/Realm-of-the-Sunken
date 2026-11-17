@@ -56,4 +56,18 @@ namespace Ros.Config
 
         public static bool B(terrain_generationEnum key) => Get(key).value != 0f;
     }
+
+    // 界面文本统一入口：V 取纯文本，F 按 {0} 占位符填充
+    public static class MessageVariable
+    {
+        private static Dictionary<message_variablesEnum, message_variables> map;
+
+        internal static void Bake(ConfigManager m) => map = m.message_variablesData;
+
+        public static message_variables Get(message_variablesEnum key) => ConfigBinary.Require(map, key, "message_variables");
+
+        public static string V(message_variablesEnum key) => Get(key).value;
+
+        public static string F(message_variablesEnum key, params object[] args) => string.Format(Get(key).value, args);
+    }
 }

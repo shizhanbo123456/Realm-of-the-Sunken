@@ -7,10 +7,20 @@ using Ros.Config;
 // 首页：攻/守分页角色列表 + 属性面板 + 改名弹窗 + 连接
 public class HomePage : PageBase
 {
-    private static readonly string[] StatKeys = { "生命", "攻击", "暴击", "暴伤", "视野", "技能槽" };
-    private static readonly string[] AttrSuffixes = { "", "", "%", "%", "m", "" }; // 与 StatKeys 一一对应
+    private static readonly message_variablesEnum[] StatNameKeys =
+    {
+        message_variablesEnum.home_attrName_health, message_variablesEnum.home_attrName_attack,
+        message_variablesEnum.home_attrName_crit, message_variablesEnum.home_attrName_critDamage,
+        message_variablesEnum.home_attrName_view, message_variablesEnum.home_attrName_skillSlot,
+    };
+    private static readonly message_variablesEnum[] StatSuffixKeys = // 与 StatNameKeys 一一对应
+    {
+        message_variablesEnum.home_attrSuffixes_health, message_variablesEnum.home_attrSuffixes_attack,
+        message_variablesEnum.home_attrSuffixes_crit, message_variablesEnum.home_attrSuffixes_critDamage,
+        message_variablesEnum.home_attrSuffixes_view, message_variablesEnum.home_attrSuffixes_skillSlot,
+    };
     private const int AttrBarSegments = 10; // 属性条格数（UI_AttrItem.m_progressBar 里的 UI_AttrValueItem 数量）
-    private const int AttrIndexHealth = 0;         // StatKeys 里生命的下标
+    private const int AttrIndexHealth = 0;         // 属性列表里生命的下标
     private const int RangeKeyHealthAttack = 6;    // attr_range：进攻方生命（两阵营血量量级不同，分开取区间）
     private const int RangeKeyHealthDefense = 7;   // attr_range：防守方生命
 
@@ -39,7 +49,7 @@ public class HomePage : PageBase
 
         panel.m_btn_settings.onClick.Add(OpenSettings);
 
-        panel.m_connectPanel.m_btn_connect.title = "连接";
+        panel.m_connectPanel.m_btn_connect.title = MessageVariable.V(message_variablesEnum.home_btnConnect);
         panel.m_connectPanel.m_btn_connect.onClick.Add(OnConnectClicked);
     }
 
@@ -238,11 +248,11 @@ public class HomePage : PageBase
         panel.m_character_attr_panel.m_attrList.itemRenderer = (i, obj) =>
         {
             var item = (UI_AttrItem)obj;
-            item.m_attrName.text = StatKeys[i];
-            item.m_attrValue.text = values[i] + AttrSuffixes[i];
+            item.m_attrName.text = MessageVariable.V(StatNameKeys[i]);
+            item.m_attrValue.text = values[i] + MessageVariable.V(StatSuffixKeys[i]);
             FillAttrBar(item.m_progressBar, RangeKey(i, defense), values[i]);
         };
-        panel.m_character_attr_panel.m_attrList.numItems = StatKeys.Length;
+        panel.m_character_attr_panel.m_attrList.numItems = StatNameKeys.Length;
     }
 
     // 生命按阵营取各自区间，其余属性与 attr_range 行号一致
@@ -277,7 +287,9 @@ public class HomePage : PageBase
     private static string DisplayName(entity info, int saveIndex)
     {
         if (!string.IsNullOrEmpty(info.name)) return info.name;
-        return IsDefense(saveIndex) ? $"防守角色 {saveIndex - GlobalConfig.attack_character_count}" : $"进攻角色 {saveIndex}";
+        return IsDefense(saveIndex)
+            ? MessageVariable.F(message_variablesEnum.home_roleName_defense, saveIndex - GlobalConfig.attack_character_count)
+            : MessageVariable.F(message_variablesEnum.home_roleName_attack, saveIndex);
     }
 
     // 属性一律取整显示

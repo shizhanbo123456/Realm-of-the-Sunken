@@ -104,7 +104,7 @@ public class LobbyPage : PageBase
 
         RefreshCampBlock(panel.m_btn_joinAttack, PlayerCampType.Attack, attackRobot);
         RefreshCampBlock(panel.m_btn_joinDefense, PlayerCampType.Defense, defenseRobot);
-        panel.m_btn_prepare.title = myReady ? "取消准备" : "准备";
+        panel.m_btn_prepare.title = PrepareButtonTitle();
         panel.m_spectate_current_member_count.text = SpectateCount(info).ToString();
 
         if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
@@ -184,16 +184,20 @@ public class LobbyPage : PageBase
     private void ToggleReady()
     {
         myReady = !myReady;
-        panel.m_btn_prepare.title = myReady ? "取消准备" : "准备";
+        panel.m_btn_prepare.title = PrepareButtonTitle();
         RaiseState();
     }
 
     private void OnExitClicked()
     {
         // 断开不可逆，先弹二次确认
-        if (Tool.UIManager != null) Tool.UIManager.ShowConfirm("确定断开与服务器的连接？", DoExitWorld);
+        if (Tool.UIManager != null) Tool.UIManager.ShowConfirm(MessageVariable.V(message_variablesEnum.lobby_confirmDisconnect), DoExitWorld);
         else DoExitWorld();
     }
+
+    private string PrepareButtonTitle() => myReady
+        ? MessageVariable.V(message_variablesEnum.lobby_btnCancelPrepare)
+        : MessageVariable.V(message_variablesEnum.lobby_btnPrepare);
 
     private void RaiseState()
     {

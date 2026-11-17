@@ -44,8 +44,10 @@ public static class GuideCatalog
         foreach (var pair in SortedKeys(SkillConfig.content))
         {
             var skill = pair.Value;
-            string store = skill.storeLimit < 0 ? "无限" : skill.storeLimit.ToString();
-            string des = $"{skill.description}\nCD {skill.cd:0.##}s｜库存 {store}";
+            string store = skill.storeLimit < 0
+                ? MessageVariable.V(message_variablesEnum.guide_storeUnlimited)
+                : skill.storeLimit.ToString();
+            string des = MessageVariable.F(message_variablesEnum.guide_skillDesc, skill.description, skill.cd, store);
             list.Add(new Entry(skill.name, des, SkillIcon(skill.key)));
         }
         return list;

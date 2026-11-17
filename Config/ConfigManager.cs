@@ -61,6 +61,7 @@ namespace Ros.Config
             ReviveTimeConfig.Bake(this);
             PromptConfig.Bake(this);
             SystemMessageConfig.Bake(this);
+            MessageVariable.Bake(this);
             QuickMessageConfig.Bake(this);
             SettingTipsConfig.Bake(this);
             AssistantExpressionConfig.Bake(this);

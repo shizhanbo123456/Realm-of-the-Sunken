@@ -1,12 +1,16 @@
 using System.Collections.Generic;
 using FairyGUI;
+using Ros.Config;
 using Ros.UI.Main;
 using UnityEngine;
 
 // 图鉴子界面：独立创建、挂 GRoot；关闭只收起自己，回到根界面（不回开设置）
 public class GuideView
 {
-    private static readonly string[] MenuTitles = { "技能", "Buff" };
+    private static readonly message_variablesEnum[] MenuTitles =
+    {
+        message_variablesEnum.guide_menu_skill, message_variablesEnum.guide_menu_buff,
+    };
 
     private readonly List<GuideCatalog.Entry> entries = new();
     private UI_GuidePanel panel;
@@ -52,7 +56,7 @@ public class GuideView
     private void RenderMenu(int index, GObject obj)
     {
         var item = (UI_GuideMenuLabel)obj;
-        item.m_title.text = MenuTitles[index];
+        item.m_title.text = MessageVariable.V(MenuTitles[index]);
         item.touchable = true;
         item.onClick.Set(() => SwitchTab(index));
     }

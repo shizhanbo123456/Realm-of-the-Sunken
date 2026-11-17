@@ -353,7 +353,7 @@ public partial class BattleManager : EnsBehaviour
         int min = GlobalVariable.I(global_variablesEnum.name_length_min);
         string name = (info.name ?? "").Trim();
         if (name.Length > max) name = name.Substring(0, max);
-        info.name = name.Length < min ? $"玩家{clientId}" : name;
+        info.name = name.Length < min ? MessageVariable.F(message_variablesEnum.default_playerName, clientId) : name;
     }
 
     // 新玩家进房：新玩家名字广播给所有人，再把房间里已有玩家的名字逐条发给新玩家（人机不下发名字）
@@ -637,7 +637,9 @@ public partial class BattleManager : EnsBehaviour
     private static string NameOf(int clientId, CSLobbyPlayerInfo info)
     {
         if (info != null && !string.IsNullOrEmpty(info.name)) return info.name;
-        return IsRobotToken(clientId) ? $"Robot{clientId - ROBOT_TOKEN_BASE + 1}" : $"玩家{clientId}";
+        return IsRobotToken(clientId)
+            ? MessageVariable.F(message_variablesEnum.default_robotName, clientId - ROBOT_TOKEN_BASE + 1)
+            : MessageVariable.F(message_variablesEnum.default_playerName, clientId);
     }
 
     // 攻守真人全部回执完成后才真正开战；观战方不阻塞

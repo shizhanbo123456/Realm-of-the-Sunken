@@ -8,6 +8,7 @@ namespace Ros.Config
         {
             Loadcard_gain_upgradeConfig();
             Loadcard_optionConfig();
+            Loadmessage_variablesConfig();
             LoadpromptConfig();
             Loadsystem_messageConfig();
             Loadai_commandConfig();

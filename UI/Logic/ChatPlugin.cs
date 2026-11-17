@@ -218,8 +218,8 @@ public class ChatPlugin
 
         bool isSelf = report.senderClientId == NetworkManager.LocalToken; // 自己没有本地回显，靠这条显示
         string head = report.state == (int)EntityReportState.None
-            ? $"血量 {report.healthPercent}%"                     // 真人上报不带状态
-            : $"{ReportStateText(report.state)}，血量 {report.healthPercent}%";
+            ? MessageVariable.F(message_variablesEnum.chat_health, report.healthPercent) // 真人上报不带状态
+            : MessageVariable.F(message_variablesEnum.chat_healthState, ReportStateText(report.state), report.healthPercent);
 
         entries.Add(new ChatEntry()
         {
@@ -228,7 +228,7 @@ public class ChatPlugin
             senderClientId = report.senderClientId,
             camp = report.camp,
             name = GetUnitName(report.senderClientId),
-            content = $"{head}，周围敌人 {report.nearbyEnemyCount} 个，{PositionText(report.position, isSelf)}",
+            content = MessageVariable.F(message_variablesEnum.chat_reportLine, head, report.nearbyEnemyCount, PositionText(report.position, isSelf)),
         });
         RefreshList();
     }
@@ -255,7 +255,8 @@ public class ChatPlugin
     // 位置写成「绝对坐标 + 相对读者方位」，自己的上报只给坐标（相对自己无意义）
     private static string PositionText(Vector3 position, bool isSelf)
     {
-        string text = $"位置 ({Mathf.RoundToInt(position.x)}, {Mathf.RoundToInt(position.z)})";
+        string text = MessageVariable.F(message_variablesEnum.chat_position,
+            Mathf.RoundToInt(position.x), Mathf.RoundToInt(position.z));
         if (isSelf) return text;
 
         var loading = ClientLoadingManager.Current;
@@ -265,7 +266,8 @@ public class ChatPlugin
 
         float dx = position.x - mine.x;
         float dz = position.z - mine.z;
-        return $"{text}，在你{BearingText(dx, dz)}方向 {Mathf.RoundToInt(Mathf.Sqrt(dx * dx + dz * dz))} 米";
+        return MessageVariable.F(message_variablesEnum.chat_distance, text, BearingText(dx, dz),
+            Mathf.RoundToInt(Mathf.Sqrt(dx * dx + dz * dz)));
     }
 
     // 世界 +Z 为北、+X 为东，方位按象限写成「北偏东 45°」
@@ -274,34 +276,36 @@ public class ChatPlugin
         int deg = Mathf.RoundToInt(Mathf.Atan2(dx, dz) * Mathf.Rad2Deg);
         if (deg < 0) deg += 360;
         if (deg >= 360) deg = 0;
-        if (deg == 0) return "正北";
-        if (deg < 90) return $"北偏东 {deg}°";
-        if (deg == 90) return "正东";
-        if (deg < 180) return $"南偏东 {180 - deg}°";
-        if (deg == 180) return "正南";
-        if (deg < 270) return $"南偏西 {deg - 180}°";
-        if (deg == 270) return "正西";
-        return $"北偏西 {360 - deg}°";
+        if (deg == 0) return MessageVariable.V(message_variablesEnum.chat_bearing_north);
+        if (deg < 90) return MessageVariable.F(message_variablesEnum.chat_bearing_northEast, deg);
+        if (deg == 90) return MessageVariable.V(message_variablesEnum.chat_bearing_east);
+        if (deg < 180) return MessageVariable.F(message_variablesEnum.chat_bearing_southEast, 180 - deg);
+        if (deg == 180) return MessageVariable.V(message_variablesEnum.chat_bearing_south);
+        if (deg < 270) return MessageVariable.F(message_variablesEnum.chat_bearing_southWest, deg - 180);
+        if (deg == 270) return MessageVariable.V(message_variablesEnum.chat_bearing_west);
+        return MessageVariable.F(message_variablesEnum.chat_bearing_northWest, 360 - deg);
     }
 
-    private static string ReportStateText(int state) => state switch
+    private static string ReportStateText(int state) => MessageVariable.V(ReportStateKey(state));
+
+    private static message_variablesEnum ReportStateKey(int state) => state switch
     {
-        (int)EntityReportState.Search => "正在搜索",
-        (int)EntityReportState.SearchCombat => "正在清理珊瑚",
-        (int)EntityReportState.Chase => "正在追击",
-        (int)EntityReportState.Combat => "正在战斗",
-        (int)EntityReportState.EscortApproach => "正在前往护送",
-        (int)EntityReportState.Escort => "正在护送",
-        (int)EntityReportState.EscortCombat => "护送中交战",
-        (int)EntityReportState.DangerEvade => "正在躲避危险",
-        (int)EntityReportState.DangerClear => "正在搜寻威胁",
-        (int)EntityReportState.DangerClearCombat => "正在清除威胁",
-        (int)EntityReportState.RallyApproach => "正在前往集结",
-        (int)EntityReportState.RallyWait => "正在集结待命",
-        (int)EntityReportState.RallyGuard => "正在守卫集结点",
-        (int)EntityReportState.Assault => "正在协同进攻",
-        (int)EntityReportState.AssaultCombat => "协同进攻中交战",
-        _ => "状态未知",
+        (int)EntityReportState.Search => message_variablesEnum.chat_state_search,
+        (int)EntityReportState.SearchCombat => message_variablesEnum.chat_state_searchCombat,
+        (int)EntityReportState.Chase => message_variablesEnum.chat_state_chase,
+        (int)EntityReportState.Combat => message_variablesEnum.chat_state_combat,
+        (int)EntityReportState.EscortApproach => message_variablesEnum.chat_state_escortApproach,
+        (int)EntityReportState.Escort => message_variablesEnum.chat_state_escort,
+        (int)EntityReportState.EscortCombat => message_variablesEnum.chat_state_escortCombat,
+        (int)EntityReportState.DangerEvade => message_variablesEnum.chat_state_dangerEvade,
+        (int)EntityReportState.DangerClear => message_variablesEnum.chat_state_dangerClear,
+        (int)EntityReportState.DangerClearCombat => message_variablesEnum.chat_state_dangerClearCombat,
+        (int)EntityReportState.RallyApproach => message_variablesEnum.chat_state_rallyApproach,
+        (int)EntityReportState.RallyWait => message_variablesEnum.chat_state_rallyWait,
+        (int)EntityReportState.RallyGuard => message_variablesEnum.chat_state_rallyGuard,
+        (int)EntityReportState.Assault => message_variablesEnum.chat_state_assault,
+        (int)EntityReportState.AssaultCombat => message_variablesEnum.chat_state_assaultCombat,
+        _ => message_variablesEnum.chat_state_unknown,
     };
 
     // 事件类型 → 播报文案：聊天列表里只留纯文本，图标与配色由横幅/飘字承担
@@ -337,7 +341,7 @@ public class ChatPlugin
     private static string GetUnitName(int clientId)
     {
         var loading = ClientLoadingManager.Current;
-        return loading != null && loading.HasSession ? loading.GetName(clientId) : $"玩家{clientId}";
+        return loading != null && loading.HasSession ? loading.GetName(clientId) : MessageVariable.F(message_variablesEnum.default_playerName, clientId);
     }
 
     private void RefreshList()
@@ -374,7 +378,7 @@ public class ChatPlugin
         var e = visibleChat[index];
         var info = RequireInfoManager();
         string channel = ChannelLabel(e.channel);
-        string name = string.IsNullOrEmpty(e.name) ? $"玩家{e.senderClientId}" : e.name;
+        string name = string.IsNullOrEmpty(e.name) ? MessageVariable.F(message_variablesEnum.default_playerName, e.senderClientId) : e.name;
         return $"[color=#{info.ChatChannelColorHex}][{channel}][/color] "
              + $"[color=#{info.ChatNameColorHex(e.camp)}]{name}[/color]: "
              + $"[color=#{info.ChatContentColorHex}]{e.content}[/color]";
@@ -384,7 +388,8 @@ public class ChatPlugin
     {
         if (index >= systemEntries.Count) return string.Empty;
         var info = RequireInfoManager();
-        return $"[color=#{info.ChatChannelColorHex}][系统][/color] [color=#{info.ChatContentColorHex}]{systemEntries[index]}[/color]";
+        return $"[color=#{info.ChatChannelColorHex}]{MessageVariable.V(message_variablesEnum.chat_tagSystem)}[/color] "
+             + $"[color=#{info.ChatContentColorHex}]{systemEntries[index]}[/color]";
     }
 
     // 聊天配色的唯一来源：场景里没有 InfoManager 就报出来，不静默用默认色
@@ -394,13 +399,13 @@ public class ChatPlugin
         return Tool.InfoManager;
     }
 
-    private static string ChannelLabel(int channel) => channel switch
+    private static string ChannelLabel(int channel) => MessageVariable.V(channel switch
     {
-        (int)ChatChannel.All => "全频道",
-        (int)ChatChannel.Camp => "阵营",
-        (int)ChatChannel.Nearby => "附近",
+        (int)ChatChannel.All => message_variablesEnum.chat_channel_all,
+        (int)ChatChannel.Camp => message_variablesEnum.chat_channel_camp,
+        (int)ChatChannel.Nearby => message_variablesEnum.chat_channel_nearby,
         _ => throw new System.ArgumentOutOfRangeException(nameof(channel), channel, "聊天频道只有 0 全频道 / 1 阵营 / 2 附近"),
-    };
+    });
 
     private int GetMyCamp()
     {
@@ -422,7 +427,7 @@ public class ChatPlugin
         var loading = ClientLoadingManager.Current;
         if (NetworkManager.BattleRunning && loading != null && loading.HasSession) return loading.GetName(NetworkManager.LocalToken);
         if (NetworkManager.TryGetLobbyPlayerName(NetworkManager.LocalToken, out var lobbyName)) return lobbyName;
-        return !string.IsNullOrEmpty(ClientSelection.playerName) ? ClientSelection.playerName : $"玩家{NetworkManager.LocalToken}";
+        return !string.IsNullOrEmpty(ClientSelection.playerName) ? ClientSelection.playerName : MessageVariable.F(message_variablesEnum.default_playerName, NetworkManager.LocalToken);
     }
     #endregion
 }

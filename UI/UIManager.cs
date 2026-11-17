@@ -210,7 +210,7 @@ public class UIManager : MonoBehaviour
     private void BeginStartupLoad()
     {
         ShowLoading();
-        SetLoadingProgress(0f, "正在加载资源… 0%");
+        SetLoadingProgress(0f, MessageVariable.F(message_variablesEnum.ui_loadingResource, 0));
 
         if (Tool.ResourceManager == null)
         {
@@ -224,7 +224,7 @@ public class UIManager : MonoBehaviour
 
     private void OnNecessaryProgress(float progress01)
     {
-        SetLoadingProgress(progress01, $"正在加载资源… {Mathf.RoundToInt(progress01 * 100f)}%");
+        SetLoadingProgress(progress01, MessageVariable.F(message_variablesEnum.ui_loadingResource, Mathf.RoundToInt(progress01 * 100f)));
     }
 
     private void EnterHome()
@@ -315,7 +315,7 @@ public class UIManager : MonoBehaviour
         }
 
         if (settings != null) settings.Hide();
-        ShowConfirm("确定启动桥接工具吗？", StartBridge);
+        ShowConfirm(MessageVariable.V(message_variablesEnum.ui_confirmStartBridge), StartBridge);
     }
 
     private void StartBridge()
@@ -337,7 +337,9 @@ public class UIManager : MonoBehaviour
         if (page == PageType.Home) return;
 
         if (settings != null) settings.Hide();
-        string content = page == PageType.Battle ? "退出将放弃本局，确定退出吗？" : "确定离开房间吗？";
+        string content = MessageVariable.V(page == PageType.Battle
+            ? message_variablesEnum.ui_confirmQuitBattle
+            : message_variablesEnum.ui_confirmLeaveRoom);
         ShowConfirm(content, DoExit);
     }
 

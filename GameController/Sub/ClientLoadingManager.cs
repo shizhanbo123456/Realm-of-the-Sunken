@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Ros.Config;
 using Ros.Transport;
 using UnityEngine;
 
@@ -81,7 +82,7 @@ public class ClientLoadingManager : ClientSubManager
     {
         if (!terrainReady || !preparedReceived) return;
         step = Step.AttackPlayers;
-        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(0f, "正在加载…");
+        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(0f, MessageVariable.V(message_variablesEnum.loading_text_prepare));
         if (Tool.NetworkManager != null) Tool.NetworkManager.SendLoadingAttackPlayerRequest();
     }
 
@@ -90,7 +91,7 @@ public class ClientLoadingManager : ClientSubManager
         if (step != Step.AttackPlayers) return;
         Merge(info.list);
         step = Step.DefensePlayers;
-        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(1f / 4f, "正在加载…");
+        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(1f / 4f, MessageVariable.V(message_variablesEnum.loading_text_prepare));
         if (Tool.NetworkManager != null) Tool.NetworkManager.SendLoadingDefensePlayerRequest();
     }
 
@@ -99,7 +100,7 @@ public class ClientLoadingManager : ClientSubManager
         if (step != Step.DefensePlayers) return;
         Merge(info.list);
         step = Step.AiUnits;
-        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(2f / 4f, "正在加载…");
+        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(2f / 4f, MessageVariable.V(message_variablesEnum.loading_text_prepare));
         if (Tool.NetworkManager != null) Tool.NetworkManager.SendLoadingAiUnitRequest();
     }
 
@@ -108,7 +109,7 @@ public class ClientLoadingManager : ClientSubManager
         if (step != Step.AiUnits) return;
         Merge(info.list);
         step = Step.BattleAssets;
-        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(3f / 4f, "正在加载战斗资源…");
+        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(3f / 4f, MessageVariable.V(message_variablesEnum.loading_text_battleAssets));
         if (Tool.ResourceManager == null)
         {
             Debug.LogError("[加载] 缺少 ResourceManager：僵尸与珊瑚未预加载");
@@ -121,7 +122,7 @@ public class ClientLoadingManager : ClientSubManager
     private void FinishLoading()
     {
         step = Step.Idle;
-        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(1f, "加载完成");
+        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(1f, MessageVariable.V(message_variablesEnum.loading_text_done));
         if (Tool.NetworkManager != null) Tool.NetworkManager.SendLoadingComplete();
     }
 
@@ -138,12 +139,12 @@ public class ClientLoadingManager : ClientSubManager
     public string GetName(int clientId)
     {
         if (names.TryGetValue(clientId, out var name) && !string.IsNullOrEmpty(name)) return name;
-        return $"玩家{clientId}";
+        return MessageVariable.F(message_variablesEnum.default_playerName, clientId);
     }
 
     public string GetNameByEntity(ushort entityId)
     {
-        return entityOwners.TryGetValue(entityId, out var clientId) ? GetName(clientId) : "玩家?";
+        return entityOwners.TryGetValue(entityId, out var clientId) ? GetName(clientId) : MessageVariable.V(message_variablesEnum.default_unknownPlayer);
     }
 
     // clientId → 当前实体 id；-1 = 无实体（死亡 / 观战 / 离场）
@@ -169,7 +170,7 @@ public class ClientLoadingManager : ClientSubManager
             return;
         }
 
-        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(0f, "正在生成地形…");
+        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(0f, MessageVariable.V(message_variablesEnum.loading_text_terrain));
         Tool.ModularTerrainGenerator.Generate(OnTerrainGenerated);
     }
 

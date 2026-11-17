@@ -83,7 +83,8 @@ public class SettlementView
 
         var result = panel.m_battle_result;
         result.m_title.text = GetEndText(r.gameState, camp);
-        result.m_content.text = $"战斗用时：{Mathf.RoundToInt(Mathf.Max(0f, GlobalVariable.F(global_variablesEnum.battle_duration) - r.remainTime))} 秒";
+        result.m_content.text = MessageVariable.F(message_variablesEnum.settlement_battleTime,
+            Mathf.RoundToInt(Mathf.Max(0f, GlobalVariable.F(global_variablesEnum.battle_duration) - r.remainTime)));
 
         BuildRows(r, camp);
 
@@ -127,17 +128,17 @@ public class SettlementView
         rows.Clear();
         items.Clear();
         // 分数只报本地阵营；观战方没有自己的分数，攻防拆成两条
-        if (camp == EntityCamp.Attack) rows.Add($"战斗分数：{(int)r.attackScore}");
-        else if (camp == EntityCamp.Defense) rows.Add($"战斗分数：{(int)r.defenseScore}");
+        if (camp == EntityCamp.Attack) rows.Add(MessageVariable.F(message_variablesEnum.settlement_score, (int)r.attackScore));
+        else if (camp == EntityCamp.Defense) rows.Add(MessageVariable.F(message_variablesEnum.settlement_score, (int)r.defenseScore));
         else
         {
-            rows.Add($"进攻方分数：{(int)r.attackScore}");
-            rows.Add($"防守方分数：{(int)r.defenseScore}");
+            rows.Add(MessageVariable.F(message_variablesEnum.settlement_attackScore, (int)r.attackScore));
+            rows.Add(MessageVariable.F(message_variablesEnum.settlement_defenseScore, (int)r.defenseScore));
         }
-        rows.Add($"击杀数：{r.killScore}");
+        rows.Add(MessageVariable.F(message_variablesEnum.settlement_kill, r.killScore));
         rows.Add(camp == EntityCamp.Attack
-            ? $"对防守点伤害：{(int)r.expGain}"
-            : $"防守点剩余血量：{(int)r.guardStatueHealth}");
+            ? MessageVariable.F(message_variablesEnum.settlement_guardDamage, (int)r.expGain)
+            : MessageVariable.F(message_variablesEnum.settlement_guardHealth, (int)r.guardStatueHealth));
 
         var list = panel.m_battle_result_detail.m_resultList;
         list.itemRenderer = RenderRow;
@@ -215,7 +216,7 @@ public class SettlementView
     {
         bool win = (gameState == 1 && camp == EntityCamp.Attack)
                 || (gameState == 2 && camp == EntityCamp.Defense);
-        return win ? "胜利" : "结束";
+        return MessageVariable.V(win ? message_variablesEnum.settlement_win : message_variablesEnum.settlement_end);
     }
     #endregion
 }

@@ -25,7 +25,7 @@ namespace Ros.UI.Main
             onCommit = commit;
             if (m_panel != null)
             {
-                m_panel.title = "技能选择";
+                m_panel.title = MessageVariable.V(message_variablesEnum.skill_selectTitle);
                 if (m_panel.m_close != null) m_panel.m_close.onClick.Set(Commit);
             }
         }

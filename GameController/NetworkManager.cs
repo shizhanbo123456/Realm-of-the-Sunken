@@ -1001,7 +1001,7 @@ public partial class NetworkManager : EnsBehaviour
     public static string GetLobbyMemberName(int clientId)
     {
         if (TryGetLobbyPlayerName(clientId, out var name)) return name;
-        return $"玩家{clientId}";
+        return MessageVariable.F(message_variablesEnum.default_playerName, clientId);
     }
 
     [Rpc]

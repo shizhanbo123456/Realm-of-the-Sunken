@@ -41,7 +41,7 @@ public class BattlePage : PageBase
     private const float HitVfxLife = 2f;
     private readonly Queue<string> importantBannerQueue = new(); // 待播的特殊技能播报文案，按到达顺序逐条播
     private bool importantBannerPlaying;                          // 当前 banner 动画是否在播
-    private const string ImportantBannerPrefix = "特殊能力启动-";
+    private static string ImportantBannerPrefix => MessageVariable.V(message_variablesEnum.battle_bannerPrefix);
     private int godViewPressCount;        // 上帝视角连按计数
     private float godViewFirstPressTime;  // 本轮第一次按下的时刻（超窗口重算）
 
