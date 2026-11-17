@@ -40,6 +40,9 @@ public class ClientSkillManager : ClientSubManager
     private float meleeScale = 1f;
     private float meleeInterval;    // 每目标再命中间隔（skill 表第 10 列），与服务器 Bullet 同口径
     private readonly Dictionary<ushort, float> meleeHitTime = new(); // 本窗内每目标上次命中时刻
+    private bool meleeSampled;
+    private Vector3 meleeLastPos;
+    private Quaternion meleeLastRot = Quaternion.identity;
     private Transform meleeWeapon;
     private BulletVfxInfo meleeHits;
     #endregion
@@ -62,6 +65,7 @@ public class ClientSkillManager : ClientSubManager
         meleeAnim = null;
         meleeSkillId = -1;
         meleeWindowEnd = 0f;
+        meleeSampled = false;
         meleeHitTime.Clear();
     }
     #endregion
@@ -248,6 +252,7 @@ public class ClientSkillManager : ClientSubManager
         meleeScale = config.bulletSizes.Count > 0 ? config.bulletSizes[0] : 1f;
         meleeInterval = config.damageInterval ?? 100f; // 与 SkillBase.DamageInterval 同口径
         meleeHitTime.Clear();
+        meleeSampled = false;
         meleeWindowEnd = Time.time + GlobalVariable.F(global_variablesEnum.melee_bullet_life);
         meleeSkillId = -1;
     }
@@ -304,42 +309,63 @@ public class ClientSkillManager : ClientSubManager
         return meleeHits;
     }
 
-    // 与服务器同口径：每帧取武器位姿做点判定（近战轨迹 Lerp 忽略时间因子，服务器 from 与 to 本是同一点），
-    // 每个目标按 skill 表第 10 列的间隔各自计一次命中
+    // 客户端保持扫掠：服务器那颗近战子弹的轨迹忽略时间因子、每 tick 取当前位姿，帧率足够高时才等价于点判定；
+    // 这里拿上一帧与这一帧的位姿连成线段，低帧率下也不会漏掉刀扫过的目标（比服务器略宽松，最多多震一次）
     private void SampleMeleeHit(EntityPlayerManager.ClientEntityView view)
     {
         if (!BulletTrajectory.TryGetWeaponPose(view.id, out var pos, out var rot, out bool inHand) || !inHand) return;
         var hits = ResolveWeaponHits();
         if (hits == null || hits.hits.Count == 0) return;
 
+        if (!meleeSampled)
+        {
+            meleeSampled = true;
+            meleeLastPos = pos;
+            meleeLastRot = rot;
+            return;
+        }
+
         for (int i = 0; i < hits.hits.Count; i++)
         {
             var h = hits.hits[i];
-            Vector3 sphereCenter = pos + rot * (h.center * meleeScale);
+            Vector3 offset = h.center * meleeScale;
+            Vector3 from = meleeLastPos + meleeLastRot * offset;
+            Vector3 to = pos + rot * offset;
             float radius = h.radius * meleeScale;
             foreach (var target in logic.EntityPlayers.AllViews)
             {
                 if (target == null || target.id == view.id || target.capsule == null) continue;
                 if (!EntityCampUtil.IsHostile(view.type.category, target.camp)) continue;
-                if (!ReachTarget(sphereCenter, radius, target)) continue;
+                if (!ReachTarget(from, to, radius, target)) continue;
                 if (!AllowHit(target.id)) continue;
                 meleeHitTime[target.id] = Time.time;
                 TriggerMeleeHit();
             }
         }
+
+        meleeLastPos = pos;
+        meleeLastRot = rot;
     }
 
-    // 与服务器 EntityPhysics.OverlapCapsuleXZ 同口径：纯 XZ 圆心距离 < 判定球半径 + 目标胶囊半径（不判高度）
-    private static bool ReachTarget(Vector3 sphereCenter, float sphereRadius, EntityPlayerManager.ClientEntityView target)
+    // 与服务器 EntityPhysics.OverlapCapsuleXZ 同口径：纯 XZ 的点到线段距离 < 判定球半径 + 目标胶囊半径（不判高度）
+    private static bool ReachTarget(Vector3 from, Vector3 to, float sphereRadius, EntityPlayerManager.ClientEntityView target)
     {
         Transform shape = target.capsule.transform;
         Vector3 scale = shape.lossyScale;
         float targetRadius = target.capsule.radius * Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z));
         Vector3 center = shape.TransformPoint(target.capsule.center);
-        float dx = center.x - sphereCenter.x;
-        float dz = center.z - sphereCenter.z;
         float sum = sphereRadius + targetRadius;
-        return dx * dx + dz * dz <= sum * sum;
+        return SqrDistPointSegmentXZ(center, from, to) <= sum * sum;
+    }
+
+    private static float SqrDistPointSegmentXZ(Vector3 p, Vector3 a, Vector3 b)
+    {
+        float ax = p.x - a.x, az = p.z - a.z;
+        float bx = b.x - a.x, bz = b.z - a.z;
+        float lenSqr = bx * bx + bz * bz;
+        float t = lenSqr > 1e-8f ? Mathf.Clamp01((ax * bx + az * bz) / lenSqr) : 0f;
+        float dx = ax - bx * t, dz = az - bz * t;
+        return dx * dx + dz * dz;
     }
 
     // 与服务器 Bullet.lastHitTime 同口径：间隔 <= 0 时一目标一刀一次，> 0 时按间隔重复
