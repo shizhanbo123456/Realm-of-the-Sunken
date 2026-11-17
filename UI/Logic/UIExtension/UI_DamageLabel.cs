@@ -16,6 +16,7 @@ namespace Ros.UI.Main
         private Vector2 scatterPx;
         private float risePx;
         private float defaultSizeDistance; // 飘字 scale=(1,1) 时的相机距离
+        private float lifeScale = 1f;      // 当前归一化生命周期对应的缩放倍率（InfoManager 曲线）
         private Timer.TransitionHandle transition;
 
         // 生成一个飘字；类型越界属枚举与 FGUI 页数不匹配，直接丢弃并报错
@@ -62,7 +63,7 @@ namespace Ros.UI.Main
             visible = true;
             // 飘字画在屏幕面板上，不随距离自然缩小：与血条同口径按距离倒比缩放，默认距离处为 (1,1)
             float distance = Vector3.Distance(cam.transform.position, anchor);
-            float scale = defaultSizeDistance / Mathf.Max(distance, 0.01f);
+            float scale = defaultSizeDistance / Mathf.Max(distance, 0.01f) * lifeScale;
             SetScale(scale, scale);
             // 轴心左上角，减半个缩放后宽度让飘字正中落在锚点上；散布与上升量随缩放同比
             xy = WorldLayer.ToLayer(this, WorldLayer.WorldToPanel(anchor, cam, out _) + scatterPx * scale)
@@ -75,6 +76,7 @@ namespace Ros.UI.Main
             {
                 float age = t01 * Life;
                 risePx = RisePerSecond * age;
+                lifeScale = Tool.InfoManager.damage_label_scale.Evaluate(t01);
                 // 前半程完全不透明，后半程线性淡出
                 alpha = age <= Life * 0.5f ? 1f : Mathf.Clamp01(1f - (age - Life * 0.5f) / (Life * 0.5f));
                 if (t01 >= 1f) Release();

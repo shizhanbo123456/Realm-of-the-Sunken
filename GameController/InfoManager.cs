@@ -12,6 +12,9 @@ public class InfoManager : MonoBehaviour
 
     public int ground_layer;
 
+    [Tooltip("伤害飘字缩放曲线：横轴为归一化生命周期（0 刚出现 → 1 消失），纵轴为缩放倍率（乘在距离缩放上）")]
+    public AnimationCurve damage_label_scale = AnimationCurve.Linear(0f, 1f, 1f, 1f);
+
     #region 聊天配色（ChatItem 正文按 UBB 拼接：频道名 + 发送者 + 内容）
     [Tooltip("频道标签（[全频道] / [阵营] / [附近] / [系统]）的文字颜色")]
     public Color chat_channel_color = new Color(0.66f, 0.66f, 0.66f, 1f);
