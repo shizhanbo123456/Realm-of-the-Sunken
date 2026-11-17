@@ -741,12 +741,11 @@ public abstract class EntityData : MonoBehaviour
         if (transformDirty < 2) transformDirty++;
     }
 
-    // 与下发口径一致：只取水平分量，客户端不推演纵向
+    // 与下发口径一致：速度按三分量比较（纵向速度也参与客户端推演）
     private float SpeedSqr()
     {
         if (rb == null) return 0f;
-        Vector3 v = rb.velocity;
-        return v.x * v.x + v.z * v.z;
+        return rb.velocity.sqrMagnitude;
     }
 
     // 持有技能不在这里：改走 SCSkillSync 独立下发（见 EntitySkillController）

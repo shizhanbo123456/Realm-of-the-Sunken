@@ -58,7 +58,7 @@ public class EntityPlayerManager : ClientSubManager
             if (predictedInit)
             {
                 // 物理步会把插进墙体/地形的刚体推出来：把这段解算位移叠加回预测位置，否则穿透会逐帧累积；
-                // 只取水平分量，纵向仍用服务器下发值（关重力，物理不决定高度）
+                // 只取水平分量，纵向高度由服务器下发的速度推演，物理不决定高度
                 if (rb != null && !snapPending)
                 {
                     Vector3 solvedDelta = rb.position - moveTarget;
@@ -497,11 +497,9 @@ public class EntityPlayerManager : ClientSubManager
         {
             EnsureCatchupConfig();
             view.predictedInit = true;
-            view.predictedYaw = info.yaw;            // 朝向直接采用包内值，不追帧
-            view.predictedPos.y = info.position.y;   // 纵向不追帧，直接吸附
+            view.predictedYaw = info.yaw;   // 朝向直接采用包内值，不追帧
 
             Vector3 offset = info.position - view.predictedPos;
-            offset.y = 0f;
             if (offset.sqrMagnitude >= catchupSnapDistance * catchupSnapDistance)
             {
                 // 首见或偏差超过上限：直接落位
@@ -522,10 +520,9 @@ public class EntityPlayerManager : ClientSubManager
             }
             else
             {
-                // 追帧目标 = 包内位置按包内速度推演追帧时长后的位置；位置由 Update 逐帧推进，不瞬移
+                // 追帧目标 = 包内位置按包内速度（含纵向）推演追帧时长后的位置；位置由 Update 逐帧推进，不瞬移
                 Vector3 target = info.position + info.velocity * catchupTime;
                 view.catchupVel = (target - view.predictedPos) / catchupTime;
-                view.catchupVel.y = 0f;
                 view.catchupEndTime = Time.time + catchupTime;
             }
         }

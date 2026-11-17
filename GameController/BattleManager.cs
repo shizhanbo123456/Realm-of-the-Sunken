@@ -1435,8 +1435,7 @@ public partial class BattleManager : EnsBehaviour
     {
         if (!info.hasTransform) return; // 不带位姿的包也不带速度，客户端不会拿它外插
         // 位置由物理积分，必须取刚体实际速度：用"意图速度"外插会与权威位置持续漂移；无刚体（不可移动单位）即无速度
-        Vector3 v = entity.rb != null ? entity.rb.velocity : Vector3.zero;
-        info.velocity = new Vector3(v.x, 0f, v.z); // 纵向不做客户端推演
+        info.velocity = entity.rb != null ? entity.rb.velocity : Vector3.zero;
         info.yawSpeed = entity.YawSpeed;
     }
     #endregion
