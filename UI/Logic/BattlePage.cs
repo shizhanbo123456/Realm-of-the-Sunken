@@ -20,7 +20,9 @@ public class BattlePage : PageBase
     private readonly float barDefaultSizeDistance = GlobalVariable.I(global_variablesEnum.distance_of_bar_default_size); // 血条 scale=(1,1) 时的相机距离
     private readonly float labelDefaultSizeDistance = GlobalVariable.I(global_variablesEnum.distance_of_label_default_size); // 飘字 scale=(1,1) 时的相机距离
     private UI_QuickMessagePanel quickMessagePanel; // 快捷指令轮盘（挂在战斗信息面板里）
-    private readonly List<UI_QuickMessagePointer> quickMessagePointers = new(); // 快捷指令点位（挂在世界层）
+    private readonly List<QuickMessageState> quickMessages = new(); // 生效中的快捷指令点位（显示在小地图上）
+    private readonly List<UI_Minimap.QuickMark> quickMessageMarks = new(); // 每帧换算给小地图的标记快照
+    private int nextQuickMessageId;
     private GTextField levelLabel;    // 玩家栏等级数字（FGUI 侧未命名，按 n12 取）
     private int localPlayerCamp = -1; // 本地玩家阵营（随本地实体摘要更新；小地图敌我识别用）
     private EntityType localAvatarType;   // 玩家栏头像当前用的角色类型（同类型不重设贴图）
@@ -133,57 +135,75 @@ public class BattlePage : PageBase
         if (Tool.NetworkManager != null) Tool.NetworkManager.SendQuickMessage(new CSQuickMessage() { messageId = index });
     }
 
-    #region 快捷指令点位
-    // 收到同阵营的快捷指令：按配表「点位显示时长」生成一个场景点位，0 = 不生成（上报状况）
-    private void OnQuickMessagePointer(SCQuickMessage message)
+    #region 快捷指令点位（显示在小地图）
+    // 收到同阵营的快捷指令：按配表「点位显示时长」登记一条，0 = 不生成（上报状况）
+    private void OnQuickMessage(SCQuickMessage message)
     {
         if (message == null) return;
         float duration = QuickMessageConfig.Get(message.messageId).markerDuration;
         if (duration <= 0f) return;
 
-        var pointer = UI_QuickMessagePointer.CreateInstance();
-        panel.m_world_element_container.AddChild(pointer); // 与血条/飘字同层
-        pointer.Bind(message, duration);
-        quickMessagePointers.Add(pointer);
-        PlaceQuickMessagePointer(pointer, UiScale); // 先落一次位，避免第一帧出现在容器左上角
+        quickMessages.Add(new QuickMessageState
+        {
+            id = ++nextQuickMessageId,
+            messageId = message.messageId,
+            senderClientId = message.senderClientId,
+            hasTargetPosition = message.hasTargetPosition,
+            targetPosition = message.targetPosition,
+            anchor = message.targetPosition,
+            expireAt = Time.unscaledTime + duration,
+        });
     }
 
-    private void TickQuickMessagePointers()
+    // 每帧推进：先剔到期的，再把每条指令的当前世界锚点换成标记数据，交给雷达与放大版小地图
+    private void TickQuickMessages()
     {
-        if (quickMessagePointers.Count == 0) return;
+        quickMessageMarks.Clear();
         float now = Time.unscaledTime;
-        float uiScale = UiScale;
-        for (int i = quickMessagePointers.Count - 1; i >= 0; i--)
+        for (int i = quickMessages.Count - 1; i >= 0; i--)
+            if (now >= quickMessages[i].expireAt) quickMessages.RemoveAt(i);
+
+        foreach (var state in quickMessages)
         {
-            var pointer = quickMessagePointers[i];
-            if (pointer.Expired(now))
-            {
-                pointer.DestroySelf();
-                quickMessagePointers.RemoveAt(i);
-                continue;
-            }
-            PlaceQuickMessagePointer(pointer, uiScale);
+            RefreshQuickMessageAnchor(state);
+            quickMessageMarks.Add(new UI_Minimap.QuickMark(state.id, state.messageId,
+                new Vector2(state.anchor.x, state.anchor.z)));
         }
     }
 
-    // 随包没带位置时改用发送者实体当前位置；实体已消失则由点位自己停在最后已知位置
-    private void PlaceQuickMessagePointer(UI_QuickMessagePointer pointer, float uiScale)
+    // 随包带了目标点就用目标点；没带就跟着发送者实体走，实体消失停在最后已知位置
+    private void RefreshQuickMessageAnchor(QuickMessageState state)
     {
-        Vector3 senderPos = Vector3.zero;
-        bool hasSenderPos = false;
-        if (HasSession)
+        if (state.hasTargetPosition)
         {
-            int entityId = Session.GetEntityId(pointer.SenderClientId);
-            var players = Tool.ClientLogicManager != null ? Tool.ClientLogicManager.EntityPlayers : null;
-            if (entityId > 0 && players != null) hasSenderPos = players.TryGetEntityPosition((ushort)entityId, out senderPos);
+            state.anchor = state.targetPosition;
+            return;
         }
-        pointer.Place(senderPos, hasSenderPos, uiScale);
+        if (!HasSession) return;
+        int entityId = Session.GetEntityId(state.senderClientId);
+        var players = Tool.ClientLogicManager != null ? Tool.ClientLogicManager.EntityPlayers : null;
+        if (entityId > 0 && players != null && players.TryGetEntityPosition((ushort)entityId, out var position))
+            state.anchor = position;
     }
 
-    private void ClearQuickMessagePointers()
+    private void ClearQuickMessages()
     {
-        foreach (var pointer in quickMessagePointers) pointer.DestroySelf();
-        quickMessagePointers.Clear();
+        quickMessages.Clear();
+        quickMessageMarks.Clear();
+        panel.m_Minimap?.ClearQuickMessages();
+        panel.m_largeMinimapPanel.ClearQuickMessages();
+    }
+
+    // 一条生效中的快捷指令：id 只用于小地图侧增删比对
+    private sealed class QuickMessageState
+    {
+        public int id;
+        public int messageId;
+        public int senderClientId;
+        public bool hasTargetPosition;
+        public Vector3 targetPosition;
+        public Vector3 anchor;
+        public float expireAt;
     }
     #endregion
 
@@ -218,7 +238,7 @@ public class BattlePage : PageBase
         EventManager.AddEvent<SCDefensePointProgress>(ClientEvent.OnDefensePointProgress, OnDefensePointProgress);
         EventManager.AddEvent(ClientEvent.OnSkillBarRefresh, OnSkillBarRefresh);
         EventManager.AddEvent<SCPlayerProgress>(ClientEvent.OnPlayerProgress, OnPlayerProgress);
-        EventManager.AddEvent<SCQuickMessage>(ClientEvent.OnQuickMessage, OnQuickMessagePointer);
+        EventManager.AddEvent<SCQuickMessage>(ClientEvent.OnQuickMessage, OnQuickMessage);
         if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated += OnCameraUpdated;
 
         localPlayerCamp = -1;
@@ -240,7 +260,7 @@ public class BattlePage : PageBase
         reviveElapsed = 0f;
         panel.m_showRegenerationBar.selectedIndex = 0; // 上一局死着结算会把它留在 1，进场必须复位
         ClearEntityBars();
-        ClearQuickMessagePointers(); // 快捷指令点位只属于本局
+        ClearQuickMessages(); // 快捷指令点位只属于本局
         TipHost.Hide();
         localBuffs.Clear();
         panel.m_playerPanel.m_buffList.m_list.numItems = 0;
@@ -273,7 +293,7 @@ public class BattlePage : PageBase
         EventManager.RemoveEvent<SCDefensePointProgress>(ClientEvent.OnDefensePointProgress, OnDefensePointProgress);
         EventManager.RemoveEvent(ClientEvent.OnSkillBarRefresh, OnSkillBarRefresh);
         EventManager.RemoveEvent<SCPlayerProgress>(ClientEvent.OnPlayerProgress, OnPlayerProgress);
-        EventManager.RemoveEvent<SCQuickMessage>(ClientEvent.OnQuickMessage, OnQuickMessagePointer);
+        EventManager.RemoveEvent<SCQuickMessage>(ClientEvent.OnQuickMessage, OnQuickMessage);
         if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated -= OnCameraUpdated;
         spectatorMode = false;
         localPlayerAlive = true;
@@ -288,7 +308,7 @@ public class BattlePage : PageBase
         TipHost.Hide();
         HideImportantBanner();
         StopPanelTransitions();
-        ClearQuickMessagePointers();
+        ClearQuickMessages();
         // 离开战斗界面即销毁地形场景（Culler 与内容根一起销毁，点位数据一并复位）
         if (Tool.ModularTerrainGenerator != null) Tool.ModularTerrainGenerator.Clear();
     }
@@ -306,12 +326,12 @@ public class BattlePage : PageBase
         if (HasSession && BattleTime != null && panel.m_BattleInfoPanel.m_time_left != null)
             panel.m_BattleInfoPanel.m_time_left.text = FormatTime(Mathf.Max(0f, BattleTime.RemainTime));
         RefreshTimeIcon();
+        TickQuickMessages(); // 先推进标记，小地图本帧就能按最新锚点落位
         TickMinimap();
         TickMinimapPanels(deltaTime);
         TickSpectator(deltaTime);
         TickLocalSkillCd(deltaTime);
         TickReviveProgress(deltaTime);
-        TickQuickMessagePointers();
     }
 
     // 冷却推演在 ClientSkillManager，这里只按节流重渲染冷却环与库存数
@@ -709,6 +729,7 @@ public class BattlePage : PageBase
         bool hasCenter = TryGetMinimapCenter(out var center);
         bool hasYaw = TryGetSelfYaw(out float yaw);
         panel.m_Minimap?.Tick(center, hasCenter, yaw, hasYaw);
+        panel.m_Minimap?.TickQuickMessages(quickMessageMarks, center, hasCenter);
     }
 
     #region 小地图展开 / 上帝视角
@@ -719,6 +740,7 @@ public class BattlePage : PageBase
             bool hasYaw = TryGetSelfYaw(out float yaw);
             var points = panel.m_Minimap != null ? panel.m_Minimap.CurrentPoints : null;
             panel.m_largeMinimapPanel.Refresh(points, (EntityCamp)localPlayerCamp, yaw, hasYaw);
+            panel.m_largeMinimapPanel.RefreshQuickMessages(quickMessageMarks);
         }
         panel.m_godViewPanel.Tick(deltaTime, (EntityCamp)localPlayerCamp, OwnEntityId);
     }

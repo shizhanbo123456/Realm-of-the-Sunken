@@ -6,7 +6,7 @@ using UnityEngine;
 using Ros.Config;
 namespace Ros.UI.Main
 {
-    // 小地图表现：点位增删改、雷达换算、自身朝向、地形底图对位。
+    // 小地图表现：点位增删改、快捷指令标记、雷达换算、自身朝向、地形底图对位。
     // 网络事件仍由 BattlePage 订阅，这里只接收换算所需的数据。
     public partial class UI_Minimap
     {
@@ -34,15 +34,33 @@ namespace Ros.UI.Main
             }
         }
 
+        // 快捷指令标记：id 是发送侧的序号，world 为世界坐标 x/z
+        public readonly struct QuickMark
+        {
+            public readonly int id;
+            public readonly int messageId;
+            public readonly Vector2 world;
+
+            public QuickMark(int id, int messageId, Vector2 world)
+            {
+                this.id = id;
+                this.messageId = messageId;
+                this.world = world;
+            }
+        }
+
         private readonly Dictionary<ushort, Point> points = new();
         private readonly Dictionary<ushort, float> lastReceived = new();
         private readonly Dictionary<ushort, UI_MinimapItem> items = new();
+        private readonly Dictionary<int, UI_QuickMessagePointer> quickPointers = new();
         private readonly List<ushort> culledIds = new(); // 剔除临时列表：遍历中不能改字典
         private readonly List<ushort> expiredIds = new();
+        private readonly List<int> staleQuickIds = new();
         private ushort selfId;
         private EntityCamp myCamp = EntityCamp.None;
         private float viewRadius;
         private float itemScale = 1f;
+        private float quickPointerScale = 1f;
         private GLoader mapLoader;
         private NTexture mapTexture;
 
@@ -59,6 +77,8 @@ namespace Ros.UI.Main
             myCamp = EntityCamp.None;
             DisposeItems();
             ComputeItemScale();
+            quickPointerScale = GlobalVariable.F(global_variablesEnum.quick_message_pointer_scale);
+            ClearQuickMessages();
             EnsureMapLoader();
         }
 
@@ -196,6 +216,74 @@ namespace Ros.UI.Main
             m_mask.SetChildIndex(self, m_mask.numChildren - 1); // 新点加入可能盖住自身图标，每次校一次层级
         }
 
+        // 快捷指令点位：与点位同一套换算，超出显示半径就夹到圆边并让箭头指真实方向
+        public void TickQuickMessages(IReadOnlyList<QuickMark> marks, Vector3 center, bool hasCenter)
+        {
+            if (!hasCenter || marks == null || marks.Count == 0)
+            {
+                ClearQuickMessages();
+                return;
+            }
+            var mapBase = m_mapBase;
+            if (mapBase == null) return;
+
+            staleQuickIds.Clear();
+            foreach (int id in quickPointers.Keys) staleQuickIds.Add(id);
+            float ppm = mapBase.width * 0.5f / viewRadius;
+            foreach (var mark in marks)
+            {
+                var pointer = EnsureQuickPointer(mark.id);
+                if (pointer == null) continue;
+                pointer.Bind(mark.messageId);
+                PlaceQuickPointer(pointer, mark, center, ppm);
+                staleQuickIds.Remove(mark.id);
+            }
+            foreach (int id in staleQuickIds) RemoveQuickPointer(id);
+        }
+
+        public void ClearQuickMessages()
+        {
+            foreach (var pointer in quickPointers.Values)
+                if (pointer != null) pointer.DestroySelf();
+            quickPointers.Clear();
+        }
+
+        private UI_QuickMessagePointer EnsureQuickPointer(int id)
+        {
+            if (quickPointers.TryGetValue(id, out var pointer) && pointer != null && !pointer.isDisposed) return pointer;
+            if (m_mask == null) return null;
+            float scale = itemScale * quickPointerScale;
+            pointer = UI_QuickMessagePointer.CreateInstance();
+            pointer.scale = new Vector2(scale, scale);
+            m_mask.AddChild(pointer); // 与点位同层，越界由遮罩裁掉
+            quickPointers[id] = pointer;
+            return pointer;
+        }
+
+        private void PlaceQuickPointer(UI_QuickMessagePointer pointer, in QuickMark mark, Vector3 center, float ppm)
+        {
+            var mapBase = m_mapBase;
+            float x = mapBase.x + mapBase.width * 0.5f - m_mask.x + (mark.world.x - center.x) * ppm;
+            float y = mapBase.y + mapBase.height * 0.5f - m_mask.y - (mark.world.y - center.z) * ppm;
+
+            // 夹边以遮罩圆为准并内缩「图标 + 伸出的箭头」，夹住后整块标记仍在可见区域内
+            float maskRadius = Mathf.Min(m_mask.width, m_mask.height) * 0.5f;
+            float limit = Mathf.Max(maskRadius - pointer.EdgeInset, 0f);
+            var offset = new Vector2(x - m_mask.width * 0.5f, y - m_mask.height * 0.5f);
+            bool clamped = offset.sqrMagnitude > limit * limit;
+            if (clamped) offset = offset.normalized * limit;
+
+            pointer.Place(m_mask.width * 0.5f + offset.x, m_mask.height * 0.5f + offset.y);
+            if (clamped) pointer.PointOut(offset);
+        }
+
+        private void RemoveQuickPointer(int id)
+        {
+            if (!quickPointers.TryGetValue(id, out var pointer)) return;
+            if (pointer != null) pointer.DestroySelf();
+            quickPointers.Remove(id);
+        }
+
         // 超时剔除：长时间未收到点位包（离屏停传 / 夜间敌方停传）即移除
         private void TickTimeout()
         {
@@ -257,6 +345,7 @@ namespace Ros.UI.Main
             points.Clear();
             lastReceived.Clear();
             selfId = 0;
+            ClearQuickMessages();
         }
     }
 }

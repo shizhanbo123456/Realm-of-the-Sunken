@@ -150,5 +150,6 @@ namespace Ros.Config
         hitback_friction,
         hitback_threshold_squared,
         hitback_max_speed,
+        quick_message_pointer_scale,
     }
 }

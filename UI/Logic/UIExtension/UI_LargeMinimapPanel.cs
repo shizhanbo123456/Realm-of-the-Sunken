@@ -10,14 +10,18 @@ namespace Ros.UI.Main
     public partial class UI_LargeMinimapPanel
     {
         private readonly Dictionary<ushort, UI_MinimapItem> items = new();
+        private readonly Dictionary<int, UI_QuickMessagePointer> quickPointers = new();
         private readonly HashSet<ushort> staleIds = new();
+        private readonly List<int> staleQuickIds = new();
         private NTexture mapTexture;
+        private float quickPointerScale = 1f;
 
         public bool IsOpen => visible;
 
         public void Open()
         {
             EnsureMapImage();
+            quickPointerScale = GlobalVariable.F(global_variablesEnum.quick_message_pointer_scale);
             visible = true;
             touchable = true;
         }
@@ -27,6 +31,7 @@ namespace Ros.UI.Main
             visible = false;
             touchable = false;
             DisposeItems();
+            ClearQuickMessages();
         }
 
         // 点位缓存每帧重排：数量不多，只做增删与换位，不重建已有图标
@@ -54,6 +59,58 @@ namespace Ros.UI.Main
                 staleIds.Remove(point.id);
             }
             foreach (ushort id in staleIds) Remove(id);
+        }
+
+        // 快捷指令点位：整图换算直接落点，整张地图都在视野内，不需要夹边
+        public void RefreshQuickMessages(IReadOnlyList<UI_Minimap.QuickMark> marks)
+        {
+            if (!visible) return;
+            if (marks == null || marks.Count == 0)
+            {
+                ClearQuickMessages();
+                return;
+            }
+            var loader = m_loader;
+            if (loader == null) return;
+
+            staleQuickIds.Clear();
+            foreach (int id in quickPointers.Keys) staleQuickIds.Add(id);
+            float mapSize = GlobalVariable.RangeLength(global_variablesEnum.terrain_size);
+            float ppmX = loader.width / mapSize;
+            float ppmY = loader.height / mapSize;
+            foreach (var mark in marks)
+            {
+                var pointer = EnsureQuickPointer(mark.id);
+                if (pointer == null) continue;
+                pointer.Bind(mark.messageId);
+                pointer.Place(loader.x + mark.world.x * ppmX, loader.y + (mapSize - mark.world.y) * ppmY);
+                staleQuickIds.Remove(mark.id);
+            }
+            foreach (int id in staleQuickIds) RemoveQuickPointer(id);
+        }
+
+        public void ClearQuickMessages()
+        {
+            foreach (var pointer in quickPointers.Values)
+                if (pointer != null) pointer.DestroySelf();
+            quickPointers.Clear();
+        }
+
+        private UI_QuickMessagePointer EnsureQuickPointer(int id)
+        {
+            if (quickPointers.TryGetValue(id, out var pointer) && pointer != null && !pointer.isDisposed) return pointer;
+            pointer = UI_QuickMessagePointer.CreateInstance();
+            pointer.scale = new Vector2(quickPointerScale, quickPointerScale);
+            AddChild(pointer); // 后加的点位压在底图与实体点位之上
+            quickPointers[id] = pointer;
+            return pointer;
+        }
+
+        private void RemoveQuickPointer(int id)
+        {
+            if (!quickPointers.TryGetValue(id, out var pointer)) return;
+            if (pointer != null) pointer.DestroySelf();
+            quickPointers.Remove(id);
         }
 
         // 整图换算：图左下 = 世界 (0,0)、上 = 世界 Z+，loader 就是整张地图的显示区域
