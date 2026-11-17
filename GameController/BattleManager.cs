@@ -1409,7 +1409,7 @@ public partial class BattleManager : EnsBehaviour
             if (info.hasTransform || info.hasHealth || info.hasBuffs)
             {
                 FillDisplayVelocity(entity, info);
-                Tool.NetworkManager.SendEntityDisplay(clientId, info, full);
+                Tool.NetworkManager.SendEntityDisplay(clientId, info);
             }
             // 动画包独立于表现包：表现包被跳过时仍要发，否则本轮末尾清掉 AnimSyncDirty 后这次状态变化就永久丢了
             if (entity.anim != null && (entity.anim.AnimSyncDirty || firstSeen)) SendEntityAnim(clientId, entity);

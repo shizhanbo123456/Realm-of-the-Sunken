@@ -442,11 +442,11 @@ public partial class NetworkManager : EnsBehaviour
     }
     #endregion
 
-    public void SendEntityDisplay(int clientId, SCEntityDisplayInfo info, bool full)
+    public void SendEntityDisplay(int clientId, SCEntityDisplayInfo info)
     {
         if (!TryGetSendTo(clientId, out var to)) return;
-        // 完整快照与含 buff 的包走尽力传输（丢一包下轮脏标记还会补）；纯位姿包走不可靠（丢了等下个快包）
-        var delivery = full || info.hasBuffs ? Delivery.Strive : Delivery.Unreliable;
+        // 含 buff 的包走尽力传输（buffDirty 本轮就清，丢了要等下一次全量心跳）；位姿段与全量心跳走不可靠（丢了等下一包）
+        var delivery = info.hasBuffs ? Delivery.Strive : Delivery.Unreliable;
         CallFuncRpc(ClientReceiveEntityDisplayLocal, to, delivery, info);
     }
 
