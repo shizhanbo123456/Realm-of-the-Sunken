@@ -8,6 +8,8 @@ public class AnimEvent : StateMachineBehaviour
     public virtual EndureType? Endure { get; }
     public virtual EntityAnim.WeaponPos ShowWeapon { get; } = EntityAnim.WeaponPos.Show;
     public virtual bool AllowCombo { get; } = false;
+    [Tooltip("处于该片段时每秒蓄力增量；负值 = 每秒倒扣，默认 -1")]
+    [SerializeField] private float chargeRate = -1f;
     //用于传递给客户端识别动画片段
     public int AnimId { get; private set; } = -1;
 
@@ -42,5 +44,12 @@ public class AnimEvent : StateMachineBehaviour
         data.SetGravityEnabled(UseGravity);
         data.SetInputBlock(blockOp);
         data.SetEndureOverride(Endure);
+    }
+
+    public override void OnStateUpdate(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
+    {
+        base.OnStateUpdate(animator, stateInfo, layerIndex);
+        if (!main || data == null) return; // 客户端表现视图没有 EntityData，不参与蓄力
+        anim.AddCharge(chargeRate * Time.deltaTime);
     }
 }

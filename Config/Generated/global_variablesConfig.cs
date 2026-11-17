@@ -151,5 +151,6 @@ namespace Ros.Config
         hitback_threshold_squared,
         hitback_max_speed,
         quick_message_pointer_scale,
+        charge_max,
     }
 }

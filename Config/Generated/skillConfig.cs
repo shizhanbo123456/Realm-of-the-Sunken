@@ -55,6 +55,8 @@ namespace Ros.Config
                     row.autoTarget = has15 == 1 ? (bool?)(r.ReadByte() != 0) : null;
                     byte has16 = r.ReadByte();
                     row.broadcast = has16 == 1 ? (bool?)(r.ReadByte() != 0) : null;
+                    byte has17 = r.ReadByte();
+                    row.chargeEnabled = has17 == 1 ? (bool?)(r.ReadByte() != 0) : null;
                     skillData.Add(row.key, row);
                 }
             }
@@ -80,5 +82,6 @@ namespace Ros.Config
         public bool? breakEndure;  // 破霸体：空 / 0 = 不破
         public bool? autoTarget;  // 自动索敌：空 = 否
         public bool? broadcast;  // 使用时播报：空 = 不播报
+        public bool? chargeEnabled;  // 启用蓄力：空 = 否；启用时击退 = 击退力度 × (蓄力值 + 1)
     }
 }

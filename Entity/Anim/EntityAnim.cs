@@ -101,6 +101,8 @@ public class EntityAnim : MonoBehaviour
 
         // 参数包复位：重复 Init（如视图重建）时清掉上一轮残留的持久参数
         paramPack = AnimParamPack.Default;
+        chargeValue = 0f;
+        lastCharge = 0f;
         ApplyBaseAnimSpeed(type); // 基础播放倍率取自配表，服务器与客户端都读同一行
 
         animData = GetComponent<EntityAnimData>();
@@ -439,6 +441,28 @@ public class EntityAnim : MonoBehaviour
         float target = paused ? 0f : PlaybackScale;
         foreach (var animator in animators)
             animator.speed = target;
+    }
+    #endregion
+
+    #region//蓄力
+    // 蓄力值：AnimEvent 按片段速率逐帧累加，攻击结算时记录并清零
+    private float chargeValue;
+    private float lastCharge;
+
+    public float LastCharge => lastCharge;
+
+    public void AddCharge(float delta)
+    {
+        if (Mathf.Approximately(delta, 0f)) return;
+        chargeValue = Mathf.Clamp(chargeValue + delta, 0f, GlobalVariable.F(global_variablesEnum.charge_max));
+    }
+
+    // 攻击结算入口调用：先记录本次蓄力值，再立即清零（不论技能是否启用蓄力）
+    public float TakeCharge()
+    {
+        lastCharge = chargeValue;
+        chargeValue = 0f;
+        return lastCharge;
     }
     #endregion
 

@@ -50,11 +50,18 @@ namespace Ros.Skill
             if (AutoTarget) FaceNearestEnemy(entity); // 转向必须在算落点之前：不索敌的技能靠朝向决定弹道
             if (!HasCastAnim || entity.anim == null)
             {
-                OnCast(entity);
+                Cast(entity);
                 return;
             }
-            entity.anim.onAttack = _ => OnCast(entity); // 不置空回调：多段攻击帧逐次结算技能
+            entity.anim.onAttack = _ => Cast(entity); // 不置空回调：多段攻击帧逐次结算技能
             entity.anim.DoAttack(CastAnim);
+        }
+
+        // 每次攻击结算前先记录蓄力值并立即清零：是否乘算只看技能表「启用蓄力」
+        private void Cast(EntityData entity)
+        {
+            entity.anim?.TakeCharge();
+            OnCast(entity);
         }
 
         // 自动索敌：转向射程内最近的敌人（不限方向），转向后落点照常按新朝向算；范围内没敌人就保持原朝向
@@ -146,8 +153,18 @@ namespace Ros.Skill
             Action<EntityData> onHit = null, float? knockback = null)
         {
             var config = SkillConfig.Get(Id);
+            float power = knockback ?? config.knockback ?? 0f;
+            if (config.chargeEnabled == true) power *= ChargeScale(entity);
             return AttackData.Create(entity, config.breakEndure ?? false,
-                addEffectEvent: addEffect, onHit: onHit, knockbackPower: knockback ?? config.knockback ?? 0f);
+                addEffectEvent: addEffect, onHit: onHit, knockbackPower: power);
+        }
+
+        // 蓄力倍率 = 本次攻击记录到的蓄力值 + 1，记录点在 Cast 入口
+        private float ChargeScale(EntityData entity)
+        {
+            if (entity.anim == null)
+                throw new FormatException($"[配表] skill.csv 技能 {Id} 启用了蓄力，但施法者没有 EntityAnim，蓄力值取不到");
+            return entity.anim.LastCharge + 1f;
         }
 
         // 技能附带的 Buff 全部读 skill.csv，按 index 取用；越界属配表错配，直接抛
