@@ -38,9 +38,8 @@ public class ClientSkillManager : ClientSubManager
     private float meleeRequestTime;
     private float meleeWindowEnd;   // 命中判定窗的结束时刻，0 = 未开窗
     private float meleeScale = 1f;
-    private bool meleeSampled;
-    private Vector3 meleeLastPos;
-    private Quaternion meleeLastRot = Quaternion.identity;
+    private float meleeInterval;    // 每目标再命中间隔（skill 表第 10 列），与服务器 Bullet 同口径
+    private readonly Dictionary<ushort, float> meleeHitTime = new(); // 本窗内每目标上次命中时刻
     private Transform meleeWeapon;
     private BulletVfxInfo meleeHits;
     #endregion
@@ -63,7 +62,7 @@ public class ClientSkillManager : ClientSubManager
         meleeAnim = null;
         meleeSkillId = -1;
         meleeWindowEnd = 0f;
-        meleeSampled = false;
+        meleeHitTime.Clear();
     }
     #endregion
 
@@ -245,9 +244,11 @@ public class ClientSkillManager : ClientSubManager
     // 开命中判定窗：窗长与服务器那颗隐形子弹同源，一次请求只开一层
     private void OpenMeleeWindow(int skillId)
     {
-        meleeScale = ResolveHitScale(skillId);
+        var config = SkillConfig.Get(skillId);
+        meleeScale = config.bulletSizes.Count > 0 ? config.bulletSizes[0] : 1f;
+        meleeInterval = config.damageInterval ?? 100f; // 与 SkillBase.DamageInterval 同口径
+        meleeHitTime.Clear();
         meleeWindowEnd = Time.time + GlobalVariable.F(global_variablesEnum.melee_bullet_life);
-        meleeSampled = false;
         meleeSkillId = -1;
     }
     #endregion
@@ -292,13 +293,6 @@ public class ClientSkillManager : ClientSubManager
         meleeRequestTime = Time.time;
     }
 
-    // 与服务器 SkillBase.VfxScale(0) 同口径：skill 表第 9 列第 0 项，没配 = 原大小
-    private static float ResolveHitScale(int skillId)
-    {
-        var sizes = SkillConfig.Get(skillId).bulletSizes;
-        return sizes.Count > 0 ? sizes[0] : 1f;
-    }
-
     // 命中球取手上武器实例的 BulletVfxInfo（与服务器同一预制体）；VfxHitSource 走 AssetsManager，客户端拿不到
     private BulletVfxInfo ResolveWeaponHits()
     {
@@ -310,73 +304,55 @@ public class ClientSkillManager : ClientSubManager
         return meleeHits;
     }
 
-    // 按服务器的采样口径逐帧取武器位姿做扫掠，纯表现触发，不结算任何伤害
+    // 与服务器同口径：每帧取武器位姿做点判定（近战轨迹 Lerp 忽略时间因子，服务器 from 与 to 本是同一点），
+    // 每个目标按 skill 表第 10 列的间隔各自计一次命中
     private void SampleMeleeHit(EntityPlayerManager.ClientEntityView view)
     {
         if (!BulletTrajectory.TryGetWeaponPose(view.id, out var pos, out var rot, out bool inHand) || !inHand) return;
         var hits = ResolveWeaponHits();
         if (hits == null || hits.hits.Count == 0) return;
 
-        if (!meleeSampled)
-        {
-            meleeSampled = true;
-            meleeLastPos = pos;
-            meleeLastRot = rot;
-            return;
-        }
-
-        bool hit = false;
         for (int i = 0; i < hits.hits.Count; i++)
         {
             var h = hits.hits[i];
-            Vector3 offset = h.center * meleeScale;
-            Vector3 from = meleeLastPos + meleeLastRot * offset;
-            Vector3 to = pos + rot * offset;
-            if (OverlapHostile(from, to, h.radius * meleeScale, view.id, view.type.category))
+            Vector3 sphereCenter = pos + rot * (h.center * meleeScale);
+            float radius = h.radius * meleeScale;
+            foreach (var target in logic.EntityPlayers.AllViews)
             {
-                hit = true;
-                break;
+                if (target == null || target.id == view.id || target.capsule == null) continue;
+                if (!EntityCampUtil.IsHostile(view.type.category, target.camp)) continue;
+                if (!ReachTarget(sphereCenter, radius, target)) continue;
+                if (!AllowHit(target.id)) continue;
+                meleeHitTime[target.id] = Time.time;
+                TriggerMeleeHit();
             }
         }
-
-        meleeLastPos = pos;
-        meleeLastRot = rot;
-        if (hit) TriggerMeleeHit();
     }
 
-    // 与服务器的 EntityPhysics.OverlapCapsuleXZ 同口径：纯 XZ 的点到线段距离 < 判定球半径 + 目标胶囊半径
-    private bool OverlapHostile(Vector3 from, Vector3 to, float radius, ushort ownId, EntityCategory ownCategory)
+    // 与服务器 EntityPhysics.OverlapCapsuleXZ 同口径：纯 XZ 圆心距离 < 判定球半径 + 目标胶囊半径（不判高度）
+    private static bool ReachTarget(Vector3 sphereCenter, float sphereRadius, EntityPlayerManager.ClientEntityView target)
     {
-        foreach (var view in logic.EntityPlayers.AllViews)
-        {
-            if (view == null || view.id == ownId || view.capsule == null) continue;
-            if (!EntityCampUtil.IsHostile(ownCategory, view.camp)) continue;
-
-            Transform shape = view.capsule.transform;
-            Vector3 scale = shape.lossyScale;
-            float targetRadius = view.capsule.radius * Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z));
-            Vector3 center = shape.TransformPoint(view.capsule.center);
-            float sum = radius + targetRadius;
-            if (SqrDistPointSegmentXZ(center, from, to) > sum * sum) continue;
-            return true;
-        }
-        return false;
+        Transform shape = target.capsule.transform;
+        Vector3 scale = shape.lossyScale;
+        float targetRadius = target.capsule.radius * Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z));
+        Vector3 center = shape.TransformPoint(target.capsule.center);
+        float dx = center.x - sphereCenter.x;
+        float dz = center.z - sphereCenter.z;
+        float sum = sphereRadius + targetRadius;
+        return dx * dx + dz * dz <= sum * sum;
     }
 
-    private static float SqrDistPointSegmentXZ(Vector3 p, Vector3 a, Vector3 b)
+    // 与服务器 Bullet.lastHitTime 同口径：间隔 <= 0 时一目标一刀一次，> 0 时按间隔重复
+    private bool AllowHit(ushort targetId)
     {
-        float ax = p.x - a.x, az = p.z - a.z;
-        float bx = b.x - a.x, bz = b.z - a.z;
-        float lenSqr = bx * bx + bz * bz;
-        float t = lenSqr > 1e-8f ? Mathf.Clamp01((ax * bx + az * bz) / lenSqr) : 0f;
-        float dx = ax - bx * t, dz = az - bz * t;
-        return dx * dx + dz * dz;
+        if (!meleeHitTime.TryGetValue(targetId, out float last)) return true;
+        if (meleeInterval <= 0f) return false;
+        return Time.time - last >= meleeInterval;
     }
 
-    // 一次挥砍只触发一次（多目标、多段扫过都不叠加）
+    // 每次命中都震：同一次挥砍里多目标、按间隔的重复命中都各算一次
     private void TriggerMeleeHit()
     {
-        meleeWindowEnd = 0f;
         if (Tool.CameraController != null)
             Tool.CameraController.AddTrauma(GlobalVariable.F(global_variablesEnum.camera_shake_hit_normal));
     }
