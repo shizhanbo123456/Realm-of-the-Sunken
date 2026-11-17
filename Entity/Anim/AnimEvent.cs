@@ -35,9 +35,9 @@ public class AnimEvent : StateMachineBehaviour
         if (!main) return;
         anim.SetWeaponPos(ShowWeapon); // 武器显示只跟动画状态走：客户端与首页角色（无 EntityData）同样要切
         anim.SetAllowCombo(AllowCombo); // 连招窗口同样只跟动画状态走
-        if (data == null) return;
         AnimId = stateInfo.fullPathHash;
-        anim.NotifyStateEnter(AnimId, State);
+        anim.NotifyStateEnter(AnimId, State); // 客户端同样要推进当前状态：播放倍率按阶段合成，两端同一套公式
+        if (data == null) return;
 
         data.SetGravityEnabled(UseGravity);
         data.SetInputBlock(blockOp);

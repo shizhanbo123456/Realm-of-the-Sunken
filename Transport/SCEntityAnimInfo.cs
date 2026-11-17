@@ -10,7 +10,7 @@ namespace Ros.Transport
         public int animId;
         public float animFrame;
         public AnimParamPack animParams;
-        public float animSpeedScale = 1f; // 动画播放倍率（服务器算好的最终值，客户端直接镜像）
+        public float moveSpeedScale = 1f;
         public bool paused;
     }
 
@@ -26,7 +26,7 @@ namespace Ros.Transport
                 if (!IntSerializer.Serialize(value.animId, result, ref indexStart)) return false;
                 if (!FloatSerializer.Serialize(value.animFrame, result, ref indexStart)) return false;
                 if (!AnimParamPackSerializer.Serialize(value.animParams, result, ref indexStart)) return false;
-                if (!FloatSerializer.Serialize(value.animSpeedScale, result, ref indexStart)) return false;
+                if (!FloatSerializer.Serialize(value.moveSpeedScale, result, ref indexStart)) return false;
                 if (!BoolSerializer.Serialize(value.paused, result, ref indexStart)) return false;
                 return true;
             }
@@ -34,7 +34,7 @@ namespace Ros.Transport
             {
                 if (result.Length - indexStart < (value == null ? 1 : 11)) return false;
 
-                // 位级：1+15+32+10+2+6+3+13+1+1=84 位
+                // 位级：1+15+32+10+2+6+3+12+1+1=83 位
                 BitField.SetBuffer(result, indexStart);
                 BitField.WriteBool(value != null);
                 if (value != null)
@@ -48,7 +48,7 @@ namespace Ros.Transport
                     BitField.WriteBool(value.animParams.moving);
                     BitField.WriteBool(value.animParams.slide);
                     BitField.WriteInt(value.animParams.hit, 0, 1);                 // 0 短受击 / 1 长受击
-                    BitField.WriteFloat(value.animSpeedScale, 0f, SyncRanges.AnimSpeedScaleMax, 0.01f);
+                    BitField.WriteFloat(value.moveSpeedScale, 0f, SyncRanges.MoveSpeedScaleMax, 0.01f);
                     BitField.WriteBool(value.paused);
                 }
                 indexStart += BitField.Flush();
@@ -67,7 +67,7 @@ namespace Ros.Transport
                     animId = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
                     animFrame = FloatSerializer.Deserialize(data, ref indexStart, invalidIndex),
                     animParams = AnimParamPackSerializer.Deserialize(data, ref indexStart, invalidIndex),
-                    animSpeedScale = FloatSerializer.Deserialize(data, ref indexStart, invalidIndex),
+                    moveSpeedScale = FloatSerializer.Deserialize(data, ref indexStart, invalidIndex),
                     paused = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
                 };
                 return info;
@@ -89,7 +89,7 @@ namespace Ros.Transport
                 r.animId = BitField.ReadInt(int.MinValue, int.MaxValue);
                 r.animFrame = BitField.ReadFloat(0f, 1f, 0.001f);
                 r.animParams = new AnimParamPack() { characterType = BitField.ReadInt(0, 3), attackId = BitField.ReadInt(0, 63), inAir = BitField.ReadBool(), moving = BitField.ReadBool(), slide = BitField.ReadBool(), hit = BitField.ReadInt(0, 1) };
-                r.animSpeedScale = BitField.ReadFloat(0f, SyncRanges.AnimSpeedScaleMax, 0.01f);
+                r.moveSpeedScale = BitField.ReadFloat(0f, SyncRanges.MoveSpeedScaleMax, 0.01f);
                 r.paused = BitField.ReadBool();
                 indexStart += 11;
                 return r;

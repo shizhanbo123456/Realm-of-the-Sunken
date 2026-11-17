@@ -287,7 +287,7 @@ public class HomePreviewManager : ClientSubManager
             Debug.LogError($"[展示] 角色模型缺少 EntityAnim，动画未初始化：{type}");
             return go;
         }
-        anim.Init(null);
+        anim.Init(null, type);
         if (weaponId < 0)
         {
             Debug.LogError($"[展示] {type} 没有配武器编号：动作集与武器显示类型都取自 weapon.csv");

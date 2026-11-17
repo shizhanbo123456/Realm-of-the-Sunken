@@ -7,6 +7,8 @@ public class TestEntityData : EntityData
 
     [Tooltip("动作集类型")]
     [SerializeField] private EntityAnim.CharcterAnimType testAnimType;
+    [Tooltip("实体类型：只用于取配表的基础移动/攻击动画倍率")]
+    [SerializeField] private EntityType testEntityType;
     [Tooltip("武器编号（-1 = 无武器）")]
     [SerializeField] private int testWeaponId = -1;
     [Tooltip("武器显示类型")]
@@ -25,7 +27,7 @@ public class TestEntityData : EntityData
         anim = GetComponentInChildren<EntityAnim>();
 
         // SetType 必须在 Init 之后：EntityAnim 的 animators 列表在 Init 里才收集
-        if (anim != null) anim.Init(this);
+        if (anim != null) anim.Init(this, testEntityType);
         if (anim != null)
         {
             anim.SetType(testAnimType);

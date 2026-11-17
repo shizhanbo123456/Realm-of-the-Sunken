@@ -95,12 +95,13 @@ public class EntityAnim : MonoBehaviour
     public Animator MainAnimator => mainAnimator;
 
 
-    public void Init(EntityData data)
+    public void Init(EntityData data, EntityType type)
     {
         this.data = data;
 
         // 参数包复位：重复 Init（如视图重建）时清掉上一轮残留的持久参数
         paramPack = AnimParamPack.Default;
+        ApplyBaseAnimSpeed(type); // 基础播放倍率取自配表，服务器与客户端都读同一行
 
         animData = GetComponent<EntityAnimData>();
         if (animData == null) Debug.LogError($"{gameObject.name}未挂载animData");
@@ -138,7 +139,7 @@ public class EntityAnim : MonoBehaviour
         }
         // 把复位后的参数推给状态机：保证"paramPack 与 Animator 参数一致"这个前提（值比较的脏标记依赖它）
         PushParamsToAnimators();
-        ApplyPlaybackSpeed(); // 阶段倍率可能先于 Init 写入（配表基础倍率），这里落到动画机上
+        ApplyPlaybackSpeed(); // 基础倍率已就位，落到动画机上
     }
 
     private void PushParamsToAnimators()
@@ -162,7 +163,7 @@ public class EntityAnim : MonoBehaviour
     {
         currentAnimId = animId;
         CurrentState = state;
-        RefreshPlaybackScale(); // 换阶段 = 换基础倍率（移动/攻击各一套）
+        ApplyPlaybackSpeed(); // 换阶段 = 换基础倍率（移动/攻击各一套）
         MarkAnimSyncDirty(); // 状态变化 = 动画事件的唯一触发源（trigger 不参与同步）
     }
 
@@ -368,7 +369,7 @@ public class EntityAnim : MonoBehaviour
 
     #region//设置速度
     // 声明速度与动画播放同源：两者乘同一个播放倍率，位移与动画节奏不会走散
-    private float PlaybackSpeed => paused ? 0f : playbackScale;
+    private float PlaybackSpeed => paused ? 0f : PlaybackScale;
     public void SetVelocityForward(float speed)
     {
         if (data == null) return;
@@ -390,20 +391,11 @@ public class EntityAnim : MonoBehaviour
     private float baseMoveSpeed = DefaultBaseSpeed;   // entity 表「基础移动动画速度」
     private float baseAttackSpeed = DefaultBaseSpeed; // entity 表「基础攻击动画速度」
     private float buffMoveScale = 1f;  // Buff 移速倍率：只作用于移动阶段
-    private float playbackScale = DefaultBaseSpeed;
     private bool paused = false;
 
-    // 下发给客户端的播放倍率（不含暂停，暂停另有字段）
-    public float PlaybackScale => playbackScale;
+    // 下发给客户端的就是 Buff 移速倍率（阶段基础倍率两端各自按配表算，不占协议字段）
+    public float MoveSpeedScale => buffMoveScale;
     public bool Paused => paused;
-
-    // 配表基础倍率：两列都留空就是 1 倍
-    public void SetBaseAnimSpeed(entity config)
-    {
-        baseMoveSpeed = config.animMovementSpeed ?? DefaultBaseSpeed;
-        baseAttackSpeed = config.animAttackSpeed ?? DefaultBaseSpeed;
-        RefreshPlaybackScale();
-    }
 
     public void SetPaused(bool paused)
     {
@@ -418,15 +410,16 @@ public class EntityAnim : MonoBehaviour
     {
         if (Mathf.Approximately(buffMoveScale, scale)) return;
         buffMoveScale = scale;
-        if (!RefreshPlaybackScale()) return; // 非移动阶段：最终倍率没变，不必多发一条同步
+        ApplyPlaybackSpeed();
         MarkAnimSyncDirty();
     }
 
-    // 客户端镜像服务器算好的倍率：客户端没有阶段信息，不自行换算
-    public void ApplyPlaybackScale(float scale)
+    // 配表基础倍率：Init 时按实体类型读，两列留空就是 1 倍
+    private void ApplyBaseAnimSpeed(EntityType type)
     {
-        playbackScale = scale;
-        ApplyPlaybackSpeed();
+        entity config = EntityConfig.GetByCategory(type);
+        baseMoveSpeed = config.animMovementSpeed ?? DefaultBaseSpeed;
+        baseAttackSpeed = config.animAttackSpeed ?? DefaultBaseSpeed;
     }
 
     // 阶段基础倍率：移动/攻击各取配表列，起身与受击不缩放
@@ -437,20 +430,13 @@ public class EntityAnim : MonoBehaviour
         _ => DefaultBaseSpeed,
     };
 
-    // 返回最终倍率是否真的变化
-    private bool RefreshPlaybackScale()
-    {
-        float target = PhaseBaseSpeed * (currentState == AnimState.Motion ? buffMoveScale : 1f);
-        if (Mathf.Approximately(playbackScale, target)) return false;
-        playbackScale = target;
-        ApplyPlaybackSpeed();
-        return true;
-    }
+    // 两端同一套公式：换阶段（NotifyStateEnter）时重算
+    private float PlaybackScale => PhaseBaseSpeed * (currentState == AnimState.Motion ? buffMoveScale : 1f);
 
     private void ApplyPlaybackSpeed()
     {
         if (animators == null || animators.Count == 0) return;
-        float target = PlaybackSpeed;
+        float target = paused ? 0f : PlaybackScale;
         foreach (var animator in animators)
             animator.speed = target;
     }

@@ -268,7 +268,7 @@ public class EntityPlayerManager : ClientSubManager
     private void ApplyAnim(ClientEntityView view, SCEntityAnimInfo info)
     {
         if (view.anim != null) view.anim.ApplyParamPack(info.animParams);
-        if (view.anim != null) view.anim.ApplyPlaybackScale(info.animSpeedScale);
+        if (view.anim != null) view.anim.SetMoveSpeedScale(info.moveSpeedScale);
         if (view.anim != null) view.anim.SetPaused(info.paused); // 强控期间置 0：与服务器一致地冻结动画
 
         // -1 = "未进入任何状态"哨兵；fullPathHash 是路径哈希、可能为负，不能用 > 0 判有效
@@ -363,7 +363,7 @@ public class EntityPlayerManager : ClientSubManager
             // 客户端动画：与服务器同一 Controller 资产；无 EntityData，攻击帧回调不传（伤害只由服务器算）
             if (view.anim != null)
             {
-                view.anim.Init(null);
+                view.anim.Init(null, info.type);
                 // 武器编号取实体配表、显示类型取武器表；显示位置之后完全由动画状态驱动
                 int weaponId = EntityConfig.GetByCategory(info.type).weaponId ?? -1;
                 if (weaponId >= 0) view.anim.SetWeapon(weaponId, WeaponConfig.Get(weaponId).weaponDisplay);

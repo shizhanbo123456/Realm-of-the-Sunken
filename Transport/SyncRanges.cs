@@ -18,7 +18,7 @@ public static class SyncRanges
     public static float YawSpeedStep => GlobalVariable.F(global_variablesEnum.sync_precision_entity_turn_rate);
 
     public static float MinimapPositionStep => GlobalVariable.F(global_variablesEnum.sync_precision_minimap_xz);
-    public static float AnimSpeedScaleMax => 64f;   // 基础倍率 1.5 × GM 极速 10 × 死灵漫步 2.2 的余量，配表无对应项
+    public static float MoveSpeedScaleMax => 32f;   // GM 极速 10 × 死灵漫步 2.2 × 加速 1.2 的余量，配表无对应项
 
     public static int MaxHealth => GlobalVariable.I(global_variablesEnum.max_entity_health);
     public static int MaxBuffCount => GlobalVariable.I(global_variablesEnum.sync_max_buff_count);
