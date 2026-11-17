@@ -44,7 +44,6 @@ public class ClientSkillManager : ClientSubManager
     private Quaternion meleeLastRot = Quaternion.identity;
     private Transform meleeWeapon;
     private BulletVfxInfo meleeHits;
-    private int meleeLastAnimId = int.MinValue;
     #endregion
 
     #region 生命周期
@@ -184,13 +183,6 @@ public class ClientSkillManager : ClientSubManager
         {
             meleeAnim = view.anim;
             meleeAnim.onAttack = OnOwnAttackFrame;
-        }
-
-        meleeAnim.GetDisplayAnim(out int animIdNow, out _);
-        if (animIdNow != meleeLastAnimId)
-        {
-            meleeLastAnimId = animIdNow;
-            Debug.Log($"[时序] 本地动画切换 hash={animIdNow} t={Time.time:F3}"); // 【临时诊断】
         }
 
         if (meleeWindowEnd <= 0f) return;
@@ -343,7 +335,7 @@ public class ClientSkillManager : ClientSubManager
                 if (!ReachTarget(from, to, radius, target)) continue;
                 if (!AllowHit(target.id)) continue;
                 meleeHitTime[target.id] = Time.time;
-                TriggerMeleeHit();
+                TriggerMeleeHit(target.id);
             }
         }
 
@@ -385,8 +377,9 @@ public class ClientSkillManager : ClientSubManager
     }
 
     // 每次命中都震：同一次挥砍里多目标、按间隔的重复命中都各算一次
-    private void TriggerMeleeHit()
+    private void TriggerMeleeHit(ushort targetId)
     {
+        Debug.Log($"[时序] 本地命中 t={Time.time:F3} target={targetId}"); // 【临时诊断】
         if (Tool.CameraController != null)
             Tool.CameraController.AddTrauma(GlobalVariable.F(global_variablesEnum.camera_shake_hit_normal));
     }
