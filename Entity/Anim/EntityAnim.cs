@@ -1,3 +1,4 @@
+using Ros.Config;
 using Ros.Transport;
 using System;
 using System.Collections;
@@ -137,6 +138,7 @@ public class EntityAnim : MonoBehaviour
         }
         // 把复位后的参数推给状态机：保证"paramPack 与 Animator 参数一致"这个前提（值比较的脏标记依赖它）
         PushParamsToAnimators();
+        ApplyPlaybackSpeed(); // 阶段倍率可能先于 Init 写入（配表基础倍率），这里落到动画机上
     }
 
     private void PushParamsToAnimators()
@@ -160,6 +162,7 @@ public class EntityAnim : MonoBehaviour
     {
         currentAnimId = animId;
         CurrentState = state;
+        RefreshPlaybackScale(); // 换阶段 = 换基础倍率（移动/攻击各一套）
         MarkAnimSyncDirty(); // 状态变化 = 动画事件的唯一触发源（trigger 不参与同步）
     }
 
@@ -364,7 +367,8 @@ public class EntityAnim : MonoBehaviour
     #endregion
 
     #region//设置速度
-    private float PlaybackSpeed => paused ? 0f : speed;
+    // 声明速度与动画播放同源：两者乘同一个播放倍率，位移与动画节奏不会走散
+    private float PlaybackSpeed => paused ? 0f : playbackScale;
     public void SetVelocityForward(float speed)
     {
         if (data == null) return;
@@ -382,30 +386,71 @@ public class EntityAnim : MonoBehaviour
     }
     #endregion
     #region//速度控制
-    private float speed=1;
-    private bool paused=false;
+    private const float DefaultBaseSpeed = 1f; // 配表该列留空 = 不缩放
+    private float baseMoveSpeed = DefaultBaseSpeed;   // entity 表「基础移动动画速度」
+    private float baseAttackSpeed = DefaultBaseSpeed; // entity 表「基础攻击动画速度」
+    private float buffMoveScale = 1f;  // Buff 移速倍率：只作用于移动阶段
+    private float playbackScale = DefaultBaseSpeed;
+    private bool paused = false;
 
-    public float MoveSpeedScale => speed;
+    // 下发给客户端的播放倍率（不含暂停，暂停另有字段）
+    public float PlaybackScale => playbackScale;
     public bool Paused => paused;
+
+    // 配表基础倍率：两列都留空就是 1 倍
+    public void SetBaseAnimSpeed(entity config)
+    {
+        baseMoveSpeed = config.animMovementSpeed ?? DefaultBaseSpeed;
+        baseAttackSpeed = config.animAttackSpeed ?? DefaultBaseSpeed;
+        RefreshPlaybackScale();
+    }
 
     public void SetPaused(bool paused)
     {
         if (this.paused == paused) return;
         this.paused = paused;
-        UpdateSpeed();
+        ApplyPlaybackSpeed();
         MarkAnimSyncDirty(); // 播放速度变化也要同步（否则被强控时客户端动画照播）
     }
 
+    // Buff 移速倍率：只改移动阶段，攻击/受击/起身不受影响
     public void SetMoveSpeedScale(float scale)
     {
-        if (Mathf.Approximately(speed, scale)) return;
-        speed = scale;
-        UpdateSpeed();
+        if (Mathf.Approximately(buffMoveScale, scale)) return;
+        buffMoveScale = scale;
+        if (!RefreshPlaybackScale()) return; // 非移动阶段：最终倍率没变，不必多发一条同步
         MarkAnimSyncDirty();
     }
-    private void UpdateSpeed()
+
+    // 客户端镜像服务器算好的倍率：客户端没有阶段信息，不自行换算
+    public void ApplyPlaybackScale(float scale)
     {
-        float target = PlaybackSpeed; // 与声明速度用的同一份"动画播放速度"，两处不会走散
+        playbackScale = scale;
+        ApplyPlaybackSpeed();
+    }
+
+    // 阶段基础倍率：移动/攻击各取配表列，起身与受击不缩放
+    private float PhaseBaseSpeed => currentState switch
+    {
+        AnimState.Motion => baseMoveSpeed,
+        AnimState.Attack => baseAttackSpeed,
+        _ => DefaultBaseSpeed,
+    };
+
+    // 返回最终倍率是否真的变化
+    private bool RefreshPlaybackScale()
+    {
+        float target = PhaseBaseSpeed * (currentState == AnimState.Motion ? buffMoveScale : 1f);
+        if (Mathf.Approximately(playbackScale, target)) return false;
+        playbackScale = target;
+        ApplyPlaybackSpeed();
+        return true;
+    }
+
+    private void ApplyPlaybackSpeed()
+    {
+        if (animators == null || animators.Count == 0) return;
+        float target = PlaybackSpeed;
         foreach (var animator in animators)
             animator.speed = target;
     }

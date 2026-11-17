@@ -1426,7 +1426,7 @@ public partial class BattleManager : EnsBehaviour
             animId = animId,
             animFrame = frame,
             animParams = entity.anim.GetParamPack(),
-            moveSpeedScale = entity.anim.MoveSpeedScale,
+            animSpeedScale = entity.anim.PlaybackScale,
             paused = entity.anim.Paused,
         });
     }

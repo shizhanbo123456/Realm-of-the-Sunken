@@ -268,7 +268,7 @@ public class EntityPlayerManager : ClientSubManager
     private void ApplyAnim(ClientEntityView view, SCEntityAnimInfo info)
     {
         if (view.anim != null) view.anim.ApplyParamPack(info.animParams);
-        if (view.anim != null) view.anim.SetMoveSpeedScale(info.moveSpeedScale);
+        if (view.anim != null) view.anim.ApplyPlaybackScale(info.animSpeedScale);
         if (view.anim != null) view.anim.SetPaused(info.paused); // 强控期间置 0：与服务器一致地冻结动画
 
         // -1 = "未进入任何状态"哨兵；fullPathHash 是路径哈希、可能为负，不能用 > 0 判有效

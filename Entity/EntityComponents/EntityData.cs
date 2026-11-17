@@ -126,9 +126,10 @@ public abstract class EntityData : MonoBehaviour
         this.level = Mathf.Min(level, GlobalVariable.I(global_variablesEnum.battle_max_level)); // 战斗期等级上限
         this.camp = camp;
         attributes = new RuntimeEntityAttributes(this, type);
+        entity config = default; // 动画基础播放倍率在下面 Init 之后才用得到，故先留到外面
         if (Tool.InfoManager != null)
         {
-            var config = Tool.InfoManager.GetEntityConfig(type);
+            config = Tool.InfoManager.GetEntityConfig(type);
             defaultEndure = config.endureLevel == true ? EndureType.Super : EndureType.None; // entity.csv「霸体等级」列：霸体下限
             weaponId = config.weaponId ?? -1;         // entity.csv「武器编号」列：实体固定武器
             hitProtectionRate = config.hitProtection;  // entity.csv「击打保护分积累速率」列：0 = 无击打保护
@@ -148,6 +149,7 @@ public abstract class EntityData : MonoBehaviour
         if (anim != null) anim.Init(this);
         if (anim != null)
         {
+            anim.SetBaseAnimSpeed(config); // entity.csv「基础移动/攻击动画速度」列：留空按 1 倍
             if (weaponId < 0)
                 Debug.LogError($"{name}（{type}）有动画却没有配武器编号：动作集与武器显示类型都取自 weapon.csv");
             else

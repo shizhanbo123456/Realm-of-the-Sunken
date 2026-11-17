@@ -49,6 +49,10 @@ namespace Ros.Config
                     row.dropToCamp = r.ReadByte() != 0;
                     row.passiveSkillDes = ConfigBinary.ReadString(r);
                     row.hitProtection = r.ReadInt32();
+                    byte has18 = r.ReadByte();
+                    row.animMovementSpeed = has18 == 1 ? (float?)(r.ReadSingle()) : null;
+                    byte has19 = r.ReadByte();
+                    row.animAttackSpeed = has19 == 1 ? (float?)(r.ReadSingle()) : null;
                     entityData.Add(row.key, row);
                 }
             }
@@ -75,5 +79,7 @@ namespace Ros.Config
         public bool dropToCamp;  // 被击败时的掉落物生效范围：单人；1：击杀方阵营
         public string passiveSkillDes;  // 被动描述：仅仅玩家角色有
         public int hitProtection;  // 击打保护分积累速率：受到多少比例的伤害进入保护
+        public float? animMovementSpeed;  // 基础移动动画速度：人形实体基础移动倍率
+        public float? animAttackSpeed;  // 基础攻击动画速度：人形实体基础攻击动画倍率
     }
 }
