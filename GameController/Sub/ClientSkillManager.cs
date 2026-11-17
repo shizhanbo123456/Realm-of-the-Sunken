@@ -334,7 +334,7 @@ public class ClientSkillManager : ClientSubManager
             float radius = h.radius * meleeScale;
             foreach (var target in logic.EntityPlayers.AllViews)
             {
-                if (target == null || target.id == view.id || target.capsule == null) continue;
+                if (target == null || target.id == view.id || target.modelInfo == null) continue;
                 if (!EntityCampUtil.IsHostile(view.type.category, target.camp)) continue;
                 if (!ReachTarget(from, to, radius, target)) continue;
                 if (!AllowHit(target.id)) continue;
@@ -347,13 +347,17 @@ public class ClientSkillManager : ClientSubManager
         meleeLastRot = rot;
     }
 
-    // 与服务器 EntityPhysics.OverlapCapsuleXZ 同口径：纯 XZ 的点到线段距离 < 判定球半径 + 目标胶囊半径（不判高度）
+    // 目标平面足迹直接从 EntityModelInfo 算，不依赖碰撞体：客户端只有带动画的视图才建胶囊，
+    // 雕像/珊瑚/水晶这类没有 Animator 的实体会漏判。口径与 EntityModelInfo.BuildCapsuleCollider + EntityData.HitRadiusXZ 一致
     private static bool ReachTarget(Vector3 from, Vector3 to, float sphereRadius, EntityPlayerManager.ClientEntityView target)
     {
-        Transform shape = target.capsule.transform;
-        Vector3 scale = shape.lossyScale;
-        float targetRadius = target.capsule.radius * Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z));
-        Vector3 center = shape.TransformPoint(target.capsule.center);
+        EntityModelInfo model = target.modelInfo;
+        Vector3 scale = model.transform.lossyScale;
+        float targetRadius = GlobalConfig.entity_capsule_radius * Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z));
+        Vector3 center = model.transform.TransformPoint(new Vector3(
+            (model.xRange.x + model.xRange.y) * 0.5f,
+            (model.yRange.x + model.yRange.y) * 0.5f,
+            (model.zRange.x + model.zRange.y) * 0.5f));
         float sum = sphereRadius + targetRadius;
         return SqrDistPointSegmentXZ(center, from, to) <= sum * sum;
     }

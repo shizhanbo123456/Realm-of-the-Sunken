@@ -31,7 +31,6 @@ public class EntityPlayerManager : ClientSubManager
         public int pendingPlayTick;
 
         public EntityModelInfo modelInfo; // 烘焙包围盒（CreateView 时缓存，发射点/头顶锚点共用）
-        public CapsuleCollider capsule;   // 判定胶囊（客户端近战命中预测按它算目标半径与圆心）
         public Transform cameraAnchor;    // 相机注视点 = EntityAnchor.Camera；旋转取实体根，供相机偏航同步
 
         public readonly Dictionary<int, GameObject> buffVfx = new();
@@ -372,7 +371,7 @@ public class EntityPlayerManager : ClientSubManager
             }
 
             // 客户端表现刚体：dynamic + 关重力，逐帧 MovePosition 喂位姿；只有 dynamic 才与场景静态碰撞体做穿透解算
-            view.capsule = view.modelInfo.BuildCapsuleCollider();
+            view.modelInfo.BuildCapsuleCollider();
             view.rb = go.GetComponent<Rigidbody>();
             if (view.rb == null) view.rb = go.AddComponent<Rigidbody>();
             view.rb.isKinematic = false;
