@@ -77,8 +77,7 @@ namespace Ros.UI.Main
                 float age = t01 * Life;
                 risePx = RisePerSecond * age;
                 lifeScale = Tool.InfoManager.damage_label_scale.Evaluate(t01);
-                // 前半程完全不透明，后半程线性淡出
-                alpha = age <= Life * 0.5f ? 1f : Mathf.Clamp01(1f - (age - Life * 0.5f) / (Life * 0.5f));
+                alpha = Mathf.Clamp01(Tool.InfoManager.damage_label_alpha.Evaluate(t01));
                 if (t01 >= 1f) Release();
             });
         }
