@@ -522,11 +522,11 @@ public partial class NetworkManager : EnsBehaviour
         CallFuncRpc(ClientReceiveCombatLabelLocal, SendTo.ExcludeSender, Delivery.Unreliable, label);
     }
 
-    // 打击震颤：只发给当事人，走 Strive（低频、丢了手感就没了，但不需要 Reliable 的重传延迟）
+    // 打击震颤：只发给当事人，走 Unreliable（纯表现，丢了只是少震一次，不值得为它多一次重发）
     public void SendHitFeel(int clientId, SCHitFeel info)
     {
         if (!TryGetSendTo(clientId, out var to)) return;
-        CallFuncRpc(ClientReceiveHitFeelLocal, to, Delivery.Strive, info);
+        CallFuncRpc(ClientReceiveHitFeelLocal, to, Delivery.Unreliable, info);
     }
 
     public void SendScoreInfo(int clientId, SCScoreInfo info)
