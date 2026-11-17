@@ -37,18 +37,15 @@ public class AnimAttackEvent : AnimEvent
         anim.SetVelocityForward(forward*anim.animData.legHeight);
         anim.SetVelocityVertical(upward);
 
-        if (canTrigAttack && stateInfo.normalizedTime > threshold)
-        {
-            canTrigAttack = false;
-            OnAttack();
-        }
+        // 过攻击帧后每帧重试：回调还没注册时保留待触发，不白丢这一次
+        if (!canTrigAttack || nt <= threshold) return;
+        var callback = anim.onAttack;
+        if (callback == null) return;
+        canTrigAttack = false;
+        callback.Invoke(type);
     }
     public override void OnStateExit(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
     {
         base.OnStateExit(animator, stateInfo, layerIndex);
-    }
-    private void OnAttack()
-    {
-        if (anim.onAttack != null) anim.onAttack.Invoke(type);
     }
 }

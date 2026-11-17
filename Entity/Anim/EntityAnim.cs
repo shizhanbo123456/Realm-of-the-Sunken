@@ -86,7 +86,8 @@ public class EntityAnim : MonoBehaviour
     private int currentAnimId = -1;
 
     
-    public Action<AttackType> onAttack;//动画中的攻击事件回调
+    // 攻击帧回调：只能一次性整体赋值；禁止用 += 分次注册（施法方每次覆写，先注册的会被覆盖）
+    public Action<AttackType> onAttack;
     public Action<AnimState, AnimState> OnStateChange;
 
     private List<Animator> animators;
