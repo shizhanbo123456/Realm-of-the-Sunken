@@ -31,7 +31,6 @@ public class ClientSkillManager : ClientSubManager
     private static readonly HashSet<int> meleeWeaponSkills = new() { GlobalConfig.unarmed_punch };
 
     private const float MeleeRequestGrace = 2f;   // 施法请求到攻击帧的容差，超时说明这次请求没落地
-    private const float AttackFrameFallback = 0.2f; // 攻击帧回调没来时的兜底：请求后等这么久按状态开窗
 
     private EntityAnim meleeAnim;   // 已挂钩的本地视图动画，换视图时重挂
     private int meleeSkillId = -1;  // 最近一次近战施法请求，攻击帧取用后清空
@@ -184,15 +183,6 @@ public class ClientSkillManager : ClientSubManager
         {
             meleeAnim = view.anim;
             meleeAnim.onAttack = OnOwnAttackFrame;
-        }
-
-        // 攻击帧回调万一不来（客户端没重播同一动画状态），按请求时刻兜底开窗
-        float sinceRequest = Time.time - meleeRequestTime;
-        if (meleeSkillId >= 0 &&
-            view.anim.CurrentState == EntityAnim.AnimState.Attack &&
-            sinceRequest >= AttackFrameFallback && sinceRequest <= MeleeRequestGrace)
-        {
-            OpenMeleeWindow(meleeSkillId);
         }
 
         if (meleeWindowEnd <= 0f) return;
