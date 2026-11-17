@@ -1,4 +1,5 @@
-﻿using Ros.Transport;
+﻿using Ros.Config;
+using Ros.Transport;
 using UnityEngine;
 
 public enum CameraViewMode
@@ -53,12 +54,7 @@ public class CameraController : MonoBehaviour
     public float freeReportInterval = 1f;
     public float freeReportDistance = 1f;
 
-    // 视角震动：强度档位由配表 camera_shake_* 给，这里只放形状参数（幅度上限按模式分、衰减、噪声频率）
-    public float shakeOffsetThirdPerson = 2f;
-    public float shakeOffsetTopDown = 4f;
-    public float shakeMaxRoll = 5f;
-    public float shakeDecay = 1.4f;
-    public float shakeFrequency = 22f;
+    // 视角震动：强度档位与形状参数（幅度上限 / roll / 衰减 / 噪声频率）全部读配表 camera_shake_*
 
     public CameraViewMode Mode { get; private set; } = CameraViewMode.ThirdPerson;
 
@@ -550,7 +546,11 @@ public class CameraController : MonoBehaviour
     // 在最终位姿之上叠加震动：偏移按镜头自身的 right/up 给，roll 绕视线轴；渲染与 UI 投影都用这个位姿
     private void ApplyShake()
     {
-        if (trauma > 0f) trauma = Mathf.Max(0f, trauma - shakeDecay * Time.unscaledDeltaTime);
+        if (trauma > 0f)
+        {
+            float decay = GlobalVariable.F(global_variablesEnum.camera_shake_decay);
+            trauma = Mathf.Max(0f, trauma - decay * Time.unscaledDeltaTime);
+        }
 
         shakeBasePos = transform.position;
         shakeBaseRot = transform.rotation;
@@ -564,14 +564,17 @@ public class CameraController : MonoBehaviour
         }
 
         float strength = trauma * trauma;
-        float t = Time.unscaledTime * shakeFrequency;
+        float t = Time.unscaledTime * GlobalVariable.F(global_variablesEnum.camera_shake_frequency);
         float nx = Mathf.PerlinNoise(shakeSeed[0], t) * 2f - 1f;
         float ny = Mathf.PerlinNoise(shakeSeed[1], t) * 2f - 1f;
         float nr = Mathf.PerlinNoise(shakeSeed[2], t) * 2f - 1f;
-        float maxOffset = Mode == CameraViewMode.TopDown ? shakeOffsetTopDown : shakeOffsetThirdPerson;
+        float maxOffset = Mode == CameraViewMode.TopDown
+            ? GlobalVariable.F(global_variablesEnum.camera_shake_offset_top_down)
+            : GlobalVariable.F(global_variablesEnum.camera_shake_offset_third_person);
+        float maxRoll = GlobalVariable.F(global_variablesEnum.camera_shake_max_roll);
 
         transform.position = shakeBasePos + (transform.right * nx + transform.up * ny) * (maxOffset * strength);
-        transform.rotation = shakeBaseRot * Quaternion.Euler(0f, 0f, nr * shakeMaxRoll * strength);
+        transform.rotation = shakeBaseRot * Quaternion.Euler(0f, 0f, nr * maxRoll * strength);
 
         shakeAppliedPos = transform.position;
         shakeAppliedRot = transform.rotation;

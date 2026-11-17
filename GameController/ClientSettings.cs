@@ -7,6 +7,6 @@ public static class ClientSettings
     // 勾选 = 俯仰角交给自动取景，鼠标不控俯仰；取消 = 鼠标纵向滑动控制俯仰
     public static bool AutoPitch { get; set; }
 
-    // 勾选 = 受击/命中时镜头震动；取消 = 完全不震（近战卡肉不受影响）
+    // 勾选 = 受击/命中时镜头震动；取消 = 完全不震
     public static bool CameraShake { get; set; } = true;
 }

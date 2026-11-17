@@ -407,19 +407,6 @@ public class EntityAnim : MonoBehaviour
         MarkAnimSyncDirty(); // 播放速度变化也要同步（否则被强控时客户端动画照播）
     }
 
-    // 客户端本地卡肉：只冻结表现播放，不进同步（服务器永远不置这个状态）
-    private float hitStopUntil;
-
-    public bool InHitStop => Time.unscaledTime < hitStopUntil;
-
-    public void BeginHitStop(float seconds)
-    {
-        float until = Time.unscaledTime + seconds;
-        if (until <= hitStopUntil) return;
-        hitStopUntil = until;
-        ApplyPlaybackSpeed();
-    }
-
     // Buff 移速倍率：只改移动阶段，攻击/受击/起身不受影响
     public void SetMoveSpeedScale(float scale)
     {
@@ -451,7 +438,7 @@ public class EntityAnim : MonoBehaviour
     private void ApplyPlaybackSpeed()
     {
         if (animators == null || animators.Count == 0) return;
-        float target = paused || InHitStop ? 0f : PlaybackScale;
+        float target = paused ? 0f : PlaybackScale;
         foreach (var animator in animators)
             animator.speed = target;
     }
@@ -519,13 +506,6 @@ public class EntityAnim : MonoBehaviour
 
     private void LateUpdate()
     {
-        // 卡肉到期要有人把播放速度放回去，否则会一直冻在 0
-        if (hitStopUntil > 0f && Time.unscaledTime >= hitStopUntil)
-        {
-            hitStopUntil = 0f;
-            ApplyPlaybackSpeed();
-        }
-
         // 逐帧写，方便运行时调偏移
         if (weaponSocketR != null) weaponSocketR.localPosition = Vector3.Scale(animData.weaponHandLocalOffset, handInvScaleR);
         if (weaponSocketL != null) weaponSocketL.localPosition = Vector3.Scale(animData.weaponLeftHandLocalOffset, handInvScaleL);

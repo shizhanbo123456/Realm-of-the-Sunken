@@ -157,5 +157,10 @@ namespace Ros.Config
         camera_shake_hurt_shield,
         camera_shake_hit_normal,
         melee_bullet_life,
+        camera_shake_offset_third_person,
+        camera_shake_offset_top_down,
+        camera_shake_max_roll,
+        camera_shake_decay,
+        camera_shake_frequency,
     }
 }

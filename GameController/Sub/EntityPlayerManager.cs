@@ -109,23 +109,16 @@ public class EntityPlayerManager : ClientSubManager
             // 若下一帧本地已经（或正在）切到目标状态，就不硬切——让控制器配的过渡时长生效。
             if (pendingPlayHash != 0 && animator != null && Time.frameCount > pendingPlayTick)
             {
-                if (anim != null && anim.InHitStop)
+                int target = pendingPlayHash;
+                float progress = pendingPlayFrame;
+                pendingPlayHash = 0;
+                animHash = target; // 该目标已被"记账"，避免重复请求
+                if (!IsHeadingTo(target))
                 {
-                    pendingPlayTick = Time.frameCount; // 卡肉期间不切状态，解冻后这一帧再执行
-                }
-                else
-                {
-                    int target = pendingPlayHash;
-                    float progress = pendingPlayFrame;
-                    pendingPlayHash = 0;
-                    animHash = target; // 该目标已被"记账"，避免重复请求
-                    if (!IsHeadingTo(target))
+                    animator.Play(target, 0, progress);
+                    if (logForcedAnimSwitch)
                     {
-                        animator.Play(target, 0, progress);
-                        if (logForcedAnimSwitch)
-                        {
-                            pendingForcedSwitch = $"[动画强制切换] 实体{id}({type}) hash={target} 要求进度={progress:F2}";
-                        }
+                        pendingForcedSwitch = $"[动画强制切换] 实体{id}({type}) hash={target} 要求进度={progress:F2}";
                     }
                 }
             }

@@ -26,11 +26,10 @@ public class ClientSkillManager : ClientSubManager
 
     public SkillRecharge Recharge => recharge;
 
-    #region 打击感（受击震颤 / 近战命中震颤 + 卡肉）
+    #region 打击感（受击震颤 / 近战命中震颤）
     // 走 SkillBase.StrikeWeapon（贴武器实例命中球判定）的技能：服务器加新的近战技能时这里要同步
     private static readonly HashSet<int> meleeWeaponSkills = new() { GlobalConfig.unarmed_punch };
 
-    private const float HitStopSeconds = 0.09f;   // 单次命中冻结自己挥砍的时长
     private const float MeleeRequestGrace = 2f;   // 施法请求到攻击帧的容差，超时说明这次请求没落地
     private const float AttackFrameFallback = 0.2f; // 攻击帧回调没来时的兜底：请求后等这么久按状态开窗
 
@@ -374,13 +373,12 @@ public class ClientSkillManager : ClientSubManager
         return dx * dx + dz * dz;
     }
 
-    // 一次挥砍只触发一次：震颤与卡肉同帧发生，卡肉时长固定
+    // 一次挥砍只触发一次（多目标、多段扫过都不叠加）
     private void TriggerMeleeHit()
     {
         meleeWindowEnd = 0f;
         if (Tool.CameraController != null)
             Tool.CameraController.AddTrauma(GlobalVariable.F(global_variablesEnum.camera_shake_hit_normal));
-        if (meleeAnim != null) meleeAnim.BeginHitStop(HitStopSeconds);
     }
     #endregion
 }
