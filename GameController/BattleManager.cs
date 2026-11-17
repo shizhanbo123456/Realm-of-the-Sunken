@@ -1208,6 +1208,7 @@ public partial class BattleManager : EnsBehaviour
         ResetCards(); // 词条是玩家级数据，跨局不保留
         zombieCount = 0;
         RemoveOfflineSessions(); // 掉线者不再有重连意义，回大厅前清出成员表
+        readyByClient.Clear(); // 下一轮一律从「未准备」重新开始
 
         BroadcastLobbyInfo(); // battleStarted = false：客户端结算页关闭后回组队大厅准备下一轮
     }

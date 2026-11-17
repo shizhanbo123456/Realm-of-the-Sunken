@@ -237,6 +237,8 @@ public class BattlePage : PageBase
         HideImportantBanner(); // 重要事件 banner 每局从隐藏状态开始
         OnDefensePointProgress(NetworkManager.LatestDefensePointProgress); // 进入战斗先填一次缓存值，随后由变更包刷新
         reviveActive = false; // 复活条每局从收起状态开始，重新由 SCReviveInfo 驱动
+        reviveElapsed = 0f;
+        panel.m_showRegenerationBar.selectedIndex = 0; // 上一局死着结算会把它留在 1，进场必须复位
         ClearEntityBars();
         ClearQuickMessagePointers(); // 快捷指令点位只属于本局
         TipHost.Hide();
@@ -285,6 +287,7 @@ public class BattlePage : PageBase
         ResetCardState();
         TipHost.Hide();
         HideImportantBanner();
+        StopPanelTransitions();
         ClearQuickMessagePointers();
         // 离开战斗界面即销毁地形场景（Culler 与内容根一起销毁，点位数据一并复位）
         if (Tool.ModularTerrainGenerator != null) Tool.ModularTerrainGenerator.Clear();
@@ -838,6 +841,13 @@ public class BattlePage : PageBase
         PlayNextImportantBanner();
     }
 
+    // 昼夜横幅与受击转场是定长动画，离场时还在播会把中间态留在下一局
+    private void StopPanelTransitions()
+    {
+        if (panel.m_showBanner != null) panel.m_showBanner.Stop();
+        if (panel.m_showHit != null) panel.m_showHit.Stop();
+    }
+
     // 进/退出战斗都收起，并丢掉未播的积压
     private void HideImportantBanner()
     {
@@ -976,6 +986,7 @@ public class BattlePage : PageBase
             if (bar != null) bar.Dispose();
         }
         entityBars.Clear();
+        entityVitals.Clear(); // 实体 id 每局重排，旧血量缓存不能跨局沿用
     }
 
     private void ShowCombatLabel(int value, CombatLabelType type, ushort targetId, bool hasHitPos, Vector3 hitPos)

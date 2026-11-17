@@ -104,6 +104,7 @@ public class LobbyPage : PageBase
 
         RefreshCampBlock(panel.m_btn_joinAttack, PlayerCampType.Attack, attackRobot);
         RefreshCampBlock(panel.m_btn_joinDefense, PlayerCampType.Defense, defenseRobot);
+        panel.m_btn_prepare.selected = myReady; // 选中态跟随服务器，避免残留上一局的已准备
         panel.m_btn_prepare.title = PrepareButtonTitle();
         panel.m_spectate_current_member_count.text = SpectateCount(info).ToString();
 
