@@ -8,6 +8,8 @@ namespace Ros.Config
         {
             Loadcard_gain_upgradeConfig();
             Loadcard_optionConfig();
+            LoadpromptConfig();
+            Loadsystem_messageConfig();
             Loadai_commandConfig();
             Loadassistant_expressionConfig();
             Loadattr_rangeConfig();
@@ -17,7 +19,6 @@ namespace Ros.Config
             LoadentityConfig();
             Loadglobal_variablesConfig();
             Loadgm_commandConfig();
-            LoadnoticeConfig();
             Loadquick_messageConfig();
             Loadrevive_timeConfig();
             Loadsetting_tipsConfig();

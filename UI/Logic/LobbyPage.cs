@@ -147,7 +147,8 @@ public class LobbyPage : PageBase
             : GlobalVariable.I(global_variablesEnum.player_limit_defenser);
         int count = attack ? humanAttack : humanDefense;
         if (count < limit) return true;
-        if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(attack ? "进攻方人数已满" : "防守方人数已满");
+        if (Tool.UIManager != null)
+            Tool.UIManager.ShowFlyText(attack ? PromptId.AttackerFull : PromptId.DefenseFull);
         return false;
     }
 
@@ -161,7 +162,8 @@ public class LobbyPage : PageBase
         int current = defense ? defenseRobot : attackRobot;
         if (delta > 0 && current >= limit)
         {
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(defense ? "防守方 AI 已达上限" : "进攻方 AI 已达上限");
+            if (Tool.UIManager != null)
+                Tool.UIManager.ShowFlyText(defense ? PromptId.DefenseAiFull : PromptId.AttackAiFull);
             return;
         }
         int next = Mathf.Clamp(current + delta, 0, limit);
@@ -175,7 +177,7 @@ public class LobbyPage : PageBase
     private bool BlockedByReady()
     {
         if (!myReady) return false;
-        if (Tool.UIManager != null) Tool.UIManager.ShowFlyText("请先取消准备");
+        if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(PromptId.CancelReadyFirst);
         return true;
     }
 

@@ -59,7 +59,8 @@ namespace Ros.Config
             CardGainUpgradeConfig.Bake(this);
             BattleFuryLayerConfig.Bake(this);
             ReviveTimeConfig.Bake(this);
-            NoticeConfig.Bake(this);
+            PromptConfig.Bake(this);
+            SystemMessageConfig.Bake(this);
             QuickMessageConfig.Bake(this);
             SettingTipsConfig.Bake(this);
             AssistantExpressionConfig.Bake(this);

@@ -102,7 +102,7 @@ public class HomePage : PageBase
         string name = (renamePanel.m_input.text ?? "").Trim();
         if (name.Length < min || name.Length > max)
         {
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText($"玩家名字必须为{min}-{max}个字符");
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(PromptId.NameLength, min, max);
             return;
         }
 
@@ -225,7 +225,7 @@ public class HomePage : PageBase
         else ClientSelection.selectedAttackIndex = localIndex;
         Refresh();
         if (Tool.UIManager != null)
-            Tool.UIManager.ShowFlyText($"已选择 {panel.m_label_character_name.text}");
+            Tool.UIManager.ShowFlyText(PromptId.CharacterSelected, panel.m_label_character_name.text);
     }
 
     private void RefreshAttrList()
@@ -309,7 +309,7 @@ public class HomePage : PageBase
         string name = (ClientSelection.playerName ?? "").Trim();
         if (name.Length < nameMin || name.Length > nameMax)
         {
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText($"玩家名字必须为{nameMin}-{nameMax}个字符");
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(PromptId.NameLength, nameMin, nameMax);
             return;
         }
         if (name != ClientSelection.playerName)

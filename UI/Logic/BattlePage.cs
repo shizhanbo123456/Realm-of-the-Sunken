@@ -1113,7 +1113,7 @@ public class BattlePage : PageBase
         if (rolls.Count == 0)
         {
             panel.m_selectCardPanel.Close();
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText("该档暂无可抽的卡");
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(PromptId.NoCardInTier);
             return;
         }
         currentCardTier = tier;

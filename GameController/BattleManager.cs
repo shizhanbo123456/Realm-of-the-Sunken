@@ -281,15 +281,6 @@ public partial class BattleManager : EnsBehaviour
                 textId = textId,
             });
         }
-        // 水晶雕像被摧毁事件（事件列表 icon=其它）
-        else if (BattleStarted && data.type.category == EntityCategory.CrystalStatue)
-        {
-            Tool.NetworkManager.SendBattleEvent(new SCBattleEvent
-            {
-                type = SCBattleEvent.Type.CrystalStatueDestroyed,
-                textId = 27,
-            });
-        }
 
         data.OnDestroyed();
         bool wasKingStatue = data.type.category == EntityCategory.GuardStatue && data.type == EntityType.KingStatue;

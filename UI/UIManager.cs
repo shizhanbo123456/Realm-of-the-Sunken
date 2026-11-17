@@ -237,8 +237,12 @@ public class UIManager : MonoBehaviour
     }
     #endregion
 
-    public void ShowFlyText(string text)
+    // 飘字只按 prompt 表主键取文案；文案带 {0} 的用 args 填充
+    public void ShowFlyText(int promptId, params object[] args)
     {
+        string text = PromptConfig.Get(promptId).text;
+        if (args != null && args.Length > 0) text = string.Format(text, args);
+
         var panel = UI_NoticePanel.CreateInstance();
         if (panel.m_title != null) panel.m_title.text = text;
         GRoot.inst.AddChild(panel);
@@ -296,21 +300,17 @@ public class UIManager : MonoBehaviour
         if (guide != null) guide.Show();
     }
 
-    // notice.xlsx 主键：33 当前阶段不可启动桥接 / 34 桥接工具已经启动
-    private const int NoticeBridgeUnavailable = 33;
-    private const int NoticeBridgeRunning = 34;
-
     // 设置里的「桥接」：只有 Home 能启动；已在跑就只提示；否则关设置 → 二次确认
     private void OpenBridgeConfirm()
     {
         if (CurrentPageType != PageType.Home)
         {
-            ShowFlyText(NoticeConfig.Get(NoticeBridgeUnavailable).text);
+            ShowFlyText(PromptId.BridgeUnavailable);
             return;
         }
         if (RuntimeBridgeServer.IsRunning)
         {
-            ShowFlyText(NoticeConfig.Get(NoticeBridgeRunning).text);
+            ShowFlyText(PromptId.BridgeRunning);
             return;
         }
 
@@ -324,10 +324,10 @@ public class UIManager : MonoBehaviour
         if (!RuntimeBridgeServer.IsRunning)
         {
             Debug.LogError("[桥接] 启动失败：" + RuntimeBridgeServer.LastError);
-            ShowFlyText("桥接工具启动失败：" + RuntimeBridgeServer.LastError);
+            ShowFlyText(PromptId.BridgeStartFailed, RuntimeBridgeServer.LastError);
             return;
         }
-        ShowFlyText("桥接工具已启动");
+        ShowFlyText(PromptId.BridgeRunning);
     }
 
     // 设置里的「退出」：首页没有可退出的东西；大厅退房间、对局退本局
@@ -407,7 +407,7 @@ public class UIManager : MonoBehaviour
     // 服务器提示是通用功能：与当前页面无关，收到即显示
     private void OnShowPrompt(int messageId)
     {
-        ShowFlyText(NoticeConfig.Get(messageId).text);
+        ShowFlyText(messageId);
     }
 
     private void ReturnToHome()

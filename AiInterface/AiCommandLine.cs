@@ -1273,7 +1273,7 @@ public sealed class AiCommandLine : ClientSubManager
         {
             channel = SystemChannel,
             kind = "系统",
-            content = ResolveText(messageId),
+            content = ResolvePrompt(messageId),
         });
         TrimChatLog();
     }
@@ -1419,8 +1419,6 @@ public sealed class AiCommandLine : ClientSubManager
                 return ResolveText(e.textId) + " 击败 " + ResolveText(e.textId2);
             case SCBattleEvent.Type.DeathUnattributed:
                 return ResolveText(e.textId) + " 死亡";
-            case SCBattleEvent.Type.PlayerRespawn:
-                return ResolveText(e.textId) + " 复活";
             case SCBattleEvent.Type.NeutralStatueCaptured:
                 return "中立雕像被击败";
             case SCBattleEvent.Type.NeutralStatueRespawn:
@@ -1431,8 +1429,6 @@ public sealed class AiCommandLine : ClientSubManager
                 return "天亮";
             case SCBattleEvent.Type.StatueDestroyed:
                 return "雕像被摧毁";
-            case SCBattleEvent.Type.CrystalStatueDestroyed:
-                return "水晶雕像被摧毁";
             case SCBattleEvent.Type.Notice:
                 return ResolveText(e.textId);
             default:
@@ -1440,6 +1436,7 @@ public sealed class AiCommandLine : ClientSubManager
         }
     }
 
+    // 事件文本 id：≥10000 是玩家名，<10000 查 system_message.csv
     private static string ResolveText(int id)
     {
         if (id >= SCBattleEvent.PlayerNameBase)
@@ -1449,12 +1446,23 @@ public sealed class AiCommandLine : ClientSubManager
             string name = loading != null ? loading.GetName(clientId) : null;
             return string.IsNullOrEmpty(name) ? "#" + clientId : name;
         }
-        if (!NoticeConfig.content.ContainsKey(id))
+        if (!SystemMessageConfig.content.ContainsKey(id))
         {
-            Debug.LogError($"[AI] notice.csv 缺少文本 id={id}");
+            Debug.LogError($"[AI] system_message.csv 缺少文本 id={id}");
             return "#" + id;
         }
-        return NoticeConfig.Get(id).text;
+        return SystemMessageConfig.Get(id).text;
+    }
+
+    // 飘字提示 id 查 prompt.csv
+    private static string ResolvePrompt(int messageId)
+    {
+        if (!PromptConfig.content.ContainsKey(messageId))
+        {
+            Debug.LogError($"[AI] prompt.csv 缺少文本 id={messageId}");
+            return "#" + messageId;
+        }
+        return PromptConfig.Get(messageId).text;
     }
     #endregion
 }

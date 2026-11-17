@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using FairyGUI;
+using Ros.Config;
 using UnityEngine;
 
 namespace Ros.UI.Main
@@ -95,7 +96,7 @@ namespace Ros.UI.Main
             }
             else if (selection.Count >= capacity)
             {
-                if (Tool.UIManager != null) Tool.UIManager.ShowFlyText("已达到技能选择上限");
+                if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(PromptId.SkillSelectLimit);
                 return;
             }
             else

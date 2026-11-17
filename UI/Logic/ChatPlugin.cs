@@ -10,6 +10,10 @@ public class ChatPlugin
 {
     public const int TabSystem = 3; // 页签 = 频道值 0/1/2，3 是本地系统消息页签（不上协议）
 
+    // system_message 表主键：1 玩家击败（两个占位符）/ 2 玩家被击败（一个占位符）
+    private const int SystemMessagePlayerKill = 1;
+    private const int SystemMessagePlayerDefeated = 2;
+
     // GM 开关「敌方对话」：开启后阵营频道额外显示敌方阵营的消息
     public static bool ShowEnemyDialog;
 
@@ -150,18 +154,18 @@ public class ChatPlugin
         int maxLength = (int)GlobalVariable.RangeMax(global_variablesEnum.chat_message_length);
         if (byteLength < minLength)
         {
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText("发送的消息太短");
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(PromptId.ChatTooShort);
             return;
         }
         if (byteLength > maxLength)
         {
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText("发送的消息太长");
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(PromptId.ChatTooLong);
             return;
         }
         // 附近频道按「操控的实体」算距离，观战/未开战没有实体
         if (sendChannel == (int)ChatChannel.Nearby && OwnEntityId == 0)
         {
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText("附近频道需要操控中的角色");
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(PromptId.ChatNearbyNoEntity);
             return;
         }
         if (Time.time - lastSendTime < SendInterval) return; // 1s 冷却
@@ -311,7 +315,12 @@ public class ChatPlugin
         switch (e.type)
         {
             case SCBattleEvent.Type.PlayerKill:
-                systemEntries.Add($"{ResolveEventText(e.textId)} 击败了 {ResolveEventText(e.textId2)}");
+                systemEntries.Add(string.Format(SystemMessageConfig.Get(SystemMessagePlayerKill).text,
+                    ResolveEventText(e.textId), ResolveEventText(e.textId2)));
+                break;
+            case SCBattleEvent.Type.DeathUnattributed:
+                systemEntries.Add(string.Format(SystemMessageConfig.Get(SystemMessagePlayerDefeated).text,
+                    ResolveEventText(e.textId)));
                 break;
             case SCBattleEvent.Type.SkillBroadcast:
                 return; // 技能播报只进重要事件 banner，不进聊天列表
@@ -322,11 +331,11 @@ public class ChatPlugin
         if (viewTab == TabSystem) RefreshList();
     }
 
-    // 事件文本统一按数字 id 解析：>=PlayerNameBase 映射为玩家名，否则查 notice.csv
+    // 事件文本统一按数字 id 解析：>=PlayerNameBase 映射为玩家名，否则查 system_message.csv
     private static string ResolveEventText(int id)
     {
         if (id >= SCBattleEvent.PlayerNameBase) return GetUnitName(id - SCBattleEvent.PlayerNameBase);
-        return NoticeConfig.Get(id).text;
+        return SystemMessageConfig.Get(id).text;
     }
 
     private static string GetUnitName(int clientId)
