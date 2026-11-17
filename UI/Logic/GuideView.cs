@@ -28,6 +28,7 @@ public class GuideView
     private readonly List<GuideCatalog.Entry> entries = new();
     private UI_GuidePanel panel;
     private int tab;
+    private int selectedIndex = -1;
     private float uiScale = 1f;
 
     public bool IsOpen => panel != null && panel.visible;
@@ -83,6 +84,7 @@ public class GuideView
     private void SwitchTab(int index)
     {
         tab = index;
+        selectedIndex = -1;
         panel.m_buffTab.selectedIndex = index;
         var menu = panel.m_menu_btn_list;
         for (int i = 0; i < menu.numChildren; i++)
@@ -115,6 +117,7 @@ public class GuideView
         {
             var item = (UI_GuideItemSkill)obj;
             item.title = entry.title;
+            item.selected = index == selectedIndex;
             item.m_des.text = entry.description;
             item.m_mask.m_mask.m_icon.texture = tex;
             item.m_Level.selectedIndex = entry.quality;
@@ -125,8 +128,11 @@ public class GuideView
         {
             var item = (UI_GuideItemBuff)obj;
             item.title = entry.title;
+            item.selected = index == selectedIndex;
             item.m_des.text = entry.description;
             item.m_slot.texture = tex;
+            int buffIndex = index;
+            item.onClick.Set(() => SelectItem(buffIndex));
         }
     }
 
@@ -141,8 +147,17 @@ public class GuideView
         }
     }
 
+    private void SelectItem(int index)
+    {
+        selectedIndex = index;
+        var itemList = panel.m_item_list;
+        for (int i = 0; i < itemList.numChildren; i++)
+            itemList.GetChildAt(i).asButton.selected = i == index;
+    }
+
     private void ShowDetail(int index)
     {
+        SelectItem(index);
         var entry = entries[index];
         var detail = panel.m_skill_detail;
         detail.m_Name.text = entry.title;

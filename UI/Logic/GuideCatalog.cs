@@ -48,11 +48,13 @@ public static class GuideCatalog
         foreach (var pair in SortedKeys(SkillConfig.content))
         {
             var skill = pair.Value;
+            var icon = SkillIcon(skill.key);
+            if (icon == null) continue; // 无图标的是非玩家技能，不进图鉴
             string store = skill.storeLimit < 0
                 ? MessageVariable.V(message_variablesEnum.guide_storeUnlimited)
                 : skill.storeLimit.ToString();
             string des = MessageVariable.F(message_variablesEnum.guide_skillDesc, skill.description, skill.cd, store);
-            list.Add(new Entry(skill.name, des, SkillIcon(skill.key),
+            list.Add(new Entry(skill.name, des, icon,
                 SkillConfig.QualityRank(skill), skill.scores != null ? skill.scores.ToArray() : null));
         }
         return list;
