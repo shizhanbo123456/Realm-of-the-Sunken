@@ -54,9 +54,9 @@ public class CameraController : MonoBehaviour
     public float freeReportDistance = 1f;
 
     // 视角震动：强度档位由配表 camera_shake_* 给，这里只放形状参数（幅度上限按模式分、衰减、噪声频率）
-    public float shakeOffsetThirdPerson = 0.54f;
-    public float shakeOffsetTopDown = 0.36f;
-    public float shakeMaxRoll = 1.5f;
+    public float shakeOffsetThirdPerson = 2f;
+    public float shakeOffsetTopDown = 4f;
+    public float shakeMaxRoll = 5f;
     public float shakeDecay = 1.4f;
     public float shakeFrequency = 22f;
 
