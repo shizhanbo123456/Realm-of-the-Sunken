@@ -7,7 +7,7 @@ namespace Ros.UI.Main
 {
     public partial class UI_GuideSlot : GComponent
     {
-        public GComponent m_mask;
+        public UI_GuideSlotMask m_mask;
         public const string URL = "ui://q68vr2bfn6szt1";
 
         public static UI_GuideSlot CreateInstance()
@@ -19,7 +19,7 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
-            m_mask = (GComponent)GetChildAt(1);
+            m_mask = (UI_GuideSlotMask)GetChildAt(1);
         }
     }
 }

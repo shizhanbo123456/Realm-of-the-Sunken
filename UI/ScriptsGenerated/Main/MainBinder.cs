@@ -65,8 +65,10 @@ namespace Ros.UI.Main
             UIObjectFactory.SetPackageItemExtension(UI_GuideScoreTab.URL, typeof(UI_GuideScoreTab));
             UIObjectFactory.SetPackageItemExtension(UI_GuideItemSkill.URL, typeof(UI_GuideItemSkill));
             UIObjectFactory.SetPackageItemExtension(UI_GuideSlot.URL, typeof(UI_GuideSlot));
+            UIObjectFactory.SetPackageItemExtension(UI_GuideSlotMask.URL, typeof(UI_GuideSlotMask));
             UIObjectFactory.SetPackageItemExtension(UI_GuideDetailSkill.URL, typeof(UI_GuideDetailSkill));
             UIObjectFactory.SetPackageItemExtension(UI_GuideDetailSkillRank.URL, typeof(UI_GuideDetailSkillRank));
+            UIObjectFactory.SetPackageItemExtension(UI_GuideItemBuff.URL, typeof(UI_GuideItemBuff));
             UIObjectFactory.SetPackageItemExtension(UI_onlookComboBox_popup.URL, typeof(UI_onlookComboBox_popup));
             UIObjectFactory.SetPackageItemExtension(UI_buffItem.URL, typeof(UI_buffItem));
             UIObjectFactory.SetPackageItemExtension(UI_buffItemMask.URL, typeof(UI_buffItemMask));

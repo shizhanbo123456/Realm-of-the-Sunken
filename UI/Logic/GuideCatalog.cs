@@ -10,12 +10,16 @@ public static class GuideCatalog
         public readonly string title;
         public readonly string description;
         public readonly Texture icon;
+        public readonly int quality;  // B=0 A=1 S=2；无品质/Buff 为 -1
+        public readonly int[] scores; // 6 项，0~4 = D/C/B/A/S；Buff 为 null
 
-        public Entry(string title, string description, Texture icon)
+        public Entry(string title, string description, Texture icon, int quality = -1, int[] scores = null)
         {
             this.title = title;
             this.description = description;
             this.icon = icon;
+            this.quality = quality;
+            this.scores = scores;
         }
     }
 
@@ -48,7 +52,8 @@ public static class GuideCatalog
                 ? MessageVariable.V(message_variablesEnum.guide_storeUnlimited)
                 : skill.storeLimit.ToString();
             string des = MessageVariable.F(message_variablesEnum.guide_skillDesc, skill.description, skill.cd, store);
-            list.Add(new Entry(skill.name, des, SkillIcon(skill.key)));
+            list.Add(new Entry(skill.name, des, SkillIcon(skill.key),
+                SkillConfig.QualityRank(skill), skill.scores != null ? skill.scores.ToArray() : null));
         }
         return list;
     }
