@@ -303,18 +303,18 @@ public partial class NetworkManager : EnsBehaviour
         CallFuncRpc(ServerReceiveLobbyUpdateLocal, SendTo.RoomOwner, Delivery.Reliable, update, LocalToken);
     }
 
-    // 选卡：tier 决定消耗哪一档待抽次数，技能卡额外带上客户端抽到的技能 id
-    public void SendSelectCard(CSSelectCard card)
+    // 抽卡界面唯一的协议：请求种子（hasChoice=false）与上报选择（第几张卡 / 弃卡）合并成一条
+    public void SendCardAction(CSCardAction action)
     {
         if (!CanSendWorldCommand) return;
-        CallFuncRpc(ServerReceiveSelectCardLocal, SendTo.RoomOwner, Delivery.Reliable, card, LocalToken);
+        CallFuncRpc(ServerReceiveCardActionLocal, SendTo.RoomOwner, Delivery.Reliable, action, LocalToken);
     }
 
-    // 弃卡：整组折算经验，服务器回推进度
-    public void SendDiscardCard(CSDiscardCard card)
+    // 抽卡种子：只发本人，客户端用它算这一组卡
+    public void SendCardSeed(int clientId, SCCardSeed seed)
     {
-        if (!CanSendWorldCommand) return;
-        CallFuncRpc(ServerReceiveDiscardCardLocal, SendTo.RoomOwner, Delivery.Reliable, card, LocalToken);
+        if (!TryGetSendTo(clientId, out var to)) return;
+        CallFuncRpc(ClientReceiveCardSeedLocal, to, Delivery.Reliable, seed);
     }
 
     #region 加载期请求（客户端 → 服务器，逐步发送）
@@ -719,15 +719,16 @@ public partial class NetworkManager : EnsBehaviour
     }
 
     [Rpc]
-    private void ServerReceiveSelectCardLocal(CSSelectCard card, int clientId)
+    private void ServerReceiveCardActionLocal(CSCardAction action, int clientId)
     {
-        if (Tool.BattleManager != null) Tool.BattleManager.ApplyCard(clientId, card.tier, card.cardId, card.skillId);
+        if (Tool.BattleManager != null) Tool.BattleManager.HandleCardAction(clientId, action);
     }
 
     [Rpc]
-    private void ServerReceiveDiscardCardLocal(CSDiscardCard card, int clientId)
+    private void ClientReceiveCardSeedLocal(SCCardSeed seed)
     {
-        if (Tool.BattleManager != null) Tool.BattleManager.DiscardCard(clientId, card.tier);
+        if (seed == null) return;
+        EventManager.TrigEvent(ClientEvent.OnCardSeed, seed);
     }
 
     [Rpc]

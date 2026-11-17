@@ -7,14 +7,14 @@ using Ros.Config;
 namespace Ros.UI.Main
 {
     // 抽卡界面：三张卡横向铺开、逐张播入场动画；选卡 / 弃卡 / 关闭三个出口都由调用方决定怎么上报
-    // 选中后是否收起由调用方决定：同一档还有次数时直接就地换下一组，面板不关、不重复淡入
+    // 只上报第几张，卡牌内容由服务器下发的种子算；种子没到之前界面立在等待态、不放卡
     public partial class UI_SelectCardPanel
     {
         private const float CardShowStagger = 0.08f; // 逐张入场的间隔（秒）
         private const float PanelFadeDuration = 0.12f;
 
         private readonly List<CardRoll> rolls = new();
-        private Action<CardRoll> onSelect;
+        private Action<int> onSelect;
         private Action onDiscard;
         private Action onClose;
         private CardTier openedTier;
@@ -27,7 +27,7 @@ namespace Ros.UI.Main
         public CardTier OpenedTier => openedTier;
 
         // 构造期一次：三个按钮接回调
-        public void Build(Action<CardRoll> select, Action discard, Action close)
+        public void Build(Action<int> select, Action discard, Action close)
         {
             onSelect = select;
             onDiscard = discard;
@@ -40,8 +40,32 @@ namespace Ros.UI.Main
         {
             bool wasVisible = visible;
             Fill(cards, tier, luck);
-            if (wasVisible) return; // 选完还有次数就地换下一组：面板已可见，不再重新淡入
+            if (wasVisible) return; // 面板已可见，不再重新淡入
 
+            PlayFadeIn();
+        }
+
+        // 等种子：面板先立起来，卡面清空且不可点，种子到了再 Fill 播入场
+        public void WaitForSeed(CardTier tier)
+        {
+            bool wasVisible = visible;
+            rolls.Clear();
+            openedTier = tier;
+
+            revealToken++;
+            IsOpen = true;
+            visible = true;
+            touchable = true;
+            if (m_discard_description != null) m_discard_description.text = MessageVariable.F(message_variablesEnum.card_discardExp, DiscardExp(tier));
+            if (m_current_luck != null) m_current_luck.visible = false; // 幸运随种子下发，还没到
+            if (m_list != null) m_list.numItems = 0;
+
+            if (wasVisible) return;
+            PlayFadeIn();
+        }
+
+        private void PlayFadeIn()
+        {
             fadeTween?.Kill();
             alpha = 0f;
             fadeTween = GTween.To(0f, 1f, PanelFadeDuration).OnUpdate(t => alpha = t.value.x);
@@ -58,7 +82,11 @@ namespace Ros.UI.Main
             visible = true;
             touchable = true;
             if (m_discard_description != null) m_discard_description.text = MessageVariable.F(message_variablesEnum.card_discardExp, DiscardExp(tier));
-            if (m_current_luck != null) m_current_luck.text = MessageVariable.F(message_variablesEnum.card_luck, luck);
+            if (m_current_luck != null)
+            {
+                m_current_luck.visible = true;
+                m_current_luck.text = MessageVariable.F(message_variablesEnum.card_luck, luck);
+            }
 
             // 条目数不变时列表不会重渲染，先清空再铺，保证每组卡都从池里新建并重播入场
             if (m_list != null)
@@ -113,8 +141,8 @@ namespace Ros.UI.Main
             action?.Invoke();
         }
 
-        // 选中后收面板还是就地换下一组，由调用方决定（这里不再自行关闭）
-        private void Select(CardRoll roll)
+        // 选中后收面板还是就地等下一组，由调用方决定（这里不再自行关闭）
+        private void Select(int index)
         {
             if (!IsOpen) return;
             var action = onSelect;
@@ -123,7 +151,7 @@ namespace Ros.UI.Main
                 Close();
                 return;
             }
-            action.Invoke(roll);
+            action.Invoke(index);
         }
 
         private void RenderCard(int index, GObject obj)
@@ -150,7 +178,7 @@ namespace Ros.UI.Main
                 face.m_skillpreview.m_loader_icon.visible = icon != null;
             }
 
-            if (face.m_btn_select != null) face.m_btn_select.onClick.Set(() => Select(roll));
+            if (face.m_btn_select != null) face.m_btn_select.onClick.Set(() => Select(index));
             RevealAfter(card, index * CardShowStagger);
         }
 

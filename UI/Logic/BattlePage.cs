@@ -87,7 +87,7 @@ public class BattlePage : PageBase
         levelLabel = panel.m_playerPanel.GetChild("n12") as GTextField; // 等级数字在 FGUI 侧还没命名
         panel.m_skillSelectPanel.Build(OnSkillSelectCommitted);
         panel.m_skillSelectPanel.Close();
-        panel.m_selectCardPanel.Build(OnCardSelected, OnCardDiscarded, null); // 关闭 = 保留待抽次数
+        panel.m_selectCardPanel.Build(OnCardSelected, OnCardDiscarded, OnCardPanelClosed); // 关闭 = 不发包，种子留给下次
         panel.m_selectCardPanel.CloseImmediately();
         panel.m_list_selectCard.itemRenderer = RenderCardButton;
         panel.m_largeMinimapPanel.visible = false;
@@ -239,6 +239,7 @@ public class BattlePage : PageBase
         EventManager.AddEvent<SCDefensePointProgress>(ClientEvent.OnDefensePointProgress, OnDefensePointProgress);
         EventManager.AddEvent(ClientEvent.OnSkillBarRefresh, OnSkillBarRefresh);
         EventManager.AddEvent<SCPlayerProgress>(ClientEvent.OnPlayerProgress, OnPlayerProgress);
+        EventManager.AddEvent<SCCardSeed>(ClientEvent.OnCardSeed, OnCardSeed);
         EventManager.AddEvent<SCQuickMessage>(ClientEvent.OnQuickMessage, OnQuickMessage);
         if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated += OnCameraUpdated;
 
@@ -295,6 +296,7 @@ public class BattlePage : PageBase
         EventManager.RemoveEvent<SCDefensePointProgress>(ClientEvent.OnDefensePointProgress, OnDefensePointProgress);
         EventManager.RemoveEvent(ClientEvent.OnSkillBarRefresh, OnSkillBarRefresh);
         EventManager.RemoveEvent<SCPlayerProgress>(ClientEvent.OnPlayerProgress, OnPlayerProgress);
+        EventManager.RemoveEvent<SCCardSeed>(ClientEvent.OnCardSeed, OnCardSeed);
         EventManager.RemoveEvent<SCQuickMessage>(ClientEvent.OnQuickMessage, OnQuickMessage);
         if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated -= OnCameraUpdated;
         spectatorMode = false;
@@ -1079,16 +1081,14 @@ public class BattlePage : PageBase
     #region 抽卡（悬浮按钮 → 抽卡界面 → 选/弃）
     private readonly List<int> pendingTiers = new();   // 有次数的档位（渲染用，避免每帧分配）
     private readonly int[] cardPending = new int[CardCatalog.TierCount];
-    private int cardLuck;             // 幸运：只影响档位内能刷出多深的卡
     private int cardLevel = 1;        // 局内等级（左上角等级 + 经验条）
     private int cardExp;              // 当前等级内已积累的经验
     private CardTier currentCardTier; // 最近一次打开的档位（弃卡按它上报）
-    private readonly HashSet<int> justPickedSkills = new(); // 本局已选中、服务器还没回包的技能，抽卡时先排除
+    private bool awaitingSeed;        // 已经发出种子请求、还没收到回包
 
-    // 服务器只下发「幸运 + 每档有多少次」，抽到什么在这里算
+    // 服务器只下发「每档有多少次」和每组的种子，幸运随种子来，抽到什么两端各算一遍
     private void OnPlayerProgress(SCPlayerProgress info)
     {
-        cardLuck = info.luck;
         cardLevel = info.level;
         cardExp = info.exp;
         cardPending[0] = info.silver;
@@ -1134,19 +1134,49 @@ public class BattlePage : PageBase
         btn.onClick.Set(() => OpenCardPanel((CardTier)tier));
     }
 
-    // 点悬浮按钮：随机抽 3 张（排除已持有技能），交给抽卡界面展示
+    // 点悬浮按钮：面板先进等待态，种子回来才铺卡
     private void OpenCardPanel(CardTier tier)
     {
         if (cardPending[(int)tier] <= 0) return;
-        ShowCardSet(tier);
+        currentCardTier = tier;
+        panel.m_selectCardPanel.WaitForSeed(tier);
+        awaitingSeed = true;
+        SendCardAction(tier, hasChoice: false, choice: 0, requestSeed: true);
     }
 
-    // 抽一组卡铺进界面：入口点击与「选完还有次数、就地换下一组」共用
-    private void ShowCardSet(CardTier tier)
+    private void SendCardAction(CardTier tier, bool hasChoice, byte choice, bool requestSeed)
+    {
+        if (Tool.NetworkManager == null) return;
+        Tool.NetworkManager.SendCardAction(new CSCardAction
+        {
+            tier = (byte)tier,
+            hasChoice = hasChoice,
+            choice = choice,
+            requestSeed = requestSeed,
+        });
+    }
+
+    // 种子到了才铺卡：幸运也只在种子里，客户端不再单独存
+    private void OnCardSeed(SCCardSeed info)
+    {
+        if (info == null || !awaitingSeed || !panel.m_selectCardPanel.IsOpen) return; // 等的时候界面已经收起就不理会，服务器留着这个种子
+        awaitingSeed = false;
+
+        var tier = (CardTier)info.tier;
+        if (!info.valid)
+        {
+            panel.m_selectCardPanel.Close();
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.no_card_in_tier);
+            return;
+        }
+        ShowCardSet(tier, info.seed, info.luck);
+    }
+
+    // 用种子抽一组卡铺进界面：入口与「选完还有次数」共用
+    private void ShowCardSet(CardTier tier, int seed, int luck)
     {
         var held = Skills != null ? new List<int>(Skills.HeldSkills) : new List<int>();
-        held.AddRange(justPickedSkills); // 刚选中的技能服务器还没回包，先本地排掉，免得下一组再出现一次
-        var rolls = CardCatalog.Roll(tier, cardLuck, CardCampForRoll(), 3, held);
+        var rolls = CardCatalog.Roll(tier, luck, CardCampForRoll(), CardCatalog.RollCount, held, seed);
         if (rolls.Count == 0)
         {
             panel.m_selectCardPanel.Close();
@@ -1154,55 +1184,53 @@ public class BattlePage : PageBase
             return;
         }
         currentCardTier = tier;
-        panel.m_selectCardPanel.Open(rolls, tier, cardLuck);
+        panel.m_selectCardPanel.Open(rolls, tier, luck);
     }
 
     // card_option.csv 的阵营限制：0 = 进攻方，1 = 防守方
     private int CardCampForRoll() => localPlayerCamp == (int)EntityCamp.Defense ? 1 : 0;
 
-    private void OnCardSelected(CardRoll roll)
+    // 选卡只上报第几张：卡牌内容由服务器用同一套伪随机算
+    private void OnCardSelected(int index)
     {
-        if (Tool.NetworkManager == null) return;
-        Tool.NetworkManager.SendSelectCard(new CSSelectCard
-        {
-            tier = (byte)roll.tier,
-            cardId = roll.cardId,
-            skillId = roll.IsSkill ? roll.skillId : -1,
-        });
-
-        // 本地先扣一次次数（服务器回 SCPlayerProgress 时以它为准覆盖）：这一档还有剩就直接出下一组，不再退回战斗界面重点
-        int tier = (int)roll.tier;
+        int tier = (int)currentCardTier;
         if (cardPending[tier] > 0) cardPending[tier]--;
-        if (roll.IsSkill) justPickedSkills.Add(roll.skillId);
         RefreshCardButtons();
 
-        if (cardPending[tier] > 0) ShowCardSet(roll.tier);
+        bool more = cardPending[tier] > 0;
+        awaitingSeed = more;
+        SendCardAction((CardTier)tier, hasChoice: true, choice: (byte)index, requestSeed: more);
+        if (more) panel.m_selectCardPanel.WaitForSeed((CardTier)tier); // 先隐掉卡面，等下一个种子
         else panel.m_selectCardPanel.Close();
     }
 
     private void OnCardDiscarded()
     {
-        if (Tool.NetworkManager == null) return;
-        Tool.NetworkManager.SendDiscardCard(new CSDiscardCard { tier = (byte)currentCardTier });
-
-        // 弃卡同样本地先扣一次：这一档还有剩就直接出下一组，否则收起
         int tier = (int)currentCardTier;
         if (cardPending[tier] > 0) cardPending[tier]--;
         RefreshCardButtons();
 
-        if (cardPending[tier] > 0) ShowCardSet(currentCardTier);
+        bool more = cardPending[tier] > 0;
+        awaitingSeed = more;
+        SendCardAction((CardTier)tier, hasChoice: true, choice: CSCardAction.DiscardChoice, requestSeed: more);
+        if (more) panel.m_selectCardPanel.WaitForSeed((CardTier)tier);
         else panel.m_selectCardPanel.Close();
+    }
+
+    // 手动关闭：不发包，服务器保留没用掉的种子（下次点开原样下发）
+    private void OnCardPanelClosed()
+    {
+        awaitingSeed = false;
     }
 
     private void ResetCardState()
     {
         for (int i = 0; i < cardPending.Length; i++) cardPending[i] = 0;
         pendingTiers.Clear();
-        justPickedSkills.Clear();
-        cardLuck = 0;
         cardLevel = 1;
         cardExp = 0;
         currentCardTier = CardTier.Silver;
+        awaitingSeed = false;
         RefreshProgressHud();
         if (panel.m_list_selectCard != null) panel.m_list_selectCard.numItems = 0;
     }

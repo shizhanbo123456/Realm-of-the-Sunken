@@ -16,6 +16,15 @@ public partial class BattleManager
         public int level = 1;
         public int exp;
         public readonly int[] pending = new int[CardCatalog.TierCount]; // 白银/黄金/炫彩 各自的待抽次数
+        public readonly CardSeedSlot[] seeds = new CardSeedSlot[CardCatalog.TierCount]; // 已下发还没用掉的种子
+    }
+
+    // 一档的抽卡种子：种子 + 生成时的幸运。没选就关界面时留着，下次原样下发
+    private class CardSeedSlot
+    {
+        public bool has;
+        public int seed;
+        public int luck;
     }
 
     private readonly Dictionary<int, PlayerProgress> playerProgress = new();
@@ -323,17 +332,102 @@ public partial class BattleManager
     #endregion
 
     #region 卡牌结算
-    // 选卡：消耗该档一次待抽次数，按类型立刻生效
-    public void ApplyCard(int clientId, int tier, int cardId, int skillId)
+    // 抽卡界面唯一的入口：无选择 = 只要种子；有选择 = 按下标结算，再决定要不要下一个种子
+    public void HandleCardAction(int clientId, Ros.Transport.CSCardAction action)
+    {
+        if (action.tier >= CardCatalog.TierCount) return;
+
+        if (!action.hasChoice)
+        {
+            RequestCardSeed(clientId, action.tier);
+            return;
+        }
+
+        bool settled = action.choice == Ros.Transport.CSCardAction.DiscardChoice
+            ? DiscardCard(clientId, action.tier)
+            : ApplyCardChoice(clientId, action.tier, action.choice);
+
+        if (!settled)
+        {
+            SendCardSeed(clientId, action.tier, valid: false); // 包与服务器状态对不上：让客户端收起面板
+            return;
+        }
+        if (action.requestSeed) RequestCardSeed(clientId, action.tier);
+    }
+
+    // 请求种子：这一档已有没消耗的种子就原样重发，反复进出界面刷不出新卡
+    private void RequestCardSeed(int clientId, int tier)
     {
         if (tier < 0 || tier >= CardCatalog.TierCount) return;
         var p = EnsureProgress(clientId);
-        if (p.pending[tier] <= 0) return;
-        if (!CardOptionConfig.content.TryGetValue(cardId, out var card)) return;
+
+        var slot = p.seeds[tier];
+        if (slot == null || !slot.has)
+        {
+            if (p.pending[tier] <= 0)
+            {
+                SendCardSeed(clientId, tier, valid: false);
+                return;
+            }
+            slot = new CardSeedSlot
+            {
+                has = true,
+                seed = Random.Range(int.MinValue, int.MaxValue),
+                luck = GetPlayerCardBonus(clientId).luck,
+            };
+            p.seeds[tier] = slot;
+        }
+        SendCardSeed(clientId, tier, valid: true);
+    }
+
+    private void SendCardSeed(int clientId, int tier, bool valid)
+    {
+        if (Tool.NetworkManager == null) return;
+        var slot = EnsureProgress(clientId).seeds[tier];
+        Tool.NetworkManager.SendCardSeed(clientId, new Ros.Transport.SCCardSeed
+        {
+            valid = valid && slot != null && slot.has,
+            tier = (byte)tier,
+            luck = slot != null ? slot.luck : 0,
+            seed = slot != null ? slot.seed : 0,
+        });
+    }
+
+    // 服务器用同一套伪随机把这一档的卡滚出来，客户端按下标选的就是这里的第几张
+    private List<CardRoll> RollSeedCards(int clientId, int tier)
+    {
+        var slot = EnsureProgress(clientId).seeds[tier];
+        if (slot == null || !slot.has) return null;
+        var held = playerSkills.TryGetValue(clientId, out var list) ? list : null;
+        return CardCatalog.Roll((CardTier)tier, slot.luck, CardCampForRoll(clientId), CardCatalog.RollCount, held, slot.seed);
+    }
+
+    private bool ApplyCardChoice(int clientId, int tier, int index)
+    {
+        var rolls = RollSeedCards(clientId, tier);
+        if (rolls == null || index < 0 || index >= rolls.Count) return false;
+        var roll = rolls[index];
+        return ApplyCard(clientId, tier, roll.cardId, roll.skillId);
+    }
+
+    // card_option.csv 的阵营限制：0 = 进攻方，1 = 防守方（与客户端同口径）
+    private int CardCampForRoll(int clientId)
+    {
+        return PlayerCamps.TryGetValue(clientId, out var camp) && camp == PlayerCampType.Defense ? 1 : 0;
+    }
+
+    // 选卡：消耗该档一次待抽次数，按类型立刻生效
+    public bool ApplyCard(int clientId, int tier, int cardId, int skillId)
+    {
+        if (tier < 0 || tier >= CardCatalog.TierCount) return false;
+        var p = EnsureProgress(clientId);
+        if (p.pending[tier] <= 0) return false;
+        if (!CardOptionConfig.content.TryGetValue(cardId, out var card)) return false;
         // 技能卡必须带具体技能 id，否则这一抽作废（不扣次数）
-        if (IsSkillType(card.type) && skillId < 0) return;
+        if (IsSkillType(card.type) && skillId < 0) return false;
 
         p.pending[tier]--;
+        ConsumeSeed(p, tier);
 
         switch (card.type)
         {
@@ -351,6 +445,12 @@ public partial class BattleManager
                 break;
         }
         SendProgress(clientId);
+        return true;
+    }
+
+    private static void ConsumeSeed(PlayerProgress p, int tier)
+    {
+        if (p.seeds[tier] != null) p.seeds[tier].has = false;
     }
 
     private static bool IsSkillType(string type)
@@ -359,15 +459,17 @@ public partial class BattleManager
     }
 
     // 弃卡：整组折算成经验（不吃经验增幅，避免"抽了就弃"滚雪球）
-    public void DiscardCard(int clientId, int tier)
+    public bool DiscardCard(int clientId, int tier)
     {
-        if (tier < 0 || tier >= CardCatalog.TierCount) return;
+        if (tier < 0 || tier >= CardCatalog.TierCount) return false;
         var p = EnsureProgress(clientId);
-        if (p.pending[tier] <= 0) return;
+        if (p.pending[tier] <= 0) return false;
 
         p.pending[tier]--;
+        ConsumeSeed(p, tier);
         GrantDiscardExp(clientId, tier);
         SendProgress(clientId);
+        return true;
     }
 
     // 弃卡折算经验：重复选择已持有的技能卡也走这里
@@ -422,7 +524,6 @@ public partial class BattleManager
         {
             level = p.level,
             exp = p.exp,
-            luck = GetPlayerCardBonus(clientId).luck,
             silver = p.pending[0],
             gold = p.pending[1],
             holo = p.pending[2],
