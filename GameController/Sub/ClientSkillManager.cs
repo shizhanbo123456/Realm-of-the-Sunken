@@ -44,6 +44,7 @@ public class ClientSkillManager : ClientSubManager
     private Quaternion meleeLastRot = Quaternion.identity;
     private Transform meleeWeapon;
     private BulletVfxInfo meleeHits;
+    private int meleeLastAnimId = int.MinValue;
     #endregion
 
     #region 生命周期
@@ -185,6 +186,13 @@ public class ClientSkillManager : ClientSubManager
             meleeAnim.onAttack = OnOwnAttackFrame;
         }
 
+        meleeAnim.GetDisplayAnim(out int animIdNow, out _);
+        if (animIdNow != meleeLastAnimId)
+        {
+            meleeLastAnimId = animIdNow;
+            Debug.Log($"[时序] 本地动画切换 hash={animIdNow} t={Time.time:F3}"); // 【临时诊断】
+        }
+
         if (meleeWindowEnd <= 0f) return;
         if (Time.time >= meleeWindowEnd)
         {
@@ -208,6 +216,7 @@ public class ClientSkillManager : ClientSubManager
     private void OnCombatLabel(SCCombatLabel label)
     {
         if (label == null) return;
+        Debug.Log($"[时序] 飘字 t={Time.time:F3} target={label.targetId} type={label.type} amount={label.amount}"); // 【临时诊断】
         var loading = ClientLoadingManager.Current;
         if (loading == null || !loading.HasSession || loading.OwnEntityId == 0) return;
         if (label.targetId != loading.OwnEntityId) return;
@@ -226,6 +235,11 @@ public class ClientSkillManager : ClientSubManager
     // 本地视图的攻击帧，与服务器同一归一化时刻：只有走武器判定的近战技能开窗
     private void OnOwnAttackFrame(EntityAnim.AttackType type)
     {
+        if (meleeAnim != null && meleeAnim.MainAnimator != null)
+        {
+            var state = meleeAnim.MainAnimator.GetCurrentAnimatorStateInfo(0); // 【临时诊断】
+            Debug.Log($"[时序] 攻击帧 t={Time.time:F3} 片段长={state.length:F2}s 归一化={state.normalizedTime:F2}"); // 【临时诊断】
+        }
         if (meleeSkillId < 0) return;
         if (Time.time - meleeRequestTime > MeleeRequestGrace)
         {
