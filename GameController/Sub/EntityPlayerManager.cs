@@ -201,22 +201,22 @@ public class EntityPlayerManager : ClientSubManager
 
         // 本地玩家：绑定相机跟随（注视点 = EntityAnchor.Camera，每帧由视图刷新）
         var loading = ClientLoadingManager.Current;
-        if (loading != null && loading.HasSession && info.entityId == loading.OwnEntityId)
+        if (loading != null && loading.HasSession && info.entityId == loading.OwnEntityId
+            && Tool.CameraController != null)
         {
-            if (Tool.CameraController != null)
+            if (view.cameraAnchor == null && info.hasTransform)
             {
-                if (view.cameraAnchor == null && info.hasTransform)
-                {
-                    // 视体位姿由 rb.MovePosition 施加，要到下一个物理步才生效；此刻读骨骼会得到"假位置"上的锚点，
-                    // 故先用权威位姿摆正一次（仅建视体这一次，之后仍由 MovePosition 驱动，不破坏碰撞解析）
-                    view.transform.position = info.position;
-                    view.transform.rotation = Quaternion.Euler(0f, info.yaw, 0f);
-                    view.cameraAnchor = new GameObject("CameraAnchor").transform;
-                    view.cameraAnchor.position = EntityAnchor.Camera.GetTransform(view.modelInfo, view.anim).position;
-                    view.cameraAnchor.rotation = view.transform.rotation;
-                    Tool.CameraController.SetLookTarget(view.cameraAnchor);
-                }
+                // 视体位姿由 rb.MovePosition 施加，要到下一个物理步才生效；此刻读骨骼会得到"假位置"上的锚点，
+                // 故先用权威位姿摆正一次（仅建视体这一次，之后仍由 MovePosition 驱动，不破坏碰撞解析）
+                view.transform.position = info.position;
+                view.transform.rotation = Quaternion.Euler(0f, info.yaw, 0f);
+                view.cameraAnchor = new GameObject("CameraAnchor").transform;
+                view.cameraAnchor.position = EntityAnchor.Camera.GetTransform(view.modelInfo, view.anim).position;
+                view.cameraAnchor.rotation = view.transform.rotation;
             }
+            // 复活换实体 / 观战结束：镜头还挂在别处就夺回跟随；每包校验，错过首包也能自愈
+            if (view.cameraAnchor != null && Tool.CameraController.lookTarget != view.cameraAnchor)
+                Tool.CameraController.SetLookTarget(view.cameraAnchor);
         }
     }
 

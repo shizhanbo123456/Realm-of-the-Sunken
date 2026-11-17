@@ -39,12 +39,14 @@ public class ClientLoadingManager : ClientSubManager
     {
         EventManager.AddEvent(ClientEvent.OnExitWorld, Clear);
         EventManager.AddEvent(ClientEvent.OnRestartGame, Clear);
+        EventManager.AddEvent<SCReviveInfo>(ClientEvent.OnReviveProgressUpdate, OnReviveProgress);
     }
 
     protected override void UnbindEvents()
     {
         EventManager.RemoveEvent(ClientEvent.OnExitWorld, Clear);
         EventManager.RemoveEvent(ClientEvent.OnRestartGame, Clear);
+        EventManager.RemoveEvent<SCReviveInfo>(ClientEvent.OnReviveProgressUpdate, OnReviveProgress);
     }
 
     #region//加载流程
@@ -197,17 +199,29 @@ public class ClientLoadingManager : ClientSubManager
     public void OnPlayerEntity(SCPlayerEntity info)
     {
         if (!HasSession || info == null) return;
+        BindEntity(info.clientId, info.entityId);
+    }
 
+    // 复活包单播到本人且必达，故本地实体 id 一并由它刷新（SCPlayerEntity 的广播不会回到房主自己的客户端）
+    private void OnReviveProgress(SCReviveInfo info)
+    {
+        if (info == null || !info.ready || info.entityId == 0) return;
+        BindEntity(NetworkManager.LocalToken, info.entityId);
+    }
+
+    // clientId → 当前实体 id（-1 = 无实体）；本地玩家同时刷新 OwnEntityId
+    private void BindEntity(int clientId, int entityId)
+    {
         // 复活换新实体 id：清掉该玩家的旧关系，避免旧 id 仍能反查到人
-        if (playerEntities.TryGetValue(info.clientId, out var old) && old > 0
-            && entityOwners.TryGetValue((ushort)old, out var oldOwner) && oldOwner == info.clientId)
+        if (playerEntities.TryGetValue(clientId, out var old) && old > 0
+            && entityOwners.TryGetValue((ushort)old, out var oldOwner) && oldOwner == clientId)
             entityOwners.Remove((ushort)old);
 
-        playerEntities[info.clientId] = info.entityId;
-        if (info.entityId > 0) entityOwners[(ushort)info.entityId] = info.clientId;
+        playerEntities[clientId] = entityId;
+        if (entityId > 0) entityOwners[(ushort)entityId] = clientId;
 
-        if (info.clientId == NetworkManager.LocalToken)
-            OwnEntityId = info.entityId > 0 ? (ushort)info.entityId : (ushort)0;
+        if (clientId == NetworkManager.LocalToken)
+            OwnEntityId = entityId > 0 ? (ushort)entityId : (ushort)0;
     }
 
     private void Clear()
