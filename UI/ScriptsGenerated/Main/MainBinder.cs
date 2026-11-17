@@ -50,9 +50,7 @@ namespace Ros.UI.Main
             UIObjectFactory.SetPackageItemExtension(UI_CharacterAttributePanel.URL, typeof(UI_CharacterAttributePanel));
             UIObjectFactory.SetPackageItemExtension(UI_HomeSpecialAbility.URL, typeof(UI_HomeSpecialAbility));
             UIObjectFactory.SetPackageItemExtension(UI_GuidePanel.URL, typeof(UI_GuidePanel));
-            UIObjectFactory.SetPackageItemExtension(UI_GuideMenuLabel.URL, typeof(UI_GuideMenuLabel));
-            UIObjectFactory.SetPackageItemExtension(UI_GuideItem.URL, typeof(UI_GuideItem));
-            UIObjectFactory.SetPackageItemExtension(UI_GuideSkillRare.URL, typeof(UI_GuideSkillRare));
+            UIObjectFactory.SetPackageItemExtension(UI_GuideRareDtoS.URL, typeof(UI_GuideRareDtoS));
             UIObjectFactory.SetPackageItemExtension(UI_LobbCampOperation.URL, typeof(UI_LobbCampOperation));
             UIObjectFactory.SetPackageItemExtension(UI_btn_SelectCard.URL, typeof(UI_btn_SelectCard));
             UIObjectFactory.SetPackageItemExtension(UI_SelectCardPanel.URL, typeof(UI_SelectCardPanel));
@@ -63,6 +61,12 @@ namespace Ros.UI.Main
             UIObjectFactory.SetPackageItemExtension(UI_CampInfoPanel.URL, typeof(UI_CampInfoPanel));
             UIObjectFactory.SetPackageItemExtension(UI_CampInfo.URL, typeof(UI_CampInfo));
             UIObjectFactory.SetPackageItemExtension(UI_ImportantEventBanner.URL, typeof(UI_ImportantEventBanner));
+            UIObjectFactory.SetPackageItemExtension(UI_GuideRareBtoS.URL, typeof(UI_GuideRareBtoS));
+            UIObjectFactory.SetPackageItemExtension(UI_GuideScoreTab.URL, typeof(UI_GuideScoreTab));
+            UIObjectFactory.SetPackageItemExtension(UI_GuideItemSkill.URL, typeof(UI_GuideItemSkill));
+            UIObjectFactory.SetPackageItemExtension(UI_GuideSlot.URL, typeof(UI_GuideSlot));
+            UIObjectFactory.SetPackageItemExtension(UI_GuideDetailSkill.URL, typeof(UI_GuideDetailSkill));
+            UIObjectFactory.SetPackageItemExtension(UI_GuideDetailSkillRank.URL, typeof(UI_GuideDetailSkillRank));
             UIObjectFactory.SetPackageItemExtension(UI_onlookComboBox_popup.URL, typeof(UI_onlookComboBox_popup));
             UIObjectFactory.SetPackageItemExtension(UI_buffItem.URL, typeof(UI_buffItem));
             UIObjectFactory.SetPackageItemExtension(UI_buffItemMask.URL, typeof(UI_buffItemMask));
