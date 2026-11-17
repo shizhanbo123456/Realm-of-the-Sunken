@@ -135,6 +135,25 @@ public partial class BattleManager
     }
     #endregion
 
+    #region 打击震颤
+    // 只有命中类参与（DoT / 反伤 / 闪避 / 失效不发）；攻击方与受击方是玩家才各发一条
+    public void SendHitFeel(EntityData attacker, EntityData target, CombatLabelType type)
+    {
+        if (type != CombatLabelType.Normal && type != CombatLabelType.Crit && type != CombatLabelType.Shield) return;
+
+        if (attacker != null && EntityOwnerClient.TryGetValue(attacker.id, out int attackerClient))
+        {
+            Tool.NetworkManager.SendHitFeel(attackerClient,
+                new SCHitFeel { role = SCHitFeel.RoleAttacker, type = (int)type });
+        }
+        if (EntityOwnerClient.TryGetValue(target.id, out int targetClient))
+        {
+            Tool.NetworkManager.SendHitFeel(targetClient,
+                new SCHitFeel { role = SCHitFeel.RoleVictim, type = (int)type });
+        }
+    }
+    #endregion
+
     #region 死亡 / 复活 / 愈战愈勇
     private class ReviveState
     {

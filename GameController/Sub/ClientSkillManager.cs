@@ -26,26 +26,6 @@ public class ClientSkillManager : ClientSubManager
 
     public SkillRecharge Recharge => recharge;
 
-    #region 打击感（受击震颤 / 近战命中震颤）
-    // 走 SkillBase.StrikeWeapon（贴武器实例命中球判定）的技能：服务器加新的近战技能时这里要同步
-    private static readonly HashSet<int> meleeWeaponSkills = new() { GlobalConfig.unarmed_punch };
-
-    private const float MeleeRequestGrace = 2f;   // 施法请求到攻击帧的容差，超时说明这次请求没落地
-
-    private EntityAnim meleeAnim;   // 已挂钩的本地视图动画，换视图时重挂
-    private int meleeSkillId = -1;  // 最近一次近战施法请求，攻击帧取用后清空
-    private float meleeRequestTime;
-    private float meleeWindowEnd;   // 命中判定窗的结束时刻，0 = 未开窗
-    private float meleeScale = 1f;
-    private float meleeInterval;    // 每目标再命中间隔（skill 表第 10 列），与服务器 Bullet 同口径
-    private readonly Dictionary<ushort, float> meleeHitTime = new(); // 本窗内每目标上次命中时刻
-    private bool meleeSampled;
-    private Vector3 meleeLastPos;
-    private Quaternion meleeLastRot = Quaternion.identity;
-    private Transform meleeWeapon;
-    private BulletVfxInfo meleeHits;
-    #endregion
-
     #region 生命周期
     public override void Init(ClientLogicManager owner)
     {
@@ -61,11 +41,6 @@ public class ClientSkillManager : ClientSubManager
         recharge.Clear();
         slotCapacity = ResolveSlotCapacity();
         selectedSlot = 0;
-        meleeAnim = null;
-        meleeSkillId = -1;
-        meleeWindowEnd = 0f;
-        meleeSampled = false;
-        meleeHitTime.Clear();
     }
     #endregion
 
@@ -146,7 +121,6 @@ public class ClientSkillManager : ClientSubManager
         if (loading == null || !loading.HasSession || loading.OwnEntityId == 0) return;
         int skillId = GetSlotSkillId(slot);
         if (skillId < 0) return;
-        MarkCastRequest(skillId);
         if (Tool.NetworkManager != null) Tool.NetworkManager.SendSkillCastInput(skillId);
     }
 
@@ -155,107 +129,54 @@ public class ClientSkillManager : ClientSubManager
     {
         var loading = ClientLoadingManager.Current;
         if (loading == null || !loading.HasSession || loading.OwnEntityId == 0) return; // 无战斗实体（观战/未开局）不发
-        MarkCastRequest(GlobalConfig.unarmed_punch);
         if (Tool.NetworkManager != null) Tool.NetworkManager.SendSkillCastInput(GlobalConfig.unarmed_punch);
     }
     #endregion
 
     #region 打击感
-    public override void Tick(float deltaTime)
-    {
-        var loading = ClientLoadingManager.Current;
-        if (loading == null || !loading.HasSession || loading.OwnEntityId == 0)
-        {
-            meleeAnim = null;
-            meleeWindowEnd = 0f;
-            return;
-        }
-
-        var view = logic.EntityPlayers.GetView(loading.OwnEntityId);
-        if (view == null || view.anim == null)
-        {
-            meleeAnim = null;
-            meleeWindowEnd = 0f;
-            return;
-        }
-        // 本地视图换过（复活重建）：重挂攻击帧回调。客户端只有判断命中这一处占用 onAttack
-        if (view.anim != meleeAnim)
-        {
-            meleeAnim = view.anim;
-            meleeAnim.onAttack = OnOwnAttackFrame;
-        }
-
-        if (meleeWindowEnd <= 0f) return;
-        if (Time.time >= meleeWindowEnd)
-        {
-            meleeWindowEnd = 0f;
-            return;
-        }
-        SampleMeleeHit(view);
-    }
-
     protected override void BindEvents()
     {
-        EventManager.AddEvent<SCCombatLabel>(ClientEvent.OnCombatLabelDisplay, OnCombatLabel);
+        EventManager.AddEvent<SCHitFeel>(ClientEvent.OnHitFeel, OnHitFeel);
     }
 
     protected override void UnbindEvents()
     {
-        EventManager.RemoveEvent<SCCombatLabel>(ClientEvent.OnCombatLabelDisplay, OnCombatLabel);
+        EventManager.RemoveEvent<SCHitFeel>(ClientEvent.OnHitFeel, OnHitFeel);
     }
 
-    // 受击震颤：飘字只带受击实体 id，命中类是唯一来源；DoT/闪避/失效/连击保护/反伤一律不震
-    private void OnCombatLabel(SCCombatLabel label)
+    // 服务器判定命中后按当事人单发：受击方按普通/暴击/护盾分档，攻击方统一命中档。
+    // 客户端不做命中预测——推演位置与权威位置的偏差会让接触时刻漂移甚至漏判
+    private void OnHitFeel(SCHitFeel info)
     {
-        if (label == null) return;
-        Debug.Log($"[时序] 飘字 t={Time.time:F3} target={label.targetId} type={label.type} amount={label.amount}"); // 【临时诊断】
-        var loading = ClientLoadingManager.Current;
-        if (loading == null || !loading.HasSession || loading.OwnEntityId == 0) return;
-        if (label.targetId != loading.OwnEntityId) return;
+        if (info == null) return;
 
-        float trauma;
-        switch ((CombatLabelType)label.type)
+        global_variablesEnum key;
+        if (info.role == SCHitFeel.RoleVictim)
         {
-            case CombatLabelType.Normal: trauma = GlobalVariable.F(global_variablesEnum.camera_shake_hurt_normal); break;
-            case CombatLabelType.Crit: trauma = GlobalVariable.F(global_variablesEnum.camera_shake_hurt_crit); break;
-            case CombatLabelType.Shield: trauma = GlobalVariable.F(global_variablesEnum.camera_shake_hurt_shield); break;
-            default: return;
+            switch ((CombatLabelType)info.type)
+            {
+                case CombatLabelType.Normal: key = global_variablesEnum.camera_shake_hurt_normal; break;
+                case CombatLabelType.Crit: key = global_variablesEnum.camera_shake_hurt_crit; break;
+                case CombatLabelType.Shield: key = global_variablesEnum.camera_shake_hurt_shield; break;
+                default: return; // DoT / 闪避 / 失效 / 反伤等不分档
+            }
         }
-        if (Tool.CameraController != null) Tool.CameraController.AddTrauma(trauma);
-    }
-
-    // 本地视图的攻击帧，与服务器同一归一化时刻：只有走武器判定的近战技能开窗
-    private void OnOwnAttackFrame(EntityAnim.AttackType type)
-    {
-        if (meleeAnim != null && meleeAnim.MainAnimator != null)
+        else if (info.role == SCHitFeel.RoleAttacker)
         {
-            var state = meleeAnim.MainAnimator.GetCurrentAnimatorStateInfo(0); // 【临时诊断】
-            Debug.Log($"[时序] 攻击帧 t={Time.time:F3} 片段长={state.length:F2}s 归一化={state.normalizedTime:F2}"); // 【临时诊断】
+            key = global_variablesEnum.camera_shake_hit_normal;
         }
-        if (meleeSkillId < 0) return;
-        if (Time.time - meleeRequestTime > MeleeRequestGrace)
+        else
         {
-            meleeSkillId = -1;
+            Debug.LogError($"[打击感] 未知的震颤角色：{info.role}");
             return;
         }
-        OpenMeleeWindow(meleeSkillId);
-    }
 
-    // 开命中判定窗：窗长与服务器那颗隐形子弹同源，一次请求只开一层
-    private void OpenMeleeWindow(int skillId)
-    {
-        var config = SkillConfig.Get(skillId);
-        meleeScale = config.bulletSizes.Count > 0 ? config.bulletSizes[0] : 1f;
-        meleeInterval = config.damageInterval ?? 100f; // 与 SkillBase.DamageInterval 同口径
-        meleeHitTime.Clear();
-        meleeSampled = false;
-        meleeWindowEnd = Time.time + GlobalVariable.F(global_variablesEnum.melee_bullet_life);
-        meleeSkillId = -1;
+        if (Tool.CameraController != null) Tool.CameraController.AddTrauma(GlobalVariable.F(key));
     }
     #endregion
 
     #region 表现
-    // 服务器只在攻击帧下发波次，客户端收到即播；wave 特效不走 anim.onAttack（那个回调留给命中判断）
+    // 服务器只在攻击帧下发波次，客户端收到即播（攻击帧回调 onAttack 客户端不再占用）
     public void OnSkillCast(SCSkillDisplayContext context)
     {
         if (context == null) return;
@@ -285,134 +206,6 @@ public class ClientSkillManager : ClientSubManager
         };
         if (saveIndex < 0 || Tool.InfoManager == null || Tool.SaveManager == null) return 0;
         return Mathf.Max(0, Tool.InfoManager.GetPlayerCharacterInfo(saveIndex).GetAttribute().weaponSlotCount);
-    }
-
-    // 记下这次施法请求的技能，攻击帧据此判断要不要开命中判定窗
-    private void MarkCastRequest(int skillId)
-    {
-        meleeSkillId = meleeWeaponSkills.Contains(skillId) ? skillId : -1;
-        meleeRequestTime = Time.time;
-    }
-
-    // 命中球取手上武器实例的 BulletVfxInfo（与服务器同一预制体）；VfxHitSource 走 AssetsManager，客户端拿不到
-    private BulletVfxInfo ResolveWeaponHits()
-    {
-        Transform weapon = meleeAnim != null ? meleeAnim.WeaponTransform : null;
-        if (weapon == null) return null;
-        if (weapon == meleeWeapon) return meleeHits;
-        meleeWeapon = weapon;
-        meleeHits = weapon.GetComponent<BulletVfxInfo>();
-        return meleeHits;
-    }
-
-    // 客户端保持扫掠：服务器那颗近战子弹的轨迹忽略时间因子、每 tick 取当前位姿，帧率足够高时才等价于点判定；
-    // 这里拿上一帧与这一帧的位姿连成线段，低帧率下也不会漏掉刀扫过的目标（比服务器略宽松，最多多震一次）
-    private void SampleMeleeHit(EntityPlayerManager.ClientEntityView view)
-    {
-        if (!BulletTrajectory.TryGetWeaponPose(view.id, out var pos, out var rot, out bool inHand) || !inHand) return;
-        var hits = ResolveWeaponHits();
-        if (hits == null || hits.hits.Count == 0) return;
-
-        if (!meleeSampled)
-        {
-            meleeSampled = true;
-            LogFirstSample(view, pos, rot, hits.hits[0]); // 【临时诊断】
-            meleeLastPos = pos;
-            meleeLastRot = rot;
-            return;
-        }
-
-        for (int i = 0; i < hits.hits.Count; i++)
-        {
-            var h = hits.hits[i];
-            Vector3 offset = h.center * meleeScale;
-            Vector3 from = meleeLastPos + meleeLastRot * offset;
-            Vector3 to = pos + rot * offset;
-            float radius = h.radius * meleeScale;
-            foreach (var target in logic.EntityPlayers.AllViews)
-            {
-                if (target == null || target.id == view.id || target.modelInfo == null) continue;
-                if (!EntityCampUtil.IsHostile(view.type.category, target.camp)) continue;
-                if (!ReachTarget(from, to, radius, target)) continue;
-                if (!AllowHit(target.id)) continue;
-                meleeHitTime[target.id] = Time.time;
-                TriggerMeleeHit(target.id);
-            }
-        }
-
-        meleeLastPos = pos;
-        meleeLastRot = rot;
-    }
-
-    // 【临时诊断】开窗首帧：判定球在哪、离最近敌对目标还差多少
-    private void LogFirstSample(EntityPlayerManager.ClientEntityView view, Vector3 pos, Quaternion rot, BulletVfxInfo.HitInfo hit)
-    {
-        Vector3 sphere = pos + rot * (hit.center * meleeScale);
-        float radius = hit.radius * meleeScale;
-        float nearest = float.MaxValue;
-        ushort nearestId = 0;
-        Vector3 nearestCenter = Vector3.zero;
-        foreach (var target in logic.EntityPlayers.AllViews)
-        {
-            if (target == null || target.id == view.id || target.modelInfo == null) continue;
-            if (!EntityCampUtil.IsHostile(view.type.category, target.camp)) continue;
-            Transform model = target.modelInfo.transform;
-            Vector3 scale = model.lossyScale;
-            float targetRadius = GlobalConfig.entity_capsule_radius * Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z));
-            Vector3 center = model.TransformPoint(new Vector3(
-                (target.modelInfo.xRange.x + target.modelInfo.xRange.y) * 0.5f,
-                0f,
-                (target.modelInfo.zRange.x + target.modelInfo.zRange.y) * 0.5f));
-            float dx = center.x - sphere.x;
-            float dz = center.z - sphere.z;
-            float gap = Mathf.Sqrt(dx * dx + dz * dz) - (radius + targetRadius);
-            if (gap >= nearest) continue;
-            nearest = gap;
-            nearestId = target.id;
-            nearestCenter = center;
-        }
-        Debug.Log($"[时序] 开窗首帧 球心={sphere} 半径={radius:F2} 最近目标={nearestId} 圆心={nearestCenter} 间隙={nearest:F2}");
-    }
-
-    // 目标平面足迹直接从 EntityModelInfo 算，不依赖碰撞体：客户端只有带动画的视图才建胶囊，
-    // 雕像/珊瑚/水晶这类没有 Animator 的实体会漏判。口径与 EntityModelInfo.BuildCapsuleCollider + EntityData.HitRadiusXZ 一致
-    private static bool ReachTarget(Vector3 from, Vector3 to, float sphereRadius, EntityPlayerManager.ClientEntityView target)
-    {
-        EntityModelInfo model = target.modelInfo;
-        Vector3 scale = model.transform.lossyScale;
-        float targetRadius = GlobalConfig.entity_capsule_radius * Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z));
-        Vector3 center = model.transform.TransformPoint(new Vector3(
-            (model.xRange.x + model.xRange.y) * 0.5f,
-            (model.yRange.x + model.yRange.y) * 0.5f,
-            (model.zRange.x + model.zRange.y) * 0.5f));
-        float sum = sphereRadius + targetRadius;
-        return SqrDistPointSegmentXZ(center, from, to) <= sum * sum;
-    }
-
-    private static float SqrDistPointSegmentXZ(Vector3 p, Vector3 a, Vector3 b)
-    {
-        float ax = p.x - a.x, az = p.z - a.z;
-        float bx = b.x - a.x, bz = b.z - a.z;
-        float lenSqr = bx * bx + bz * bz;
-        float t = lenSqr > 1e-8f ? Mathf.Clamp01((ax * bx + az * bz) / lenSqr) : 0f;
-        float dx = ax - bx * t, dz = az - bz * t;
-        return dx * dx + dz * dz;
-    }
-
-    // 与服务器 Bullet.lastHitTime 同口径：间隔 <= 0 时一目标一刀一次，> 0 时按间隔重复
-    private bool AllowHit(ushort targetId)
-    {
-        if (!meleeHitTime.TryGetValue(targetId, out float last)) return true;
-        if (meleeInterval <= 0f) return false;
-        return Time.time - last >= meleeInterval;
-    }
-
-    // 每次命中都震：同一次挥砍里多目标、按间隔的重复命中都各算一次
-    private void TriggerMeleeHit(ushort targetId)
-    {
-        Debug.Log($"[时序] 本地命中 t={Time.time:F3} target={targetId}"); // 【临时诊断】
-        if (Tool.CameraController != null)
-            Tool.CameraController.AddTrauma(GlobalVariable.F(global_variablesEnum.camera_shake_hit_normal));
     }
     #endregion
 }

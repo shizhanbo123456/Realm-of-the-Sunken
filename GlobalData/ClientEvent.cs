@@ -30,6 +30,7 @@ public static class ClientEvent
     public const int OnGodViewEntities = 10236;     // param=SCGodViewEntities 上帝视角实体块（不含珊瑚）
     public const int OnGodViewCorals = 10237;       // param=SCGodViewCorals 上帝视角珊瑚块（仅 id 与位置）
     public const int OnGodViewDetail = 10238;       // param=SCGodViewEntityDetail 上帝视角点选实体的详情快照
+    public const int OnHitFeel = 10239;             // param=SCHitFeel 打击震颤（只发给攻击方/受击方当事人）
     #endregion
 
     #region UI 通用（10300 段）

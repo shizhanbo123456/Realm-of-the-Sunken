@@ -522,6 +522,13 @@ public partial class NetworkManager : EnsBehaviour
         CallFuncRpc(ClientReceiveCombatLabelLocal, SendTo.ExcludeSender, Delivery.Unreliable, label);
     }
 
+    // 打击震颤：只发给当事人，走 Strive（低频、丢了手感就没了，但不需要 Reliable 的重传延迟）
+    public void SendHitFeel(int clientId, SCHitFeel info)
+    {
+        if (!TryGetSendTo(clientId, out var to)) return;
+        CallFuncRpc(ClientReceiveHitFeelLocal, to, Delivery.Strive, info);
+    }
+
     public void SendScoreInfo(int clientId, SCScoreInfo info)
     {
         if (!TryGetSendTo(clientId, out var to)) return;
@@ -925,6 +932,12 @@ public partial class NetworkManager : EnsBehaviour
     {
         if (label == null) return;
         EventManager.TrigEvent(ClientEvent.OnCombatLabelDisplay, label);
+    }
+    [Rpc]
+    private void ClientReceiveHitFeelLocal(SCHitFeel info)
+    {
+        if (info == null) return;
+        EventManager.TrigEvent(ClientEvent.OnHitFeel, info);
     }
     [Rpc]
     private void ClientReceivePlayerProgressLocal(SCPlayerProgress info)

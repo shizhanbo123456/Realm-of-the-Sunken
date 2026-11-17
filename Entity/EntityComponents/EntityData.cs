@@ -640,6 +640,7 @@ public abstract class EntityData : MonoBehaviour
             shownType = CombatLabelType.Invalid;
         }
         SendCombatLabelEvent(shownDamage, shownType, hitPos);
+        if (Tool.BattleManager != null) Tool.BattleManager.SendHitFeel(attacker, this, shownType); // 当事人震颤（飘字管数字，震颤管手感）
         OnDamageApplied(finalDamage, attacker); // 各子类在此处理自己的受击后果（雕像计分与采集量等）
         if (attacker != null && canReflect && effectController != null)
         {
