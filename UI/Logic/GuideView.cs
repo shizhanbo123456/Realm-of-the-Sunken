@@ -75,13 +75,18 @@ public class GuideView
     {
         var btn = (GButton)obj;
         btn.title = MessageVariable.V(MenuTitles[index]);
-        btn.onClick.Set(() => SwitchTab(index));
+        btn.selected = index == tab;
+        int menuIndex = index;
+        btn.onClick.Set(() => SwitchTab(menuIndex));
     }
 
     private void SwitchTab(int index)
     {
         tab = index;
         panel.m_buffTab.selectedIndex = index;
+        var menu = panel.m_menu_btn_list;
+        for (int i = 0; i < menu.numChildren; i++)
+            menu.GetChildAt(i).asButton.selected = i == index;
         entries.Clear();
         if (index == 0)
         {
@@ -111,7 +116,7 @@ public class GuideView
             var item = (UI_GuideItemSkill)obj;
             item.title = entry.title;
             item.m_des.text = entry.description;
-            item.m_slot.texture = tex;
+            item.m_mask.m_mask.m_icon.texture = tex;
             item.m_Level.selectedIndex = entry.quality;
             item.m_rare_BtoS.m_level.selectedIndex = entry.quality;
             item.onClick.Set(() => ShowDetail(index));
