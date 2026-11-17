@@ -316,6 +316,7 @@ public class ClientSkillManager : ClientSubManager
         if (!meleeSampled)
         {
             meleeSampled = true;
+            LogFirstSample(view, pos, rot, hits.hits[0]); // 【临时诊断】
             meleeLastPos = pos;
             meleeLastRot = rot;
             return;
@@ -341,6 +342,36 @@ public class ClientSkillManager : ClientSubManager
 
         meleeLastPos = pos;
         meleeLastRot = rot;
+    }
+
+    // 【临时诊断】开窗首帧：判定球在哪、离最近敌对目标还差多少
+    private void LogFirstSample(EntityPlayerManager.ClientEntityView view, Vector3 pos, Quaternion rot, BulletVfxInfo.HitInfo hit)
+    {
+        Vector3 sphere = pos + rot * (hit.center * meleeScale);
+        float radius = hit.radius * meleeScale;
+        float nearest = float.MaxValue;
+        ushort nearestId = 0;
+        Vector3 nearestCenter = Vector3.zero;
+        foreach (var target in logic.EntityPlayers.AllViews)
+        {
+            if (target == null || target.id == view.id || target.modelInfo == null) continue;
+            if (!EntityCampUtil.IsHostile(view.type.category, target.camp)) continue;
+            Transform model = target.modelInfo.transform;
+            Vector3 scale = model.lossyScale;
+            float targetRadius = GlobalConfig.entity_capsule_radius * Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z));
+            Vector3 center = model.TransformPoint(new Vector3(
+                (target.modelInfo.xRange.x + target.modelInfo.xRange.y) * 0.5f,
+                0f,
+                (target.modelInfo.zRange.x + target.modelInfo.zRange.y) * 0.5f));
+            float dx = center.x - sphere.x;
+            float dz = center.z - sphere.z;
+            float gap = Mathf.Sqrt(dx * dx + dz * dz) - (radius + targetRadius);
+            if (gap >= nearest) continue;
+            nearest = gap;
+            nearestId = target.id;
+            nearestCenter = center;
+        }
+        Debug.Log($"[时序] 开窗首帧 球心={sphere} 半径={radius:F2} 最近目标={nearestId} 圆心={nearestCenter} 间隙={nearest:F2}");
     }
 
     // 目标平面足迹直接从 EntityModelInfo 算，不依赖碰撞体：客户端只有带动画的视图才建胶囊，
