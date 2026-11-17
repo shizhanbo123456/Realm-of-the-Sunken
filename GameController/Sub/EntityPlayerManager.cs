@@ -152,6 +152,7 @@ public class EntityPlayerManager : ClientSubManager
     // 追帧参数（global_variables）：首次收到位姿包时读取并校验
     private float catchupTime;
     private float catchupSnapDistance;
+    private float catchupSnapDistanceY;
     private bool catchupConfigLoaded;
 
     private void EnsureCatchupConfig()
@@ -159,8 +160,10 @@ public class EntityPlayerManager : ClientSubManager
         if (catchupConfigLoaded) return;
         catchupTime = GlobalVariable.F(global_variablesEnum.display_catchup_time);
         catchupSnapDistance = GlobalVariable.F(global_variablesEnum.display_catchup_snap_distance);
+        catchupSnapDistanceY = GlobalVariable.F(global_variablesEnum.display_catchup_snap_distance_y);
         if (catchupTime <= 0f) throw new System.FormatException("[配表] global_variables 的 display_catchup_time 必须大于 0");
         if (catchupSnapDistance <= 0f) throw new System.FormatException("[配表] global_variables 的 display_catchup_snap_distance 必须大于 0");
+        if (catchupSnapDistanceY <= 0f) throw new System.FormatException("[配表] global_variables 的 display_catchup_snap_distance_y 必须大于 0");
         catchupConfigLoaded = true;
     }
 
@@ -499,8 +502,10 @@ public class EntityPlayerManager : ClientSubManager
             view.predictedInit = true;
             view.predictedYaw = info.yaw;   // 朝向直接采用包内值，不追帧
 
+            // 水平与纵向分别判定：高度突变（落地、升降切换）不允许靠追帧慢慢抹平
             Vector3 offset = info.position - view.predictedPos;
-            if (offset.sqrMagnitude >= catchupSnapDistance * catchupSnapDistance)
+            float offsetXZ = offset.x * offset.x + offset.z * offset.z;
+            if (offsetXZ >= catchupSnapDistance * catchupSnapDistance || Mathf.Abs(offset.y) >= catchupSnapDistanceY)
             {
                 // 首见或偏差超过上限：直接落位
                 view.predictedPos = info.position;

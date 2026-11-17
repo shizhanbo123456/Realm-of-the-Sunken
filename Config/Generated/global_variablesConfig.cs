@@ -81,6 +81,7 @@ namespace Ros.Config
         sync_entity_turn_rate,
         display_catchup_time,
         display_catchup_snap_distance,
+        display_catchup_snap_distance_y,
         max_entity_health,
         name_length_max,
         name_length_min,
