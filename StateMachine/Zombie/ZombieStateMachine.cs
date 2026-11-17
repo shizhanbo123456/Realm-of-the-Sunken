@@ -59,12 +59,18 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
     // 每 tick 先刷新目标，三个状态共用同一份结论
     protected override void OnThink()
     {
-        // 目标连续算不出路：忽略一段时间，避免放弃后下一拍又锁回同一个走不到的目标
-        if (Owner.NavUnreachable && currentTarget != null)
+        // 目标连续算不出路 / 有方向却顶死在墙角：忽略一段时间，避免放弃后下一拍又锁回同一个走不到的目标
+        if (Owner.NavUnreachable || Owner.NavStalled)
         {
-            ignoredTargetId = currentTarget.id;
-            ignoreTargetUntil = Time.time + GlobalConfig.ai_ignore_unreachable_time;
-            ClearTarget();
+            bool stalled = Owner.NavStalled;
+            if (stalled) Owner.ClearNavStall(); // 同一拍只处理一次
+            if (currentTarget != null)
+            {
+                ignoredTargetId = currentTarget.id;
+                ignoreTargetUntil = Time.time + GlobalConfig.ai_ignore_unreachable_time;
+                ClearTarget();
+            }
+            else if (stalled) Current.OnStuck(); // 没有目标：走不到的游荡点丢掉重取
         }
 
         currentTarget = AcquireTarget();
@@ -165,8 +171,8 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
 
     public void ClearFace() => Owner.SetFaceTarget(0);
 
-    // 卡住由 OnThink 统一处理（忽略该目标一段时间），行为层不必额外做
-    public void NotifyStuck() { }
+    // 卡住由 OnThink 统一处理（忽略该目标 / 丢掉游荡点），行为层不必额外做
+    public void NotifyStuck() => Current.OnStuck();
     #endregion
 
     #region//DecisionStates
@@ -181,6 +187,13 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
         {
             machine.Owner.SetFaceTarget(0); // 已无目标，别再朝旧目标转
             machine.wanderCenter = machine.Owner.transform.position;
+            machine.hasWanderPoint = false;
+            machine.wanderResumeTime = 0f;
+        }
+
+        // 这个点走不到：丢掉，下一拍在圆心附近重取
+        public override void OnStuck()
+        {
             machine.hasWanderPoint = false;
             machine.wanderResumeTime = 0f;
         }

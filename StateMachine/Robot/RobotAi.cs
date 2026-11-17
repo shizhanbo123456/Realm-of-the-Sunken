@@ -112,6 +112,16 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
     // 静止一段时间说明目的地走不到
     private void UpdateStuckSample()
     {
+        // 执行层已判出「有方向却没位移」（贴住墙角被几何挡住）：立刻放弃，不必等满采样周期
+        if (Owner.NavStalled)
+        {
+            Owner.StopMoving(); // 同时清掉卡死信号，下一拍从零重新累计
+            NotifyStuck();
+            stuckSampleTime = Time.time;
+            stuckSamplePos = Owner.transform.position;
+            return;
+        }
+
         if (Time.time - stuckSampleTime < GlobalConfig.ai_unreachable_pause) return;
         Vector3 delta = Owner.transform.position - stuckSamplePos;
         delta.y = 0f;

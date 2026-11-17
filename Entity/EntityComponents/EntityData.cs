@@ -188,6 +188,9 @@ public abstract class EntityData : MonoBehaviour
     private const float nav_corner_radius = 0.3f;
     private const float nav_repath_interval = 0.25f;
     private const float nav_arrive_radius = 0.3f; // 到达死区：执行层每帧判定，越过目标后不再掉头
+    private const float nav_arrive_radius_max = 0.6f;   // 死区上限：帧率再低也不许放大到跨过障碍拐点
+    private const float nav_stall_step = 0.01f;         // 单帧位移低于此值算没走动（米）
+    private const float nav_stall_timeout = 0.5f;       // 有方向却持续没位移多久判卡住（秒）
     private const float nav_rescue_tolerance = 1f;      // 与导航面的距离在此以内视为仍在网格上
     private const float nav_rescue_search_radius = 10f; // 脱网救援点搜索半径
     private const float nav_rescue_interval = 1f;       // 脱网检查间隔
@@ -200,10 +203,18 @@ public abstract class EntityData : MonoBehaviour
     private float navArriveRadius = nav_arrive_radius; // 当前生效的到达半径（随帧率放大）
     private Vector3 navLastDir;
     private int navReverseFrames;
+    private int navCornerIndex; // 当前正在追的拐点下标，只在真正走过之后推进
     private int navFailCount; // 连续算路失败次数：达到上限即判定目标不可达
     private float navNextRescueTime;
+    private float navStallTime; // 有方向却持续没位移的累计时长
 
     public bool NavUnreachable => navFailCount >= GlobalConfig.nav_path_fail_limit;
+
+    // 卡死：走不动但路径算得出来（贴住墙角/被几何挡住），交给决策层放弃或换点
+    public bool NavStalled => navStallTime >= nav_stall_timeout;
+
+    // 决策层消费掉卡死信号：下一拍从零重新累计，否则同一次卡住会被每拍重复放弃
+    public void ClearNavStall() => navStallTime = 0f;
 
     public void MoveTo(Vector3 dest)
     {
@@ -226,9 +237,11 @@ public abstract class EntityData : MonoBehaviour
         NavDestination = default;
         HasNavDestination = false;
         navCorners = null;
+        navCornerIndex = 0;
         navLastDir = Vector3.zero;
         navReverseFrames = 0;
         navFailCount = 0;
+        navStallTime = 0f;
     }
 
     public Vector3 ResolveNavDirection()
@@ -239,12 +252,16 @@ public abstract class EntityData : MonoBehaviour
         float step = (transform.position - navLastPos).magnitude;
         navLastPos = transform.position;
         if (step > 0.001f && step < 2f) navLastStep = Mathf.Lerp(navLastStep, step, 0.15f); // 平滑：避免到达半径逐帧跳动
-        navArriveRadius = Mathf.Max(nav_arrive_radius, navLastStep * 1.5f);
+        navArriveRadius = Mathf.Clamp(navLastStep * 1.5f, nav_arrive_radius, nav_arrive_radius_max);
         float arrive = navArriveRadius;
 
         Vector3 toDest = NavDestination - transform.position;
         toDest.y = 0f;
-        if (toDest.sqrMagnitude <= arrive * arrive) return Vector3.zero;
+        if (toDest.sqrMagnitude <= arrive * arrive)
+        {
+            navStallTime = 0f; // 已进入死区，不算卡住
+            return Vector3.zero;
+        }
 
         if (Time.time >= navNextRepathTime)
         {
@@ -264,41 +281,48 @@ public abstract class EntityData : MonoBehaviour
             }
 
             navCorners = navPath.corners;
+            navCornerIndex = 0;
             navFailCount = 0;
         }
 
         // 上一轮就失败了：等重算，本帧不动
         if (navCorners == null) return Vector3.zero;
 
-        Vector3 dir = NavDestination - transform.position;
-        dir.y = 0f;
-
-        if (navCorners != null)
+        // 拐点只在真正走过之后才推进：按下一段方向的投影判断，不按距离。
+        // 按距离跳会漏掉「跳过该拐点后线段切进障碍」的情况，凸角处方向会直接指进墙里，且位置不动→重算得出同一结果→永久卡死。
+        while (navCornerIndex < navCorners.Length - 1)
         {
-            int i = 0; // 起点与走过的拐点都靠这个距离跳过
-            while (i < navCorners.Length && FlatSqrDistance(navCorners[i]) <= arrive * arrive) i++;
-            if (i < navCorners.Length)
+            Vector3 rel = transform.position - navCorners[navCornerIndex];
+            Vector3 seg = navCorners[navCornerIndex + 1] - navCorners[navCornerIndex];
+            rel.y = 0f;
+            seg.y = 0f;
+            if (rel.sqrMagnitude <= 0.0025f || (seg.sqrMagnitude > 0.0001f && Vector3.Dot(rel, seg) >= 0f))
             {
-                Vector3 toCorner = navCorners[i] - transform.position;
-                toCorner.y = 0f;
-                // 拐点落在身后说明这条路径与前进方向矛盾（起点脱网/贴边），弃用拐点改用直线，避免前后翻转
-                if (toCorner.sqrMagnitude > 0.0001f && Vector3.Dot(toCorner, dir) > 0f) dir = toCorner;
+                navCornerIndex++;
+                navReverseFrames = 0; // 换段了，上一段的方向不再有参考价值
+                continue;
             }
+            break;
         }
 
+        // 方向只朝导航面上的拐点：绝不回退成「直冲目的地」的直线，那条线会穿过墙角
+        Vector3 dir = navCorners[navCornerIndex] - transform.position;
+        dir.y = 0f;
         if (dir.sqrMagnitude <= 0.0001f) return Vector3.zero;
 
         Vector3 final = dir.normalized;
         // 方向与上一帧相反时先保持原方向，连续两帧才接受：目标在两点间跳变时不至于前后抽搐
         if (navLastDir.sqrMagnitude > 0.5f && Vector3.Dot(final, navLastDir) < 0f)
         {
-            if (++navReverseFrames < 2) return navLastDir;
+            if (++navReverseFrames < 2) final = navLastDir;
         }
         else
         {
             navReverseFrames = 0;
         }
 
+        // 有方向却没走出位移 = 被几何挡住（贴墙角）
+        navStallTime = step < nav_stall_step ? navStallTime + Time.deltaTime : 0f;
         navLastDir = final;
         return final;
     }
