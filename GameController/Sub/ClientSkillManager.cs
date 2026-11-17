@@ -32,6 +32,7 @@ public class ClientSkillManager : ClientSubManager
 
     private const float HitStopSeconds = 0.045f;  // 单次命中冻结自己挥砍的时长
     private const float MeleeRequestGrace = 2f;   // 施法请求到攻击帧的容差，超时说明这次请求没落地
+    private const float AttackFrameFallback = 0.12f; // 攻击帧回调没来时的兜底：攻击态进入后等这么久按状态开窗
 
     private EntityAnim meleeAnim;   // 已挂钩的本地视图动画，换视图时重挂
     private int meleeSkillId = -1;  // 最近一次近战施法请求，攻击帧取用后清空
@@ -43,6 +44,7 @@ public class ClientSkillManager : ClientSubManager
     private Quaternion meleeLastRot = Quaternion.identity;
     private Transform meleeWeapon;
     private BulletVfxInfo meleeHits;
+    private bool meleeDiagLogged;
     #endregion
 
     #region 生命周期
@@ -183,6 +185,15 @@ public class ClientSkillManager : ClientSubManager
             meleeAnim.onAttack = OnOwnAttackFrame;
         }
 
+        // 攻击帧回调万一不来（客户端没重播同一动画状态），按请求时刻兜底开窗
+        float sinceRequest = Time.time - meleeRequestTime;
+        if (meleeSkillId >= 0 &&
+            view.anim.CurrentState == EntityAnim.AnimState.Attack &&
+            sinceRequest >= AttackFrameFallback && sinceRequest <= MeleeRequestGrace)
+        {
+            OpenMeleeWindow(meleeSkillId, "状态兜底");
+        }
+
         if (meleeWindowEnd <= 0f) return;
         if (Time.time >= meleeWindowEnd)
         {
@@ -225,17 +236,24 @@ public class ClientSkillManager : ClientSubManager
     private void OnOwnAttackFrame(EntityAnim.AttackType type)
     {
         if (meleeSkillId < 0) return;
-        bool recent = Time.time - meleeRequestTime <= MeleeRequestGrace;
-        if (!recent || !meleeWeaponSkills.Contains(meleeSkillId))
+        if (Time.time - meleeRequestTime > MeleeRequestGrace)
         {
             meleeSkillId = -1;
             return;
         }
+        OpenMeleeWindow(meleeSkillId, "攻击帧");
+    }
 
-        meleeScale = ResolveHitScale(meleeSkillId);
-        meleeWindowEnd = Time.time + GlobalVariable.F(global_variablesEnum.melee_bullet_life);
+    // 开命中判定窗：窗长与服务器那颗隐形子弹同源，一次请求只开一层
+    private void OpenMeleeWindow(int skillId, string reason)
+    {
+        meleeScale = ResolveHitScale(skillId);
+        float life = GlobalVariable.F(global_variablesEnum.melee_bullet_life);
+        meleeWindowEnd = Time.time + life;
         meleeSampled = false;
-        meleeSkillId = -1; // 一次请求只开一层窗，重击帧不叠加
+        meleeDiagLogged = false;
+        meleeSkillId = -1;
+        Debug.Log($"[打击感] 开窗({reason}) skill={skillId} scale={meleeScale} life={life}"); // 【临时诊断】
     }
     #endregion
 
@@ -300,15 +318,27 @@ public class ClientSkillManager : ClientSubManager
     // 按服务器的采样口径逐帧取武器位姿做扫掠，纯表现触发，不结算任何伤害
     private void SampleMeleeHit(EntityPlayerManager.ClientEntityView view)
     {
-        if (!BulletTrajectory.TryGetWeaponPose(view.id, out var pos, out var rot, out bool inHand) || !inHand) return;
+        bool poseOk = BulletTrajectory.TryGetWeaponPose(view.id, out var pos, out var rot, out bool inHand);
+        if (!poseOk || !inHand)
+        {
+            if (!meleeDiagLogged) { meleeDiagLogged = true; Debug.Log($"[打击感] 采样失败：武器位姿 pose={poseOk} inHand={inHand} weapon={(meleeAnim != null && meleeAnim.WeaponTransform != null)}"); } // 【临时诊断】
+            return;
+        }
         var hits = ResolveWeaponHits();
-        if (hits == null || hits.hits.Count == 0) return;
+        if (hits == null || hits.hits.Count == 0)
+        {
+            if (!meleeDiagLogged) { meleeDiagLogged = true; Debug.Log($"[打击感] 采样失败：命中球 hits={(hits != null ? hits.hits.Count : -1)} weapon={(meleeWeapon != null)}"); } // 【临时诊断】
+            return;
+        }
 
         if (!meleeSampled)
         {
+            meleeSampled = true;
+            meleeDiagLogged = true;
+            var probe = ProbeHostile(view, pos + rot * (hits.hits[0].center * meleeScale), hits.hits[0].radius * meleeScale); // 【临时诊断】
+            Debug.Log($"[打击感] 采样首帧 hits={hits.hits.Count} r0={hits.hits[0].radius} scale={meleeScale} pos={pos} 敌对={probe.count} 最近间隙={probe.gap:F2}"); // 【临时诊断】
             meleeLastPos = pos;
             meleeLastRot = rot;
-            meleeSampled = true;
             return;
         }
 
@@ -360,10 +390,34 @@ public class ClientSkillManager : ClientSubManager
         return dx * dx + dz * dz;
     }
 
-    // 一次挥砍只触发一次：震颤与卡肉同帧发生，卡肉时长固定（暴击由服务器结算，本地预知不到）
+    // 【临时诊断】敌对视图数量与最近的目标间隙（负值 = 判定球已经压到目标）
+    private (int count, float gap) ProbeHostile(EntityPlayerManager.ClientEntityView self, Vector3 sphereCenter, float sphereRadius)
+    {
+        int count = 0;
+        float gap = float.MaxValue;
+        foreach (var view in logic.EntityPlayers.AllViews)
+        {
+            if (view == null || view.id == self.id || view.capsule == null) continue;
+            if (!EntityCampUtil.IsHostile(self.type.category, view.camp)) continue;
+            count++;
+
+            Transform shape = view.capsule.transform;
+            Vector3 scale = shape.lossyScale;
+            float targetRadius = view.capsule.radius * Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z));
+            Vector3 center = shape.TransformPoint(view.capsule.center);
+            float dx = center.x - sphereCenter.x;
+            float dz = center.z - sphereCenter.z;
+            float current = Mathf.Sqrt(dx * dx + dz * dz) - (sphereRadius + targetRadius);
+            if (current < gap) gap = current;
+        }
+        return (count, gap);
+    }
+
+    // 一次挥砍只触发一次：震颤与卡肉同帧发生，卡肉时长固定
     private void TriggerMeleeHit()
     {
         meleeWindowEnd = 0f;
+        Debug.Log("[打击感] 命中触发"); // 【临时诊断】
         if (Tool.CameraController != null)
             Tool.CameraController.AddTrauma(GlobalVariable.F(global_variablesEnum.camera_shake_hit_normal));
         if (meleeAnim != null) meleeAnim.BeginHitStop(HitStopSeconds);
