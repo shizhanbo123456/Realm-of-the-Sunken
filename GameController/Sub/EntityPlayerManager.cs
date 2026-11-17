@@ -22,6 +22,8 @@ public class EntityPlayerManager : ClientSubManager
         public bool predictedInit;
         public bool snapPending;   // 刚收到权威位姿、物理步尚未应用：本帧不要用 rb.position 覆盖预测位置
         public Vector3 moveTarget; // 上一次 MovePosition 的目标，用于取物理解算位移（推到墙外的那一段）
+        public Vector3 catchupVel; // 追帧速度：收包时按"追帧目标点"算好，追帧期内逐帧使用
+        public float catchupEndTime; // 追帧截止时刻，过期后回到包内速度推演
         public float lastSeenTime; // 最近一次收到同步的时间（超时移除用）
 
         public int pendingPlayHash;
@@ -65,7 +67,9 @@ public class EntityPlayerManager : ClientSubManager
                 }
                 snapPending = false;
 
-                if (velocity.sqrMagnitude > 0f) predictedPos += velocity * Time.deltaTime;
+                // 追帧期内走追帧速度，到期后回到服务器速度推演
+                Vector3 step = Time.time < catchupEndTime ? catchupVel : velocity;
+                if (step.sqrMagnitude > 0f) predictedPos += step * Time.deltaTime;
                 if (!Mathf.Approximately(yawSpeed, 0f)) predictedYaw += yawSpeed * Time.deltaTime;
                 if (rb != null)
                 {
@@ -144,6 +148,21 @@ public class EntityPlayerManager : ClientSubManager
     private const float ViewTimeoutSeconds = 3f;
 
     private Transform displayRoot;
+
+    // 追帧参数（global_variables）：首次收到位姿包时读取并校验
+    private float catchupTime;
+    private float catchupSnapDistance;
+    private bool catchupConfigLoaded;
+
+    private void EnsureCatchupConfig()
+    {
+        if (catchupConfigLoaded) return;
+        catchupTime = GlobalVariable.F(global_variablesEnum.display_catchup_time);
+        catchupSnapDistance = GlobalVariable.F(global_variablesEnum.display_catchup_snap_distance);
+        if (catchupTime <= 0f) throw new System.FormatException("[配表] global_variables 的 display_catchup_time 必须大于 0");
+        if (catchupSnapDistance <= 0f) throw new System.FormatException("[配表] global_variables 的 display_catchup_snap_distance 必须大于 0");
+        catchupConfigLoaded = true;
+    }
 
     public override void Init(ClientLogicManager owner)
     {
@@ -476,20 +495,38 @@ public class EntityPlayerManager : ClientSubManager
         // 位姿只在带位姿的包里应用：无变化时的包不带 position/yaw，拿默认值覆盖会把实体瞬移回原点
         if (info.hasTransform)
         {
-            view.predictedPos = info.position;
-            view.predictedYaw = info.yaw;
+            EnsureCatchupConfig();
             view.predictedInit = true;
-            view.snapPending = true;
-            if (view.rb != null)
+            view.predictedYaw = info.yaw;            // 朝向直接采用包内值，不追帧
+            view.predictedPos.y = info.position.y;   // 纵向不追帧，直接吸附
+
+            Vector3 offset = info.position - view.predictedPos;
+            offset.y = 0f;
+            if (offset.sqrMagnitude >= catchupSnapDistance * catchupSnapDistance)
             {
-                view.rb.MovePosition(info.position);
-                view.rb.MoveRotation(Quaternion.Euler(0f, info.yaw, 0f));
-                view.moveTarget = info.position;
+                // 首见或偏差超过上限：直接落位
+                view.predictedPos = info.position;
+                view.catchupEndTime = 0f;
+                view.snapPending = true;
+                if (view.rb != null)
+                {
+                    view.rb.MovePosition(info.position);
+                    view.rb.MoveRotation(Quaternion.Euler(0f, info.yaw, 0f));
+                    view.moveTarget = info.position;
+                }
+                else
+                {
+                    view.transform.position = info.position;
+                    view.transform.rotation = Quaternion.Euler(0f, info.yaw, 0f);
+                }
             }
             else
             {
-                view.transform.position = info.position;
-                view.transform.rotation = Quaternion.Euler(0f, info.yaw, 0f);
+                // 追帧目标 = 包内位置按包内速度推演追帧时长后的位置；位置由 Update 逐帧推进，不瞬移
+                Vector3 target = info.position + info.velocity * catchupTime;
+                view.catchupVel = (target - view.predictedPos) / catchupTime;
+                view.catchupVel.y = 0f;
+                view.catchupEndTime = Time.time + catchupTime;
             }
         }
 
