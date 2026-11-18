@@ -27,6 +27,9 @@ public class UIManager : MonoBehaviour
     // 结算界面：独立子界面（不挂页面），战斗结束与 GM 演示都用它
     public SettlementView Settlement { get; private set; }
 
+    // 聊天面板：AI 指令发消息也要走它的发送链路，外部从这里取
+    public ChatPlugin Chat => chat;
+
     // 确认弹窗：独立子界面（不挂页面），弹出时自带全屏遮罩挡底层点击
     public ConfirmView Confirm { get; private set; }
 

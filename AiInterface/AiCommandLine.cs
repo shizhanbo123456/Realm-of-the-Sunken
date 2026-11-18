@@ -564,20 +564,40 @@ public sealed class AiCommandLine : ClientSubManager
             reply("错误：未联网");
             return;
         }
+        var chat = Tool.UIManager != null ? Tool.UIManager.Chat : null;
+        if (chat == null)
+        {
+            reply("错误：聊天面板未初始化");
+            return;
+        }
 
-        Tool.NetworkManager.SendChat(new CSChat { channel = channel, content = content });
+        // 与玩家在输入框发消息同一条链路：长度校验、冷却、本地回显都由 ChatPlugin 负责
+        var result = chat.Submit(channel, content);
+        if (result != ChatPlugin.ChatSendResult.Sent)
+        {
+            reply("错误：" + ChatRejectText(result));
+            return;
+        }
 
-        // 自己的消息服务器不回送，本地补一条，保证「收发都要」
+        // UI 的显示由 ChatPlugin 本地回显；这里补一份自己的记录，供 readChatMessage 读
         chatLog.Add(new ChatRecord
         {
             channel = channel,
             kind = ChannelName(channel),
-            camp = SelfCampName(),
-            name = ClientSelection.playerName,
+            camp = ((PlayerCampType)chat.GetMyCamp()).ToString(),
+            name = chat.GetMyName(),
             content = content,
         });
         TrimChatLog();
         reply("已发送");
+    }
+
+    // 发送被拦截时的说法：配表有文案就用配表的，冷却没有配表文案
+    private static string ChatRejectText(ChatPlugin.ChatSendResult result)
+    {
+        var prompt = ChatPlugin.RejectPrompt(result);
+        if (prompt.HasValue) return PromptConfig.Get(prompt.Value).text;
+        return "发送过于频繁，请稍后再试";
     }
 
     private void ReadChat(AiArgs a, Action<string> reply)
@@ -1242,11 +1262,13 @@ public sealed class AiCommandLine : ClientSubManager
     #region 事件
     private void OnChatMessage(SCChat chat)
     {
+        if (chat == null) return;
+        if (chat.senderClientId == NetworkManager.LocalToken) return; // 自己的已在 SendChat 里记录，服务器回送的那份丢掉
         chatLog.Add(new ChatRecord
         {
             channel = chat.channel,
             kind = ChannelName(chat.channel),
-            camp = ((EntityCamp)chat.camp).ToString(),
+            camp = ((PlayerCampType)chat.camp).ToString(),
             name = chat.name,
             content = chat.content,
         });
@@ -1362,12 +1384,6 @@ public sealed class AiCommandLine : ClientSubManager
     private void TrimChatLog()
     {
         while (chatLog.Count > ChatLogCapacity) chatLog.RemoveAt(0);
-    }
-
-    private static string SelfCampName()
-    {
-        var loading = ClientLoadingManager.Current;
-        return loading == null ? "未定" : loading.Camp.ToString();
     }
 
     public bool TryGetSelfPos(out Vector3 pos)

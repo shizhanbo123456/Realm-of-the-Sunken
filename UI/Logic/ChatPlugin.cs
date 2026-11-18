@@ -8,6 +8,16 @@ using Ros.Config;
 //全局聊天面板：联网后常驻显示，大厅与战斗共用；离开房间清空并隐藏
 public class ChatPlugin
 {
+    // Submit 的结果：Sent 之外都是拦截原因
+    public enum ChatSendResult
+    {
+        Sent,
+        TooShort,
+        TooLong,
+        NearbyNoEntity,
+        TooFrequent,
+    }
+
     public const int TabSystem = 3; // 页签 = 频道值 0/1/2，3 是本地系统消息页签（不上协议）
 
     // GM 开关「敌方对话」：开启后阵营频道额外显示敌方阵营的消息
@@ -146,35 +156,24 @@ public class ChatPlugin
 
     private string ItemUrlAt(int index) => UI_ChatItem.URL;
 
-    private void TrySend()
+    // 输入框与 AI 指令共用的发送入口：校验 → 本地回显 → 发包，返回拦截原因
+    public ChatSendResult Submit(int channel, string content)
     {
-        string content = (panel.m_input.text ?? "").Trim();
+        content = (content ?? "").Trim();
         // 长度按协议字节数算：StringSerializer.GetLength 含 1 字节长度头，减掉才是正文字节数
         int byteLength = StringSerializer.GetLength(content) - 1;
         int minLength = (int)GlobalVariable.RangeMin(global_variablesEnum.chat_message_length);
         int maxLength = (int)GlobalVariable.RangeMax(global_variablesEnum.chat_message_length);
-        if (byteLength < minLength)
-        {
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.chat_too_short);
-            return;
-        }
-        if (byteLength > maxLength)
-        {
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.chat_too_long);
-            return;
-        }
+        if (byteLength < minLength) return ChatSendResult.TooShort;
+        if (byteLength > maxLength) return ChatSendResult.TooLong;
         // 附近频道按「操控的实体」算距离，观战/未开战没有实体
-        if (sendChannel == (int)ChatChannel.Nearby && OwnEntityId == 0)
-        {
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.chat_nearby_no_entity);
-            return;
-        }
-        if (Time.time - lastSendTime < SendInterval) return; // 1s 冷却
+        if (channel == (int)ChatChannel.Nearby && OwnEntityId == 0) return ChatSendResult.NearbyNoEntity;
+        if (Time.time - lastSendTime < SendInterval) return ChatSendResult.TooFrequent; // 1s 冷却
         lastSendTime = Time.time;
 
         entries.Add(new ChatEntry()
         {
-            channel = sendChannel,
+            channel = channel,
             isSelf = true,
             senderClientId = NetworkManager.LocalToken,
             camp = GetMyCamp(),
@@ -182,11 +181,33 @@ public class ChatPlugin
             content = content,
         });
         RefreshList();
-        panel.m_input.text = string.Empty;
 
         if (Tool.NetworkManager != null)
-            Tool.NetworkManager.SendChat(new CSChat() { channel = sendChannel, content = content });
+            Tool.NetworkManager.SendChat(new CSChat() { channel = channel, content = content });
+        return ChatSendResult.Sent;
     }
+
+    private void TrySend()
+    {
+        ChatSendResult result = Submit(sendChannel, panel.m_input.text);
+        if (result == ChatSendResult.Sent)
+        {
+            panel.m_input.text = string.Empty;
+            return;
+        }
+        // 冷却没有配表文案，输入框这里保持静默，只做本地节流
+        promptEnum? prompt = RejectPrompt(result);
+        if (prompt.HasValue && Tool.UIManager != null) Tool.UIManager.ShowFlyText(prompt.Value);
+    }
+
+    // 拦截原因对应的配表提示；冷却不配文案，调用方自行处理
+    public static promptEnum? RejectPrompt(ChatSendResult result) => result switch
+    {
+        ChatSendResult.TooShort => promptEnum.chat_too_short,
+        ChatSendResult.TooLong => promptEnum.chat_too_long,
+        ChatSendResult.NearbyNoEntity => promptEnum.chat_nearby_no_entity,
+        _ => null,
+    };
 
     private static ushort OwnEntityId
     {
@@ -412,7 +433,7 @@ public class ChatPlugin
         _ => throw new System.ArgumentOutOfRangeException(nameof(channel), channel, "聊天频道只有 0 全频道 / 1 阵营 / 2 附近"),
     });
 
-    private int GetMyCamp()
+    public int GetMyCamp()
     {
         var loading = ClientLoadingManager.Current;
         if (NetworkManager.BattleRunning && loading != null && loading.HasSession)
@@ -427,7 +448,7 @@ public class ChatPlugin
         return member != null ? member.camp : (int)PlayerCampType.Spectator;
     }
 
-    private string GetMyName()
+    public string GetMyName()
     {
         var loading = ClientLoadingManager.Current;
         if (NetworkManager.BattleRunning && loading != null && loading.HasSession) return loading.GetName(NetworkManager.LocalToken);
