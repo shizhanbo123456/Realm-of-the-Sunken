@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-// 垂直下落：从高空沿直线砸到终点，抵达后原地驻留 hold 秒再销毁（终点可低于地表）
+// 直线下落：从起点直落到终点，抵达后原地驻留 hold 秒再销毁（终点可低于地表）
 public class SkillTrajectoryDropHold : BulletTrajectory
 {
     private readonly Vector3 start;

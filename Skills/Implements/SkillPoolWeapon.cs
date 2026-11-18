@@ -925,71 +925,74 @@ namespace Ros.Skill
         }
     }
 
-    // 兵雨：自身周围 8 个点循环天降，垂直落到脚下以下后驻留片刻
+    // 兵雨：锁定一个敌人，6 把武器依次从它头顶 8m 出现，砸进脚下 2m 内的圈里
     public class SkillOrbitWeaponRain : SkillBase
     {
         public override int Id => (int)SkillType.SkillOrbitWeaponRain;
 
-        private const int Shots = 4;
-        private const int Waves = 4;
-        private const int Points = 8;
-        private const float WaveGap = 0.2f;
-        private const float Ring = 3.2f;
-        private const float FallHeight = 20f;      // 起点在落点正上方：高于两种镜头，出现时不在画面里
-        private const float FallTime = 0.9f;
+        private const int Shots = 6;
+        private const float ShotGap = 0.1f;        // 相邻两把的出现间隔
+        private const float SpawnHeight = 8f;      // 出现点固定在圈心正上方
+        private const float SpreadRadius = 1.4f;   // 第 0 把砸圈心，其余 5 把按 72° 落在圈上
+        private const float FallTime = 0.3f;
         private const float Sink = 0.8f;           // 终点压到地表以下
         private const float HoldTime = 0.4f;       // 落到位后原地停留再销毁
         private const float BulletLife = FallTime + HoldTime;
 
         protected override void OnCast(EntityData caster)
         {
-            Vector3 center = caster.transform.position; // 落点中心是自己脚下
+            Vector3 center = LockCenter(caster);
+            Vector3[] lands = LandPoints(center);
             var attack = BuildAttack(caster);
             var spec = HitSpec(SkillVfxKind.Weapon, WeaponOf(caster), VfxScale());
-            for (int wave = 0; wave < Waves; wave++)
+            for (int i = 0; i < Shots; i++)
             {
-                int w = wave;
-                if (w == 0) FireWave(caster, center, 0, attack, spec);
-                else Timer.AddTimer(w, _ => FireWave(caster, center, w, attack, spec), WaveGap * w, 1, false);
+                int index = i;
+                if (index == 0) FireOne(caster, center, lands[index], attack, spec);
+                else Timer.AddTimer(index, _ => FireOne(caster, center, lands[index], attack, spec), ShotGap * index, 1, false);
             }
             SendWave(caster, 0, context => context.WriteVector3(center));
         }
 
-        private void FireWave(EntityData caster, Vector3 center, int wave, AttackData attack, BulletHitSpec spec)
+        // 锁定射程内最近的敌人，圈心取它脚下；场上没有敌人时退回自身脚下
+        private Vector3 LockCenter(EntityData caster)
         {
-            Vector3[] ring = SpreadStyle.CircleDests(Vector3.zero, Ring, Points);
-            for (int i = 0; i < Shots; i++)
-            {
-                Vector3 land = center + ring[(wave * Shots + i) % Points];
-                Tool.BattleManager.ShootBullet(caster, attack, Drop(land), BulletLife, spec);
-            }
+            EntityData target = BattleManager.EntityContainer.GetNearestEnemy(caster, CastRange);
+            return target != null ? target.transform.position : caster.transform.position;
         }
 
-        // 起点 = 落点正上方，垂直落下，终点压到地表以下：刀身穿过脚面再驻留
-        private static BulletTrajectory Drop(Vector3 land)
-            => new SkillTrajectoryDropHold(land + Vector3.up * FallHeight, land - Vector3.up * Sink, FallTime, HoldTime);
+        // 落点全部在圈心 2m 半径内：第 0 把正中心，其余 5 把均匀落在半径 1.4 的圈上
+        private static Vector3[] LandPoints(Vector3 center)
+        {
+            var lands = new Vector3[Shots];
+            lands[0] = center;
+            Vector3[] ring = SpreadStyle.CircleDests(Vector3.zero, SpreadRadius, Shots - 1);
+            for (int i = 1; i < Shots; i++) lands[i] = center + ring[i - 1];
+            return lands;
+        }
+
+        private static void FireOne(EntityData caster, Vector3 center, Vector3 land, AttackData attack, BulletHitSpec spec)
+            => Tool.BattleManager.ShootBullet(caster, attack, Drop(center, land), BulletLife, spec);
+
+        // 出现点一律是圈心正上方，直线砸到落点以下再驻留
+        private static BulletTrajectory Drop(Vector3 center, Vector3 land)
+            => new SkillTrajectoryDropHold(center + Vector3.up * SpawnHeight, land - Vector3.up * Sink, FallTime, HoldTime);
 
         public override void PlayWave(SCSkillDisplayContext context)
         {
             Vector3 center = context.ReadVector3();
             int weapon = DisplayWeapon(context);
-            for (int wave = 0; wave < Waves; wave++)
+            Vector3[] lands = LandPoints(center);
+            for (int i = 0; i < Shots; i++)
             {
-                int w = wave;
-                if (w == 0) PlayOneWave(center, 0, weapon);
-                else Timer.AddTimer(w, _ => PlayOneWave(center, w, weapon), WaveGap * w, 1, false);
+                int index = i;
+                if (index == 0) PlayOne(center, lands[index], weapon);
+                else Timer.AddTimer(index, _ => PlayOne(center, lands[index], weapon), ShotGap * index, 1, false);
             }
         }
 
-        private void PlayOneWave(Vector3 center, int wave, int weapon)
-        {
-            Vector3[] ring = SpreadStyle.CircleDests(Vector3.zero, Ring, Points);
-            for (int i = 0; i < Shots; i++)
-            {
-                Vector3 land = center + ring[(wave * Shots + i) % Points];
-                VfxHelper.PlayOne(SkillVfxKind.Weapon, weapon, Drop(land), VfxScale());
-            }
-        }
+        private void PlayOne(Vector3 center, Vector3 land, int weapon)
+            => VfxHelper.PlayOne(SkillVfxKind.Weapon, weapon, Drop(center, land), VfxScale());
     }
 
     // 引力锤击：把周围敌人拉到自身位置，半秒后原地砸击
