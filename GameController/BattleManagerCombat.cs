@@ -362,6 +362,7 @@ public partial class BattleManager
         activeBullets.Clear();
         reviveStates.Clear();
         neutralStatueRespawnTime = -1f; // 由 SpawnBattleWorld 重新排首次刷新
+        guardPointHealthScale = 0f;     // 同上：由 SpawnBattleWorld 重新取人数倍率
         HarvestByClient.Clear();
         KillCountByClient.Clear();
         minimapRadiusByClient.Clear(); // 每局雷达显示半径回到默认档
@@ -380,7 +381,7 @@ public partial class BattleManager
         for (int i = 0; i < sentDefensePointHealth.Length; i++) sentDefensePointHealth[i] = -1;
     }
 
-    #region 守护点当前血量（与视野解耦，变更即广播；上限与名字由客户端读 entity.csv）
+    #region 守护点当前血量（与视野解耦，变更即广播；名字由客户端读 entity.csv，上限 = 配表生命 × 随包下发的人数倍率）
     private readonly int[] defensePointHealth = { -1, -1, -1, -1 }; // 0 主点 / 1~3 副点，-1 = 未生成
     private readonly int[] sentDefensePointHealth = { -1, -1, -1, -1 };
 
@@ -409,6 +410,7 @@ public partial class BattleManager
             sub1Health = defensePointHealth[1],
             sub2Health = defensePointHealth[2],
             sub3Health = defensePointHealth[3],
+            healthScale = guardPointHealthScale,
         });
     }
 

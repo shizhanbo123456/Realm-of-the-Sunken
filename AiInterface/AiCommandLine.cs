@@ -1126,7 +1126,7 @@ public sealed class AiCommandLine : ClientSubManager
             reply("错误：尚未收到守护点数据");
             return;
         }
-        reply($"主={guardProgress.mainHealth} 副1={guardProgress.sub1Health} 副2={guardProgress.sub2Health} 副3={guardProgress.sub3Health}（当前血量，上限读 entity.csv）");
+        reply($"主={guardProgress.mainHealth} 副1={guardProgress.sub1Health} 副2={guardProgress.sub2Health} 副3={guardProgress.sub3Health}（当前血量，上限 = entity.csv 生命 × 人数倍率）");
     }
 
     private void DayNightInfo(Action<string> reply)

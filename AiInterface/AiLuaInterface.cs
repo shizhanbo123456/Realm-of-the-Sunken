@@ -499,10 +499,10 @@ public sealed class AiLuaApi
         var info = commands.GuardSnapshot;
         switch (index)
         {
-            case 0: return GlobalConfig.GuardPointDamagedPercent(0, info.mainHealth);
-            case 1: return GlobalConfig.GuardPointDamagedPercent(1, info.sub1Health);
-            case 2: return GlobalConfig.GuardPointDamagedPercent(2, info.sub2Health);
-            case 3: return GlobalConfig.GuardPointDamagedPercent(3, info.sub3Health);
+            case 0: return GlobalConfig.GuardPointDamagedPercent(0, info.mainHealth, info.healthScale);
+            case 1: return GlobalConfig.GuardPointDamagedPercent(1, info.sub1Health, info.healthScale);
+            case 2: return GlobalConfig.GuardPointDamagedPercent(2, info.sub2Health, info.healthScale);
+            case 3: return GlobalConfig.GuardPointDamagedPercent(3, info.sub3Health, info.healthScale);
             default: return -1;
         }
     }

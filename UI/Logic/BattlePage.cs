@@ -591,8 +591,9 @@ public class BattlePage : PageBase
 
     #region 守护点（主点 + 3 个副点）
     private readonly int[] guardianHealth = { -1, -1, -1, -1 }; // 当前血量，-1 = 还没收到/还没生成
+    private float guardianHealthScale; // 开局人数倍率：上限 = 配表生命 × 该倍率，0 = 还没收到守护点数据
 
-    // 只认 SCDefensePointProgress 的当前血量；上限、名字读 entity.csv，百分比在客户端算
+    // 只认 SCDefensePointProgress 的当前血量与人数倍率；名字读 entity.csv，百分比在客户端算
     private void OnDefensePointProgress(SCDefensePointProgress info)
     {
         if (info == null) return;
@@ -600,12 +601,14 @@ public class BattlePage : PageBase
         guardianHealth[1] = info.sub1Health;
         guardianHealth[2] = info.sub2Health;
         guardianHealth[3] = info.sub3Health;
+        guardianHealthScale = info.healthScale;
         RefreshGuardianPanels();
     }
 
     private void ResetGuardStatues()
     {
         for (int i = 0; i < guardianHealth.Length; i++) guardianHealth[i] = -1;
+        guardianHealthScale = 0f;
         RefreshGuardianPanels(); // 复位成满血/未摧毁，等第一包覆盖
     }
 
@@ -644,7 +647,7 @@ public class BattlePage : PageBase
     // 血量未知（守护点还没生成）按满血算，避免开局显示成空槽
     private float GuardRatio(int index, out int health, out int max)
     {
-        max = Mathf.Max(1, Mathf.RoundToInt(GlobalConfig.GuardPointConfig(index).health));
+        max = Mathf.Max(1, Mathf.RoundToInt(GlobalConfig.GuardPointMaxHealth(index, guardianHealthScale)));
         health = guardianHealth[index] < 0 ? max : guardianHealth[index];
         return Mathf.Clamp01((float)health / max);
     }

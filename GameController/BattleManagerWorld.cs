@@ -13,6 +13,7 @@ public partial class BattleManager
     private static readonly List<ushort> s_coralIdScratch = new();
 
     private float neutralStatueRespawnTime = -1f;
+    private float guardPointHealthScale; // 守护点人数倍率：生成时定值，随守护点血量包下发，客户端据此算上限
 
     private void SpawnBattleWorld()
     {
@@ -45,6 +46,7 @@ public partial class BattleManager
         neutralStatueRespawnTime = Time.time + GlobalConfig.neutral_statue_first_spawn_delay;
 
         CaptureGuardTotalHealth(); // 守护点总血量在此刻定死，经验增幅按已扣除比例算
+        guardPointHealthScale = GetBuildingHealthScale(EntityCategory.GuardStatue); // 与雕像构造时取的倍率同源，供客户端算血量上限
     }
 
     // 防御塔/守护点的初始血量人数修正：进攻方人数 /（防守方人数 × 2），夹 1~10 倍

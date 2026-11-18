@@ -33,11 +33,18 @@ public static class GlobalConfig
     // 守护点血量上限与名字都在这张表里（entity.csv「生命」「姓名」列）
     public static entity GuardPointConfig(int index) => EntityConfig.GetByCategory(GuardPointType(index));
 
+    // 血量上限 = 配表生命 × 开局人数倍率（倍率由 SCDefensePointProgress 下发，0 = 守护点还没生成，按配表值占位）
+    public static float GuardPointMaxHealth(int index, float healthScale)
+    {
+        float baseHealth = GuardPointConfig(index).health;
+        return healthScale > 0f ? baseHealth * healthScale : baseHealth;
+    }
+
     // 当前血量 → 被打掉的百分比（0~100）；血量为负说明守护点还没生成，按未受损算
-    public static int GuardPointDamagedPercent(int index, int health)
+    public static int GuardPointDamagedPercent(int index, int health, float healthScale)
     {
         if (health < 0) return 0;
-        float max = GuardPointConfig(index).health;
+        float max = GuardPointMaxHealth(index, healthScale);
         if (max <= 0f) throw new System.FormatException($"[配表] entity.csv 守护点 {index} 的生命必须大于 0");
         return Mathf.Clamp((int)(100f * (1f - health / max)), 0, 100);
     }

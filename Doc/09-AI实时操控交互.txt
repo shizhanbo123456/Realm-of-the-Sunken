@@ -97,7 +97,7 @@ AI 实时操控交互（命令行 + Lua）
     getInfo()                         自身 / 守护点 / 阵营人数 / 昼夜 / 小地图条数
     currentPos()
     getSelfStatus()                   实体 / 阵营 / 血量 / 坐标 / 朝向 / buff
-    getGuardProgress()                四个守护点当前血量（上限读 entity.csv）
+    getGuardProgress()                四个守护点当前血量（上限 = entity.csv 生命 × 人数倍率）
     getMinimapEntities()              小地图缓存逐条
     getDayNightInfo()                 昼夜 + CycleTime
     getCampCount()                    双方存活/总数 + 观战人数
@@ -258,7 +258,7 @@ ai 表（写：只在值变化时上行）
 设置技能栏         ClientSkillManager.TrySetActiveSkills → CSSkillSelection → 服务器回推快照
 小地图实体         OnMinimapUpdate ← SCMinimapEntity{entityId, type, camp, posX, posZ, marked}
                    自建缓存 + minimap_entity_timeout（1.5s）超时剔除
-守护点血量         OnDefensePointProgress ← SCDefensePointProgress{main, sub1~3}
+守护点血量         OnDefensePointProgress ← SCDefensePointProgress{main, sub1~3, healthScale}
 本地玩家状态       OnEntityDisplayUpdate ← SCEntityDisplayInfo（血量、buff）
 阵营人数           NetworkManager.LatestCampAliveCount（值变更时下发）
 会话身份           ClientLoadingManager.HasSession / Camp / OwnEntityId
