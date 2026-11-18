@@ -1,4 +1,5 @@
-﻿using Ros.Skill.Utils;
+﻿using Ros.Config;
+using Ros.Skill.Utils;
 using Ros.Transport;
 using UnityEngine;
 
@@ -169,7 +170,8 @@ namespace Ros.Skill
         {
             if (caster == null || Tool.BattleManager == null) return;
             int level = Tool.BattleManager.GetZombieSpawnLevel(); // 跟随自然刷新等级
-            for (int i = 0; i < GlobalConfig.summon_elite_count; i++)
+            int count = GlobalVariable.I(global_variablesEnum.summon_elite_count);
+            for (int i = 0; i < count; i++)
             {
                 var type = EntityType.EliteZombie(UnityEngine.Random.Range(0, GlobalConfig.elite_zombie_variant_count));
                 Tool.BattleManager.SpawnEntity(type, level,

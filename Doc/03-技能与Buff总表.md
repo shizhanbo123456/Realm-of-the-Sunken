@@ -94,7 +94,7 @@
 | 65 | 长夜降临 | SkillForceNight | 无 | 无 |
 | 66 | 唤尸 | SkillSummonZombies | 无 | 无（5 只普通鲛人，等级跟随自然刷新等级） |
 | 67 | 死境漫游 | SkillDeathStrollCast | 无 | DeathStroll（霸体 + 光环 DoT） |
-| 68 | 菁英尸潮 | SkillSummonElites | 无 | 无（3 只精英鲛人，等级跟随自然刷新等级） |
+| 68 | 菁英尸潮 | SkillSummonElites | 无 | 无（召唤数量读 `global_variables` 的 `summon_elite_count`，当前 1 只，等级跟随自然刷新等级） |
 | 69 | 缄默之咒 | SkillSilenceCast | 无 | 自身 8m 内敌人挂 Silence |
 | 70 | 沉沼缚 | SkillMireCast | 无 | 全场敌人挂 Mire |
 | 71 | 荆棘回响 | SkillReflectCast | 无 | 守护雕像挂 Reflect |
