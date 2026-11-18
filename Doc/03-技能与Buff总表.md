@@ -101,8 +101,8 @@
 | 72 | 疫印 | SkillPlagueMarkCast | 无 | 自身 8m 内敌人挂 PlagueMark |
 | 73 | 疫染 | SkillPlaguePollute | 无 | 场上现有珊瑚挂 PlaguePollute；珊瑚被摧毁时给 8m 内进攻方挂 1 层 PlagueMark |
 | 74 | 疫爆 | SkillDetonatePlague | 无 | 移除 PlagueMark 并结算伤害 |
-| 75 | 苍白耀光 | SkillPaleLightCast | Bullet[2] ×5 | 命中挂 PaleLight |
-| 76 | 苍白蚀影 | SkillPaleDarkCast | Bullet[1] ×5 | 命中挂 PaleDark |
+| 75 | 苍白耀光 | SkillPaleLightCast | Bullet[2] ×10（±15° 随机角，0.1s 间隔） | 命中挂 PaleLight |
+| 76 | 苍白蚀影 | SkillPaleDarkCast | Bullet[1] ×10（±15° 随机角，0.1s 间隔） | 命中挂 PaleDark |
 | 77 | 蔽目之雾 | SkillFogCast | 无 | 敌人挂 Fog |
 
 **被动（不是技能、不占 id）**：暴击麻痹（`BattleManagerPassive.OnHitPassive`）、单次受伤不超过生命上限 5%（`AdjustIncomingDamage`）、命中类伤害结算后生命低于上限 10% 即挂 20s 10 级护盾并恢复 1000 生命值（`CheckLowHealthShield`，每角色 60s 一次）、光暗转化（`CheckPaleConversion`）、教皇守护 / 鲛人刷新等级提升等全局被动见策划案第二十章。

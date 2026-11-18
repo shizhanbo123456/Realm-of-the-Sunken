@@ -268,31 +268,38 @@ namespace Ros.Skill
     #endregion
 
     #region 苍白舞者
+    // 两招共用同一套随机扇形：10 发在 ±15° 内各取随机角，0.1s 间隔逐发直线射出
     public class SkillPaleLightCast : SkillBase
     {
         public override int Id => (int)SkillType.SkillPaleLightCast;
 
         private const int Vfx = 2;
-        private const int Shots = 5;
-        private const float SpreadDeg = 12f;
+        private const int Shots = 10;
+        private const float SpreadDeg = 15f;
+        private const float ShotGap = 0.1f;
         private const float BulletLife = 1.2f;
 
         protected override void OnCast(EntityData caster)
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
+            int seed = SkillSeed.New();
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
             var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
-            Spread.Fan(origin, aim, Shots, 1, SpreadDeg, 0f, BulletLife,
+            Spread.MachineGun(origin, aim, seed, SpreadDeg, Shots, ShotGap, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec));
-            SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
+            SendWave(caster, 0, context =>
+            {
+                context.WriteVector3(origin); context.WriteVector3(aim); context.WriteInt(seed);
+            });
         }
 
         public override void PlayWave(SCSkillDisplayContext context)
         {
             Vector3 origin = context.ReadVector3();
             Vector3 aim = context.ReadVector3();
-            Spread.Fan(origin, aim, Shots, 1, SpreadDeg, 0f, BulletLife,
+            int seed = context.ReadInt();
+            Spread.MachineGun(origin, aim, seed, SpreadDeg, Shots, ShotGap, BulletLife,
                 trajectory => VfxHelper.PlayOne(SkillVfxKind.Bullet, Vfx, trajectory, VfxScale()));
         }
     }
@@ -302,41 +309,33 @@ namespace Ros.Skill
         public override int Id => (int)SkillType.SkillPaleDarkCast;
 
         private const int Vfx = 1;
-        private const int Shots = 5;
-        private const float SpreadDeg = 12f;
+        private const int Shots = 10;
+        private const float SpreadDeg = 15f;
+        private const float ShotGap = 0.1f;
         private const float BulletLife = 1.4f;
 
         protected override void OnCast(EntityData caster)
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
+            int seed = SkillSeed.New();
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
             var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
-            SpreadArcs(origin, aim, caster, attack, spec);
-            SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
-        }
-
-        // 这一发走贝塞尔弧线：扇形展开后每发各自抬成拱形
-        private void SpreadArcs(Vector3 origin, Vector3 aim, EntityData caster, AttackData attack, BulletHitSpec spec)
-        {
-            Vector3[] dests = SpreadStyle.FanDests(origin, aim, Shots, SpreadDeg);
-            for (int i = 0; i < dests.Length; i++)
+            Spread.MachineGun(origin, aim, seed, SpreadDeg, Shots, ShotGap, BulletLife,
+                trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec));
+            SendWave(caster, 0, context =>
             {
-                Tool.BattleManager.ShootBullet(caster, attack,
-                    new SkillTrajectoryBezier(origin, dests[i], BulletLife), BulletLife, spec);
-            }
+                context.WriteVector3(origin); context.WriteVector3(aim); context.WriteInt(seed);
+            });
         }
 
         public override void PlayWave(SCSkillDisplayContext context)
         {
             Vector3 origin = context.ReadVector3();
             Vector3 aim = context.ReadVector3();
-            Vector3[] dests = SpreadStyle.FanDests(origin, aim, Shots, SpreadDeg);
-            for (int i = 0; i < dests.Length; i++)
-            {
-                VfxHelper.PlayOne(SkillVfxKind.Bullet, Vfx,
-                    new SkillTrajectoryBezier(origin, dests[i], BulletLife), VfxScale());
-            }
+            int seed = context.ReadInt();
+            Spread.MachineGun(origin, aim, seed, SpreadDeg, Shots, ShotGap, BulletLife,
+                trajectory => VfxHelper.PlayOne(SkillVfxKind.Bullet, Vfx, trajectory, VfxScale()));
         }
     }
 
