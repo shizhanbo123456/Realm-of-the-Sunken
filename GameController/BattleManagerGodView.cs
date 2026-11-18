@@ -8,7 +8,7 @@ public partial class BattleManager
     // 上帝视角：客户端按 0.2s 反复请求显示区域，服务器只在收到请求时扫描并回块，不保存状态、不做定时下发
     // 区域内的实体没有任何显示条件（阵营 / 视野 / 昼夜 / 显示距离一律不过滤）
     private static readonly List<SCMinimapEntity> s_godViewEntities = new();
-    private static readonly List<Vector2> s_godViewCorals = new();
+    private static readonly List<SCGodViewCorals.Point> s_godViewCorals = new();
 
     public void ReceiveGodViewArea(int clientId, CSGodViewArea request)
     {
@@ -24,8 +24,8 @@ public partial class BattleManager
         if (maxX <= minX || maxZ <= minZ) return;
 
         CollectGodViewEntities(minX, minZ, maxX, maxZ);
-        SendGodViewEntities(clientId, request.seq);
-        SendGodViewCorals(clientId, request.seq);
+        SendGodViewEntities(clientId);
+        SendGodViewCorals(clientId);
         s_godViewEntities.Clear();
         s_godViewCorals.Clear();
     }
@@ -45,10 +45,15 @@ public partial class BattleManager
             if (entity == null) continue;
             var pos = entity.transform.position;
             if (pos.x < minX || pos.x > maxX || pos.z < minZ || pos.z > maxZ) continue;
-            // 珊瑚数量最多，只进珊瑚流（纯坐标，不可点所以不带 id），实体流不带
+            // 珊瑚数量最多，只进珊瑚流（id + 坐标，客户端按 id 落点），实体流不带
             if (entity.type.category == EntityCategory.Coral)
             {
-                s_godViewCorals.Add(new Vector2(pos.x, pos.z));
+                s_godViewCorals.Add(new SCGodViewCorals.Point
+                {
+                    entityId = entity.id,
+                    posX = pos.x,
+                    posZ = pos.z,
+                });
                 continue;
             }
             s_godViewEntities.Add(new SCMinimapEntity
@@ -63,42 +68,27 @@ public partial class BattleManager
         }
     }
 
-    private void SendGodViewEntities(int clientId, byte seq)
+    // 按固定条数切包（GodViewChunk 写死的单包预算）；区域内无实体就一个包都不发，客户端靠 3s 超时清点
+    private void SendGodViewEntities(int clientId)
     {
         int capacity = GodViewChunk.EntityCapacity;
         int total = s_godViewEntities.Count;
-        int chunkCount = (total + capacity - 1) / capacity;
-        if (chunkCount == 0) chunkCount = 1; // 区域内无实体也回一个空块，客户端据此清空点位
-        for (int index = 0; index < chunkCount; index++)
+        for (int start = 0; start < total; start += capacity)
         {
-            var chunk = new SCGodViewEntities
-            {
-                seq = seq,
-                chunkIndex = (ushort)index,
-                chunkCount = (ushort)chunkCount,
-            };
-            int start = index * capacity;
+            var chunk = new SCGodViewEntities();
             int end = Mathf.Min(start + capacity, total);
             for (int i = start; i < end; i++) chunk.entries.Add(s_godViewEntities[i]);
             Tool.NetworkManager.SendGodViewEntities(clientId, chunk);
         }
     }
 
-    private void SendGodViewCorals(int clientId, byte seq)
+    private void SendGodViewCorals(int clientId)
     {
         int capacity = GodViewChunk.CoralCapacity;
         int total = s_godViewCorals.Count;
-        int chunkCount = (total + capacity - 1) / capacity;
-        if (chunkCount == 0) chunkCount = 1;
-        for (int index = 0; index < chunkCount; index++)
+        for (int start = 0; start < total; start += capacity)
         {
-            var chunk = new SCGodViewCorals
-            {
-                seq = seq,
-                chunkIndex = (ushort)index,
-                chunkCount = (ushort)chunkCount,
-            };
-            int start = index * capacity;
+            var chunk = new SCGodViewCorals();
             int end = Mathf.Min(start + capacity, total);
             for (int i = start; i < end; i++) chunk.points.Add(s_godViewCorals[i]);
             Tool.NetworkManager.SendGodViewCorals(clientId, chunk);

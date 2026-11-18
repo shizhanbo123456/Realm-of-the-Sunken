@@ -9,24 +9,23 @@ namespace Ros.UI.Main
 {
     // 上帝视角（左 Ctrl）：显示区域 = 中心 + 边长（地形边长 / 倍率），可拖动；服务器只在收到请求时回包
     // 实体点位可点，点中后单独请求详情快照填右侧面板；珊瑚只画点、不响应点击
+    // 点位按实体 id 复用：收到就移过去，超过 MarkerTimeout 没再收到就清掉（丢包只影响丢的那几条）
     public partial class UI_GodViewMinimapPanel
     {
         private const float RequestInterval = 0.2f; // 进界面期间按此频率反复拉取，本地图不动就不请求
+        private const float MarkerTimeout = 3f;     // 实体超过此时长没再收到即从上帝视角清除
         private const int DetailSkillCapacity = 8;
 
         private struct Marker
         {
             public GObject view;
             public Vector2 world;
+            public float lastSeen; // 收到该实体所在包时的客户端时间
         }
 
-        private readonly Dictionary<ushort, Marker> entityMarkers = new();
-        private readonly List<UI_MinimapItem> coralViews = new(); // 珊瑚没有 id：按序号复用图标
-        private readonly HashSet<ushort> staleIds = new();
-        private readonly HashSet<ushort> receivedEntityChunks = new();
-        private readonly HashSet<ushort> receivedCoralChunks = new();
-        private readonly List<SCMinimapEntity> entityBuffer = new();
-        private readonly List<Vector2> coralBuffer = new();
+        private readonly Dictionary<ushort, Marker> entityMarkers = new(); // 可点实体
+        private readonly Dictionary<ushort, Marker> coralMarkers = new();   // 珊瑚：只画点、不可点
+        private readonly List<ushort> expiredScratch = new();
         private readonly List<UI_SkillList.Slot> detailSkills = new();
         private readonly List<UI_SkillList.Slot> detailHeldSkills = new();
         private readonly List<SCGodViewEntityDetail.Buff> detailBuffs = new();
@@ -34,12 +33,10 @@ namespace Ros.UI.Main
         private NTexture mapTexture;
         private Vector2 center;
         private int scaleIndex;
-        private byte seq;
         private float requestTimer;
         private bool dragging;
+        private bool markersDirty;
         private Vector2 lastPointer;
-        private int expectedEntityChunks = -1;
-        private int expectedCoralChunks = -1;
         private float itemScale = 1f;
         private EntityCamp myCamp = EntityCamp.None;
         private ushort ownEntityId;
@@ -62,11 +59,11 @@ namespace Ros.UI.Main
             m_largeMinimapContainer.touchable = true;
             center = ClampCenter(worldCenter);
             scaleIndex = 0; // 默认取配表首档（放大最多的一档）
-            seq = 0;
             requestTimer = RequestInterval;
             dragging = false;
+            markersDirty = false;
             DisposeMarkers(entityMarkers);
-            DisposeCoralViews(coralViews);
+            DisposeMarkers(coralMarkers);
             ClearDetail();
             BuildScaleButtons();
             ComputeItemScale();
@@ -79,8 +76,9 @@ namespace Ros.UI.Main
             visible = false;
             touchable = false;
             dragging = false;
+            markersDirty = false;
             DisposeMarkers(entityMarkers);
-            DisposeCoralViews(coralViews);
+            DisposeMarkers(coralMarkers);
             ClearDetail();
         }
 
@@ -89,6 +87,12 @@ namespace Ros.UI.Main
             if (!visible) return;
             myCamp = localCamp;
             ownEntityId = ownId;
+            ExpireMarkers();
+            if (markersDirty)
+            {
+                markersDirty = false;
+                PlaceMarkers();
+            }
             requestTimer -= deltaTime;
             if (requestTimer > 0f) return;
             requestTimer = RequestInterval;
@@ -121,38 +125,45 @@ namespace Ros.UI.Main
         #endregion
 
         #region 数据回包
+        // 逐条落点位：已有该 id 就只更新坐标与收到时间，没有才新建；不做整轮拼装，单包丢失只影响包内几条
         public void OnEntities(SCGodViewEntities chunk)
         {
-            if (!visible || chunk == null || chunk.seq != seq) return; // 上一轮的残留块直接丢
-            if (chunk.chunkCount == 0) return;
-            if (expectedEntityChunks < 0)
+            if (!visible || chunk == null || chunk.entries == null) return;
+            float now = Time.unscaledTime;
+            for (int i = 0; i < chunk.entries.Count; i++)
             {
-                expectedEntityChunks = chunk.chunkCount;
-                receivedEntityChunks.Clear();
-                entityBuffer.Clear();
+                var entry = chunk.entries[i];
+                if (entry == null) continue;
+                var view = EnsureEntityView(entry.entityId);
+                if (view == null) continue;
+                view.m_type.selectedIndex = UI_Minimap.PageOf(entry.type.category, entry.type, entry.camp, entry.entityId == ownEntityId, myCamp);
+                entityMarkers[entry.entityId] = new Marker
+                {
+                    view = view,
+                    world = new Vector2(entry.posX, entry.posZ),
+                    lastSeen = now,
+                };
             }
-            if (expectedEntityChunks != chunk.chunkCount) return;
-            if (!receivedEntityChunks.Add(chunk.chunkIndex)) return; // 重复块
-            entityBuffer.AddRange(chunk.entries);
-            if (receivedEntityChunks.Count < expectedEntityChunks) return;
-            ApplyEntities();
+            markersDirty = true;
         }
 
         public void OnCorals(SCGodViewCorals chunk)
         {
-            if (!visible || chunk == null || chunk.seq != seq) return;
-            if (chunk.chunkCount == 0) return;
-            if (expectedCoralChunks < 0)
+            if (!visible || chunk == null || chunk.points == null) return;
+            float now = Time.unscaledTime;
+            for (int i = 0; i < chunk.points.Count; i++)
             {
-                expectedCoralChunks = chunk.chunkCount;
-                receivedCoralChunks.Clear();
-                coralBuffer.Clear();
+                var point = chunk.points[i];
+                var view = EnsureCoralView(point.entityId);
+                if (view == null) continue;
+                coralMarkers[point.entityId] = new Marker
+                {
+                    view = view,
+                    world = new Vector2(point.posX, point.posZ),
+                    lastSeen = now,
+                };
             }
-            if (expectedCoralChunks != chunk.chunkCount) return;
-            if (!receivedCoralChunks.Add(chunk.chunkIndex)) return;
-            coralBuffer.AddRange(chunk.points);
-            if (receivedCoralChunks.Count < expectedCoralChunks) return;
-            ApplyCorals();
+            markersDirty = true;
         }
 
         public void OnDetail(SCGodViewEntityDetail info)
@@ -174,73 +185,16 @@ namespace Ros.UI.Main
         private void SendRequest()
         {
             if (Tool.NetworkManager == null) return;
-            float edge = Edge;
-            float half = edge * 0.5f;
-            seq++;
-            expectedEntityChunks = -1;
-            expectedCoralChunks = -1;
-            receivedEntityChunks.Clear();
-            receivedCoralChunks.Clear();
-            entityBuffer.Clear();
-            coralBuffer.Clear();
+            float half = Edge * 0.5f;
             Tool.NetworkManager.SendGodViewArea(new CSGodViewArea
             {
                 min = new Vector2(center.x - half, center.y - half),
                 max = new Vector2(center.x + half, center.y + half),
-                seq = seq,
             });
         }
         #endregion
 
         #region 点位
-        private void ApplyEntities()
-        {
-            staleIds.Clear();
-            foreach (ushort id in entityMarkers.Keys) staleIds.Add(id);
-            foreach (var entry in entityBuffer)
-            {
-                var view = EnsureEntityView(entry.entityId);
-                if (view == null) continue;
-                view.m_type.selectedIndex = UI_Minimap.PageOf(entry.type.category, entry.type, entry.camp, entry.entityId == ownEntityId, myCamp);
-                entityMarkers[entry.entityId] = new Marker
-                {
-                    view = view,
-                    world = new Vector2(entry.posX, entry.posZ),
-                };
-                staleIds.Remove(entry.entityId);
-            }
-            foreach (ushort id in staleIds) RemoveMarker(entityMarkers, id);
-            PlaceMarkers();
-        }
-
-        // 珊瑚没有 id（不可点），按序号复用图标：每轮用新坐标覆盖前 N 个，多出来的销毁
-        private void ApplyCorals()
-        {
-            while (coralViews.Count < coralBuffer.Count)
-            {
-                var view = UI_MinimapItem.CreateInstance();
-                view.scale = new Vector2(itemScale, itemScale);
-                view.touchable = false;
-                view.m_type.selectedIndex = UI_Minimap.PageOf(EntityCategory.Coral, default, EntityCamp.None, false, myCamp);
-                m_largeMinimapContainer.AddChild(view);
-                coralViews.Add(view);
-            }
-            while (coralViews.Count > coralBuffer.Count)
-            {
-                var view = coralViews[coralViews.Count - 1];
-                if (view != null) view.Dispose();
-                coralViews.RemoveAt(coralViews.Count - 1);
-            }
-            PlaceMarkers();
-        }
-
-        private static void DisposeCoralViews(List<UI_MinimapItem> views)
-        {
-            foreach (var view in views)
-                if (view != null) view.Dispose();
-            views.Clear();
-        }
-
         private UI_MinimapItemButton EnsureEntityView(ushort entityId)
         {
             if (entityMarkers.TryGetValue(entityId, out var marker) && marker.view != null && !marker.view.isDisposed)
@@ -252,10 +206,40 @@ namespace Ros.UI.Main
             return view;
         }
 
+        private UI_MinimapItem EnsureCoralView(ushort entityId)
+        {
+            if (coralMarkers.TryGetValue(entityId, out var marker) && marker.view != null && !marker.view.isDisposed)
+                return marker.view as UI_MinimapItem;
+            var view = UI_MinimapItem.CreateInstance();
+            view.scale = new Vector2(itemScale, itemScale);
+            view.touchable = false;
+            view.m_type.selectedIndex = UI_Minimap.PageOf(EntityCategory.Coral, default, EntityCamp.None, false, myCamp);
+            m_largeMinimapContainer.AddChild(view);
+            return view;
+        }
+
         private void RequestDetail(ushort entityId)
         {
             if (!visible || Tool.NetworkManager == null) return;
             Tool.NetworkManager.SendGodViewEntityDetail(new CSGodViewEntityDetail { entityId = entityId });
+        }
+
+        // 超过 MarkerTimeout 没再收到（实体消失 / 拖出区域 / 服务端停发）就清点位
+        private void ExpireMarkers()
+        {
+            float now = Time.unscaledTime;
+            if (ExpireMarkers(entityMarkers, now)) markersDirty = true;
+            if (ExpireMarkers(coralMarkers, now)) markersDirty = true;
+        }
+
+        private bool ExpireMarkers(Dictionary<ushort, Marker> markers, float now)
+        {
+            expiredScratch.Clear();
+            foreach (var pair in markers)
+                if (now - pair.Value.lastSeen > MarkerTimeout) expiredScratch.Add(pair.Key);
+            if (expiredScratch.Count == 0) return false;
+            for (int i = 0; i < expiredScratch.Count; i++) RemoveMarker(markers, expiredScratch[i]);
+            return true;
         }
 
         private void PlaceMarkers()
@@ -265,17 +249,14 @@ namespace Ros.UI.Main
             float minX = center.x - Edge * 0.5f;
             float maxZ = center.y + Edge * 0.5f;
             foreach (var marker in entityMarkers.Values) PlaceMarker(marker.view, marker.world, ppm, minX, maxZ);
-            for (int i = 0; i < coralViews.Count && i < coralBuffer.Count; i++)
-                PlaceMarker(coralViews[i], coralBuffer[i], ppm, minX, maxZ);
+            foreach (var marker in coralMarkers.Values) PlaceMarker(marker.view, marker.world, ppm, minX, maxZ);
         }
 
+        // 点位组件的轴心在中心（pivotAsAnchor），xy 就是图标中点，不能再扣半宽高
         private static void PlaceMarker(GObject view, Vector2 world, float ppm, float minX, float maxZ)
         {
             if (view == null) return;
-            // 缩放以左上角为轴心：居中要按缩放后的尺寸扣半宽高，否则点位会偏到图标右下
-            float halfW = view.width * view.scale.x * 0.5f;
-            float halfH = view.height * view.scale.y * 0.5f;
-            view.SetXY((world.x - minX) * ppm - halfW, (maxZ - world.y) * ppm - halfH);
+            view.SetXY((world.x - minX) * ppm, (maxZ - world.y) * ppm);
         }
 
         private static void DisposeMarkers(Dictionary<ushort, Marker> markers)
@@ -482,4 +463,3 @@ namespace Ros.UI.Main
         }
     }
 }
-
