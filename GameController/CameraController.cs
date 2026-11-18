@@ -44,11 +44,9 @@ public class CameraController : MonoBehaviour
     public Vector3 topDownOffset = new Vector3(0f, 16f, -4f);
     public float topDownSmooth = 8f;
 
-    // 自由视角（仅纯观战）：平移 / 升降 / 转向 / 俯仰速度与俯仰钳制范围
+    // 自由视角（仅纯观战）：平移 / 升降速度与俯仰钳制范围（转向与俯仰由鼠标滑动驱动）
     public float freeMoveSpeed = 12f;
     public float freeVerticalSpeed = 8f;
-    public float freeTurnSpeed = 90f;
-    public float freePitchSpeed = 60f;
     public Vector2 freePitchClamp = new Vector2(-89f, 89f);
     // 自由视角位置上报：每 freeReportInterval 秒检查一次，与上次上报位置水平距离小于 freeReportDistance 则不发
     public float freeReportInterval = 1f;
@@ -236,7 +234,7 @@ public class CameraController : MonoBehaviour
             pitchHoldTime = 0f;
         }
 
-        if (Mode == CameraViewMode.Free) TickFreeKeys();
+        if (Mode == CameraViewMode.Free) TickFreeLook();
         else TickMouseLook();
     }
 
@@ -372,18 +370,33 @@ public class CameraController : MonoBehaviour
     }
 
     #region 自由视角（仅纯观战）
-    // 键位固定：WASD 水平平移 / K 升 J 降 / Q 左转 E 右转 / Y 抬头 H 低头
-    private void TickFreeKeys()
+    // 鼠标滑动转向：水平滑动改 yaw、纵向滑动改俯仰（灵敏度与第三人称同一组口径）
+    private void TickFreeLook()
     {
-        if (InputManager.PlayerInputBlocked) return;
-        float deltaTime = Time.deltaTime;
-        if (Input.GetKey(KeyCode.Q)) freeYaw -= freeTurnSpeed * deltaTime;
-        if (Input.GetKey(KeyCode.E)) freeYaw += freeTurnSpeed * deltaTime;
-        if (Input.GetKey(KeyCode.Y)) freePitch -= freePitchSpeed * deltaTime;
-        if (Input.GetKey(KeyCode.H)) freePitch += freePitchSpeed * deltaTime;
-        freePitch = Mathf.Clamp(freePitch, freePitchClamp.x, freePitchClamp.y);
+        if (InputManager.PlayerInputBlocked)
+        {
+            mousePosValid = false;
+            return;
+        }
+
+        Vector3 pos = Input.mousePosition;
+        if (!mousePosValid)
+        {
+            lastMousePos = pos;
+            mousePosValid = true;
+            return;
+        }
+
+        float dx = pos.x - lastMousePos.x;
+        float dy = pos.y - lastMousePos.y;
+        lastMousePos = pos;
+
+        if (dx != 0f) freeYaw = Mathf.Repeat(freeYaw + dx * GlobalConfig.mouse_yaw_sensitivity, 360f);
+        if (dy != 0f)
+            freePitch = Mathf.Clamp(freePitch - dy * GlobalConfig.mouse_pitch_sensitivity, freePitchClamp.x, freePitchClamp.y);
     }
 
+    // 位移固定：W/S 前后、A/D 左右，方向只取 yaw 的水平面（抬头低头不会向上/下飞）；左 Shift 降、左 Alt / 空格 升
     private void TickFreeMove(float deltaTime)
     {
         if (InputManager.PlayerInputBlocked) return;
@@ -399,8 +412,8 @@ public class CameraController : MonoBehaviour
         if (flat.sqrMagnitude > 1e-6f) flat = flat.normalized * freeMoveSpeed;
 
         float vertical = 0f;
-        if (Input.GetKey(KeyCode.K)) vertical += 1f;
-        if (Input.GetKey(KeyCode.J)) vertical -= 1f;
+        if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.Space)) vertical += 1f;
+        if (Input.GetKey(KeyCode.LeftShift)) vertical -= 1f;
 
         transform.position += (flat + Vector3.up * (vertical * freeVerticalSpeed)) * deltaTime;
         transform.rotation = Quaternion.Euler(freePitch, freeYaw, 0f);
