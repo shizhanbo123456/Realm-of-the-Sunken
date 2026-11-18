@@ -1130,7 +1130,7 @@ public class BattlePage : PageBase
         if (obj is not UI_btn_SelectCard btn || index >= pendingTiers.Count) return;
         int tier = pendingTiers[index];
         if (btn.m_level != null) btn.m_level.selectedIndex = tier;
-        if (btn.m_label_num != null) btn.m_label_num.text = $"×{cardPending[tier]}";
+        if (btn.m_label_num != null) btn.m_label_num.text = cardPending[tier].ToString();
         btn.onClick.Set(() => OpenCardPanel((CardTier)tier));
     }
 
