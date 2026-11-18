@@ -27,9 +27,9 @@ namespace Ros.UI.Main
             m_btn_prepare = (GButton)GetChildAt(1);
             m_btn_exit = (GButton)GetChildAt(2);
             m_spectate_current_member_count = (GTextField)GetChildAt(4);
-            m_btn_joinDefense = (UI_LobbCampOperation)GetChildAt(6);
-            m_btn_joinAttack = (UI_LobbCampOperation)GetChildAt(7);
-            m_btn_settings = (GButton)GetChildAt(8);
+            m_btn_joinDefense = (UI_LobbCampOperation)GetChildAt(7);
+            m_btn_joinAttack = (UI_LobbCampOperation)GetChildAt(8);
+            m_btn_settings = (GButton)GetChildAt(9);
         }
     }
 }
