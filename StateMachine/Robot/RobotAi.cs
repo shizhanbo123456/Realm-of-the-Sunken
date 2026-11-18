@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Ros.Config;
 using Ros.Skill;
 using Ros.Transport;
 using UnityEngine;
@@ -156,9 +157,18 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
         Owner.SetRobotFacePoint(target.transform.position);
     }
 
-    // 站定攻击：有就绪技能就放，全部没好就原地站着（文档要求的"不空放"）
+    private float comboRetryTime; // 上次续段时刻（普攻按 0.1s 节拍连段）
+
+    // 站定攻击：连招窗口内续接普攻下一段（等同真人连点普攻），否则技能优先、全不可用退普攻
     protected bool TryAttack(EntityData target)
     {
+        if (skillBar.PunchChain && Owner.anim != null && Owner.anim.AllowCombo)
+        {
+            if (Time.time < comboRetryTime) return false;
+            comboRetryTime = Time.time + GlobalConfig.attack_retry_interval;
+            Owner.anim.DoCombo();
+            return true;
+        }
         if (Owner.InputBlocked(InputBlockOp.Attack)) return false;
         return skillBar.TryCastAny(target);
     }
@@ -253,7 +263,7 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
         Tool.BattleManager.ReportStatus(Owner, (int)Current.ReportState, Mathf.RoundToInt(HealthRatio * 100f));
     }
 
-    // 接敌距离 = 栏内此刻真能放的技能里最远的射程；全场技能只在还有库存时拉近距离，放完自动退回近战距离
+    // 接敌距离 = 栏内此刻真能放的技能里最远的射程；全场技能只在还有库存时拉近距离，放完自动退回普攻射程
     protected float AttackRange
     {
         get
@@ -266,7 +276,7 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
                 if (!SkillManager.TryGet(slots[i], out var skill)) continue;
                 if (skill.CastRange > best) best = skill.CastRange;
             }
-            return best > 0f ? best : DefaultAttackRange;
+            return best > 0f ? best : SkillConfig.Get(GlobalConfig.unarmed_punch).castRange;
         }
     }
 

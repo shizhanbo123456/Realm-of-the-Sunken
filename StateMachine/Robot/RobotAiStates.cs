@@ -4,8 +4,6 @@ using UnityEngine;
 // 人机玩家的各决策状态实现（状态图与消息矩阵见 Doc/08-游戏AI逻辑），只写期望行为、不碰执行层
 public partial class RobotAi
 {
-    private const float DefaultAttackRange = 2f; // 栏内没有带射程的技能时按空手射程算，不能用大值否则会停在打不到的距离
-
     private sealed class SearchState : DecisionState
     {
         public override EntityReportState ReportState => EntityReportState.Search;

@@ -182,6 +182,9 @@ public static class GlobalConfig
     public const int weapon_skill_id_min = (int)SkillType.SkillFanIceCone;
     public const int weapon_skill_id_max = (int)SkillType.SkillAllyShieldTwentyFive;
     #endregion
+
+    // 攻击动作播放期间的重试节拍：普攻连段按此频率续段，与真人连点普攻同频
+    public const float attack_retry_interval = 0.1f;
     #endregion
 
     #region 结算与得分

@@ -15,6 +15,8 @@ public sealed class AiIntentRelay : DecisionMachine, IBehaviorHost
     private Vector2 point;
     private ushort targetId;
     private bool moveBlocked; // 目的地走不到：意图不变就不再重发，避免每帧重算路径并刷回执
+    private bool punchChain;  // 最近一次成功出手是空手普攻：连招窗口内可续段，放技能后失效
+    private float comboRetryTime; // 上次续段时刻（普攻按 0.1s 节拍连段）
     private readonly List<int> castOrder = new();
 
     public AiIntentRelay(PlayerEntityData owner, int ownerClientId)
@@ -95,10 +97,14 @@ public sealed class AiIntentRelay : DecisionMachine, IBehaviorHost
         castOrder.Sort(ComparePriority);
         for (int i = 0; i < castOrder.Count; i++)
         {
-            if (TryUseSkill(castOrder[i])) return true;
+            if (!TryUseSkill(castOrder[i])) continue;
+            punchChain = false;
+            return true;
         }
 
-        return TryUseSkill(GlobalConfig.unarmed_punch);
+        if (!TryUseSkill(GlobalConfig.unarmed_punch)) return false;
+        punchChain = true;
+        return true;
     }
 
     private int ComparePriority(int a, int b)
@@ -137,8 +143,16 @@ public sealed class AiIntentRelay : DecisionMachine, IBehaviorHost
 
     void IBehaviorHost.FaceTarget(EntityData target) => Owner.SetRobotFacePoint(target.transform.position);
 
+    // 连招窗口内续接普攻下一段；窗口没开就按技能优先、全不可用退普攻的常规顺序出手
     bool IBehaviorHost.TryAttack(EntityData target)
     {
+        if (punchChain && Owner.anim != null && Owner.anim.AllowCombo)
+        {
+            if (Time.time < comboRetryTime) return false;
+            comboRetryTime = Time.time + GlobalConfig.attack_retry_interval;
+            Owner.anim.DoCombo();
+            return true;
+        }
         if (Owner.InputBlocked(InputBlockOp.Attack)) return false;
         return TryCastAny();
     }

@@ -19,6 +19,9 @@ public class RobotSkillBar
 
     public IReadOnlyList<int> Slots => slots;
 
+    // 最近一次成功出手是空手普攻：连招窗口内可续下一段，放技能后立即失效
+    public bool PunchChain { get; private set; }
+
     // 持有表变化（珊瑚掉落 / GM / 复活继承）后重排：品质降序，同品质 id 降序
     public void Rebuild()
     {
@@ -47,12 +50,16 @@ public class RobotSkillBar
         for (int i = 0; i < slots.Count; i++)
         {
             if (!CanReach(slots[i], dist)) continue;
-            if (TryCast(slots[i])) return true;
+            if (!TryCast(slots[i])) continue;
+            PunchChain = false;
+            return true;
         }
 
         // 普攻同样取配表射程，够不到就交给决策层继续前压
         if (dist > SkillConfig.Get(GlobalConfig.unarmed_punch).castRange) return false;
-        return TryCast(GlobalConfig.unarmed_punch);
+        if (!TryCast(GlobalConfig.unarmed_punch)) return false;
+        PunchChain = true;
+        return true;
     }
 
     // 只影响自身的技能（射程 0）不看距离，其余必须覆盖当前距离
