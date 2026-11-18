@@ -101,13 +101,18 @@ public partial class BattleManager : EnsBehaviour
         private static readonly HashSet<int> s_buffer = new();
 
         // AI 侧索敌（不限方向）；技能索敌一律走带夹角的那个重载，夹角与半径读 skill.csv
+        // 珊瑚垫底：先排除珊瑚找最近，范围内只有珊瑚时才锁珊瑚
         public static EntityData GetNearestEnemy(EntityData entity, float radius)
         {
             if (entity == null) return null;
-            return GetNearestInCamp(entity.transform.position, radius, EntityCampUtil.HostileOf(entity.type.category), entity.id);
+            EntityCamp hostile = EntityCampUtil.HostileOf(entity.type.category);
+            Vector3 pos = entity.transform.position;
+            return GetNearestInCamp(pos, radius, hostile, entity.id, true)
+                ?? GetNearestInCamp(pos, radius, hostile, entity.id);
         }
 
         // 索敌：夹角 <= skill_target_no_sector = 不索敌；> skill_target_full_sector = 不限方向；半径 > skill_target_unlimited_radius = 不限距离
+        // 珊瑚垫底：先排除珊瑚找最近，范围内只有珊瑚时才锁珊瑚
         public static EntityData GetNearestEnemy(EntityData entity, float radius, float sectorHalfAngle)
         {
             if (entity == null || sectorHalfAngle <= GlobalConfig.skill_target_no_sector) return null;
@@ -118,6 +123,14 @@ public partial class BattleManager : EnsBehaviour
             if (inSector && fwd.sqrMagnitude < 1e-6f) return null; // 朝向退化时不猜方向
             fwd.Normalize();
             float cosLimit = inSector ? Mathf.Cos(sectorHalfAngle * Mathf.Deg2Rad) : -1f;
+            EntityCamp hostile = EntityCampUtil.HostileOf(entity.type.category);
+            return NearestInSector(pos, fwd, radius, cosLimit, inSector, hostile, entity.id, true)
+                ?? NearestInSector(pos, fwd, radius, cosLimit, inSector, hostile, entity.id, false);
+        }
+
+        private static EntityData NearestInSector(Vector3 pos, Vector3 fwd, float radius, float cosLimit, bool inSector,
+            EntityCamp hostile, ushort selfId, bool skipCoral)
+        {
             bool unlimited = radius > GlobalConfig.skill_target_unlimited_radius;
             float sqrLimit = unlimited ? float.MaxValue : radius * radius;
 
@@ -131,13 +144,13 @@ public partial class BattleManager : EnsBehaviour
                 Entities.GetIdsInRange(pos, radius, s_buffer);
             }
 
-            EntityCamp hostile = EntityCampUtil.HostileOf(entity.type.category);
             EntityData target = null;
             float bestSqr = float.MaxValue;
             foreach (var id in s_buffer)
             {
                 if (!Entities.TryGetObject(id, out var e) || e == null) continue;
-                if (e.id == entity.id || (hostile & e.camp) == 0 || !e.Alive) continue;
+                if (e.id == selfId || (hostile & e.camp) == 0 || !e.Alive) continue;
+                if (skipCoral && e.type.category == EntityCategory.Coral) continue;
                 Vector3 to = e.transform.position - pos;
                 to.y = 0f;
                 float dsqr = to.sqrMagnitude;
@@ -154,7 +167,8 @@ public partial class BattleManager : EnsBehaviour
             return target;
         }
 
-        public static EntityData GetNearestInCamp(Vector3 pos, float radius, EntityCamp camp, ushort excludeId = 0)
+        public static EntityData GetNearestInCamp(Vector3 pos, float radius, EntityCamp camp, ushort excludeId = 0,
+            bool skipCoral = false)
         {
             // 半径 > skill_target_unlimited_radius = 不限距离（与带夹角的重载同约定）
             if (radius > GlobalConfig.skill_target_unlimited_radius)
@@ -172,6 +186,7 @@ public partial class BattleManager : EnsBehaviour
             {
                 if (!Entities.TryGetObject(id, out var e)) continue;
                 if (e.id == excludeId || (camp & e.camp) == 0 || !e.Alive) continue;
+                if (skipCoral && e.type.category == EntityCategory.Coral) continue;
                 float d = (e.transform.position - pos).sqrMagnitude;
                 if (d < sqr)
                 {
