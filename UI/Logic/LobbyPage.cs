@@ -65,8 +65,8 @@ public class LobbyPage : PageBase
     #region//Local
     private void WireCamp(UI_LobbCampOperation block, PlayerCampType camp)
     {
-        block.m_join.onClick.Add(() => JoinCamp(camp));
-        block.m_quit.onClick.Add(() => JoinCamp(PlayerCampType.Spectator));
+        block.m_join.onClick.Add(() => JoinCampClicked(camp));
+        block.m_quit.onClick.Add(() => JoinCampClicked(PlayerCampType.Spectator));
         block.m_add_ai.onClick.Add(() => ChangeRobotCount(camp, +1));
         block.m_remove_ai.onClick.Add(() => ChangeRobotCount(camp, -1));
     }
@@ -131,12 +131,21 @@ public class LobbyPage : PageBase
         return count;
     }
 
-    private void JoinCamp(PlayerCampType camp)
+    // 阵营唯一的切换入口：大厅按钮与 AI 指令共用，返回拦截原因（null = 已提交）
+    public promptEnum? JoinCamp(PlayerCampType camp)
     {
-        if (BlockedByReady()) return;
-        if (camp != myCamp && !HasHumanSeat(camp)) return;
+        if (myReady) return promptEnum.cancel_ready_first; // 已准备（含开战倒计时）不允许改阵营：服务器只在准备状态变化时重算开局条件
+        if (camp != myCamp && !HasHumanSeat(camp))
+            return camp == PlayerCampType.Attack ? promptEnum.attacker_full : promptEnum.defense_full;
         myCamp = camp;
         RaiseState();
+        return null;
+    }
+
+    private void JoinCampClicked(PlayerCampType camp)
+    {
+        var reject = JoinCamp(camp);
+        if (reject.HasValue && Tool.UIManager != null) Tool.UIManager.ShowFlyText(reject.Value);
     }
 
     // 真人名额（不含 AI）：观战不限，按服务器上次广播的成员列表预判，最终以服务器为准
@@ -147,40 +156,42 @@ public class LobbyPage : PageBase
         int limit = attack
             ? GlobalVariable.I(global_variablesEnum.player_limit_attacker)
             : GlobalVariable.I(global_variablesEnum.player_limit_defenser);
-        int count = attack ? humanAttack : humanDefense;
-        if (count < limit) return true;
-        if (Tool.UIManager != null)
-            Tool.UIManager.ShowFlyText(attack ? promptEnum.attacker_full : promptEnum.defense_full);
-        return false;
+        return (attack ? humanAttack : humanDefense) < limit;
+    }
+
+    // 机器人数上限（global_variables）
+    public static int RobotLimit(PlayerCampType camp) => camp == PlayerCampType.Defense
+        ? GlobalVariable.I(global_variablesEnum.player_limit_defenser_AI)
+        : GlobalVariable.I(global_variablesEnum.player_limit_attacker_AI);
+
+    // 机器人数唯一的写入口：大厅 +/- 与 AI 指令共用，返回拦截原因（null = 已提交）
+    public promptEnum? SetRobotCount(PlayerCampType camp, int count)
+    {
+        if (camp != PlayerCampType.Attack && camp != PlayerCampType.Defense)
+            throw new System.ArgumentOutOfRangeException(nameof(camp), camp, "只有进攻/防守阵营有机器人数");
+        if (count < 0)
+            throw new System.ArgumentOutOfRangeException(nameof(count), count, "机器人数不能为负");
+        if (myReady) return promptEnum.cancel_ready_first; // 与改阵营同规则：已准备不再重算开局
+
+        bool defense = camp == PlayerCampType.Defense;
+        int limit = RobotLimit(camp);
+        if (count > limit) return defense ? promptEnum.defense_ai_full : promptEnum.attack_ai_full;
+
+        if (defense) defenseRobot = count;
+        else attackRobot = count;
+        RefreshCampBlock(defense ? panel.m_btn_joinDefense : panel.m_btn_joinAttack, camp, count);
+        RaiseState();
+        return null;
     }
 
     private void ChangeRobotCount(PlayerCampType camp, int delta)
     {
-        if (camp == PlayerCampType.Spectator || BlockedByReady()) return;
-        bool defense = camp == PlayerCampType.Defense;
-        int limit = defense
-            ? GlobalVariable.I(global_variablesEnum.player_limit_defenser_AI)
-            : GlobalVariable.I(global_variablesEnum.player_limit_attacker_AI);
-        int current = defense ? defenseRobot : attackRobot;
-        if (delta > 0 && current >= limit)
-        {
-            if (Tool.UIManager != null)
-                Tool.UIManager.ShowFlyText(defense ? promptEnum.defense_ai_full : promptEnum.attack_ai_full);
-            return;
-        }
-        int next = Mathf.Clamp(current + delta, 0, limit);
-        if (defense) defenseRobot = next;
-        else attackRobot = next;
-        RefreshCampBlock(defense ? panel.m_btn_joinDefense : panel.m_btn_joinAttack, camp, next);
-        RaiseState();
-    }
-
-    // 已准备（含开战倒计时中）不允许改阵营与 AI 数量：服务器只在准备状态变化时重算开局条件
-    private bool BlockedByReady()
-    {
-        if (!myReady) return false;
-        if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.cancel_ready_first);
-        return true;
+        if (camp == PlayerCampType.Spectator) return; // 观战块没有 AI 数量按钮
+        int current = camp == PlayerCampType.Defense ? defenseRobot : attackRobot;
+        if (current <= 0 && delta < 0) return; // 已经 0 了，减号无动作
+        // 目标值直接交给唯一写入口判定：超上限给「已满」，已准备给「先取消准备」
+        var reject = SetRobotCount(camp, current + delta);
+        if (reject.HasValue && Tool.UIManager != null) Tool.UIManager.ShowFlyText(reject.Value);
     }
 
     private void ToggleReady()

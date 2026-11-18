@@ -178,7 +178,7 @@ public sealed class AiCommandLine : ClientSubManager
     private Task<NetworkManager.ConnectResult> connectTask;
     private Action<string> connectReply;
     private string connectIp;
-    private bool lastReady; // 阵营与准备同包上报，改阵营时不能把准备状态清掉
+    private bool lastReady; // lobbyPrepare 上报用；阵营由大厅页面统一按自己的状态发全量
 
     public AiInterruptHub Interrupts => hub;
 
@@ -510,6 +510,7 @@ public sealed class AiCommandLine : ClientSubManager
             case AiCommandId.ConnectToServer: Connect(a, reply); break;
             case AiCommandId.Takeover: Takeover(a, reply); break;
             case AiCommandId.JoinCamp: SelectCamp(a, reply); break;
+            case AiCommandId.SetRobotCount: SetRobotCount(a, reply); break;
             case AiCommandId.LobbyPrepare: SetReady(a, reply); break;
             case AiCommandId.ExitRoom: LeaveRoom(reply); break;
             case AiCommandId.SendChatMessage: SendChat(a, reply); break;
@@ -708,29 +709,27 @@ public sealed class AiCommandLine : ClientSubManager
     {
         int camp = a.Int(0);
         int index = a.Int(1);
-        if (camp == 0)
-        {
-            if (index < 0 || index >= GlobalConfig.attack_character_count)
-            {
-                reply($"错误：进攻方下标范围 0~{GlobalConfig.attack_character_count - 1}");
-                return;
-            }
-            ClientSelection.selectedAttackIndex = index;
-        }
-        else if (camp == 1)
-        {
-            if (index < 0 || index >= GlobalConfig.defense_character_count)
-            {
-                reply($"错误：防守方下标范围 0~{GlobalConfig.defense_character_count - 1}");
-                return;
-            }
-            ClientSelection.selectedDefenseIndex = index;
-        }
-        else
+        if (camp != 0 && camp != 1)
         {
             reply("错误：camp 只能是 0 进攻方 / 1 防守方");
             return;
         }
+        bool defense = camp == 1;
+        int count = defense ? GlobalConfig.defense_character_count : GlobalConfig.attack_character_count;
+        if (index < 0 || index >= count)
+        {
+            reply($"错误：{(defense ? "防守" : "进攻")}方下标范围 0~{count - 1}");
+            return;
+        }
+        var home = Tool.UIManager != null ? Tool.UIManager.Home : null;
+        if (home == null)
+        {
+            reply("错误：首页未初始化");
+            return;
+        }
+
+        // 与首页「确认选择」同一个落盘入口：切页签、浏览、刷新预览、写 ClientSelection
+        home.SelectCharacter(defense, index);
         reply($"已选择 进攻={ClientSelection.selectedAttackIndex} 防守={ClientSelection.selectedDefenseIndex}");
     }
 
@@ -741,9 +740,23 @@ public sealed class AiCommandLine : ClientSubManager
             reply("错误：上一次连接还没结束");
             return;
         }
+        var home = Tool.UIManager != null ? Tool.UIManager.Home : null;
+        if (home == null)
+        {
+            reply("错误：首页未初始化");
+            return;
+        }
+
+        // 与首页连接按钮同一个入口：先按配表校验并回写玩家名，名字不合法不许连
+        if (!home.TrySetPlayerName(ClientSelection.playerName, out int min, out int max))
+        {
+            reply("错误：" + string.Format(PromptConfig.Get(promptEnum.name_length_invalid).text, min, max));
+            return;
+        }
+
         connectIp = a.Str(0);
         connectReply = reply;
-        connectTask = Tool.NetworkManager.TryConnect(connectIp);
+        connectTask = home.ConnectAsync(connectIp);
         reply("已发起连接：" + (connectIp.Length == 0 ? "本机" : connectIp));
     }
 
@@ -769,15 +782,26 @@ public sealed class AiCommandLine : ClientSubManager
             return;
         }
 
-        Tool.NetworkManager.EnterWorld();
+        // 进房间已由 HomePage.ConnectAsync 完成，这里只回报结果
         reply("已连接，正在进入房间");
     }
 
     private void SetPlayerName(AiArgs a, Action<string> reply)
     {
-        string name = a.Str(0);
-        ClientSelection.playerName = name;
-        reply("名称已设为 " + name);
+        var home = Tool.UIManager != null ? Tool.UIManager.Home : null;
+        if (home == null)
+        {
+            reply("错误：首页未初始化");
+            return;
+        }
+
+        // 与改名弹窗同一个落盘入口：校验长度、写存档、刷新首页标签
+        if (!home.TrySetPlayerName(a.Str(0), out int min, out int max))
+        {
+            reply("错误：" + string.Format(PromptConfig.Get(promptEnum.name_length_invalid).text, min, max));
+            return;
+        }
+        reply("名称已设为 " + ClientSelection.playerName);
     }
 
     // 控制模式只在 Home 可改：连接服务器时随 CSLobbyPlayerInfo 上报，进房后不允许再切
@@ -788,7 +812,6 @@ public sealed class AiCommandLine : ClientSubManager
         reply(on ? "已接管：键鼠与界面点击已屏蔽" : "已解除接管：恢复玩家控制");
     }
 
-    // 阵营与准备同包上报，本地记住每次准备状态，改阵营时不能把准备悄悄清掉
     private void SelectCamp(AiArgs a, Action<string> reply)
     {
         int camp = a.Int(0);
@@ -797,8 +820,56 @@ public sealed class AiCommandLine : ClientSubManager
             reply("错误：阵营只能是 0 进攻 / 1 防守 / 2 观战");
             return;
         }
-        Tool.NetworkManager.SendLobbyUpdate(new CSLobbyUpdate { camp = camp, ready = lastReady });
+        var lobby = Tool.UIManager != null ? Tool.UIManager.Lobby : null;
+        if (lobby == null)
+        {
+            reply("错误：大厅未初始化");
+            return;
+        }
+
+        // 与大厅阵营按钮同一个入口：已准备不许改、真人名额不足会被拦
+        var reject = lobby.JoinCamp((PlayerCampType)camp);
+        if (reject.HasValue)
+        {
+            reply("错误：" + PromptConfig.Get(reject.Value).text);
+            return;
+        }
         reply("已选择阵营 " + camp);
+    }
+
+    // 机器人数：与大厅 +/- 同一个写入口，直接给目标值
+    private void SetRobotCount(AiArgs a, Action<string> reply)
+    {
+        int camp = a.Int(0);
+        int count = a.Int(1);
+        if (camp != 0 && camp != 1)
+        {
+            reply("错误：camp 只能是 0 进攻方 / 1 防守方");
+            return;
+        }
+        var lobby = Tool.UIManager != null ? Tool.UIManager.Lobby : null;
+        if (lobby == null)
+        {
+            reply("错误：大厅未初始化");
+            return;
+        }
+
+        bool defense = camp == 1;
+        var side = defense ? PlayerCampType.Defense : PlayerCampType.Attack;
+        int limit = LobbyPage.RobotLimit(side);
+        if (count < 0 || count > limit)
+        {
+            reply($"错误：{(defense ? "防守" : "进攻")}方机器人数范围 0~{limit}");
+            return;
+        }
+
+        var reject = lobby.SetRobotCount(side, count);
+        if (reject.HasValue)
+        {
+            reply("错误：" + PromptConfig.Get(reject.Value).text);
+            return;
+        }
+        reply($"已设置{(defense ? "防守" : "进攻")}方机器人数 {count}");
     }
 
     private void SetReady(AiArgs a, Action<string> reply)

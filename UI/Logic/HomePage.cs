@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Threading.Tasks;
 using FairyGUI;
 using Ros.UI.Main;
 using UnityEngine;
@@ -105,21 +106,29 @@ public class HomePage : PageBase
 
     private void CloseRename() => renamePanel.visible = false;
 
-    // 只有名字合法才改名并关闭；不合法只飘字，弹窗留在原地
-    private void CommitRename()
+    // 玩家名唯一的落盘入口：改名弹窗、连接前校验、AI 指令都走这里
+    // 返回 false 表示长度不合法，min/max 是配表区间，供调用方提示
+    public bool TrySetPlayerName(string rawName, out int min, out int max)
     {
-        int min = GlobalVariable.I(global_variablesEnum.name_length_min);
-        int max = GlobalVariable.I(global_variablesEnum.name_length_max);
-        string name = (renamePanel.m_input.text ?? "").Trim();
-        if (name.Length < min || name.Length > max)
-        {
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.name_length_invalid, min, max);
-            return;
-        }
+        min = GlobalVariable.I(global_variablesEnum.name_length_min);
+        max = GlobalVariable.I(global_variablesEnum.name_length_max);
+        string name = (rawName ?? "").Trim();
+        if (name.Length < min || name.Length > max) return false;
 
         ClientSelection.playerName = name;
         if (Tool.SaveManager != null) Tool.SaveManager.playerName = name;
         RefreshPlayerName();
+        return true;
+    }
+
+    // 只有名字合法才改名并关闭；不合法只飘字，弹窗留在原地
+    private void CommitRename()
+    {
+        if (!TrySetPlayerName(renamePanel.m_input.text, out int min, out int max))
+        {
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.name_length_invalid, min, max);
+            return;
+        }
         renamePanel.visible = false;
     }
 
@@ -239,6 +248,15 @@ public class HomePage : PageBase
             Tool.UIManager.ShowFlyText(promptEnum.character_selected, panel.m_label_character_name.text);
     }
 
+    // 出场选择唯一的落盘入口：首页「确认选择」与 AI 指令都走这里
+    // 先切到该阵营并浏览到该角色（刷新列表 / 属性 / 场景预览），再落 ClientSelection
+    public void SelectCharacter(bool defense, int index)
+    {
+        defenseTab = defense;
+        Browse(CampOffset + index);
+        ConfirmSelection();
+    }
+
     private void RefreshAttrList()
     {
         int saveIndex = selectedSaveIndex;
@@ -317,25 +335,24 @@ public class HomePage : PageBase
     private async void OnConnectClicked()
     {
         // 连接前校验玩家名字长度，不合法则飘字提示并拦截连接
-        int nameMin = GlobalVariable.I(global_variablesEnum.name_length_min);
-        int nameMax = GlobalVariable.I(global_variablesEnum.name_length_max);
-        string name = (ClientSelection.playerName ?? "").Trim();
-        if (name.Length < nameMin || name.Length > nameMax)
+        if (!TrySetPlayerName(ClientSelection.playerName, out int min, out int max))
         {
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.name_length_invalid, nameMin, nameMax);
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.name_length_invalid, min, max);
             return;
         }
-        if (name != ClientSelection.playerName)
-        {
-            // 首尾空白去掉后回写：上报、显示与存档保持同一口径
-            ClientSelection.playerName = name;
-            if (Tool.SaveManager != null) Tool.SaveManager.playerName = name;
-            RefreshPlayerName();
-        }
-        if (Tool.NetworkManager == null) return;
-        var result = await Tool.NetworkManager.TryConnect(panel.m_connectPanel.m_input_ipaddress.m_content.text);
-        if (result != NetworkManager.ConnectResult.Success) return;
+        await ConnectAsync(panel.m_connectPanel.m_input_ipaddress.m_content.text);
+    }
+
+    // 连接唯一的发起入口：连接按钮与 AI 指令共用（名字校验由调用方先走 TrySetPlayerName）
+    public async Task<NetworkManager.ConnectResult> ConnectAsync(string ip)
+    {
+        if (Tool.NetworkManager == null)
+            throw new System.InvalidOperationException("[首页] 场景缺少 NetworkManager，无法连接");
+
+        var result = await Tool.NetworkManager.TryConnect(ip);
+        if (result != NetworkManager.ConnectResult.Success) return result;
         Tool.NetworkManager.EnterWorld();
+        return result;
     }
     #endregion
 }

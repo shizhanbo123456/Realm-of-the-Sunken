@@ -30,6 +30,11 @@ public class UIManager : MonoBehaviour
     // 聊天面板：AI 指令发消息也要走它的发送链路，外部从这里取
     public ChatPlugin Chat => chat;
 
+    // 首页 / 大厅：AI 指令的改名、选角、连接、阵营与机器人数都走页面里那条链路
+    public HomePage Home => home;
+
+    public LobbyPage Lobby => lobby;
+
     // 确认弹窗：独立子界面（不挂页面），弹出时自带全屏遮罩挡底层点击
     public ConfirmView Confirm { get; private set; }
 

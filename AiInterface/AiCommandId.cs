@@ -12,6 +12,7 @@ public static class AiCommandId
     public const int JoinCamp = 5;
     public const int LobbyPrepare = 6;
     public const int ExitRoom = 7;
+    public const int SetRobotCount = 33;
 
     // 通讯
     public const int SendChatMessage = 8;
