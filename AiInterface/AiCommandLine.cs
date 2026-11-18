@@ -191,6 +191,8 @@ public sealed class AiCommandLine : ClientSubManager
 
     public SCDefensePointProgress GuardSnapshot => guardProgress;
 
+    public bool HasGuardSnapshot => hasGuardProgress;
+
     public void CopyMinimap(List<SCMinimapEntity> buffer)
     {
         buffer.Clear();

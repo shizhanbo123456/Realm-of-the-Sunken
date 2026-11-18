@@ -51,7 +51,7 @@ namespace Ros.Transport
                 attackRobotCount = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
                 defenseRobotCount = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
                 battleStarted = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
-                members = new List<LobbyMemberInfo>(),
+                members = new List<SCLobbyInfo.LobbyMemberInfo>(),
             };
             int count = IntSerializer.Deserialize(data, ref indexStart, invalidIndex);
             for (int i = 0; i < count; i++)

@@ -495,7 +495,7 @@ public sealed class AiLuaApi
     public int guard_progress(int index)
     {
         var commands = AiCommandLine.Current;
-        if (commands == null || commands.GuardSnapshot == null) return -1;
+        if (commands == null || !commands.HasGuardSnapshot) return -1;
         var info = commands.GuardSnapshot;
         switch (index)
         {

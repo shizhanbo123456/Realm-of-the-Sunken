@@ -127,7 +127,7 @@ namespace Ros.Transport
                     hasTransform = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
                     hasHealth = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
                     hasBuffs = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
-                    buffs = new List<BuffRuntime>(),
+                    buffs = new List<SCEntityDisplayInfo.BuffRuntime>(),
                 };
                 if (info.hasHealth)
                 {
@@ -159,7 +159,7 @@ namespace Ros.Transport
 
                 BitField.SetBuffer(data, indexStart);
                 var r = new SCEntityDisplayInfo();
-                r.buffs = new List<BuffRuntime>();
+                r.buffs = new List<SCEntityDisplayInfo.BuffRuntime>();
                 r.entityId = (ushort)BitField.ReadInt(0, SyncRanges.EntityIdMax);
                 r.type = new EntityType((EntityCategory)BitField.ReadInt(0, 7), BitField.ReadInt(0, 31));
                 r.camp = (EntityCamp)BitField.ReadInt(0, 31);
