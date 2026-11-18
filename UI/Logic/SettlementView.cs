@@ -58,12 +58,8 @@ public class SettlementView
         var loading = ClientLoadingManager.Current;
         Show(r, loading != null && loading.HasSession ? loading.Camp : EntityCamp.None, true);
 
-        // 立即切回组队界面（战斗 HUD 随 Exit 隐藏），再隐藏组队面板等结算播完
-        if (Tool.UIManager != null)
-        {
-            Tool.UIManager.TurnPage(PageType.Lobby);
-            Tool.UIManager.SetLobbyPanelVisible(false);
-        }
+        // 战斗页退出（HUD 随 Exit 隐藏），组队页留到结算关闭时再恢复
+        if (Tool.UIManager != null) Tool.UIManager.HidePage(PageId.Battle);
     }
 
     private void Show(SettlementResult r, EntityCamp camp, bool restoreLobbyAfterClose)
@@ -208,7 +204,7 @@ public class SettlementView
         closing = false;
         items.Clear();
         rows.Clear();
-        if (restoreLobby && Tool.UIManager != null) Tool.UIManager.SetLobbyPanelVisible(true);
+        if (restoreLobby && Tool.UIManager != null) Tool.UIManager.ShowPage(PageId.Lobby);
         restoreLobby = false;
     }
 

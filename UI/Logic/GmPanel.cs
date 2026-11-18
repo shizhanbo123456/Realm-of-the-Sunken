@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using FairyGUI;
@@ -9,7 +9,7 @@ using Ros.UI.Main;
 using UnityEngine;
 
 // GM 面板：菜单与参数全部来自 gm_command 配表；每条命令渲染「主栏(描述) + 副栏(参数) + 按钮」，无参数时不出副栏
-public class GmPanel
+public class GmPanel : PageBase
 {
     private readonly UI_GmPanel panel;
 
@@ -25,36 +25,29 @@ public class GmPanel
     private const int ParamVector2 = 3;
     private const int ParamVector3 = 4;
 
-    // 面板入口：1 秒内连按 3 次 V 打开；关闭走面板上的关闭按钮
-    private const KeyCode panelOpenKey = KeyCode.V;
-    private const int panelOpenPressCount = 3;
-    private const float panelOpenPressWindow = 1f;
-    private int pressCount;
-    private float firstPressTime;
-
     private struct GmArg
     {
         public int i;
         public float v0, v1, v2;
     }
 
-    public GmPanel(UI_GmPanel panel)
+    public GmPanel(UI_GmPanel panel) : base(panel)
     {
         this.panel = panel;
-        GRoot.inst.AddChild(panel);
-        panel.visible = false;
     }
 
-    public bool IsOpen => panel.visible;
+    protected override UiConfig InitConfig() => new UiConfig { Order = UILayer.Gm };
 
-    public void Construct()
+    public bool IsOpen => IsVisible;
+
+    protected override void Init()
     {
         panel.m_firstMenu.m_button_list.itemRenderer = RenderGroupButton;
         panel.m_firstMenu.m_button_list.onClickItem.Add(OnClickGroup);
         panel.m_secondMenu.m_button_list.itemRenderer = RenderSubButton;
         panel.m_secondMenu.m_button_list.onClickItem.Add(OnClickSub);
         panel.m_GmItemList.itemRenderer = RenderItem;
-        panel.m_panel.m_close.onClick.Add(Close);
+        panel.m_panel.m_close.onClick.Add(CloseSelf);
 
         // EventManager 是静态的，订阅必须与解绑成对
         EventManager.AddEvent(ClientEvent.OnConnect, OnNetChanged);
@@ -64,7 +57,7 @@ public class GmPanel
         EventManager.AddEvent<SCGm>(ClientEvent.OnGmResult, OnGmResult);
     }
 
-    public void Shutdown()
+    public override void Shutdown()
     {
         EventManager.RemoveEvent(ClientEvent.OnConnect, OnNetChanged);
         EventManager.RemoveEvent(ClientEvent.OnExitWorld, OnNetChanged);
@@ -74,55 +67,34 @@ public class GmPanel
     }
 
     // 与页面同规则的整体缩放（设计高度 1080）；面板居中
-    public void OnResize(float uiScale)
+    public override void OnResize(float width, float height)
     {
+        float uiScale = Screen.height / 1080f;
         panel.scale = new Vector2(uiScale, uiScale);
         panel.SetXY(
             (GRoot.inst.width - panel.width * uiScale) * 0.5f,
             (GRoot.inst.height - panel.height * uiScale) * 0.5f);
     }
 
-    // 每帧由 UIManager 驱动：检测面板打开快捷键
-    public void Tick()
+    // 打开由 InputManager 的三连 V 触发：每次打开都重建菜单并清空输出
+    public override void Enter(ShowParam param)
     {
-        if (panel.visible) { ResetPress(); return; } // 已打开时不再累计按键，避免重复重建
-        if (InputManager.PlayerInputBlocked) { ResetPress(); return; } // 输入被 UI 占用或 AI 接管时不响应
-        if (GRoot.inst.focus is GTextInput) return; // 正在编辑输入框时不响应，避免 V 误开
-        if (!Input.GetKeyDown(panelOpenKey)) return;
-        if (pressCount == 0 || Time.unscaledTime - firstPressTime > panelOpenPressWindow)
-        {
-            pressCount = 1;
-            firstPressTime = Time.unscaledTime;
-        }
-        else pressCount++;
-        if (pressCount >= panelOpenPressCount)
-        {
-            ResetPress();
-            Open();
-        }
-    }
-
-    private void ResetPress()
-    {
-        pressCount = 0;
-        firstPressTime = 0f;
-    }
-
-    public void Open()
-    {
-        panel.visible = true;
         Output(string.Empty);
         BuildGroups();
+        base.Enter(param);
     }
 
-    public void Close() => panel.visible = false;
-
-    private static bool Online => Tool.NetworkManager != null && NetworkManager.CanSendWorldCommand;
-
-    private void OnNetChanged() { if (panel.visible) BuildGroups(); }
+    private static void CloseSelf()
+    {
+        if (Tool.UIManager != null) Tool.UIManager.HidePage(PageId.Gm);
+    }
 
     // 开战：相位由组队期变对局中，各指令的可用时机随之变化 → 重建菜单
     private void OnBattleStartChanged(int camp) => OnNetChanged();
+
+    private static bool Online => Tool.NetworkManager != null && NetworkManager.CanSendWorldCommand;
+
+    private void OnNetChanged() { if (IsVisible) BuildGroups(); }
 
     // 输出框每次覆盖，不追加
     private void Output(string text) => panel.m_logOutput.text = text;

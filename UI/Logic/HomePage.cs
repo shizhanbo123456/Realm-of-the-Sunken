@@ -33,7 +33,9 @@ public class HomePage : PageBase
         this.panel = panel;
     }
 
-    public override void Construct()
+    protected override UiConfig InitConfig() => new UiConfig { Order = UILayer.Page };
+
+    protected override void Init()
     {
         var selection = panel.m_character_selection_panel;
         selection.m_characterList.itemRenderer = RenderCharacter;

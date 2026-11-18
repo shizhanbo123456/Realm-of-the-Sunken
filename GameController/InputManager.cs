@@ -25,8 +25,43 @@ public class InputManager : MonoBehaviour
     private void Update()
     {
         ApplyUiTouch();
+        TickGmHotkey();
         SendInput();
     }
+
+    #region GM 面板入口
+    // 1 秒内连按 3 次 V 打开；面板已开、输入被 UI 占用或 AI 接管时不响应
+    private const KeyCode GmPanelKey = KeyCode.V;
+    private const int GmPanelPressCount = 3;
+    private const float GmPanelPressWindow = 1f;
+    private int gmPressCount;
+    private float gmFirstPressTime;
+
+    private void TickGmHotkey()
+    {
+        if (Tool.UIManager == null) return;
+        if (Tool.UIManager.IsPageVisible(PageId.Gm) || PlayerInputBlocked) { ResetGmPress(); return; }
+        if (GRoot.inst != null && GRoot.inst.focus is GTextInput) return; // 正在编辑输入框时不响应，避免 V 误开
+        if (!Input.GetKeyDown(GmPanelKey)) return;
+
+        if (gmPressCount == 0 || Time.unscaledTime - gmFirstPressTime > GmPanelPressWindow)
+        {
+            gmPressCount = 1;
+            gmFirstPressTime = Time.unscaledTime;
+        }
+        else gmPressCount++;
+
+        if (gmPressCount < GmPanelPressCount) return;
+        ResetGmPress();
+        Tool.UIManager.ShowPage(PageId.Gm);
+    }
+
+    private void ResetGmPress()
+    {
+        gmPressCount = 0;
+        gmFirstPressTime = 0f;
+    }
+    #endregion
 
     public static PlayerControlMode Mode { get; private set; } = PlayerControlMode.Player;
 

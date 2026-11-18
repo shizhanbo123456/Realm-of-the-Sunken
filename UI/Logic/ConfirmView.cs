@@ -3,40 +3,42 @@ using FairyGUI;
 using Ros.UI.Main;
 using UnityEngine;
 
-// 确认弹窗：全局子界面（不挂任何页面，挂 GRoot）。
-// 全屏拦截层已并入 ConfirmPanel 内部，弹窗本体 opaque 吞掉点击。
-public class ConfirmView
+// 确认弹窗：全屏拦截层已并入 ConfirmPanel 内部，弹窗本体 opaque 吞掉点击。
+public class ConfirmView : PageBase
 {
     private UI_ConfirmPanel panel;
     private Action onConfirm;
     private Action onCancel;
-    private float uiScale = 1f;
 
-    public bool IsOpen { get; private set; }
+    public bool IsOpen => IsVisible;
 
-    public void Construct()
+    public ConfirmView(UI_ConfirmPanel panel) : base(panel)
     {
-        panel = UI_ConfirmPanel.CreateInstance();
+        this.panel = panel;
+    }
+
+    protected override UiConfig InitConfig() => new UiConfig { Order = UILayer.Confirm };
+
+    protected override void Init()
+    {
         panel.opaque = true; // 吞掉点击：底层页面/聊天/GM 面板都不再响应
         panel.touchable = true;
-        GRoot.inst.AddChild(panel);
-        panel.visible = false;
 
         panel.m_confirm.onClick.Add(OnConfirmClicked);
         panel.m_cancel.onClick.Add(OnCancelClicked);
     }
 
-    public void Shutdown()
+    public override void Shutdown()
     {
         onConfirm = null;
         onCancel = null;
-        Hide();
+        base.Shutdown();
     }
 
     // 与页面同规则的整体缩放（设计高度 1080）
-    public void OnResize(float uiScale)
+    public override void OnResize(float width, float height)
     {
-        this.uiScale = uiScale;
+        UiScale = Screen.height / 1080f;
         ApplyTransform();
     }
 
@@ -47,18 +49,16 @@ public class ConfirmView
         onCancel = cancel;
         if (panel.m_content != null) panel.m_content.text = content;
 
-        GRoot.inst.AddChild(panel); // 每次弹出都重新置顶
-        panel.visible = true;
         ApplyTransform();
-        IsOpen = true;
+        if (Tool.UIManager != null) Tool.UIManager.ShowPage(PageId.Confirm);
     }
 
-    public void Hide()
+    // 隐藏时清掉回调：取消按钮与外部 CloseConfirm 都不该再触发上一次的操作
+    public override void Exit()
     {
         onConfirm = null;
         onCancel = null;
-        IsOpen = false;
-        if (panel != null) panel.visible = false;
+        base.Exit();
     }
 
     #region//Local
@@ -66,14 +66,14 @@ public class ConfirmView
     private void OnConfirmClicked()
     {
         var act = onConfirm;
-        Hide();
+        if (Tool.UIManager != null) Tool.UIManager.HidePage(PageId.Confirm);
         if (act != null) act();
     }
 
     private void OnCancelClicked()
     {
         var act = onCancel;
-        Hide();
+        if (Tool.UIManager != null) Tool.UIManager.HidePage(PageId.Confirm);
         if (act != null) act();
     }
 
@@ -81,7 +81,7 @@ public class ConfirmView
     private void ApplyTransform()
     {
         if (panel == null) return;
-        panel.scale = new Vector2(uiScale, uiScale);
+        panel.scale = new Vector2(UiScale, UiScale);
         panel.pivotAsAnchor = true;
         panel.pivot = new Vector2(0.5f, 0.5f);
         panel.SetXY(GRoot.inst.width * 0.5f, GRoot.inst.height * 0.5f);

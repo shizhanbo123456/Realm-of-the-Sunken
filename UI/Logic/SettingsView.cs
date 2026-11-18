@@ -1,11 +1,11 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using FairyGUI;
 using Ros.Config;
 using Ros.UI.Main;
 using UnityEngine;
 
-// 设置子界面：独立创建、挂 GRoot，三个页面共用同一份；开关只改显隐，勾选态不会丢
-public class SettingsView
+// 设置子界面：三个页面共用同一份，显隐由 UIManager 统一管理；勾选态不会丢
+public class SettingsView : PageBase
 {
     // 由 UIManager 注入：这三个动作跨页面，去哪由它决定
     public System.Action OnOpenGuide;
@@ -18,26 +18,29 @@ public class SettingsView
     private int tipTab;
 
     private UI_SettingsPanel panel;
-    private float uiScale = 1f;
 
     private UI_SettingScrollView View => panel != null ? panel.m_settings.GetChildAt(0) as UI_SettingScrollView : null;
 
-    public bool IsOpen => panel != null && panel.visible;
+    public bool IsOpen => IsVisible;
 
-    public void Construct()
+    public SettingsView(UI_SettingsPanel panel) : base(panel)
     {
-        panel = UI_SettingsPanel.CreateInstance();
+        this.panel = panel;
+    }
+
+    protected override UiConfig InitConfig() => new UiConfig { Order = UILayer.Dialog };
+
+    protected override void Init()
+    {
         panel.m_settings.numItems = 1; // 容器是列表，唯一元素即真正的设置面板
         panel.opaque = true;
         panel.touchable = true;
-        GRoot.inst.AddChild(panel);
-        panel.visible = false;
 
-        panel.m_close2.onClick.Set(Hide);        // 关闭按钮（右上）
-        panel.m_close.onClick.Set(Hide);         // 关闭按钮（面板内）
-        panel.m_panel.m_close.onClick.Set(Hide); // 底框关闭按钮
-        View.m_back_to_fight.onClick.Set(Hide);
-        View.m_back.onClick.Set(Hide);
+        panel.m_close2.onClick.Set(CloseSelf);        // 关闭按钮（右上）
+        panel.m_close.onClick.Set(CloseSelf);         // 关闭按钮（面板内）
+        panel.m_panel.m_close.onClick.Set(CloseSelf); // 底框关闭按钮
+        View.m_back_to_fight.onClick.Set(CloseSelf);
+        View.m_back.onClick.Set(CloseSelf);
         View.m_exit.onClick.Set(() => OnExit?.Invoke());
         View.m_open_guide.onClick.Set(() => OnOpenGuide?.Invoke());
         View.m_open_bridge.onClick.Set(() => OnOpenBridge?.Invoke());
@@ -46,31 +49,29 @@ public class SettingsView
         BindToggles();
     }
 
-    public void Show()
+    public override void Enter(ShowParam param)
     {
-        if (panel == null) return;
-        GRoot.inst.AddChild(panel); // 每次弹出都重新置顶
-        panel.visible = true;
+        base.Enter(param);
         View.m_in_server.selectedIndex = NetworkManager.IsConnected ? 1 : 0; // 0 未连服务器 / 1 已连服务器
         ApplyTransform();
         SyncToggles();
         if (tipKeys.Count > 0) SelectTip(tipTab);
     }
 
-    public void Hide()
+    private static void CloseSelf()
     {
-        if (panel != null) panel.visible = false;
+        if (Tool.UIManager != null) Tool.UIManager.HidePage(PageId.Settings);
     }
 
     // C 键切视角会写回同一个开关，面板常驻不重建，这里每帧把勾选态跟过去
-    public void Tick()
+    public override void Update(float deltaTime)
     {
         if (IsOpen) SyncToggles();
     }
 
-    public void OnResize(float scale)
+    public override void OnResize(float width, float height)
     {
-        uiScale = scale;
+        UiScale = Screen.height / 1080f;
         ApplyTransform();
     }
 
@@ -139,7 +140,7 @@ public class SettingsView
     private void ApplyTransform()
     {
         if (panel == null) return;
-        panel.scale = new Vector2(uiScale, uiScale);
+        panel.scale = new Vector2(UiScale, UiScale);
         panel.pivotAsAnchor = true;
         panel.pivot = new Vector2(0.5f, 0.5f);
         panel.SetXY(GRoot.inst.width * 0.5f, GRoot.inst.height * 0.5f);

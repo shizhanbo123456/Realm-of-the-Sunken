@@ -69,7 +69,9 @@ public class BattlePage : PageBase
         this.panel = panel;
     }
 
-    public override void Construct()
+    protected override UiConfig InitConfig() => new UiConfig { Order = UILayer.Page };
+
+    protected override void Init()
     {
         var battleInfo = panel.m_BattleInfoPanel;
         battleInfo.m_btn_settings.onClick.Add(OpenSettings);
@@ -318,7 +320,7 @@ public class BattlePage : PageBase
         if (Tool.ModularTerrainGenerator != null) Tool.ModularTerrainGenerator.Clear();
     }
 
-    public override void Tick(float deltaTime)
+    public override void Update(float deltaTime)
     {
         if (OwnEntityId != 0) lastOwnEntityId = OwnEntityId;
         // 输入被 UI 占用或 AI 接管时，技能选择、快捷消息与面板快捷键都不响应

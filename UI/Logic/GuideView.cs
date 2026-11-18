@@ -1,11 +1,11 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using FairyGUI;
 using Ros.Config;
 using Ros.UI.Main;
 using UnityEngine;
 
 // 图鉴子界面：m_buffTab 切技能/Buff 两页；技能页带详情与评分
-public class GuideView
+public class GuideView : PageBase
 {
     private const int ScoreCount = 6;
     private const int ScoreTabCount = 5;
@@ -29,18 +29,21 @@ public class GuideView
     private UI_GuidePanel panel;
     private int tab;
     private int selectedIndex = -1;
-    private float uiScale = 1f;
 
-    public bool IsOpen => panel != null && panel.visible;
+    public bool IsOpen => IsVisible;
 
-    public void Construct()
+    public GuideView(UI_GuidePanel panel) : base(panel)
     {
-        panel = UI_GuidePanel.CreateInstance();
-        panel.opaque = true;
-        GRoot.inst.AddChild(panel);
-        panel.visible = false;
+        this.panel = panel;
+    }
 
-        panel.m_btn_close.onClick.Set(Hide);
+    protected override UiConfig InitConfig() => new UiConfig { Order = UILayer.Dialog };
+
+    protected override void Init()
+    {
+        panel.opaque = true;
+
+        panel.m_btn_close.onClick.Set(CloseSelf);
         panel.m_menu_btn_list.itemRenderer = RenderMenu;
         panel.m_menu_btn_list.numItems = MenuTitles.Length;
         panel.m_item_list.itemRenderer = RenderItem;
@@ -51,23 +54,21 @@ public class GuideView
         rankList.numItems = ScoreCount;
     }
 
-    public void Show()
+    public override void Enter(ShowParam param)
     {
-        if (panel == null) return;
-        GRoot.inst.AddChild(panel); // 每次弹出都重新置顶
-        panel.visible = true;
+        base.Enter(param);
         ApplyTransform();
         SwitchTab(tab);
     }
 
-    public void Hide()
+    private static void CloseSelf()
     {
-        if (panel != null) panel.visible = false;
+        if (Tool.UIManager != null) Tool.UIManager.HidePage(PageId.Guide);
     }
 
-    public void OnResize(float scale)
+    public override void OnResize(float width, float height)
     {
-        uiScale = scale;
+        UiScale = Screen.height / 1080f;
         ApplyTransform();
     }
 
@@ -181,7 +182,7 @@ public class GuideView
     private void ApplyTransform()
     {
         if (panel == null) return;
-        panel.scale = new Vector2(uiScale, uiScale);
+        panel.scale = new Vector2(UiScale, UiScale);
         panel.pivotAsAnchor = true;
         panel.pivot = new Vector2(0.5f, 0.5f);
         panel.SetXY(GRoot.inst.width * 0.5f, GRoot.inst.height * 0.5f);

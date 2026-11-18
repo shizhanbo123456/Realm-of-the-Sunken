@@ -25,10 +25,9 @@ public class LobbyPage : PageBase
         this.panel = panel;
     }
 
-    //结算在大厅之上播放期间隐藏/恢复面板
-    public void SetPanelVisible(bool visible) => Root.visible = visible;
+    protected override UiConfig InitConfig() => new UiConfig { Order = UILayer.Page };
 
-    public override void Construct()
+    protected override void Init()
     {
         // m_quit_mode：0 = 未加入（显示加入）/ 1 = 已加入（显示退出）
         WireCamp(panel.m_btn_joinAttack, PlayerCampType.Attack);

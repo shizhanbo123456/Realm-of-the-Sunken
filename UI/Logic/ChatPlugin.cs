@@ -6,7 +6,7 @@ using UnityEngine;
 
 using Ros.Config;
 //全局聊天面板：联网后常驻显示，大厅与战斗共用；离开房间清空并隐藏
-public class ChatPlugin
+public class ChatPlugin : PageBase
 {
     // Submit 的结果：Sent 之外都是拦截原因
     public enum ChatSendResult
@@ -43,16 +43,15 @@ public class ChatPlugin
     private int viewTab = (int)ChatChannel.All;
     private int sendChannel = (int)ChatChannel.All;
     private float lastSendTime = -999f;
-    private float uiScale = 1f;
 
-    public ChatPlugin(UI_ChatPanel panel)
+    public ChatPlugin(UI_ChatPanel panel) : base(panel)
     {
         this.panel = panel;
-        GRoot.inst.AddChild(panel);
-        panel.visible = false;
     }
 
-    public void Construct()
+    protected override UiConfig InitConfig() => new UiConfig { Order = UILayer.Chat };
+
+    protected override void Init()
     {
         panel.m_content.itemProvider = ItemUrlAt;
         panel.m_content.itemRenderer = RenderItem;
@@ -62,7 +61,6 @@ public class ChatPlugin
         panel.m_btn_nearby.onClick.Add(() => SelectTab((int)ChatChannel.Nearby));
         panel.m_btn_systemInfo.onClick.Add(() => SelectTab(TabSystem));
 
-        EventManager.AddEvent(ClientEvent.OnConnect, OnConnect);
         EventManager.AddEvent<int>(ClientEvent.OnBattleStart, OnBattleStart);
         EventManager.AddEvent<int>(ClientEvent.OnBattleEnd, OnBattleEnd);
         EventManager.AddEvent<SCBattleEvent>(ClientEvent.OnBattleEvent, OnBattleEvent);
@@ -73,10 +71,17 @@ public class ChatPlugin
         EventManager.AddEvent(ClientEvent.OnRestartGame, OnLeaveRoom);
     }
 
-    public void Shutdown()
+    // 联网后由 UIManager 显示：每次显示都清空上一条会话的残留
+    public override void Enter(ShowParam param)
+    {
+        ClearMessages();
+        EnterLobbyMode();
+        base.Enter(param);
+    }
+
+    public override void Shutdown()
     {
         //EventManager 是静态的，订阅必须与解绑成对
-        EventManager.RemoveEvent(ClientEvent.OnConnect, OnConnect);
         EventManager.RemoveEvent<int>(ClientEvent.OnBattleStart, OnBattleStart);
         EventManager.RemoveEvent<int>(ClientEvent.OnBattleEnd, OnBattleEnd);
         EventManager.RemoveEvent<SCBattleEvent>(ClientEvent.OnBattleEvent, OnBattleEvent);
@@ -88,24 +93,17 @@ public class ChatPlugin
     }
 
     //与页面同规则的整体缩放（设计高度 1080）；贴屏幕左下角
-    public void OnResize(float uiScale)
+    public override void OnResize(float width, float height)
     {
-        this.uiScale = uiScale;
+        UiScale = Screen.height / 1080f;
         ApplyTransform();
     }
 
     #region//Local
     private void ApplyTransform()
     {
-            panel.scale = new Vector2(uiScale, uiScale);
-            panel.SetXY(0f, GRoot.inst.height - panel.height * uiScale); // x 贴左边缘，y 贴屏幕底
-    }
-
-    private void OnConnect()
-    {
-        ClearMessages(); // 显示前先清空，避免残留 FGUI 设计期的测试条目
-        EnterLobbyMode();
-        panel.visible = true;
+            panel.scale = new Vector2(UiScale, UiScale);
+            panel.SetXY(0f, GRoot.inst.height - panel.height * UiScale); // x 贴左边缘，y 贴屏幕底
     }
 
     private void OnBattleStart(int camp)
@@ -131,7 +129,6 @@ public class ChatPlugin
     {
         ClearMessages();
         SelectTab((int)ChatChannel.All);
-        panel.visible = false;
     }
 
     private void ClearMessages()
