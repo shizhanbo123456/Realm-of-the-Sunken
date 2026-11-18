@@ -249,7 +249,7 @@ public partial class BattleManager
 
             int[] weights = CardGainUpgradeConfig.WeightsOf(p.level); // 按升级后等级的个位数给档位
             int tier = CardCatalog.RollTier(weights);
-            if (tier >= 0) p.pending[tier]++;
+            if (tier >= 0) AddPendingCard(clientId, tier);
         }
         // 满级后余经验不再累积，避免读数永远停在 MAX 之前
         if (p.level >= CharacterExpConfig.MaxLevel) p.exp = 0;
@@ -294,7 +294,7 @@ public partial class BattleManager
 
             int tier = CardCatalog.RollTier(config.cardDropWeights);
             if (tier < 0) continue;
-            EnsureProgress(clientId).pending[tier]++;
+            AddPendingCard(clientId, tier);
             SendProgress(clientId);
         }
     }
@@ -332,6 +332,22 @@ public partial class BattleManager
     #endregion
 
     #region 卡牌结算
+    // 待抽次数入账：人机没有抽卡界面，拿到就自己抽掉；真人的进度由调用方下发
+    private void AddPendingCard(int clientId, int tier)
+    {
+        EnsureProgress(clientId).pending[tier]++;
+        if (IsRobotToken(clientId)) AutoPickRobotCard(clientId, tier);
+    }
+
+    // 人机抽卡：池子与筛法同真人，滚 1 张直接生效、不建种子槽；池子筛空或结算不成按弃卡折算
+    private void AutoPickRobotCard(int clientId, int tier)
+    {
+        var held = playerSkills.TryGetValue(clientId, out var list) ? list : null;
+        var rolls = CardCatalog.Roll((CardTier)tier, GetPlayerCardBonus(clientId).luck, CardCampForRoll(clientId), 1, held, Random.Range(int.MinValue, int.MaxValue));
+        if (rolls.Count > 0 && ApplyCard(clientId, tier, rolls[0].cardId, rolls[0].skillId)) return;
+        DiscardCard(clientId, tier);
+    }
+
     // 抽卡界面唯一的入口：无选择 = 只要种子；有选择 = 按下标结算，再决定要不要下一个种子
     public void HandleCardAction(int clientId, Ros.Transport.CSCardAction action)
     {
