@@ -83,8 +83,10 @@ namespace Ros.UI.Main
                 item.m_loader_icon.visible = icon != null;
             }
             item.selected = selection.Contains(skillId);
-            // GList 复用条目，先清后加以免叠加
+            // GList 复用条目，先清后加以免叠加；提示与技能栏条目同一入口
             item.onClick.Set(() => ToggleItem(skillId));
+            item.onRollOver.Set(() => TipHost.ShowSkill(skillId, item));
+            item.onRollOut.Set(TipHost.Hide);
         }
 
         // 勾选/取消：超过槽位数只提示，不改当前选择
