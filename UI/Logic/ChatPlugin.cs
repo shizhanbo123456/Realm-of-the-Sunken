@@ -94,8 +94,7 @@ public class ChatPlugin
     private void OnConnect()
     {
         ClearMessages(); // 显示前先清空，避免残留 FGUI 设计期的测试条目
-        SelectTab((int)ChatChannel.All);
-        panel.m_show_channel_menu.selectedIndex = 0; // 组队界面不显示频道页签
+        EnterLobbyMode();
         panel.visible = true;
     }
 
@@ -107,9 +106,15 @@ public class ChatPlugin
 
     private void OnBattleEnd(int gameState)
     {
-        if (systemEntries.Count == 0) return;
         systemEntries.Clear(); // 系统消息只属于本局
-        if (viewTab == TabSystem) RefreshList();
+        EnterLobbyMode();      // 结算后回到组队：页签收起、频道回全频道
+    }
+
+    // 组队界面：隐藏频道页签，默认显示全频道
+    private void EnterLobbyMode()
+    {
+        panel.m_show_channel_menu.selectedIndex = 0;
+        SelectTab((int)ChatChannel.All);
     }
 
     private void OnLeaveRoom()
