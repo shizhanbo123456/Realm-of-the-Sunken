@@ -21,7 +21,7 @@
 | 4 | 冰扇双舞 | SkillDoubleFanShot | Bullet[39] | 命中挂 1 级减速 5s |
 | 5 | 回锋环 | SkillOrbitBlades | Bullet[40] ×4（绕身） | 无 |
 | 6 | 退锋 | SkillBackstepShot | Bullet[41] | 短暂闪避 buff |
-| 7 | 腾跃散华 | SkillLeapScatter | Bullet[57] ×N（随机角） | 无 |
+| 7 | 腾跃散华 | SkillLeapScatter | Bullet[57] ×12（身前 120° 扇形） | 无 |
 | 8 | 掷兵 | SkillThrowWeapon | 武器模型本体 | 无 |
 | 9 | 五刃扇 | SkillFanWeaponThrow | 武器模型本体 ×5 | 无 |
 | 10 | 天诛落刃 | SkillSkyfallWeapon | 武器模型本体（天降） | 无 |
@@ -32,9 +32,9 @@
 | --- | --- | --- | --- | --- |
 | 11 | 回旋枪 | SkillBoomerangWeapon | 武器模型本体（去-回） | 无 |
 | 12 | 背水一击 | SkillBackstabWeapon | 武器模型本体 + 悬停 | 命中挂麻痹 2s |
-| 13 | 疾风步 | SkillSwiftAura | 无 | 1 级加速 20s |
+| 13 | 疾风步 | SkillSwiftAura | 无 | 1 级加速 20s（移动速度 +50%，重复施放只刷新时间） |
 | 14 | 旋枪荡 | SkillOrbitWeaponKnockback | 武器模型本体 ×4（绕身） | 无 |
-| 15 | 短距突进 | SkillShortDash | 无 | 无 |
+| 15 | 短距突进 | SkillShortDash | 无 | 无（0.22s × 22 m/s 前冲） |
 | 16 | 铁壁 | SkillShieldTen | 无（护盾 buff 自带） | 10 级护盾 60s |
 | 17 | 裂地踢 | SkillFlyingKick | 无 | 无 |
 | 18 | 霜锋 | SkillIceFanTiny | Bullet[9] | 命中挂冰冻 |
@@ -46,7 +46,7 @@
 | 19 | 背袭弹幕 | SkillBackVolley | Bullet[11] ×6 | 无 |
 | 20 | 霜雨扫射 | SkillIceSweep | Bullet[20] | 附加冰冻 3s |
 | 21 | 缚足弹 | SkillRootShot | Bullet[28] | 命中挂定身 3s |
-| 22 | 浮游弹 | SkillDriftOrb | Bullet[29] | 命中击退 |
+| 22 | 浮游弹 | SkillDriftOrb | Bullet[29] ×5（30° 扇形，弹体存活 4.8s） | 命中击退 |
 | 23 | 冰潮递进 | SkillTripleWaveIce | Bullet[45] | 命中挂冰冻 2s |
 | 24 | 前压弹幕 | SkillForwardSpray | Bullet[46] | 无 |
 | 25 | 禁声弹 | SkillSilenceBolt | Bullet[47] | 1 级沉默 12s |
@@ -54,7 +54,7 @@
 | 27 | 环射 | SkillOrbitWeaponVolley | 武器模型本体 ×N（环身飞出） | 无 |
 | 28 | 兵雨 | SkillOrbitWeaponRain | 武器模型本体 ×N（自身周围落下） | 无 |
 | 29 | 引力锤击 | SkillPullSmash | RangeMagic[7] 起手 + RangeMagic[4] 落点 | 无 |
-| 30 | 坠落序曲 | SkillRainBarrage | Bullet[44] ×N | 无 |
+| 30 | 坠落序曲 | SkillRainBarrage | Bullet[44] ×12（落点取最近敌人，中心 + 外圈） | 无 |
 | 31 | 疾风突进 | SkillDashSpeed | 无 | 2 级加速 10s |
 | 32 | 同心壁垒 | SkillAllyShieldEight | 无（护盾 buff 自带） | 8 级护盾 60s（自身+附近友方） |
 | 33 | 自守壁垒 | SkillShieldFour | 无（护盾 buff 自带） | 4 级护盾 10s |
@@ -69,14 +69,14 @@
 | 37 | 霜封扇 | SkillFanFreeze | Bullet[3] | 命中挂冰冻 4s |
 | 38 | 毒幕往复 | SkillSweepPoison | Bullet[4] ×N | 3 级中毒 5s |
 | 39 | 连弹 | SkillBounceShot | Bullet[5]（9 点折线） | 无 |
-| 40 | 焚幕 | SkillSweepBurn | Bullet[8] | 5 级燃烧 5s |
-| 41 | 六芒连射 | SkillCircleVolley | MagicCircle[7] 法阵 + Bullet[12] ×6 | 无 |
-| 42 | 钩影扇 | SkillHookFan | Bullet[14] ×5 | 命中挂 MotionAttract 牵引 |
-| 43 | 涡爆 | SkillVortexBomb | RangeMagic[1] | 命中挂 MotionAttract 牵引 |
+| 40 | 焚幕 | SkillSweepBurn | Bullet[8] ×49（-60° ↔ +60° 来回扫射，每两发夹 5°） | 5 级燃烧 5s |
+| 41 | 六芒连射 | SkillCircleVolley | Bullet[12] ×18（每 60° 一发，连射三圈） | 无 |
+| 42 | 瞬影扇 | SkillHookFan | Bullet[14] ×5 | 无（纯伤害，不牵引） |
+| 43 | 涡爆 | SkillVortexBomb | RangeMagic[1]（涡心落在最近敌人处） | 命中挂 MotionAttract 牵引 |
 | 44 | 六点灼阵 | SkillSixOrbs | RangeMagic[3] ×6（定点） | 无 |
-| 45 | 禁言之落 | SkillSkyfallSilence | RangeMagic[4]（头顶落下） | 命中挂沉默 10s |
-| 46 | 爆裂崩击 | SkillBlastKnockback | Bullet[7] ×6（扇形） | 灼烧 3 级 10s |
-| 47 | 弧刃背袭 | SkillBackArcWeapons | 武器模型本体 ×N（贝塞尔） | 无 |
+| 45 | 禁言之落 | SkillSkyfallSilence | RangeMagic[4]（落在索敌目标脚下） | 命中挂沉默 10s |
+| 46 | 黑洞爆破 | SkillBlastKnockback | Bullet[2] ×4（自身前后左右，持续 6s） | 灼烧 3 级 10s |
+| 47 | 弧刃背袭 | SkillBackArcWeapons | Slash[2] ×6（身后两侧水平刀光） | 无 |
 | 48 | 锐意共鸣 | SkillAllyCritBoost | 无 | 5 级暴击率 + 5 级暴伤 20s（自身+附近友方） |
 | 49 | 圣域壁垒 | SkillAllyShieldTwentyFive | 无（护盾 buff 自带） | 25 级护盾 30s（全体友方） |
 
@@ -187,7 +187,7 @@ Skills文件夹：
 ② **包粒度由「这一波要不要重新索敌」决定**：多波共用一次索敌 → 只发一个包，客户端用同一个波次常量 + 延时工具排后续波；每波/每发都要重新索敌 → 每波一个包，各自带当时的敌人位置。这是两端一致性的要求，不是性能取舍。
 ③ **包里只放客户端推不出来的东西**：发射位置、方向/目标点、随机种子。发数、散布角、波间隔、时长、轨迹形状、特效下标一律写死在技能类常量里。伤害范围不写进包：有本体特效的取该特效预制体的命中球，无特效近战取 skill.csv 第 9 列半径；倍率与再伤害间隔取第 11 / 10 列。
 ④ **payload 布局由每个技能自己决定**：`SendWave` 里的写序与 `PlayWave` 里的读序一一对应，两段代码就在同一个技能类里，改包不会再漏改另一端。
-⑤ **跨端随机一律伪随机**：服务器施放时生成种子写进包里，两端用 `SkillSeed.Rng(seed)` 按固定调用顺序取数（禁止 `UnityEngine.Random`：全局状态，两端消耗顺序不同必然发散）。用到种子的技能：腾跃散华、背袭弹幕。
+⑤ **跨端随机一律伪随机**：服务器施放时生成种子写进包里，两端用 `SkillSeed.Rng(seed)` 按固定调用顺序取数（禁止 `UnityEngine.Random`：全局状态，两端消耗顺序不同必然发散）。用到种子的技能：背袭弹幕、弧刃背袭。
 ⑥ **纯服务端技能不发包**：只加 buff / 召唤 / 位移 / 增减益的技能在 `OnCast` 里直接干活，没有 `PlayWave`、也没有网络开销——不是靠「是否发送」的开关，而是根本不生成上下文。
 ⑦ **禁止给子弹加跨端回调**：分裂 / 弹跳 / 延时等二次效果，施放时就算好时刻与点位，两端到点各自创建——弹跳 = 起点 + 8 跳点位整串下发；分裂 = 母弹终点 + 按弹速与距离算出的时刻。
 包体参考：头部固定 18B（skillId 1 + 波次 1 + 施法者 id 2 + 施法者位置 12 + payload 长度 2），普通射击再加 24B（起点 + 落点），带种子 +4B，弹跳 9 点 +112B；整包仍受 `EnsTemporaryBuffer` 的 256B 约束。
@@ -202,10 +202,11 @@ Skills文件夹：
 - 夹角 > 179.9：**不限方向**（360°），雕像孢子与「周围 / 全场」类技能用这个；
 - **雕像孢子例外（110 / 111 / 113 等塔与树的孢子）**：索敌成功时落点直接取目标自身位置（110 = 体中心，111 / 113 = 脚下），**不按射程归一化**——塔不需要预判，敌人贴到脚下也照样打在它身上；射程只用于「能不能打」（索敌半径与开火判定）；
 - 射程 > 9999：**不限距离**（全场类统一写 10000，填更大值等价）；
+- **涡爆 / 坠落序曲 / 禁言之落的落点直接取目标位置**：涡爆的涡心落在最近敌人脚下、坠落序曲以最近敌人为中心铺弹幕、禁言之落砸在索敌目标脚下，都不按射程归一化（归一化会把落点推到射程末端，贴身敌人反而打不到）；范围内无敌人时退回「朝面向 × 射程」。
 - **水平距离从施法者自身位置起算**，不从发射锚点起算：锚点在身前时，终点到身体的距离仍恒等于射程，不会变成「射程 + 锚点偏移」；
 - 范围内一个敌人都没有时，落点与「不索敌」完全一致（朝面向、定距射出），**不回退到自身**（雕像孢子同样如此）；
 - 射程 = 0 表示只影响自身（自身增益 / 位移 / 自身光环），这类技能不调 `Aim`、不参与索敌，落点由各自轨迹常量决定；
-- 专门做上下变化的技能自己覆盖瞄准点（天罗 / 兵雨 → 自身脚下）；不写瞄准点的 6 个（回锋环 / 腾跃散华 / 旋枪荡 / 静滞矩阵 / 六芒连射 / 六点灼阵）落点由各自轨迹常量决定。
+- 专门做上下变化的技能自己覆盖瞄准点（天罗 / 兵雨 → 自身脚下）；不写瞄准点的 5 个（回锋环 / 旋枪荡 / 静滞矩阵 / 六芒连射 / 六点灼阵）落点由各自轨迹常量决定。
 
 `TargetSelect.AimPos(entity, 夹角, 半径, 射程, normalizeDistance)` 给非射击类索敌用（防守方 / 塔 / 树）：`normalizeDistance = true`（默认）时按体中心定向、水平距离取射程；**雕像孢子传 `false`，落点直接取目标体中心**（`TargetSelect.BodyPos`），无敌人时退回「朝面向 × 射程」。
 

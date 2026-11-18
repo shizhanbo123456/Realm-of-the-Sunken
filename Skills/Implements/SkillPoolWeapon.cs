@@ -298,45 +298,33 @@ namespace Ros.Skill
         }
     }
 
-    // 跃起，向周围随机散射；角度序列由服务器生成的种子决定，两端一致
+    // 跃起，朝身前 120° 扇形散射
     public class SkillLeapScatter : SkillBase
     {
         public override int Id => (int)SkillType.SkillLeapScatter;
 
         private const int Vfx = 41;                // Projection 黄·样式2
-        private const int Shots = 6;
-        private const float Radius = 6f;
+        private const int Shots = 12;
+        private const float SpreadDeg = 120f;      // 身前半扇：±60°
         private const float BulletLife = 0.9f;
 
         protected override void OnCast(EntityData caster)
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
-            int seed = SkillSeed.New();
+            Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster);
             var spec = HitSpec(SkillVfxKind.Projection, Vfx, VfxScale());
-            var rng = SkillSeed.Rng(seed);
-            for (int i = 0; i < Shots; i++)
-            {
-                float angle = (float)rng.NextDouble() * 360f;
-                Vector3 dir = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
-                Tool.BattleManager.ShootBullet(caster, attack,
-                    new SkillTrajectoryLine(origin, origin + dir * Radius, BulletLife), BulletLife, spec);
-            }
-            SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteInt(seed); });
+            Spread.Fan(origin, aim, Shots, 1, SpreadDeg, 0f, BulletLife,
+                trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec));
+            SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
         }
 
         public override void PlayWave(SCSkillDisplayContext context)
         {
             Vector3 origin = context.ReadVector3();
-            int seed = context.ReadInt();
-            var rng = SkillSeed.Rng(seed);
-            for (int i = 0; i < Shots; i++)
-            {
-                float angle = (float)rng.NextDouble() * 360f;
-                Vector3 dir = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
-                VfxHelper.PlayOne(SkillVfxKind.Projection, Vfx,
-                    new SkillTrajectoryLine(origin, origin + dir * Radius, BulletLife), VfxScale());
-            }
+            Vector3 aim = context.ReadVector3();
+            Spread.Fan(origin, aim, Shots, 1, SpreadDeg, 0f, BulletLife,
+                trajectory => VfxHelper.PlayOne(SkillVfxKind.Projection, Vfx, trajectory, VfxScale()));
         }
     }
 
@@ -533,7 +521,10 @@ namespace Ros.Skill
     {
         public override int Id => (int)SkillType.SkillShortDash;
 
-        protected override void OnCast(EntityData caster) => caster.SetMotion(new MotionDash(0.25f, 11f));
+        private const float DashTime = 0.22f;
+        private const float DashSpeed = 22f;       // 明显高于跑步速度，肉眼能看出冲刺
+
+        protected override void OnCast(EntityData caster) => caster.SetMotion(new MotionDash(DashTime, DashSpeed));
     }
 
     public class SkillShieldTen : SkillBase
@@ -705,12 +696,15 @@ namespace Ros.Skill
         }
     }
 
+    // 浮游弹：缓行弹体，30° 扇形齐射 5 发
     public class SkillDriftOrb : SkillBase
     {
         public override int Id => (int)SkillType.SkillDriftOrb;
 
         private const int Vfx = 12;                // 华丽飞弹蓝
-        private const float BulletLife = 1.6f;
+        private const int Shots = 5;
+        private const float SpreadDeg = 30f;
+        private const float BulletLife = 4.8f;
         private const float ArcHeight = 3f;
 
         protected override void OnCast(EntityData caster)
@@ -719,8 +713,12 @@ namespace Ros.Skill
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
             var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
-            Tool.BattleManager.ShootBullet(caster, attack,
-                new SkillTrajectoryBezier(origin, aim, BulletLife, ArcHeight), BulletLife, spec);
+            Vector3[] dests = SpreadStyle.FanDests(origin, aim, Shots, SpreadDeg);
+            for (int i = 0; i < Shots; i++)
+            {
+                Tool.BattleManager.ShootBullet(caster, attack,
+                    new SkillTrajectoryBezier(origin, dests[i], BulletLife, ArcHeight), BulletLife, spec);
+            }
             SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
         }
 
@@ -728,8 +726,12 @@ namespace Ros.Skill
         {
             Vector3 origin = context.ReadVector3();
             Vector3 aim = context.ReadVector3();
-            VfxHelper.PlayOne(SkillVfxKind.Bullet, Vfx,
-                new SkillTrajectoryBezier(origin, aim, BulletLife, ArcHeight), VfxScale());
+            Vector3[] dests = SpreadStyle.FanDests(origin, aim, Shots, SpreadDeg);
+            for (int i = 0; i < Shots; i++)
+            {
+                VfxHelper.PlayOne(SkillVfxKind.Bullet, Vfx,
+                    new SkillTrajectoryBezier(origin, dests[i], BulletLife, ArcHeight), VfxScale());
+            }
         }
     }
 
@@ -890,11 +892,12 @@ namespace Ros.Skill
 
         private void FireWave(EntityData caster, Vector3 center, Vector3 aim, int wave, AttackData attack, BulletHitSpec spec)
         {
+            // 环身取点：12 等分即每发间隔 30°，波次整体再转 60°
+            Vector3[] ring = SpreadStyle.CircleDests(Vector3.zero, 1.5f, 12, wave * 60f);
             for (int i = 0; i < Shots; i++)
             {
-                Vector3 start = center + SpreadStyle.CircleDests(center, 1.5f, 6, wave * 60f + i * 30f)[0];
                 Tool.BattleManager.ShootBullet(caster, attack,
-                    new SkillTrajectoryLine(start, aim, BulletLife), BulletLife, spec);
+                    new SkillTrajectoryLine(center + ring[i], aim, BulletLife), BulletLife, spec);
             }
         }
 
@@ -913,11 +916,11 @@ namespace Ros.Skill
 
         private void PlayOneWave(Vector3 center, Vector3 aim, int wave, int weapon)
         {
+            Vector3[] ring = SpreadStyle.CircleDests(Vector3.zero, 1.5f, 12, wave * 60f);
             for (int i = 0; i < Shots; i++)
             {
-                Vector3 start = center + SpreadStyle.CircleDests(center, 1.5f, 6, wave * 60f + i * 30f)[0];
                 VfxHelper.PlayOne(SkillVfxKind.Weapon, weapon,
-                    new SkillTrajectoryLine(start, aim, BulletLife), VfxScale());
+                    new SkillTrajectoryLine(center + ring[i], aim, BulletLife), VfxScale());
             }
         }
     }
@@ -1022,7 +1025,7 @@ namespace Ros.Skill
         }
     }
 
-    // 坠落序曲：朝前方落点周围 8 个位置连续天降
+    // 坠落序曲：落点取射程内最近的敌人，每波 1 发中心 + 3 发外圈
     public class SkillRainBarrage : SkillBase
     {
         public override int Id => (int)SkillType.SkillRainBarrage;
@@ -1036,17 +1039,23 @@ namespace Ros.Skill
 
         protected override void OnCast(EntityData caster)
         {
-            Vector3 origin = OriginPos(caster, EntityAnchor.UpFront, Vector3.zero);
-            Vector3 aim = Aim(caster, origin);
+            Vector3 center = LandCenter(caster);
             var attack = BuildAttack(caster);
             var spec = HitSpec(SkillVfxKind.RangeMagic, Vfx, VfxScale());
             for (int wave = 0; wave < Waves; wave++)
             {
                 int w = wave;
-                if (w == 0) FireWave(caster, aim, 0, attack, spec);
-                else Timer.AddTimer(w, _ => FireWave(caster, aim, w, attack, spec), WaveGap * w, 1, false);
+                if (w == 0) FireWave(caster, center, 0, attack, spec);
+                else Timer.AddTimer(w, _ => FireWave(caster, center, w, attack, spec), WaveGap * w, 1, false);
             }
-            SendWave(caster, 0, context => context.WriteVector3(aim));
+            SendWave(caster, 0, context => context.WriteVector3(center));
+        }
+
+        // 弹幕中心 = 射程内最近的敌人脚下；范围内没有敌人时退回前方射程落点
+        private Vector3 LandCenter(EntityData caster)
+        {
+            EntityData target = BattleManager.EntityContainer.GetNearestEnemy(caster, CastRange);
+            return target != null ? target.transform.position : Aim(caster, OriginPos(caster, EntityAnchor.UpFront, Vector3.zero));
         }
 
         private void FireWave(EntityData caster, Vector3 center, int wave, AttackData attack, BulletHitSpec spec)
@@ -1054,7 +1063,8 @@ namespace Ros.Skill
             Vector3[] ring = SpreadStyle.CircleDests(Vector3.zero, Ring, 8);
             for (int i = 0; i < Shots; i++)
             {
-                Vector3 land = center + ring[(wave * Shots + i) % 8];
+                // 第 0 发砸在正中心，贴身敌人也吃得到
+                Vector3 land = i == 0 ? center : center + ring[(wave * (Shots - 1) + i - 1) % 8];
                 Tool.BattleManager.ShootBullet(caster, attack,
                     new SkillTrajectorySkyFall(center + Vector3.up * 10f, land, BulletLife), BulletLife, spec);
             }
@@ -1076,7 +1086,7 @@ namespace Ros.Skill
             Vector3[] ring = SpreadStyle.CircleDests(Vector3.zero, Ring, 8);
             for (int i = 0; i < Shots; i++)
             {
-                Vector3 land = center + ring[(wave * Shots + i) % 8];
+                Vector3 land = i == 0 ? center : center + ring[(wave * (Shots - 1) + i - 1) % 8];
                 VfxHelper.PlayOne(SkillVfxKind.RangeMagic, Vfx,
                     new SkillTrajectorySkyFall(center + Vector3.up * 10f, land, BulletLife), VfxScale());
             }
@@ -1383,16 +1393,25 @@ namespace Ros.Skill
         }
     }
 
+    // 焚幕：每两发夹 5°，-60° → +60° → -60° 来回扫射
     public class SkillSweepBurn : SkillBase
     {
         public override int Id => (int)SkillType.SkillSweepBurn;
 
         private const int Vfx = 56;                // 粗锥子红
-        private const int Waves = 5;
-        private const float WaveGap = 0.1f;
+        private const int Shots = 49;
+        private const float StepDeg = 5f;
+        private const float SweepDeg = 60f;
+        private const float ShotGap = 0.05f;
         private const float BulletLife = 0.4f;
 
-        private static float SpreadOfWave(int wave) => (wave - 2f) * 10f;
+        // 三角波：前 24 发从 -60° 摆到 +60°，后 24 发摆回 -60°
+        private static float AngleOf(int shot)
+        {
+            int leg = shot % 48;
+            int step = leg <= 24 ? leg : 48 - leg;
+            return -SweepDeg + StepDeg * step;
+        }
 
         protected override void OnCast(EntityData caster)
         {
@@ -1400,52 +1419,69 @@ namespace Ros.Skill
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
             var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
-            Spread.Fan(origin, aim, 1, Waves, 0f, WaveGap, BulletLife,
-                trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec),
-                null, SpreadOfWave);
+            for (int shot = 0; shot < Shots; shot++)
+            {
+                int s = shot;
+                if (s == 0) Fire(caster, origin, aim, 0, attack, spec);
+                else Timer.AddTimer(s, _ => Fire(caster, origin, aim, s, attack, spec), ShotGap * s, 1, false);
+            }
             SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
+        }
+
+        private void Fire(EntityData caster, Vector3 origin, Vector3 aim, int shot, AttackData attack, BulletHitSpec spec)
+        {
+            Vector3 dest = SpreadStyle.RotateTargetAroundDirection(origin, aim, AngleOf(shot));
+            Tool.BattleManager.ShootBullet(caster, attack,
+                new SkillTrajectoryLine(origin, dest, BulletLife), BulletLife, spec);
         }
 
         public override void PlayWave(SCSkillDisplayContext context)
         {
             Vector3 origin = context.ReadVector3();
             Vector3 aim = context.ReadVector3();
-            Spread.Fan(origin, aim, 1, Waves, 0f, WaveGap, BulletLife,
-                trajectory => VfxHelper.PlayOne(SkillVfxKind.Bullet, Vfx, trajectory, VfxScale()),
-                null, SpreadOfWave);
+            for (int shot = 0; shot < Shots; shot++)
+            {
+                int s = shot;
+                if (s == 0) PlayOne(origin, aim, 0);
+                else Timer.AddTimer(s, _ => PlayOne(origin, aim, s), ShotGap * s, 1, false);
+            }
+        }
+
+        private void PlayOne(Vector3 origin, Vector3 aim, int shot)
+        {
+            Vector3 dest = SpreadStyle.RotateTargetAroundDirection(origin, aim, AngleOf(shot));
+            VfxHelper.PlayOne(SkillVfxKind.Bullet, Vfx, new SkillTrajectoryLine(origin, dest, BulletLife), VfxScale());
         }
     }
 
-    // 六芒连射：先开法阵，再每 60° 一发
+    // 六芒连射：每 60° 一发连成圈，连打三圈（偏航角 = 60° × 序号 % 360°）
     public class SkillCircleVolley : SkillBase
     {
         public override int Id => (int)SkillType.SkillCircleVolley;
 
         private const int Vfx = 40;                // 刀光橙
-        private const int CircleVfx = 7;
-        private const int Waves = 6;
+        private const int Shots = 18;
         private const float WaveGap = 0.12f;
         private const float BulletLife = 0.6f;
         private const float FireRange = 8f;
-        private const float CircleLife = 1.2f;
 
         protected override void OnCast(EntityData caster)
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             var attack = BuildAttack(caster);
             var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
-            for (int wave = 0; wave < Waves; wave++)
+            for (int shot = 0; shot < Shots; shot++)
             {
-                int w = wave;
-                if (w == 0) FireWave(caster, origin, 0, attack, spec);
-                else Timer.AddTimer(w, _ => FireWave(caster, origin, w, attack, spec), WaveGap * w, 1, false);
+                int s = shot;
+                if (s == 0) Fire(caster, origin, 0, attack, spec);
+                else Timer.AddTimer(s, _ => Fire(caster, origin, s, attack, spec), WaveGap * s, 1, false);
             }
             SendWave(caster, 0, context => context.WriteVector3(origin));
         }
 
-        private void FireWave(EntityData caster, Vector3 origin, int wave, AttackData attack, BulletHitSpec spec)
+        private void Fire(EntityData caster, Vector3 origin, int shot, AttackData attack, BulletHitSpec spec)
         {
-            Vector3 dir = Quaternion.Euler(0f, wave * 60f, 0f) * Vector3.forward;
+            Vector3 dir = Quaternion.Euler(0f, shot * 60f % 360f, 0f) * Vector3.forward;
             Tool.BattleManager.ShootBullet(caster, attack,
                 new SkillTrajectoryLine(origin, origin + dir * FireRange, BulletLife), BulletLife, spec);
         }
@@ -1453,24 +1489,23 @@ namespace Ros.Skill
         public override void PlayWave(SCSkillDisplayContext context)
         {
             Vector3 origin = context.ReadVector3();
-            VfxHelper.PlayAt(SkillVfxKind.MagicCircle, CircleVfx, origin, CircleLife, VfxScale(1));
-            for (int wave = 0; wave < Waves; wave++)
+            for (int shot = 0; shot < Shots; shot++)
             {
-                int w = wave;
-                if (w == 0) PlayOneWave(origin, 0);
-                else Timer.AddTimer(w, _ => PlayOneWave(origin, w), WaveGap * w, 1, false);
+                int s = shot;
+                if (s == 0) PlayOne(origin, 0);
+                else Timer.AddTimer(s, _ => PlayOne(origin, s), WaveGap * s, 1, false);
             }
         }
 
-        private void PlayOneWave(Vector3 origin, int wave)
+        private void PlayOne(Vector3 origin, int shot)
         {
-            Vector3 dir = Quaternion.Euler(0f, wave * 60f, 0f) * Vector3.forward;
+            Vector3 dir = Quaternion.Euler(0f, shot * 60f % 360f, 0f) * Vector3.forward;
             VfxHelper.PlayOne(SkillVfxKind.Bullet, Vfx,
                 new SkillTrajectoryLine(origin, origin + dir * FireRange, BulletLife), VfxScale());
         }
     }
 
-    // 把一名敌人拉到前方，再扇形散射
+    // 瞬影扇：朝身前扇形甩出刀光，纯伤害不牵引
     public class SkillHookFan : SkillBase
     {
         public override int Id => (int)SkillType.SkillHookFan;
@@ -1479,19 +1514,11 @@ namespace Ros.Skill
         private const int Shots = 5;
         private const float SpreadDeg = 28f;
         private const float BulletLife = 0.5f;
-        private const float HookTime = 0.35f;
-        private const float HookDistance = 3f;
 
         protected override void OnCast(EntityData caster)
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
-            EntityData target = ResolveTarget(caster);
             Vector3 aim = Aim(caster, origin);
-            if (target != null)
-            {
-                Vector3 front = caster.transform.position + caster.transform.forward * HookDistance;
-                target.SetMotion(new MotionAttract(front, HookTime, 20f, 40f));
-            }
             var attack = BuildAttack(caster);
             var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
             Spread.Fan(origin, aim, Shots, 1, SpreadDeg, 0f, BulletLife,
@@ -1508,7 +1535,7 @@ namespace Ros.Skill
         }
     }
 
-    // 涡爆：前方持续吸引，延迟爆炸
+    // 涡爆：涡心落在射程内最近的敌人脚下，持续吸引后延迟爆炸
     public class SkillVortexBomb : SkillBase
     {
         public override int Id => (int)SkillType.SkillVortexBomb;
@@ -1519,12 +1546,15 @@ namespace Ros.Skill
 
         protected override void OnCast(EntityData caster)
         {
-            Vector3 center = caster.transform.position + caster.transform.forward * FrontDistance;
+            EntityData target = BattleManager.EntityContainer.GetNearestEnemy(caster, CastRange);
+            Vector3 center = target != null
+                ? target.transform.position
+                : caster.transform.position + caster.transform.forward * FrontDistance;
             CollectEnemies(caster, center);
             for (int i = 0; i < TargetSelect.TargetBuffer.Count; i++)
             {
-                EntityData target = TargetSelect.TargetBuffer[i];
-                if (target != null) target.SetMotion(new MotionAttract(center, PullTime)); // 牵引点 = 施放瞬间的位置
+                EntityData enemy = TargetSelect.TargetBuffer[i];
+                if (enemy != null) enemy.SetMotion(new MotionAttract(center, PullTime)); // 牵引点 = 施放瞬间的位置
             }
             // 引爆时刻由 RM[1] 的命中窗口决定（1.0~1.2s），子弹在施放时就位陪特效走完整段
             Tool.BattleManager.ShootBullet(caster, BuildAttack(caster),
@@ -1584,110 +1614,167 @@ namespace Ros.Skill
         protected override void OnCast(EntityData caster)
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
-            Vector3 aim = Aim(caster, origin);
+            // 落点取索敌目标脚下：不按射程归一化，贴身敌人也砸得到
+            EntityData target = ResolveTarget(caster);
+            Vector3 land = target != null ? target.transform.position : Aim(caster, origin);
             Tool.BattleManager.ShootBullet(caster, BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0)),
-                new SkillTrajectorySkyFall(aim + Vector3.up * DropHeight, aim, BulletLife), BulletLife,
+                new SkillTrajectorySkyFall(land + Vector3.up * DropHeight, land, BulletLife), BulletLife,
                 HitSpec(SkillVfxKind.RangeMagic, Vfx, VfxScale()));
-            SendWave(caster, 0, context => context.WriteVector3(aim));
+            SendWave(caster, 0, context => context.WriteVector3(land));
         }
 
         public override void PlayWave(SCSkillDisplayContext context)
         {
-            Vector3 aim = context.ReadVector3();
+            Vector3 land = context.ReadVector3();
             VfxHelper.PlayOne(SkillVfxKind.RangeMagic, Vfx,
-                new SkillTrajectorySkyFall(aim + Vector3.up * DropHeight, aim, BulletLife), VfxScale());
+                new SkillTrajectorySkyFall(land + Vector3.up * DropHeight, land, BulletLife), VfxScale());
         }
     }
 
-    // 自身位置爆炸：击退 + 灼烧
+    // 黑洞爆破：自身前后左右各布一个黑洞，持续 6 秒不断把附近的敌人吸进去
     public class SkillBlastKnockback : SkillBase
     {
         public override int Id => (int)SkillType.SkillBlastKnockback;
 
         private const int Vfx = 2;                 // Bullet 黑洞红
+        private const int Fields = 4;
+        private const float FieldDistance = 3.5f;
+        private const float FieldLife = 6f;
+        private const float PullInterval = 0.4f;
+        private const float PullWindow = 0.5f;
+        private const int PullTicks = 15;
+
+        protected override void OnCast(EntityData caster)
+        {
+            Vector3 pos = caster.transform.position;
+            Vector3[] points = FieldPoints(pos, caster.transform.rotation);
+            var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            for (int i = 0; i < Fields; i++)
+            {
+                Vector3 point = points[i];
+                Tool.BattleManager.ShootBullet(caster, attack,
+                    new SkillTrajectoryPoint(point, FieldLife), FieldLife, spec);
+                Timer.AddTimer(0, _ => PullAround(caster, point), PullInterval, PullTicks, true);
+            }
+            SendWave(caster, 0, context =>
+            {
+                for (int i = 0; i < Fields; i++) context.WriteVector3(points[i]);
+            });
+        }
+
+        // 前 / 后 / 左 / 右：以施法瞬间的朝向为基准
+        private static Vector3[] FieldPoints(Vector3 pos, Quaternion rotation) => new[]
+        {
+            pos + rotation * new Vector3(0f, 0f, FieldDistance),
+            pos + rotation * new Vector3(0f, 0f, -FieldDistance),
+            pos + rotation * new Vector3(FieldDistance, 0f, 0f),
+            pos + rotation * new Vector3(-FieldDistance, 0f, 0f),
+        };
+
+        // 每隔一小段重新施加牵引，保证走进来的敌人也会被持续拉向黑洞
+        private void PullAround(EntityData caster, Vector3 center)
+        {
+            if (caster == null) return;
+            TargetSelect.SetEnemiesInRangeToBuffer(center, TargetRadius, caster.type.category);
+            for (int i = 0; i < TargetSelect.TargetBuffer.Count; i++)
+            {
+                EntityData enemy = TargetSelect.TargetBuffer[i];
+                if (enemy != null) enemy.SetMotion(new MotionAttract(center, PullWindow));
+            }
+        }
+
+        public override void PlayWave(SCSkillDisplayContext context)
+        {
+            for (int i = 0; i < Fields; i++)
+                VfxHelper.PlayAt(SkillVfxKind.Bullet, Vfx, context.ReadVector3(), FieldLife, VfxScale());
+        }
+    }
+
+    // 弧刃背袭：水平刀光从身后左右两侧的随机位置掠向目标
+    public class SkillBackArcWeapons : SkillBase
+    {
+        public override int Id => (int)SkillType.SkillBackArcWeapons;
+
+        private const int Vfx = 2;                 // Slash 深红刀光
         private const int Shots = 6;
-        private const float Radius = 0.8f;
-        private const float Hold = 0.15f;
-        private const float Flight = 0.3f;
+        private const int Waves = 3;
+        private const int ShotsPerWave = Shots / Waves;
+        private const float WaveGap = 0.12f;
+        private const float BulletLife = 0.45f;
+        private const float BehindMin = 0.8f;
+        private const float BehindMax = 2.2f;
+        private const float SideMin = 1.2f;
+        private const float SideMax = 3f;
 
         protected override void OnCast(EntityData caster)
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
             int seed = SkillSeed.New();
-            var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
-            Spread.ChargeAim(origin, aim, seed, Radius, Shots, Hold, Flight,
-                trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, 0f, spec));
-            SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); context.WriteInt(seed); });
-        }
-
-        public override void PlayWave(SCSkillDisplayContext context)
-        {
-            Vector3 origin = context.ReadVector3();
-            Vector3 aim = context.ReadVector3();
-            int seed = context.ReadInt();
-            Spread.ChargeAim(origin, aim, seed, Radius, Shots, Hold, Flight,
-                trajectory => VfxHelper.PlayOne(SkillVfxKind.Bullet, Vfx, trajectory, VfxScale()));
-        }
-    }
-
-    public class SkillBackArcWeapons : SkillBase
-    {
-        public override int Id => (int)SkillType.SkillBackArcWeapons;
-
-        private const int Vfx = 2;                 // Slash 深红刀光
-        private const int Shots = 3;
-        private const int Waves = 3;
-        private const float SpreadDeg = 15f;
-        private const float WaveGap = 0.15f;
-        private const float BulletLife = 0.8f;
-        private static readonly Vector3 Offset = new Vector3(0f, 0f, -2f);
-
-        protected override void OnCast(EntityData caster)
-        {
-            Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Offset);
-            Vector3 aim = Aim(caster, origin);
+            Vector3[] starts = StartPoints(caster, aim, seed);
             var attack = BuildAttack(caster);
             var spec = HitSpec(SkillVfxKind.Slash, Vfx, VfxScale());
             for (int wave = 0; wave < Waves; wave++)
             {
                 int w = wave;
-                if (w == 0) FireWave(caster, origin, aim, 0, attack, spec);
-                else Timer.AddTimer(w, _ => FireWave(caster, origin, aim, w, attack, spec), WaveGap * w, 1, false);
+                if (w == 0) FireWave(caster, starts, aim, 0, attack, spec);
+                else Timer.AddTimer(w, _ => FireWave(caster, starts, aim, w, attack, spec), WaveGap * w, 1, false);
             }
-            SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
+            SendWave(caster, 0, context =>
+            {
+                context.WriteVector3(aim);
+                for (int i = 0; i < Shots; i++) context.WriteVector3(starts[i]);
+            });
         }
 
-        private void FireWave(EntityData caster, Vector3 origin, Vector3 aim, int wave, AttackData attack, BulletHitSpec spec)
+        // 起手点：左右交替、落在身后两侧，高度与落点齐平所以刀光是水平掠过去的
+        private static Vector3[] StartPoints(EntityData caster, Vector3 aim, int seed)
         {
-            Vector3[] dests = SpreadStyle.FanDests(origin, aim, Shots, SpreadDeg);
+            var points = new Vector3[Shots];
+            var rng = SkillSeed.Rng(seed);
+            Vector3 pos = caster.transform.position;
+            Quaternion rotation = caster.transform.rotation;
             for (int i = 0; i < Shots; i++)
             {
+                float side = i % 2 == 0 ? -1f : 1f;
+                float back = BehindMin + (float)rng.NextDouble() * (BehindMax - BehindMin);
+                float width = SideMin + (float)rng.NextDouble() * (SideMax - SideMin);
+                Vector3 point = pos + rotation * new Vector3(side * width, 0f, -back);
+                point.y = aim.y;
+                points[i] = point;
+            }
+            return points;
+        }
+
+        private void FireWave(EntityData caster, Vector3[] starts, Vector3 aim, int wave, AttackData attack, BulletHitSpec spec)
+        {
+            for (int i = 0; i < ShotsPerWave; i++)
+            {
                 Tool.BattleManager.ShootBullet(caster, attack,
-                    new SkillTrajectoryBezier(origin, dests[i], BulletLife), BulletLife, spec);
+                    new SkillTrajectoryLine(starts[wave * ShotsPerWave + i], aim, BulletLife), BulletLife, spec);
             }
         }
 
         public override void PlayWave(SCSkillDisplayContext context)
         {
-            Vector3 origin = context.ReadVector3();
             Vector3 aim = context.ReadVector3();
+            var starts = new Vector3[Shots];
+            for (int i = 0; i < Shots; i++) starts[i] = context.ReadVector3();
             for (int wave = 0; wave < Waves; wave++)
             {
                 int w = wave;
-                if (w == 0) PlayOneWave(origin, aim, 0);
-                else Timer.AddTimer(w, _ => PlayOneWave(origin, aim, w), WaveGap * w, 1, false);
+                if (w == 0) PlayOneWave(starts, aim, 0);
+                else Timer.AddTimer(w, _ => PlayOneWave(starts, aim, w), WaveGap * w, 1, false);
             }
         }
 
-        private void PlayOneWave(Vector3 origin, Vector3 aim, int wave)
+        private void PlayOneWave(Vector3[] starts, Vector3 aim, int wave)
         {
-            Vector3[] dests = SpreadStyle.FanDests(origin, aim, Shots, SpreadDeg);
-            for (int i = 0; i < Shots; i++)
+            for (int i = 0; i < ShotsPerWave; i++)
             {
                 VfxHelper.PlayOne(SkillVfxKind.Slash, Vfx,
-                    new SkillTrajectoryBezier(origin, dests[i], BulletLife), VfxScale());
+                    new SkillTrajectoryLine(starts[wave * ShotsPerWave + i], aim, BulletLife), VfxScale());
             }
         }
     }
