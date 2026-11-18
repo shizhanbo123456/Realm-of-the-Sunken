@@ -207,8 +207,13 @@ public abstract class EntityData : MonoBehaviour
     private int navFailCount; // 连续算路失败次数：达到上限即判定目标不可达
     private float navNextRescueTime;
     private float navStallTime; // 有方向却持续没位移的累计时长
+    private bool navArrived; // 到达锁存：进过死区就不再掉头，直到目的地被替换
+    private Vector3 navArrivePoint; // 确认到位时的那一点，用来判断目的地是否真换了
 
     public bool NavUnreachable => navFailCount >= GlobalConfig.nav_path_fail_limit;
+
+    // 已到位：执行层死区判过之后一直成立（惯性滑出死区也算到），状态机据此判到达
+    public bool NavArrived => navArrived;
 
     // 卡死：走不动但路径算得出来（贴住墙角/被几何挡住），交给决策层放弃或换点
     public bool NavStalled => navStallTime >= nav_stall_timeout;
@@ -228,6 +233,14 @@ public abstract class EntityData : MonoBehaviour
             navFailCount = 0; // 换了目的地才重新计数，否则同一目标永远攒不满
         }
 
+        // 目的地真换了才解锁：同一个点被每拍重发时保持锁存，惯性滑出死区也不会掉头
+        if (navArrived)
+        {
+            Vector3 shift = dest - navArrivePoint;
+            shift.y = 0f;
+            if (shift.sqrMagnitude > nav_corner_radius * nav_corner_radius) navArrived = false;
+        }
+
         NavDestination = dest;
         HasNavDestination = true;
     }
@@ -242,11 +255,20 @@ public abstract class EntityData : MonoBehaviour
         navReverseFrames = 0;
         navFailCount = 0;
         navStallTime = 0f;
+        navArrived = false;
     }
 
     public Vector3 ResolveNavDirection()
     {
         if (!HasNavDestination) return Vector3.zero;
+
+        // 到位锁存：惯性滑出死区也不掉头，等目的地被替换；滑行不算「有方向没位移」
+        if (navArrived)
+        {
+            navLastPos = transform.position;
+            navStallTime = 0f;
+            return Vector3.zero;
+        }
 
         // 到达/拐点半径随单帧位移放大：低帧率下一帧就能跨过固定半径，导致在目标两侧反复掉头
         float step = (transform.position - navLastPos).magnitude;
@@ -259,6 +281,8 @@ public abstract class EntityData : MonoBehaviour
         toDest.y = 0f;
         if (toDest.sqrMagnitude <= arrive * arrive)
         {
+            navArrived = true;
+            navArrivePoint = NavDestination;
             navStallTime = 0f; // 已进入死区，不算卡住
             return Vector3.zero;
         }
@@ -330,12 +354,13 @@ public abstract class EntityData : MonoBehaviour
     protected float FlatDistance(Vector3 point) => Mathf.Sqrt(FlatSqrDistance(point));
 
     // 到导航目的地的水平距离（含 NavMesh 吸附后的实际点）：状态机判定到达要跟执行层同一口径
-    // 进入到达死区一律返回 0，否则「执行层已停、状态机还在等」会互相卡住
+    // 进过死区一律返回 0（含锁存后的惯性滑出），否则「执行层已停、状态机还在等」会互相卡住
     public float DistanceToNavDestination
     {
         get
         {
             if (!HasNavDestination) return float.MaxValue;
+            if (navArrived) return 0f;
             float d = FlatDistance(NavDestination);
             return d <= navArriveRadius ? 0f : d;
         }

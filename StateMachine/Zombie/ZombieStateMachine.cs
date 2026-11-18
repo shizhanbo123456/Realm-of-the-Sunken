@@ -204,8 +204,8 @@ public class ZombieStateMachine : DecisionMachine, IBehaviorHost
 
             if (machine.hasWanderPoint)
             {
-                // 用执行层吸附后的目的地判到达：MoveTo 会把点吸到导航面，拿原始点判会出现「已停但状态机认为没到」的反复重发
-                if (machine.Owner.DistanceToNavDestination > ZombieEntityData.ArriveRadius)
+                // 到达口径与执行层同一份：死区判过即锁存，之后不会被惯性滑出判成「还没到」
+                if (!machine.Owner.NavArrived)
                 {
                     machine.RequestMove(machine.wanderPoint); // 还在路上
                     return null;

@@ -2,9 +2,6 @@ using UnityEngine;
 
 public class ZombieEntityData : EntityData
 {
-    // 到达判定：寻路终点与游荡取点共用
-    public const float ArriveRadius = 0.4f;
-
     private ZombieStateMachine stateMachine;
 
     private float yaw;
@@ -56,9 +53,8 @@ public class ZombieEntityData : EntityData
             return;
         }
 
-        Vector3 to = NavDestination - transform.position;
-        to.y = 0f;
-        if (to.sqrMagnitude <= ArriveRadius * ArriveRadius)
+        // 到达判定统一走执行层死区（含锁存）：滑出死区也算已到，不会掉头回来
+        if (NavArrived)
         {
             Halt();
             return;
