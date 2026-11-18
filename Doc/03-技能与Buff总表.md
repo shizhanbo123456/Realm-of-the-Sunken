@@ -92,7 +92,7 @@
 | 63 | 白瞳凝视 | SkillEyeMark | 无 | EyeMark（小地图常显） |
 | 64 | 夜隐 | SkillNightMark | 无 | 自身挂 NightMark（不出现在敌方小地图） |
 | 65 | 长夜降临 | SkillForceNight | 无 | 无 |
-| 66 | 唤尸 | SkillSummonZombies | 无 | 无（5 只普通鲛人，等级跟随自然刷新等级） |
+| 66 | 唤尸 | SkillSummonZombies | 无 | 无（召唤数量读 `global_variables` 的 `summon_zombie_count`，当前 5 只，等级跟随自然刷新等级） |
 | 67 | 死境漫游 | SkillDeathStrollCast | 无 | DeathStroll（霸体 + 光环 DoT） |
 | 68 | 菁英尸潮 | SkillSummonElites | 无 | 无（召唤数量读 `global_variables` 的 `summon_elite_count`，当前 1 只，等级跟随自然刷新等级） |
 | 69 | 缄默之咒 | SkillSilenceCast | 无 | 自身 8m 内敌人挂 Silence |

@@ -148,6 +148,7 @@ namespace Ros.Config
         passive_defense_zombie_spawn_level_boost,
         buff_mire_speed_rate,
         buff_death_stroll_speed_up,
+        summon_zombie_count,
         summon_elite_count,
         death_curse_radius,
         death_curse_duration,

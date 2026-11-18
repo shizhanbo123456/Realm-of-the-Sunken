@@ -236,7 +236,6 @@ public static class GlobalConfig
     #region 防守方技能参数（占位初值，待策划定稿）
     public const float death_stroll_radius = 4f;
     public const float death_stroll_dot_ratio = 1.5f; // 死灵漫步光环每跳 = 施加者攻击 × 此系数 × 等级
-    public const int summon_zombie_count = 5;
     public const float plague_detonate_damage = 20f;
     public const int power_suppress_hits = 3;
     public const float power_suppress_interval = 0.4f;

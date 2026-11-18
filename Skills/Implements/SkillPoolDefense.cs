@@ -146,7 +146,8 @@ namespace Ros.Skill
         {
             if (caster == null || Tool.BattleManager == null) return;
             int level = Tool.BattleManager.GetZombieSpawnLevel(); // 跟随自然刷新等级
-            for (int i = 0; i < GlobalConfig.summon_zombie_count; i++)
+            int count = GlobalVariable.I(global_variablesEnum.summon_zombie_count);
+            for (int i = 0; i < count; i++)
             {
                 var type = EntityType.Zombie(UnityEngine.Random.Range(0, GlobalConfig.zombie_variant_count));
                 Tool.BattleManager.SpawnEntity(type, level,
