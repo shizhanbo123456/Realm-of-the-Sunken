@@ -925,16 +925,21 @@ namespace Ros.Skill
         }
     }
 
-    // 兵雨：自身周围 6 个点循环天降
+    // 兵雨：自身周围 8 个点循环天降，垂直落到脚下以下后驻留片刻
     public class SkillOrbitWeaponRain : SkillBase
     {
         public override int Id => (int)SkillType.SkillOrbitWeaponRain;
 
-        private const int Shots = 3;
-        private const int Waves = 3;
-        private const float WaveGap = 0.25f;
-        private const float BulletLife = 1f;
-        private const float Ring = 3f;
+        private const int Shots = 4;
+        private const int Waves = 4;
+        private const int Points = 8;
+        private const float WaveGap = 0.2f;
+        private const float Ring = 3.2f;
+        private const float FallHeight = 20f;      // 起点在落点正上方：高于两种镜头，出现时不在画面里
+        private const float FallTime = 0.9f;
+        private const float Sink = 0.8f;           // 终点压到地表以下
+        private const float HoldTime = 0.4f;       // 落到位后原地停留再销毁
+        private const float BulletLife = FallTime + HoldTime;
 
         protected override void OnCast(EntityData caster)
         {
@@ -952,14 +957,17 @@ namespace Ros.Skill
 
         private void FireWave(EntityData caster, Vector3 center, int wave, AttackData attack, BulletHitSpec spec)
         {
-            Vector3[] ring = SpreadStyle.CircleDests(Vector3.zero, Ring, 6);
+            Vector3[] ring = SpreadStyle.CircleDests(Vector3.zero, Ring, Points);
             for (int i = 0; i < Shots; i++)
             {
-                Vector3 land = center + ring[(wave * Shots + i) % 6];
-                Tool.BattleManager.ShootBullet(caster, attack,
-                    new SkillTrajectorySkyFall(center + Vector3.up * 8f, land, BulletLife), BulletLife, spec);
+                Vector3 land = center + ring[(wave * Shots + i) % Points];
+                Tool.BattleManager.ShootBullet(caster, attack, Drop(land), BulletLife, spec);
             }
         }
+
+        // 起点 = 落点正上方，垂直落下，终点压到地表以下：刀身穿过脚面再驻留
+        private static BulletTrajectory Drop(Vector3 land)
+            => new SkillTrajectoryDropHold(land + Vector3.up * FallHeight, land - Vector3.up * Sink, FallTime, HoldTime);
 
         public override void PlayWave(SCSkillDisplayContext context)
         {
@@ -975,12 +983,11 @@ namespace Ros.Skill
 
         private void PlayOneWave(Vector3 center, int wave, int weapon)
         {
-            Vector3[] ring = SpreadStyle.CircleDests(Vector3.zero, Ring, 6);
+            Vector3[] ring = SpreadStyle.CircleDests(Vector3.zero, Ring, Points);
             for (int i = 0; i < Shots; i++)
             {
-                Vector3 land = center + ring[(wave * Shots + i) % 6];
-                VfxHelper.PlayOne(SkillVfxKind.Weapon, weapon,
-                    new SkillTrajectorySkyFall(center + Vector3.up * 8f, land, BulletLife), VfxScale());
+                Vector3 land = center + ring[(wave * Shots + i) % Points];
+                VfxHelper.PlayOne(SkillVfxKind.Weapon, weapon, Drop(land), VfxScale());
             }
         }
     }
