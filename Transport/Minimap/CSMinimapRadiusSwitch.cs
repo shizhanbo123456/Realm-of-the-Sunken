@@ -1,7 +1,7 @@
 namespace Ros.Transport
 {
     // 客户端 → 服务器：请求切换雷达显示半径（100/200/300 循环），无载荷
-    public class CSMinimapRadiusSwitch
+    public struct CSMinimapRadiusSwitch
     {
     }
 

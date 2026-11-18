@@ -187,7 +187,6 @@ public class ClientLoadingManager : ClientSubManager
         if (list == null) return;
         foreach (var entry in list)
         {
-            if (entry == null) continue;
             units.Add(entry);
             names[entry.clientId] = entry.name;
             entityOwners[entry.entityId] = entry.clientId;
@@ -198,14 +197,14 @@ public class ClientLoadingManager : ClientSubManager
     // 玩家 → 实体关系由网络层直连转入：开战前的批量下发与界面创建存在时差，走事件会整批丢包
     public void OnPlayerEntity(SCPlayerEntity info)
     {
-        if (!HasSession || info == null) return;
+        if (!HasSession) return;
         BindEntity(info.clientId, info.entityId);
     }
 
     // 复活包单播到本人且必达，故本地实体 id 一并由它刷新（SCPlayerEntity 的广播不会回到房主自己的客户端）
     private void OnReviveProgress(SCReviveInfo info)
     {
-        if (info == null || !info.ready || info.entityId == 0) return;
+        if (!info.ready || info.entityId == 0) return;
         BindEntity(NetworkManager.LocalToken, info.entityId);
     }
 

@@ -2,7 +2,7 @@ namespace Ros.Transport
 {
     // 服务器 → 客户端：这一档的抽卡种子（伪随机数 / 档位 / 当时的幸运）。
     // valid = false 表示这一档没次数或抽不出来，客户端收起面板；客户端用这套种子算出的卡与服务端一致
-    public class SCCardSeed
+    public struct SCCardSeed
     {
         public bool valid;
         public byte tier;
@@ -14,8 +14,6 @@ namespace Ros.Transport
     {
         public static bool Serialize(SCCardSeed value, byte[] result, ref int indexStart)
         {
-            if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-            if (value == null) return true;
             if (!BoolSerializer.Serialize(value.valid, result, ref indexStart)) return false;
             if (!ByteSerializer.Serialize(value.tier, result, ref indexStart)) return false;
             if (!IntSerializer.Serialize(value.luck, result, ref indexStart)) return false;
@@ -24,7 +22,6 @@ namespace Ros.Transport
 
         public static SCCardSeed Deserialize(byte[] data, ref int indexStart, int invalidIndex)
         {
-            if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
             return new SCCardSeed()
             {
                 valid = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),

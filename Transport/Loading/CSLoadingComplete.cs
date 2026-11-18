@@ -1,7 +1,7 @@
 namespace Ros.Transport
 {
     // 客户端 → 服务器：加载完成（三步数据都收齐后发送）
-    public class CSLoadingComplete
+    public struct CSLoadingComplete
     {
     }
 

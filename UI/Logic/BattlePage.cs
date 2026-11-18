@@ -142,7 +142,6 @@ public class BattlePage : PageBase
     // 收到同阵营的快捷指令：按配表「点位显示时长」登记一条，0 = 不生成（上报状况）
     private void OnQuickMessage(SCQuickMessage message)
     {
-        if (message == null) return;
         float duration = QuickMessageConfig.Get(message.messageId).markerDuration;
         if (duration <= 0f) return;
 
@@ -252,7 +251,7 @@ public class BattlePage : PageBase
         localPlayerAlive = !spectatorMode;
         panel.m_onlook.selectedIndex = spectatorMode ? 1 : 0; // onlook=1：FGUI 自动隐藏血条/技能等非观战元素
         if (panel.m_onlookComboBox != null) panel.m_onlookComboBox.onChanged.Set(OnOnlookComboBoxChanged);
-        RefreshCampAliveCount(NetworkManager.LatestCampAliveCount); // 进入战斗先填一次缓存值，随后由变更包刷新
+        if (NetworkManager.HasCampAliveCount) RefreshCampAliveCount(NetworkManager.LatestCampAliveCount); // 进入战斗先填一次缓存值，随后由变更包刷新
         // 首页/大厅展示的选角预览模型只属于那两个界面，进战斗前清掉（否则会残留在地图的预览锚点上）
         if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
             Tool.ClientLogicManager.HomePreview.Hide();
@@ -260,7 +259,7 @@ public class BattlePage : PageBase
         HideQuickMessage(); // 快捷消息面板每局从收起状态开始
         ResetGodViewPress(); // 连按计数每局清零
         HideImportantBanner(); // 重要事件 banner 每局从隐藏状态开始
-        OnDefensePointProgress(NetworkManager.LatestDefensePointProgress); // 进入战斗先填一次缓存值，随后由变更包刷新
+        if (NetworkManager.HasDefensePointProgress) OnDefensePointProgress(NetworkManager.LatestDefensePointProgress); // 进入战斗先填一次缓存值，随后由变更包刷新
         reviveActive = false; // 复活条每局从收起状态开始，重新由 SCReviveInfo 驱动
         reviveElapsed = 0f;
         panel.m_showRegenerationBar.selectedIndex = 0; // 上一局死着结算会把它留在 1，进场必须复位
@@ -363,7 +362,6 @@ public class BattlePage : PageBase
     #region 事件处理
     private void OnEntityDisplayUpdate(SCEntityDisplayInfo info)
     {
-        if (info == null) return;
         // 血条是否创建由 entity.csv 的「显示血条」列决定；名牌只给双方角色
         if (EntityConfig.GetByCategory(info.type).showHealthBar == true)
         {
@@ -496,7 +494,6 @@ public class BattlePage : PageBase
             for (int i = 0; i < units.Count; i++)
             {
                 var unit = units[i];
-                if (unit == null) continue;
                 if (unit.clientId == NetworkManager.LocalToken) continue; // 自己不进观战列表
                 if (isCombatant && unit.camp != myCamp) continue; // 攻/守玩家只能观战同阵营（服务器同样拒绝异阵营）
                 names.Add(Session.GetName(unit.clientId));
@@ -598,7 +595,6 @@ public class BattlePage : PageBase
     // 只认 SCDefensePointProgress 的当前血量与人数倍率；名字读 entity.csv，百分比在客户端算
     private void OnDefensePointProgress(SCDefensePointProgress info)
     {
-        if (info == null) return;
         guardianHealth[0] = info.mainHealth;
         guardianHealth[1] = info.sub1Health;
         guardianHealth[2] = info.sub2Health;
@@ -695,7 +691,6 @@ public class BattlePage : PageBase
 
     private void OnScoreUpdate(SCScoreInfo info)
     {
-        if (info == null) return;
         if (panel.m_BattleInfoPanel.m_time_left != null) panel.m_BattleInfoPanel.m_time_left.text = FormatTime(Mathf.Max(0f, info.remainTime));
     }
 
@@ -704,7 +699,6 @@ public class BattlePage : PageBase
     // 三方阵营信息：每行自带 c1 控制器（0 攻 / 1 守 / 2 观战），是不是自己阵营交给 is_in_tis_camp
     private void RefreshCampAliveCount(SCCampAliveCount info)
     {
-        if (info == null) return;
         var camps = panel.m_CampInfoPanel;
         if (camps == null) return;
         ApplyCampCount(camps.m_camp_attack, info.attackerAlive);
@@ -722,7 +716,6 @@ public class BattlePage : PageBase
 
     private void OnMinimapUpdate(SCMinimapEntity e)
     {
-        if (e == null) return;
         // 每个实体一个独立包：只登记坐标与类别，换算和显隐交给小地图自身
         panel.m_Minimap?.Push(new UI_Minimap.Point(e.entityId, e.type.category, e.type, e.camp,
             e.marked, IsOwnEntity(e.entityId), new Vector2(e.posX, e.posZ)), (EntityCamp)localPlayerCamp);
@@ -895,7 +888,6 @@ public class BattlePage : PageBase
     // 事件条目播报在聊天面板（ChatPlugin 系统消息页签），这里只负责日夜大横幅与技能播报 banner
     private void OnBattleEvent(SCBattleEvent e)
     {
-        if (e == null) return;
         if (e.type == SCBattleEvent.Type.Nightfall) ShowEventBanner(BannerNightfall);     // 天黑横幅
         else if (e.type == SCBattleEvent.Type.Daybreak) ShowEventBanner(BannerDaybreak);  // 天亮横幅
         else if (e.type == SCBattleEvent.Type.SkillBroadcast) EnqueueImportantBanner(e.textId); // 特殊技能播报
@@ -903,7 +895,6 @@ public class BattlePage : PageBase
 
     private void OnCombatLabelDisplay(SCCombatLabel label)
     {
-        if (label == null) return;
         var type = (CombatLabelType)label.type;
         var targetId = (ushort)label.targetId;
         ShowCombatLabel(label.amount, type, targetId, label.hasHitPos, label.hitPos);
@@ -914,7 +905,7 @@ public class BattlePage : PageBase
     // 复活条只服务本地玩家：包按令牌单播，观战目标死亡不驱动本界面
     private void OnReviveProgressUpdate(SCReviveInfo info)
     {
-        if (info == null || !HasSession) return;
+        if (!HasSession) return;
 
         if (info.ready)
         {
@@ -973,9 +964,8 @@ public class BattlePage : PageBase
     private IReadOnlyList<UI_EntityBar.Buff> ToBarBuffs(List<SCEntityDisplayInfo.BuffRuntime> source)
     {
         barBuffs.Clear();
-        if (source != null)
-            for (int i = 0; i < source.Count; i++)
-                if (source[i] != null) barBuffs.Add(new UI_EntityBar.Buff(source[i].type, source[i].level));
+        for (int i = 0; i < source.Count; i++)
+            barBuffs.Add(new UI_EntityBar.Buff(source[i].type, source[i].level));
         return barBuffs;
     }
 
@@ -983,7 +973,7 @@ public class BattlePage : PageBase
     private static void RefreshBuffList(GList list, List<SCEntityDisplayInfo.BuffRuntime> target, List<SCEntityDisplayInfo.BuffRuntime> source)
     {
         target.Clear();
-        if (source != null) target.AddRange(source);
+        target.AddRange(source);
         list.numItems = target.Count;
     }
 
@@ -1164,7 +1154,7 @@ public class BattlePage : PageBase
     // 种子到了才铺卡：幸运也只在种子里，客户端不再单独存
     private void OnCardSeed(SCCardSeed info)
     {
-        if (info == null || !awaitingSeed || !panel.m_selectCardPanel.IsOpen) return; // 等的时候界面已经收起就不理会，服务器留着这个种子
+        if (!awaitingSeed || !panel.m_selectCardPanel.IsOpen) return; // 等的时候界面已经收起就不理会，服务器留着这个种子
         awaitingSeed = false;
 
         var tier = (CardTier)info.tier;

@@ -4,7 +4,7 @@ namespace Ros.Transport
 {
     // 服务器 → 客户端：打击震颤。只发给当事人（攻击方 / 受击方各一条），不夹在 SCCombatLabel 里——
     // 飘字是给视野内所有人看的数字，震颤只与该次命中有关的两台客户端有关
-    public class SCHitFeel
+    public struct SCHitFeel
     {
         public const int RoleAttacker = 0; // 我是这次命中的攻击方
         public const int RoleVictim = 1;   // 我是被命中的一方
@@ -19,20 +19,14 @@ namespace Ros.Transport
         {
             if (!EnsInstance.enableBitTransform)
             {
-                if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-                if (value == null) return true;
                 if (!IntSerializer.Serialize(value.role, result, ref indexStart)) return false;
                 return IntSerializer.Serialize(value.type, result, ref indexStart);
             }
 
-            // 位级：1+1+4 = 6 位
+            // 位级：1+4 = 5 位
             BitField.SetBuffer(result, indexStart);
-            BitField.WriteBool(value != null);
-            if (value != null)
-            {
-                BitField.WriteInt(value.role, 0, 1);
-                BitField.WriteInt(value.type, 0, 15);
-            }
+            BitField.WriteInt(value.role, 0, 1);
+            BitField.WriteInt(value.type, 0, 15);
             indexStart += BitField.Flush();
             return true;
         }
@@ -41,7 +35,6 @@ namespace Ros.Transport
         {
             if (!EnsInstance.enableBitTransform)
             {
-                if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
                 return new SCHitFeel()
                 {
                     role = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
@@ -52,12 +45,6 @@ namespace Ros.Transport
             if (invalidIndex - indexStart < 1) throw new Exception("反序列化 SCHitFeel 失败：剩余数据不足");
 
             BitField.SetBuffer(data, indexStart);
-            if (!BitField.ReadBool())
-            {
-                indexStart += 1;
-                return null;
-            }
-
             var r = new SCHitFeel();
             r.role = BitField.ReadInt(0, 1);
             r.type = BitField.ReadInt(0, 15);

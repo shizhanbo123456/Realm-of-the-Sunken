@@ -384,7 +384,6 @@ public class GmPanel : PageBase
     #region//服务器查询回包
     private void OnGmResult(SCGm gm)
     {
-        if (gm == null) return;
         string text = gm.type switch
         {
             GmCommandId.ServerFps => $"服务器帧率：{gm.i} FPS",

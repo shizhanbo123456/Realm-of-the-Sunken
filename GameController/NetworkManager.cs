@@ -32,6 +32,8 @@ public partial class NetworkManager : EnsBehaviour
     private static bool connected;
     private static bool tryingEnterWorld;
     private static bool hasLobbyInfo;
+    private static bool hasCampAliveCount;
+    private static bool hasDefensePointProgress;
     private static bool intentionalExitWorld;
     private static bool kicked;      // 被同令牌的新连接顶掉：提示语与普通断线区分
     private static bool connectFailed;  // 连接失败后 ShutDown 的回流：跳过断线提示与回主界面
@@ -51,10 +53,12 @@ public partial class NetworkManager : EnsBehaviour
         serverHello = null;
         BattleRunning = false;
         hasLobbyInfo = false;
+        hasCampAliveCount = false;
+        hasDefensePointProgress = false;
         tryingEnterWorld = false;
         intentionalExitWorld = false;
         connectFailed = false;
-        LatestLobbyInfo = null; // 跨连接清空，防止重连后大厅显示上一局成员
+        LatestLobbyInfo = default; // 跨连接清空，防止重连后大厅显示上一局成员
         lobbyMembers.Clear();
         lobbyPlayerNames.Clear();
         serverTimeOffset = 0f;
@@ -223,6 +227,8 @@ public partial class NetworkManager : EnsBehaviour
             EnsInstance.Corr.FlushSendBufferNow();
         }
         hasLobbyInfo = false;
+        hasCampAliveCount = false;
+        hasDefensePointProgress = false;
         EnsInstance.Corr.ShutDown();
         // 主动退出：通知 UI 返回主界面。断开回调 OnServerDisconnect 仅用于抑制 OnRestartGame，避免重复重启流程。
         EventManager.TrigEvent(ClientEvent.OnExitWorld);
@@ -292,7 +298,7 @@ public partial class NetworkManager : EnsBehaviour
     public void SendSkillSelection(List<int> skillIds)
     {
         if (!CanSendWorldCommand || skillIds == null) return;
-        var selection = new CSSkillSelection();
+        var selection = new CSSkillSelection { skillIds = new List<int>() };
         selection.skillIds.AddRange(skillIds);
         CallFuncRpc(ServerReceiveSkillSelectionLocal, SendTo.RoomOwner, Delivery.Reliable, selection, LocalToken);
     }
@@ -369,20 +375,20 @@ public partial class NetworkManager : EnsBehaviour
     // 快捷消息上行：位置参数可选（按住 J 时才带）
     public void SendQuickMessage(CSQuickMessage message)
     {
-        if (message == null || !CanSendWorldCommand) return;
+        if (!CanSendWorldCommand) return;
         CallFuncRpc(ServerReceiveQuickMessageLocal, SendTo.RoomOwner, Delivery.Reliable, message, LocalToken);
     }
 
     public void SendGm(CSGm gm)
     {
-        if (gm == null || !CanSendWorldCommand) return;
+        if (!CanSendWorldCommand) return;
         CallFuncRpc(ServerReceiveGmLocal, SendTo.RoomOwner, Delivery.Reliable, gm, LocalToken);
     }
 
     // AI 操控意图上行：低频可靠包，服务器翻译成行为层请求
     public void SendAiIntent(CSAiIntent intent)
     {
-        if (intent == null || !CanSendWorldCommand) return;
+        if (!CanSendWorldCommand) return;
         CallFuncRpc(ServerReceiveAiIntentLocal, SendTo.RoomOwner, Delivery.Reliable, intent, LocalToken);
     }
 
@@ -575,7 +581,7 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ClientReceivePlayerEntityLocal(SCPlayerEntity info)
     {
-        if (info == null || Tool.ClientLogicManager == null) return;
+        if (Tool.ClientLogicManager == null) return;
         // 直连常驻的加载会话：开战关系包早于战斗界面创建到达，走事件会整批丢失
         Tool.ClientLogicManager.Loading.OnPlayerEntity(info);
     }
@@ -629,35 +635,35 @@ public partial class NetworkManager : EnsBehaviour
     // 聊天单播：附近频道按距离逐个下发
     public void SendChat(int clientId, SCChat chat)
     {
-        if (chat == null || !TryGetSendTo(clientId, out var to)) return;
+        if (!TryGetSendTo(clientId, out var to)) return;
         CallFuncRpc(ClientReceiveChatLocal, to, Delivery.Reliable, chat);
     }
 
     // 快捷消息下发：只发给同阵营的真人（人机在服务器侧直接消费）
     public void SendQuickMessage(int clientId, SCQuickMessage message)
     {
-        if (message == null || !TryGetSendTo(clientId, out var to)) return;
+        if (!TryGetSendTo(clientId, out var to)) return;
         CallFuncRpc(ClientReceiveQuickMessageLocal, to, Delivery.Reliable, message);
     }
 
     // 状态上报下发：只发给同阵营的真人
     public void SendStateReport(int clientId, SCStateReport report)
     {
-        if (report == null || !TryGetSendTo(clientId, out var to)) return;
+        if (!TryGetSendTo(clientId, out var to)) return;
         CallFuncRpc(ClientReceiveStateReportLocal, to, Delivery.Reliable, report);
     }
 
     //GM 指令回包（服务器帧率 / 服务器时间等）
     public void SendGm(int clientId, SCGm gm)
     {
-        if (gm == null || !TryGetSendTo(clientId, out var to)) return;
+        if (!TryGetSendTo(clientId, out var to)) return;
         CallFuncRpc(ClientReceiveGmLocal, to, Delivery.Reliable, gm);
     }
 
     // AI 操控回执（移动失败等）：只发给发起意图的客户端
     public void SendAiFeedback(int clientId, SCAiFeedback info)
     {
-        if (info == null || !TryGetSendTo(clientId, out var to)) return;
+        if (!TryGetSendTo(clientId, out var to)) return;
         CallFuncRpc(ClientReceiveAiFeedbackLocal, to, Delivery.Reliable, info);
     }
     #endregion
@@ -702,7 +708,6 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ServerReceiveSkillSelectionLocal(CSSkillSelection selection, int clientId)
     {
-        if (selection == null) return;
         if (Tool.BattleManager != null) Tool.BattleManager.ReceiveSkillSelection(clientId, selection.skillIds);
     }
 
@@ -727,7 +732,6 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ClientReceiveCardSeedLocal(SCCardSeed seed)
     {
-        if (seed == null) return;
         EventManager.TrigEvent(ClientEvent.OnCardSeed, seed);
     }
 
@@ -758,7 +762,7 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ServerReceiveSpectateLocal(CSSpectate request, int clientId)
     {
-        if (Tool.BattleManager != null) Tool.BattleManager.SpectateRequest(clientId, request != null ? request.targetClientId : -1);
+        if (Tool.BattleManager != null) Tool.BattleManager.SpectateRequest(clientId, request.targetClientId);
     }
 
     [Rpc]
@@ -788,21 +792,18 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ServerReceiveGmLocal(CSGm gm, int clientId)
     {
-        if (gm == null) return;
         if (Tool.BattleManager != null) Tool.BattleManager.ExecuteGm(clientId, gm);
     }
 
     [Rpc]
     private void ServerReceiveAiIntentLocal(CSAiIntent intent, int clientId)
     {
-        if (intent == null) return;
         if (Tool.BattleManager != null) Tool.BattleManager.ReceiveAiIntent(clientId, intent);
     }
 
     [Rpc]
     private void ServerReceiveAiSkillCastLocal(CSAiSkillCast cast, int clientId)
     {
-        if (cast == null) return;
         if (Tool.BattleManager != null) Tool.BattleManager.ReceiveAiSkillCast(clientId, cast.skillId);
     }
     #endregion
@@ -812,42 +813,42 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ClientReceiveLoadingStartLocal(SCLoadingStart info)
     {
-        if (info == null || Tool.ClientLogicManager == null) return;
+        if (Tool.ClientLogicManager == null) return;
         Tool.ClientLogicManager.Loading.OnLoadingStart(info);
     }
 
     [Rpc]
     private void ClientReceiveLoadingPreparedLocal(SCLoadingPrepared info)
     {
-        if (info == null || Tool.ClientLogicManager == null) return;
+        if (Tool.ClientLogicManager == null) return;
         Tool.ClientLogicManager.Loading.OnLoadingPrepared(info);
     }
 
     [Rpc]
     private void ClientReceiveLoadingAttackPlayerResponseLocal(SCLoadingAttackPlayerResponse info)
     {
-        if (info == null || Tool.ClientLogicManager == null) return;
+        if (Tool.ClientLogicManager == null) return;
         Tool.ClientLogicManager.Loading.OnAttackPlayerResponse(info);
     }
 
     [Rpc]
     private void ClientReceiveLoadingDefensePlayerResponseLocal(SCLoadingDefensePlayerResponse info)
     {
-        if (info == null || Tool.ClientLogicManager == null) return;
+        if (Tool.ClientLogicManager == null) return;
         Tool.ClientLogicManager.Loading.OnDefensePlayerResponse(info);
     }
 
     [Rpc]
     private void ClientReceiveLoadingAiUnitResponseLocal(SCLoadingAiUnitResponse info)
     {
-        if (info == null || Tool.ClientLogicManager == null) return;
+        if (Tool.ClientLogicManager == null) return;
         Tool.ClientLogicManager.Loading.OnAiUnitResponse(info);
     }
 
     [Rpc]
     private void ClientReceiveBattleStartLocal(SCBattleStart info)
     {
-        if (info == null || Tool.ClientLogicManager == null) return;
+        if (Tool.ClientLogicManager == null) return;
         Tool.ClientLogicManager.Loading.OnBattleStart();
     }
     #endregion
@@ -855,7 +856,6 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ClientReceiveEntityDisplayLocal(SCEntityDisplayInfo info)
     {
-        if (info == null) return;
         var logic = Tool.ClientLogicManager;
         if (logic != null) logic.EntityPlayers.OnEntityDisplay(info);
         else EventManager.TrigEvent(ClientEvent.OnEntityDisplayUpdate, info);
@@ -864,7 +864,6 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ClientReceiveEntityAnimLocal(SCEntityAnimInfo info)
     {
-        if (info == null) return;
         if (Tool.ClientLogicManager != null) Tool.ClientLogicManager.EntityPlayers.OnEntityAnim(info);
     }
 
@@ -879,35 +878,30 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ClientReceiveMinimapEntityLocal(SCMinimapEntity e)
     {
-        if (e == null) return;
         EventManager.TrigEvent(ClientEvent.OnMinimapUpdate, e);
     }
 
     [Rpc]
     private void ClientReceiveMinimapRadiusLocal(SCMinimapRadius info)
     {
-        if (info == null) return;
         EventManager.TrigEvent(ClientEvent.OnMinimapRadiusUpdate, info.radius);
     }
 
     [Rpc]
     private void ClientReceiveBattleEventLocal(SCBattleEvent e)
     {
-        if (e == null) return;
         EventManager.TrigEvent(ClientEvent.OnBattleEvent, e);
     }
 
     [Rpc]
     private void ClientReceivePromptLocal(SCPrompt p)
     {
-        if (p == null) return;
         EventManager.TrigEvent(ClientEvent.OnShowPrompt, p.messageId);
     }
 
     [Rpc]
     private void ClientReceiveSkillRechargeLocal(SCSkillRecharge info)
     {
-        if (info == null) return;
         if (Tool.ClientLogicManager == null) return;
         var skills = Tool.ClientLogicManager.SkillVfx;
         if (skills == null) return;
@@ -917,7 +911,6 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ClientReceiveSkillSyncLocal(SCSkillSync info)
     {
-        if (info == null) return;
         if (Tool.ClientLogicManager == null) return;
         var skills = Tool.ClientLogicManager.SkillVfx;
         if (skills == null) return;
@@ -931,25 +924,21 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ClientReceiveCombatLabelLocal(SCCombatLabel label)
     {
-        if (label == null) return;
         EventManager.TrigEvent(ClientEvent.OnCombatLabelDisplay, label);
     }
     [Rpc]
     private void ClientReceiveHitFeelLocal(SCHitFeel info)
     {
-        if (info == null) return;
         EventManager.TrigEvent(ClientEvent.OnHitFeel, info);
     }
     [Rpc]
     private void ClientReceivePlayerProgressLocal(SCPlayerProgress info)
     {
-        if (info == null) return;
         EventManager.TrigEvent(ClientEvent.OnPlayerProgress, info);
     }
     [Rpc]
     private void ClientReceiveScoreInfoLocal(SCScoreInfo info)
     {
-        if (info == null) return;
         var logic = Tool.ClientLogicManager;
         if (logic != null) logic.BattleTime.OnScoreUpdate(info);
         else EventManager.TrigEvent(ClientEvent.OnScoreUpdate, info);
@@ -958,14 +947,12 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ClientReceiveReviveInfoLocal(SCReviveInfo info)
     {
-        if (info == null) return;
         EventManager.TrigEvent(ClientEvent.OnReviveProgressUpdate, info);
     }
 
     [Rpc]
     private void ClientReceiveLobbyInfoLocal(SCLobbyInfo info)
     {
-        if (info == null) return;
         hasLobbyInfo = true; // 已收到服务器房间状态，允许发送大厅命令（选队/开始/输入）
         BattleRunning = info.battleStarted;
         MergeLobbyMembers(info); // 增量合并成完整成员表，UI 与聊天仍按全量快照消费
@@ -975,20 +962,19 @@ public partial class NetworkManager : EnsBehaviour
 
     public static SCLobbyInfo LatestLobbyInfo { get; private set; }
 
+    // 是否已收到过房间状态：LatestLobbyInfo 是结构体，靠它区分「没收到」与「收到但内容为空」
+    public static bool HasLobbyInfo => hasLobbyInfo;
+
     // 组队期成员表：服务器只发增量，这里合并成完整快照
     private static readonly Dictionary<int, SCLobbyInfo.LobbyMemberInfo> lobbyMembers = new();
 
     private static void MergeLobbyMembers(SCLobbyInfo info)
     {
         if (info.full) lobbyMembers.Clear();
-        if (info.members != null)
+        foreach (var member in info.members)
         {
-            foreach (var member in info.members)
-            {
-                if (member == null) continue;
-                if (member.removed) lobbyMembers.Remove(member.clientId);
-                else lobbyMembers[member.clientId] = member;
-            }
+            if (member.removed) lobbyMembers.Remove(member.clientId);
+            else lobbyMembers[member.clientId] = member;
         }
         info.members.Clear();
         foreach (var member in lobbyMembers.Values) info.members.Add(member);
@@ -1001,7 +987,6 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ClientReceiveLobbyPlayerNameLocal(SCLobbyPlayerName info)
     {
-        if (info == null) return;
         lobbyPlayerNames[info.clientId] = info.name;
     }
 
@@ -1013,22 +998,28 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ClientReceiveCampAliveCountLocal(SCCampAliveCount info)
     {
-        if (info == null) return;
         LatestCampAliveCount = info; // 缓存最新双方人数（战斗页进入时取初值）
+        hasCampAliveCount = true;
         EventManager.TrigEvent(ClientEvent.OnCampAliveCount, info);
     }
 
     public static SCCampAliveCount LatestCampAliveCount { get; private set; }
 
+    // 是否收到过人数包：缓存是结构体，靠它区分「没收到」与「收到但全为 0」
+    public static bool HasCampAliveCount => hasCampAliveCount;
+
     [Rpc]
     private void ClientReceiveDefensePointProgressLocal(SCDefensePointProgress info)
     {
-        if (info == null) return;
         LatestDefensePointProgress = info; // 缓存最新进度（战斗页进入时取初值）
+        hasDefensePointProgress = true;
         EventManager.TrigEvent(ClientEvent.OnDefensePointProgress, info);
     }
 
     public static SCDefensePointProgress LatestDefensePointProgress { get; private set; }
+
+    // 是否收到过守护点进度：同上
+    public static bool HasDefensePointProgress => hasDefensePointProgress;
 
     // 组队期的成员名字（战斗期请走 ClientLoadingManager，不要读这里的组队缓存）
     public static string GetLobbyMemberName(int clientId)
@@ -1040,7 +1031,6 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ClientReceiveDayNightInfoLocal(SCDayNightInfo info)
     {
-        if (info == null) return;
         var logic = Tool.ClientLogicManager;
         if (logic != null) logic.BattleTime.OnDayNightSync(info);
         else Tool.BattleManager.ApplyDayNightSync(info.cycleTime, info.dayDuration, info.nightDuration);
@@ -1058,35 +1048,30 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ClientReceiveChatLocal(SCChat chat)
     {
-        if (chat == null) return;
         EventManager.TrigEvent(ClientEvent.OnChatMessage, chat);
     }
 
     [Rpc]
     private void ClientReceiveQuickMessageLocal(SCQuickMessage message)
     {
-        if (message == null) return;
         EventManager.TrigEvent(ClientEvent.OnQuickMessage, message);
     }
 
     [Rpc]
     private void ClientReceiveStateReportLocal(SCStateReport report)
     {
-        if (report == null) return;
         EventManager.TrigEvent(ClientEvent.OnStateReport, report);
     }
 
     [Rpc]
     private void ClientReceiveGmLocal(SCGm gm)
     {
-        if (gm == null) return;
         EventManager.TrigEvent(ClientEvent.OnGmResult, gm);
     }
 
     [Rpc]
     private void ClientReceiveAiFeedbackLocal(SCAiFeedback info)
     {
-        if (info == null) return;
         var commands = AiCommandLine.Current;
         if (commands == null) return;
         commands.OnServerFeedback(info);
@@ -1096,31 +1081,31 @@ public partial class NetworkManager : EnsBehaviour
     #region 上帝视角（客户端反复请求，服务器只回应，不主动下发）
     public void SendGodViewArea(CSGodViewArea area)
     {
-        if (area == null || !CanSendWorldCommand) return;
+        if (!CanSendWorldCommand) return;
         CallFuncRpc(ServerReceiveGodViewAreaLocal, SendTo.RoomOwner, Delivery.Unreliable, area, LocalToken);
     }
 
     public void SendGodViewEntityDetail(CSGodViewEntityDetail request)
     {
-        if (request == null || !CanSendWorldCommand) return;
+        if (!CanSendWorldCommand) return;
         CallFuncRpc(ServerReceiveGodViewEntityDetailLocal, SendTo.RoomOwner, Delivery.Reliable, request, LocalToken);
     }
 
     public void SendGodViewEntities(int clientId, SCGodViewEntities chunk)
     {
-        if (chunk == null || !TryGetSendTo(clientId, out var to)) return;
+        if (!TryGetSendTo(clientId, out var to)) return;
         CallFuncRpc(ClientReceiveGodViewEntitiesLocal, to, Delivery.Unreliable, chunk);
     }
 
     public void SendGodViewCorals(int clientId, SCGodViewCorals chunk)
     {
-        if (chunk == null || !TryGetSendTo(clientId, out var to)) return;
+        if (!TryGetSendTo(clientId, out var to)) return;
         CallFuncRpc(ClientReceiveGodViewCoralsLocal, to, Delivery.Unreliable, chunk);
     }
 
     public void SendGodViewEntityDetail(int clientId, SCGodViewEntityDetail info)
     {
-        if (info == null || !TryGetSendTo(clientId, out var to)) return;
+        if (!TryGetSendTo(clientId, out var to)) return;
         CallFuncRpc(ClientReceiveGodViewEntityDetailLocal, to, Delivery.Reliable, info);
     }
 
@@ -1140,21 +1125,18 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ClientReceiveGodViewEntitiesLocal(SCGodViewEntities chunk)
     {
-        if (chunk == null) return;
         EventManager.TrigEvent(ClientEvent.OnGodViewEntities, chunk);
     }
 
     [Rpc]
     private void ClientReceiveGodViewCoralsLocal(SCGodViewCorals chunk)
     {
-        if (chunk == null) return;
         EventManager.TrigEvent(ClientEvent.OnGodViewCorals, chunk);
     }
 
     [Rpc]
     private void ClientReceiveGodViewEntityDetailLocal(SCGodViewEntityDetail info)
     {
-        if (info == null) return;
         EventManager.TrigEvent(ClientEvent.OnGodViewDetail, info);
     }
     #endregion

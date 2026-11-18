@@ -4,7 +4,7 @@ namespace Ros.Transport
 {
     // 服务器 → 客户端：小地图上单个单位（每个实体一个独立数据包，不拼装、不编号、无标志位）
     // 直接承载实体字段，不再嵌套 MinimapEntity，省去一层对象分配与 GC
-    public class SCMinimapEntity
+    public struct SCMinimapEntity
     {
         public ushort entityId;   // 实体 id（客户端据此定位本地玩家自己）
         public EntityType type;   // 实体类型（UI 按类别取图标 / 尺寸）
@@ -20,8 +20,6 @@ namespace Ros.Transport
         {
             if (!EnsInstance.enableBitTransform)
             {
-                if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-                if (value == null) return true;
                 if (!UshortSerializer.Serialize(value.entityId, result, ref indexStart)) return false;
                 if (!EntityTypeSerializer.Serialize(value.type, result, ref indexStart)) return false;
                 if (!IntSerializer.Serialize((int)value.camp, result, ref indexStart)) return false;
@@ -32,21 +30,17 @@ namespace Ros.Transport
             }
             else
             {
-                if (result.Length - indexStart < (value == null ? 1 : 7)) return false;
+                if (result.Length - indexStart < 7) return false;
 
-                // 位级：1+15+3+5+5+12+12+1=54 位
+                // 位级：15+3+5+5+12+12+1=53 位
                 BitField.SetBuffer(result, indexStart);
-                BitField.WriteBool(value != null);
-                if (value != null)
-                {
-                    BitField.WriteInt(value.entityId, 0, SyncRanges.EntityIdMax);
-                    BitField.WriteInt((int)value.type.category, 0, 7);
-                    BitField.WriteInt(value.type.value, 0, 31);
-                    BitField.WriteInt((int)value.camp, 0, 31);
-                    BitField.WriteFloat(value.posX, 0f, SyncRanges.PositionXZMax, SyncRanges.MinimapPositionStep);
-                    BitField.WriteFloat(value.posZ, 0f, SyncRanges.PositionXZMax, SyncRanges.MinimapPositionStep);
-                    BitField.WriteBool(value.marked);
-                }
+                BitField.WriteInt(value.entityId, 0, SyncRanges.EntityIdMax);
+                BitField.WriteInt((int)value.type.category, 0, 7);
+                BitField.WriteInt(value.type.value, 0, 31);
+                BitField.WriteInt((int)value.camp, 0, 31);
+                BitField.WriteFloat(value.posX, 0f, SyncRanges.PositionXZMax, SyncRanges.MinimapPositionStep);
+                BitField.WriteFloat(value.posZ, 0f, SyncRanges.PositionXZMax, SyncRanges.MinimapPositionStep);
+                BitField.WriteBool(value.marked);
                 indexStart += BitField.Flush();
                 return true;
             }
@@ -56,7 +50,6 @@ namespace Ros.Transport
         {
             if (!EnsInstance.enableBitTransform)
             {
-                if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
                 return new SCMinimapEntity()
                 {
                     entityId = UshortSerializer.Deserialize(data, ref indexStart, invalidIndex),
@@ -69,16 +62,9 @@ namespace Ros.Transport
             }
             else
             {
-                if (invalidIndex - indexStart < 1) throw new Exception("反序列化 SCMinimapEntity 失败：剩余数据不足");
-
-                BitField.SetBuffer(data, indexStart);
-                if (!BitField.ReadBool())
-                {
-                    indexStart += 1;
-                    return null;
-                }
                 if (invalidIndex - indexStart < 7) throw new Exception("反序列化 SCMinimapEntity 失败：剩余数据不足");
 
+                BitField.SetBuffer(data, indexStart);
                 var r = new SCMinimapEntity();
                 r.entityId = (ushort)BitField.ReadInt(0, SyncRanges.EntityIdMax);
                 r.type = new EntityType((EntityCategory)BitField.ReadInt(0, 7), BitField.ReadInt(0, 31));

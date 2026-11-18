@@ -8,25 +8,22 @@ namespace Ros.Transport
         Nearby = 2, // 附近：发送者实体 chat_nearby_radius 米内的玩家
     }
 
-    public class CSChat
+    public struct CSChat
     {
         public int channel;      // ChatChannel
-        public string content = "";
+        public string content;
     }
 
     public struct CSChatSerializer
     {
         public static bool Serialize(CSChat value, byte[] result, ref int indexStart)
         {
-            if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-            if (value == null) return true;
             if (!IntSerializer.Serialize(value.channel, result, ref indexStart)) return false;
             return StringSerializer.Serialize(value.content, result, ref indexStart);
         }
 
         public static CSChat Deserialize(byte[] data, ref int indexStart, int invalidIndex)
         {
-            if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
             return new CSChat()
             {
                 channel = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),

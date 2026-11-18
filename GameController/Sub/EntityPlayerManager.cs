@@ -217,7 +217,6 @@ public class EntityPlayerManager : ClientSubManager
 
     public void OnEntityDisplay(SCEntityDisplayInfo info)
     {
-        if (info == null) return;
         if (!views.TryGetValue(info.entityId, out var view))
         {
             view = CreateView(info);
@@ -260,7 +259,6 @@ public class EntityPlayerManager : ClientSubManager
 
     public void OnEntityAnim(SCEntityAnimInfo info)
     {
-        if (info == null) return;
         if (!views.TryGetValue(info.entityId, out var view) || view == null)
         {
             pendingAnim[info.entityId] = info; // 视图尚未创建：暂存，等首个姿态包建好视图后补应用
@@ -399,7 +397,7 @@ public class EntityPlayerManager : ClientSubManager
         for (int i = 0; i < buffs.Count; i++)
         {
             var b = buffs[i];
-            if (b == null || !view.activeBuffs.Add(b.type)) continue;
+            if (!view.activeBuffs.Add(b.type)) continue;
             var effect = EffectConfig.Get(b.type); // 特效类别/下标取 effect.csv 第 11、12 列
             if (!effect.vfxKind.HasValue) continue;
             if (view.buffVfx.ContainsKey(b.type)) continue;
@@ -544,7 +542,7 @@ public class EntityPlayerManager : ClientSubManager
             bool fogged = false;
             foreach (var b in info.buffs)
             {
-                if (b != null && b.type == (int)EffectType.Fog)
+                if (b.type == (int)EffectType.Fog)
                 {
                     fogged = true;
                     break;

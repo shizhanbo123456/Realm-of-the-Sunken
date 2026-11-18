@@ -1,7 +1,7 @@
 namespace Ros.Transport
 {
     // 客户端 → 服务器：请求 AI 单位表（加载期第 3 步）
-    public class CSLoadingAiUnitRequest
+    public struct CSLoadingAiUnitRequest
     {
     }
 

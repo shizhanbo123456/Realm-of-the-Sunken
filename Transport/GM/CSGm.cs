@@ -1,7 +1,7 @@
 namespace Ros.Transport
 {
     // gm指令载荷：type = 配表主键；i 装 int/bool，v0~v2 装 float 或 Vector2/Vector3 分量
-    public class CSGm
+    public struct CSGm
     {
         public int type;
         public int i;
@@ -14,8 +14,6 @@ namespace Ros.Transport
     {
         public static bool Serialize(CSGm value, byte[] result, ref int indexStart)
         {
-            if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-            if (value == null) return true;
             if (!IntSerializer.Serialize(value.type, result, ref indexStart)) return false;
             if (!IntSerializer.Serialize(value.i, result, ref indexStart)) return false;
             if (!FloatSerializer.Serialize(value.v0, result, ref indexStart)) return false;
@@ -25,7 +23,6 @@ namespace Ros.Transport
 
         public static CSGm Deserialize(byte[] data, ref int indexStart, int invalidIndex)
         {
-            if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
             return new CSGm()
             {
                 type = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),

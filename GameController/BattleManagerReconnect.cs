@@ -99,7 +99,7 @@ public partial class BattleManager
     // 技能栏快照：槽位技能 + cd 根戳，只在槽位改变 / 释放成功 / 技能表变化时推一次
     private void SendSkillRecharge(int clientId)
     {
-        var info = new SCSkillRecharge();
+        var info = new SCSkillRecharge { skillIds = new List<int>(), roots = new List<float>() };
         if (PlayerEntityId.TryGetValue(clientId, out var entityId))
         {
             var entity = GetEntity(entityId);

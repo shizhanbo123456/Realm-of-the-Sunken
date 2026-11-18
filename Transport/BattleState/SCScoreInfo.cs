@@ -1,6 +1,6 @@
 namespace Ros.Transport
 {
-    public class SCScoreInfo
+    public struct SCScoreInfo
     {
         public int gameState;
         public float attackScore;
@@ -16,8 +16,6 @@ namespace Ros.Transport
     {
         public static bool Serialize(SCScoreInfo value, byte[] result, ref int indexStart)
         {
-            if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-            if (value == null) return true;
             if (!IntSerializer.Serialize(value.gameState, result, ref indexStart)) return false;
             if (!FloatSerializer.Serialize(value.attackScore, result, ref indexStart)) return false;
             if (!FloatSerializer.Serialize(value.defenseScore, result, ref indexStart)) return false;
@@ -30,7 +28,6 @@ namespace Ros.Transport
 
         public static SCScoreInfo Deserialize(byte[] data, ref int indexStart, int invalidIndex)
         {
-            if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
             return new SCScoreInfo()
             {
                 gameState = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),

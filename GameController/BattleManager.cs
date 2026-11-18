@@ -334,7 +334,7 @@ public partial class BattleManager : EnsBehaviour
             NotifyPlayerOnline(clientId); // 同一令牌再次进房 = 断线重连，数据都还在，只需补发
             return;
         }
-        NormalizeName(info, clientId);
+        NormalizeName(ref info, clientId);
         if (info.aiTakeover) AiClients.Add(clientId); // 连接时已声明 AI 接管：记进会话，出战与复活都按它恢复
         PlayerInfoList[clientId] = info;
         PlayerCamps[clientId] = PlayerCampType.Spectator; // 进入大厅默认观战方
@@ -347,7 +347,7 @@ public partial class BattleManager : EnsBehaviour
     }
 
     // 名字按字符数裁剪：超上限截断，不足下限用默认名兜底（客户端已有同样限制，这里防绕过）
-    private static void NormalizeName(CSLobbyPlayerInfo info, int clientId)
+    private static void NormalizeName(ref CSLobbyPlayerInfo info, int clientId)
     {
         int max = GlobalVariable.I(global_variablesEnum.name_length_max);
         int min = GlobalVariable.I(global_variablesEnum.name_length_min);
@@ -434,7 +434,7 @@ public partial class BattleManager : EnsBehaviour
     public void ReceiveLobbyUpdate(int clientId, CSLobbyUpdate update)
     {
         // 加载阶段与对局中都不再接受组队大厅的改动
-        if (update == null || BattleStarted || LoadingStarted || !PlayerInfoList.ContainsKey(clientId)) return;
+        if (BattleStarted || LoadingStarted || !PlayerInfoList.ContainsKey(clientId)) return;
 
         // 选队（0 进攻 / 1 防守 / 2 观战；进入大厅默认观战，不存在无阵营状态），真人名额满则保持原阵营
         if (update.camp == (int)PlayerCampType.Attack && CanJoinCamp(clientId, PlayerCampType.Attack)) PlayerCamps[clientId] = PlayerCampType.Attack;
@@ -636,7 +636,7 @@ public partial class BattleManager : EnsBehaviour
 
     private static string NameOf(int clientId, CSLobbyPlayerInfo info)
     {
-        if (info != null && !string.IsNullOrEmpty(info.name)) return info.name;
+        if (!string.IsNullOrEmpty(info.name)) return info.name;
         return IsRobotToken(clientId)
             ? MessageVariable.F(message_variablesEnum.default_robotName, clientId - ROBOT_TOKEN_BASE + 1)
             : MessageVariable.F(message_variablesEnum.default_playerName, clientId);
@@ -693,6 +693,7 @@ public partial class BattleManager : EnsBehaviour
             attackRobotCount = AttackRobotCount,
             defenseRobotCount = DefenseRobotCount,
             battleStarted = BattleStarted,
+            members = new List<SCLobbyInfo.LobbyMemberInfo>(),
         };
         CollectLobbyMembers(info.members);
         Tool.NetworkManager.SendLobbyInfo(clientId, info);
@@ -732,6 +733,7 @@ public partial class BattleManager : EnsBehaviour
             attackRobotCount = AttackRobotCount,
             defenseRobotCount = DefenseRobotCount,
             battleStarted = BattleStarted,
+            members = new List<SCLobbyInfo.LobbyMemberInfo>(),
         };
         bool changed = AttackRobotCount != lobbySnapshotAttackRobot
             || DefenseRobotCount != lobbySnapshotDefenseRobot
@@ -765,7 +767,6 @@ public partial class BattleManager : EnsBehaviour
     //聊天只转发不存历史；发送方名字/阵营/角色由服务器补齐（客户端不知道别人的）
     public void ReceiveChat(int clientId, CSChat chat)
     {
-        if (chat == null) return;
         var message = BuildChat(clientId, chat.channel, chat.content);
         if (chat.channel == (int)ChatChannel.Nearby)
         {
@@ -804,7 +805,7 @@ public partial class BattleManager : EnsBehaviour
             channel = channel,
             camp = campValue,
             characterIndex = CharacterIndexOf(clientId, campValue),
-            name = info != null ? info.name : "",
+            name = info.name,
             content = content,
         };
     }
@@ -827,7 +828,7 @@ public partial class BattleManager : EnsBehaviour
     // 上行入口：服务器补齐发送者后按阵营广播；真人收回包，人机在服务器侧直接消费
     public void ReceiveQuickMessage(int clientId, CSQuickMessage message)
     {
-        if (message == null || !BattleStarted) return;
+        if (!BattleStarted) return;
         if (!PlayerCamps.TryGetValue(clientId, out var campType)) return;
         if (campType == PlayerCampType.Spectator) return;
         if (message.messageId < 0 || message.messageId > 7) return; // quick_message.csv 只有 0~7
@@ -854,8 +855,6 @@ public partial class BattleManager : EnsBehaviour
 
     public void BroadcastQuickMessage(SCQuickMessage message, EntityCamp camp)
     {
-        if (message == null) return;
-
         foreach (var pair in PlayerInfoList)
         {
             if (RobotClients.Contains(pair.Key)) continue;
@@ -1408,7 +1407,7 @@ public partial class BattleManager : EnsBehaviour
             // 位姿/血量/buff 全无变化就不发整包；全量轮 full 恒真，兼作静止实体的心跳
             if (info.hasTransform || info.hasHealth || info.hasBuffs)
             {
-                FillDisplayVelocity(entity, info);
+                FillDisplayVelocity(entity, ref info);
                 Tool.NetworkManager.SendEntityDisplay(clientId, info);
             }
             // 动画包独立于表现包：表现包被跳过时仍要发，否则本轮末尾清掉 AnimSyncDirty 后这次状态变化就永久丢了
@@ -1431,7 +1430,7 @@ public partial class BattleManager : EnsBehaviour
         });
     }
 
-    private void FillDisplayVelocity(EntityData entity, SCEntityDisplayInfo info)
+    private void FillDisplayVelocity(EntityData entity, ref SCEntityDisplayInfo info)
     {
         if (!info.hasTransform) return; // 不带位姿的包也不带速度，客户端不会拿它外插
         // 位置由物理积分，必须取刚体实际速度：用"意图速度"外插会与权威位置持续漂移；无刚体（不可移动单位）即无速度

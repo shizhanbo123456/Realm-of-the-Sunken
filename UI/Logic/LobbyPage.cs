@@ -49,7 +49,8 @@ public class LobbyPage : PageBase
         Tool.EnvironmentManager.SetTime(GlobalConfig.lobby_env_time); // 固定大厅昼夜，不沿用对局结束时的时刻
         EventManager.AddEvent<SCLobbyInfo>(ClientEvent.OnLobbyInfoUpdate, OnLobbyInfoUpdate);
         // 有缓存立即回显（服务器只在事件时广播，错过就没了）
-        ApplyLobbyInfo(NetworkManager.LatestLobbyInfo);
+        if (NetworkManager.HasLobbyInfo) ApplyLobbyInfo(NetworkManager.LatestLobbyInfo);
+        else ApplyLobbyInfo(new SCLobbyInfo { members = new List<SCLobbyInfo.LobbyMemberInfo>() });
         // 大厅展示真人成员所选角色的场景模型（战斗页 Enter 时会隐藏，故返回大厅需重建）
         if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
             Tool.ClientLogicManager.HomePreview.ResetLobbyView();
@@ -81,26 +82,22 @@ public class LobbyPage : PageBase
         myCamp = PlayerCampType.Spectator;
         myReady = false;
 
-        if (info?.members != null)
+        for (int i = 0; i < info.members.Count; i++)
         {
-            for (int i = 0; i < info.members.Count; i++)
+            var member = info.members[i];
+            // 场景只摆真人所选角色：AI 与未选角色不占锚点
+            if (member.clientId >= 0 && member.characterIndex >= 0)
             {
-                var member = info.members[i];
-                if (member == null) continue;
-                // 场景只摆真人所选角色：AI 与未选角色不占锚点
-                if (member.clientId >= 0 && member.characterIndex >= 0)
-                {
-                    if (member.camp == (int)PlayerCampType.Attack) { attackerIndices.Add(member.characterIndex); humanAttack++; }
-                    else if (member.camp == (int)PlayerCampType.Defense) { defenserIndices.Add(member.characterIndex); humanDefense++; }
-                }
-                if (member.clientId != NetworkManager.LocalToken) continue;
-                myCamp = (PlayerCampType)member.camp;
-                myReady = member.ready;
+                if (member.camp == (int)PlayerCampType.Attack) { attackerIndices.Add(member.characterIndex); humanAttack++; }
+                else if (member.camp == (int)PlayerCampType.Defense) { defenserIndices.Add(member.characterIndex); humanDefense++; }
             }
+            if (member.clientId != NetworkManager.LocalToken) continue;
+            myCamp = (PlayerCampType)member.camp;
+            myReady = member.ready;
         }
 
-        attackRobot = info != null ? info.attackRobotCount : 0;
-        defenseRobot = info != null ? info.defenseRobotCount : 0;
+        attackRobot = info.attackRobotCount;
+        defenseRobot = info.defenseRobotCount;
 
         RefreshCampBlock(panel.m_btn_joinAttack, PlayerCampType.Attack, attackRobot);
         RefreshCampBlock(panel.m_btn_joinDefense, PlayerCampType.Defense, defenseRobot);
@@ -121,11 +118,10 @@ public class LobbyPage : PageBase
     private static int SpectateCount(SCLobbyInfo info)
     {
         int count = 0;
-        if (info?.members == null) return 0;
         for (int i = 0; i < info.members.Count; i++)
         {
             var member = info.members[i];
-            if (member != null && member.camp == (int)PlayerCampType.Spectator) count++;
+            if (member.camp == (int)PlayerCampType.Spectator) count++;
         }
         return count;
     }

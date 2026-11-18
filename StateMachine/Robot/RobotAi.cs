@@ -291,7 +291,7 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
     #region//消息处理
     public void OnQuickMessage(SCQuickMessage message)
     {
-        if (message == null || !Owner.Alive) return;
+        if (!Owner.Alive) return;
         var type = (QuickMessageType)message.messageId;
 
         if (type == QuickMessageType.ReportStatus) return; // AI 自己发的，不处理

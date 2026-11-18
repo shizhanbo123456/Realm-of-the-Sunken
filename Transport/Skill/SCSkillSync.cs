@@ -4,22 +4,19 @@ namespace Ros.Transport
 {
     // 服务器 → 客户端：本人持有技能。full = 全量替换（开局 / 重连补发），false = 增量新增（掉落 / GM）
     // 线上技能 id 按 1 字节下发（id 上界见 SkillType，最大 130），内存里仍是 int 便于配表对齐
-    public class SCSkillSync
+    public struct SCSkillSync
     {
         public bool full;
-        public List<int> skills = new();
+        public List<int> skills;
     }
 
     public struct SCSkillSyncSerializer
     {
         public static bool Serialize(SCSkillSync value, byte[] result, ref int indexStart)
         {
-            if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-            if (value == null) return true;
             if (!BoolSerializer.Serialize(value.full, result, ref indexStart)) return false;
-            int count = value.skills != null ? value.skills.Count : 0;
+            int count = value.skills.Count;
             if (!IntSerializer.Serialize(count, result, ref indexStart)) return false;
-            if (value.skills == null) return true;
             foreach (var skillId in value.skills)
             {
                 if (skillId < 0 || skillId > byte.MaxValue)
@@ -31,10 +28,10 @@ namespace Ros.Transport
 
         public static SCSkillSync Deserialize(byte[] data, ref int indexStart, int invalidIndex)
         {
-            if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
             var r = new SCSkillSync
             {
                 full = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
+                skills = new List<int>(),
             };
             int count = IntSerializer.Deserialize(data, ref indexStart, invalidIndex);
             for (int i = 0; i < count; i++)

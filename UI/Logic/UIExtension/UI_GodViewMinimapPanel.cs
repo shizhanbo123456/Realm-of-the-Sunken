@@ -128,12 +128,11 @@ namespace Ros.UI.Main
         // 逐条落点位：已有该 id 就只更新坐标与收到时间，没有才新建；不做整轮拼装，单包丢失只影响包内几条
         public void OnEntities(SCGodViewEntities chunk)
         {
-            if (!visible || chunk == null || chunk.entries == null) return;
+            if (!visible) return;
             float now = Time.unscaledTime;
             for (int i = 0; i < chunk.entries.Count; i++)
             {
                 var entry = chunk.entries[i];
-                if (entry == null) continue;
                 var view = EnsureEntityView(entry.entityId);
                 if (view == null) continue;
                 view.m_type.selectedIndex = UI_Minimap.PageOf(entry.type.category, entry.type, entry.camp, entry.entityId == ownEntityId, myCamp);
@@ -149,7 +148,7 @@ namespace Ros.UI.Main
 
         public void OnCorals(SCGodViewCorals chunk)
         {
-            if (!visible || chunk == null || chunk.points == null) return;
+            if (!visible) return;
             float now = Time.unscaledTime;
             for (int i = 0; i < chunk.points.Count; i++)
             {
@@ -169,7 +168,7 @@ namespace Ros.UI.Main
         public void OnDetail(SCGodViewEntityDetail info)
         {
             if (!visible) return;
-            if (info == null || info.entityId == 0)
+            if (info.entityId == 0)
             {
                 ClearDetail(); // 实体已消失：收起详情
                 return;
@@ -404,8 +403,7 @@ namespace Ros.UI.Main
         {
             if (m_buff_list == null || m_buff_list.m_list == null) return;
             detailBuffs.Clear();
-            if (info.buffs != null)
-                for (int i = 0; i < info.buffs.Count; i++) detailBuffs.Add(info.buffs[i]);
+            for (int i = 0; i < info.buffs.Count; i++) detailBuffs.Add(info.buffs[i]);
             var list = m_buff_list.m_list;
             list.itemRenderer = (index, obj) =>
                 ((UI_buffItem)obj).Fill(detailBuffs[index].type, detailBuffs[index].level);
@@ -416,13 +414,10 @@ namespace Ros.UI.Main
         private void FillSkills(SCGodViewEntityDetail info)
         {
             detailSkills.Clear();
-            if (info.slotSkills != null)
+            for (int i = 0; i < info.slotSkills.Count; i++)
             {
-                for (int i = 0; i < info.slotSkills.Count; i++)
-                {
-                    var slot = info.slotSkills[i];
-                    detailSkills.Add(new UI_SkillList.Slot(slot.skillId, slot.recharge01 / 100f, slot.store, slot.store < 0));
-                }
+                var slot = info.slotSkills[i];
+                detailSkills.Add(new UI_SkillList.Slot(slot.skillId, slot.recharge01 / 100f, slot.store, slot.store < 0));
             }
             if (m_activeSkillList != null)
             {
@@ -431,11 +426,8 @@ namespace Ros.UI.Main
             }
 
             detailHeldSkills.Clear();
-            if (info.heldSkills != null)
-            {
-                for (int i = 0; i < info.heldSkills.Count && i < DetailSkillCapacity; i++)
-                    detailHeldSkills.Add(new UI_SkillList.Slot(info.heldSkills[i], 1f, 0, true));
-            }
+            for (int i = 0; i < info.heldSkills.Count && i < DetailSkillCapacity; i++)
+                detailHeldSkills.Add(new UI_SkillList.Slot(info.heldSkills[i], 1f, 0, true));
             if (m_skillList != null)
             {
                 m_skillList.itemRenderer = RenderHeldSkillSlot;

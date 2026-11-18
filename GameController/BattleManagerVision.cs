@@ -113,7 +113,6 @@ public partial class BattleManager
     public void ReceiveFreeCamera(int clientId, CSFreeCamera request)
     {
         if (!AtServer || !BattleStarted) return;
-        if (request == null) return;
         if (!PlayerCamps.TryGetValue(clientId, out var camp) || camp != PlayerCampType.Spectator) return;
         if (!visionStates.TryGetValue(clientId, out var state)) return;
         state.freeLook = request.free;

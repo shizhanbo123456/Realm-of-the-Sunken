@@ -31,7 +31,7 @@ public class SettlementManager : ClientSubManager
 
     private void OnScoreUpdate(SCScoreInfo info)
     {
-        if (info == null || info.gameState == 0 || settled) return;
+        if (info.gameState == 0 || settled) return;
         settled = true;
         var result = BuildSettlementResult(info);
         EventManager.TrigEvent(ClientEvent.OnBattleEnd, info.gameState);

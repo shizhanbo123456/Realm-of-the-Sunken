@@ -2,7 +2,7 @@ namespace Ros.Transport
 {
     // 服务器 → 客户端：本人局内进度。等级/经验用于压制与升级抽卡，
     // silver/gold/holo = 三档各自的待抽次数（幸运随 SCCardSeed 下发，不在这里）
-    public class SCPlayerProgress
+    public struct SCPlayerProgress
     {
         public int level;
         public int exp;
@@ -15,8 +15,6 @@ namespace Ros.Transport
     {
         public static bool Serialize(SCPlayerProgress value, byte[] result, ref int indexStart)
         {
-            if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-            if (value == null) return true;
             if (!IntSerializer.Serialize(value.level, result, ref indexStart)) return false;
             if (!IntSerializer.Serialize(value.exp, result, ref indexStart)) return false;
             if (!IntSerializer.Serialize(value.silver, result, ref indexStart)) return false;
@@ -26,7 +24,6 @@ namespace Ros.Transport
 
         public static SCPlayerProgress Deserialize(byte[] data, ref int indexStart, int invalidIndex)
         {
-            if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
             return new SCPlayerProgress()
             {
                 level = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),

@@ -174,6 +174,7 @@ public sealed class AiCommandLine : ClientSubManager
     private int selfHealth;
     private int selfMaxHealth;
     private SCDefensePointProgress guardProgress;
+    private bool hasGuardProgress; // 是否收到过守护点进度（缓存是结构体，靠它区分「未收到」）
 
     private Task<NetworkManager.ConnectResult> connectTask;
     private Action<string> connectReply;
@@ -1183,7 +1184,7 @@ public sealed class AiCommandLine : ClientSubManager
             .Append(" 朝向=").Append(SelfYaw().ToString("0.#"));
 
         builder.Append("\n守护点 ");
-        if (guardProgress == null) builder.Append("未收到");
+        if (!hasGuardProgress) builder.Append("未收到");
         else
         {
             builder.Append("主=").Append(guardProgress.mainHealth)
@@ -1194,7 +1195,7 @@ public sealed class AiCommandLine : ClientSubManager
 
         builder.Append("\n阵营 ");
         var camp = NetworkManager.LatestCampAliveCount;
-        if (camp == null) builder.Append("未收到");
+        if (!NetworkManager.HasCampAliveCount) builder.Append("未收到");
         else
         {
             builder.Append("进攻=").Append(camp.attackerAlive).Append('/').Append(camp.attackerTotal)
@@ -1212,7 +1213,7 @@ public sealed class AiCommandLine : ClientSubManager
 
     private void GuardProgress(Action<string> reply)
     {
-        if (guardProgress == null)
+        if (!hasGuardProgress)
         {
             reply("错误：尚未收到守护点数据");
             return;
@@ -1228,7 +1229,7 @@ public sealed class AiCommandLine : ClientSubManager
     private void CampCount(Action<string> reply)
     {
         var camp = NetworkManager.LatestCampAliveCount;
-        if (camp == null)
+        if (!NetworkManager.HasCampAliveCount)
         {
             reply("错误：尚未收到阵营人数");
             return;
@@ -1333,7 +1334,6 @@ public sealed class AiCommandLine : ClientSubManager
     #region 事件
     private void OnChatMessage(SCChat chat)
     {
-        if (chat == null) return;
         if (chat.senderClientId == NetworkManager.LocalToken) return; // 自己的已在 SendChat 里记录，服务器回送的那份丢掉
         chatLog.Add(new ChatRecord
         {
@@ -1353,7 +1353,6 @@ public sealed class AiCommandLine : ClientSubManager
 
     private void OnBattleEvent(SCBattleEvent e)
     {
-        if (e == null) return;
         string text = ResolveEventText(e);
         if (text == null) return;
         chatLog.Add(new ChatRecord { channel = SystemChannel, kind = "系统", content = text });
@@ -1373,7 +1372,6 @@ public sealed class AiCommandLine : ClientSubManager
 
     private void OnMinimapUpdate(SCMinimapEntity e)
     {
-        if (e == null) return;
         minimap[e.entityId] = e;
         minimapSeen[e.entityId] = Time.time;
     }
@@ -1397,7 +1395,11 @@ public sealed class AiCommandLine : ClientSubManager
         }
     }
 
-    private void OnGuardProgress(SCDefensePointProgress info) => guardProgress = info;
+    private void OnGuardProgress(SCDefensePointProgress info)
+    {
+        guardProgress = info;
+        hasGuardProgress = true;
+    }
 
     private void OnBattleStart(int camp) => hub.Push(AiInterruptKind.BattleStart, "阵营=" + (EntityCamp)camp);
 

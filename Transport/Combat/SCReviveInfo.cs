@@ -1,6 +1,6 @@
 namespace Ros.Transport
 {
-    public class SCReviveInfo
+    public struct SCReviveInfo
     {
         public int deathCount;    // 第几次死亡：客户端查 revive_time.csv 得到复活总时长
         public float progress;    // 本段起点进度：死亡为 0，重连补发为服务器当前进度
@@ -13,8 +13,6 @@ namespace Ros.Transport
     {
         public static bool Serialize(SCReviveInfo value, byte[] result, ref int indexStart)
         {
-            if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-            if (value == null) return true;
             if (!IntSerializer.Serialize(value.deathCount, result, ref indexStart)) return false;
             if (!FloatSerializer.Serialize(value.progress, result, ref indexStart)) return false;
             if (!BoolSerializer.Serialize(value.ready, result, ref indexStart)) return false;
@@ -24,7 +22,6 @@ namespace Ros.Transport
 
         public static SCReviveInfo Deserialize(byte[] data, ref int indexStart, int invalidIndex)
         {
-            if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
             return new SCReviveInfo()
             {
                 deathCount = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),

@@ -4,7 +4,7 @@ namespace Ros.Transport
 {
     // 服务器 → 客户端：上帝视角区域内的一批珊瑚（数量最多，单独成流，只带 id 与坐标）
     // 单包条数由 GodViewChunk.CoralCapacity 写死（单包 ≤240B）；客户端逐条按 id 落点，超时清除
-    public class SCGodViewCorals
+    public struct SCGodViewCorals
     {
         public struct Point
         {
@@ -13,17 +13,14 @@ namespace Ros.Transport
             public float posZ;
         }
 
-        public List<Point> points = new();
+        public List<Point> points;
     }
 
     public struct SCGodViewCoralsSerializer
     {
         public static bool Serialize(SCGodViewCorals value, byte[] result, ref int indexStart)
         {
-            if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-            if (value == null) return true;
-
-            int count = value.points != null ? value.points.Count : 0;
+            int count = value.points.Count;
             if (!ByteSerializer.Serialize((byte)count, result, ref indexStart)) return false;
             if (!EnsInstance.enableBitTransform)
             {
@@ -53,7 +50,6 @@ namespace Ros.Transport
 
         public static SCGodViewCorals Deserialize(byte[] data, ref int indexStart, int invalidIndex)
         {
-            if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
             var info = new SCGodViewCorals() { points = new List<SCGodViewCorals.Point>() };
             int count = ByteSerializer.Deserialize(data, ref indexStart, invalidIndex);
             if (!EnsInstance.enableBitTransform)

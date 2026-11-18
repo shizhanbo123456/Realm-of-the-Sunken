@@ -217,7 +217,6 @@ public class ChatPlugin : PageBase
 
     private void OnChatMessage(SCChat chat)
     {
-        if (chat == null) return;
         if (chat.senderClientId == NetworkManager.LocalToken) return; // 自己的已本地回显
         // 阵营频道客户端过滤；GM「敌方对话」开启时放行敌方阵营消息（附近频道已由服务器按距离筛过）
         if (chat.channel == (int)ChatChannel.Camp && chat.camp != GetMyCamp() && !ShowEnemyDialog) return;
@@ -236,7 +235,6 @@ public class ChatPlugin : PageBase
     // 状态上报：协议只带状态、血量、位置与周边敌人数，文本本地拼，统一进阵营频道
     private void OnStateReport(SCStateReport report)
     {
-        if (report == null) return;
         if (report.camp != GetMyCamp() && !ShowEnemyDialog) return; // 与聊天同规则：阵营频道只显示同阵营
 
         bool isSelf = report.senderClientId == NetworkManager.LocalToken; // 自己没有本地回显，靠这条显示
@@ -259,7 +257,6 @@ public class ChatPlugin : PageBase
     // 快捷指令发进阵营频道；chatText 留空的（上报状况）改走 SCStateReport，这里不出条目
     private void OnQuickMessage(SCQuickMessage message)
     {
-        if (message == null) return;
         var cfg = QuickMessageConfig.Get(message.messageId);
         if (string.IsNullOrEmpty(cfg.chatText)) return;
 
@@ -334,7 +331,6 @@ public class ChatPlugin : PageBase
     // 事件类型 → 播报文案：聊天列表里只留纯文本，图标与配色由横幅/飘字承担
     private void OnBattleEvent(SCBattleEvent e)
     {
-        if (e == null) return;
         switch (e.type)
         {
             case SCBattleEvent.Type.PlayerKill:
@@ -439,10 +435,10 @@ public class ChatPlugin : PageBase
             if (loading.Camp == EntityCamp.Defense) return (int)PlayerCampType.Defense;
             return (int)PlayerCampType.Spectator; // 观战方玩家（无战斗实体）
         }
+        if (!NetworkManager.HasLobbyInfo) return (int)PlayerCampType.Spectator;
         var info = NetworkManager.LatestLobbyInfo;
-        if (info == null || info.members == null) return (int)PlayerCampType.Spectator;
-        var member = info.members.Find(m => m != null && m.clientId == NetworkManager.LocalToken);
-        return member != null ? member.camp : (int)PlayerCampType.Spectator;
+        int index = info.members.FindIndex(m => m.clientId == NetworkManager.LocalToken);
+        return index >= 0 ? info.members[index].camp : (int)PlayerCampType.Spectator;
     }
 
     public string GetMyName()

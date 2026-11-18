@@ -33,13 +33,11 @@ public class ClientBattleTimeManager : ClientSubManager
 
     public void OnDayNightSync(SCDayNightInfo info)
     {
-        if (info == null) return;
         Tool.BattleManager.ApplyDayNightSync(info.cycleTime, info.dayDuration, info.nightDuration);
     }
 
     public void OnScoreUpdate(SCScoreInfo info)
     {
-        if (info == null) return;
         LatestScore = info;
         if (info.gameState != 0)
         {
@@ -61,7 +59,7 @@ public class ClientBattleTimeManager : ClientSubManager
 
     private void OnBattleStart(int camp)
     {
-        LatestScore = null;
+        LatestScore = default;
         BattleOver = false;
         running = true;
         // 重连 / 中途进入：起点与剩余时间沿用加载期快照；正常开战从满时长起算

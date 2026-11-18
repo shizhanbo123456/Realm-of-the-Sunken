@@ -24,7 +24,7 @@ namespace Ros.Transport
     }
 
     // 服务器 → 客户端：同阵营的状态上报（真人与人机共用）
-    public class SCStateReport
+    public struct SCStateReport
     {
         public int senderClientId;
         public int state;          // EntityReportState
@@ -39,8 +39,6 @@ namespace Ros.Transport
     {
         public static bool Serialize(SCStateReport value, byte[] result, ref int indexStart)
         {
-            if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-            if (value == null) return true;
             if (!IntSerializer.Serialize(value.senderClientId, result, ref indexStart)) return false;
             if (!IntSerializer.Serialize(value.state, result, ref indexStart)) return false;
             if (!IntSerializer.Serialize(value.healthPercent, result, ref indexStart)) return false;
@@ -52,7 +50,6 @@ namespace Ros.Transport
 
         public static SCStateReport Deserialize(byte[] data, ref int indexStart, int invalidIndex)
         {
-            if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
             var value = new SCStateReport();
             value.senderClientId = IntSerializer.Deserialize(data, ref indexStart, invalidIndex);
             value.state = IntSerializer.Deserialize(data, ref indexStart, invalidIndex);

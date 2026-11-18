@@ -1,10 +1,10 @@
 namespace Ros.Transport
 {
-    public class CSLobbyPlayerInfo
+    public struct CSLobbyPlayerInfo
     {
         public EntityType attackCharacter;
         public EntityType defenseCharacter;
-        public string name = "";
+        public string name;
         public bool aiTakeover; // 该客户端是否由 AI 接管（Home 阶段选定，进房后不可改）
     }
 
@@ -12,8 +12,6 @@ namespace Ros.Transport
     {
         public static bool Serialize(CSLobbyPlayerInfo value, byte[] result, ref int indexStart)
         {
-            if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-            if (value == null) return true;
             if (!EntityTypeSerializer.Serialize(value.attackCharacter, result, ref indexStart)) return false;
             if (!EntityTypeSerializer.Serialize(value.defenseCharacter, result, ref indexStart)) return false;
             if (!StringSerializer.Serialize(value.name, result, ref indexStart)) return false;
@@ -22,7 +20,6 @@ namespace Ros.Transport
 
         public static CSLobbyPlayerInfo Deserialize(byte[] data, ref int indexStart, int invalidIndex)
         {
-            if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
             var info = new CSLobbyPlayerInfo()
             {
                 attackCharacter = EntityTypeSerializer.Deserialize(data, ref indexStart, invalidIndex),

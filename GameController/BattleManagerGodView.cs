@@ -12,7 +12,7 @@ public partial class BattleManager
 
     public void ReceiveGodViewArea(int clientId, CSGodViewArea request)
     {
-        if (!AtServer || !BattleStarted || request == null) return;
+        if (!AtServer || !BattleStarted) return;
 
         // 包围盒必须是有限值且有面积；超出地图的部分按地形口径夹回边界
         if (!IsFinite(request.min) || !IsFinite(request.max)) return;
@@ -32,7 +32,7 @@ public partial class BattleManager
 
     public void ReceiveGodViewEntityDetail(int clientId, CSGodViewEntityDetail request)
     {
-        if (!AtServer || !BattleStarted || request == null) return;
+        if (!AtServer || !BattleStarted) return;
         Tool.NetworkManager.SendGodViewEntityDetail(clientId, BuildGodViewDetail(request.entityId));
     }
 
@@ -75,7 +75,7 @@ public partial class BattleManager
         int total = s_godViewEntities.Count;
         for (int start = 0; start < total; start += capacity)
         {
-            var chunk = new SCGodViewEntities();
+            var chunk = new SCGodViewEntities { entries = new List<SCMinimapEntity>() };
             int end = Mathf.Min(start + capacity, total);
             for (int i = start; i < end; i++) chunk.entries.Add(s_godViewEntities[i]);
             Tool.NetworkManager.SendGodViewEntities(clientId, chunk);
@@ -88,7 +88,7 @@ public partial class BattleManager
         int total = s_godViewCorals.Count;
         for (int start = 0; start < total; start += capacity)
         {
-            var chunk = new SCGodViewCorals();
+            var chunk = new SCGodViewCorals { points = new List<SCGodViewCorals.Point>() };
             int end = Mathf.Min(start + capacity, total);
             for (int i = start; i < end; i++) chunk.points.Add(s_godViewCorals[i]);
             Tool.NetworkManager.SendGodViewCorals(clientId, chunk);
@@ -99,7 +99,12 @@ public partial class BattleManager
     private SCGodViewEntityDetail BuildGodViewDetail(ushort entityId)
     {
         if (!EntityContainer.Entities.TryGetObject(entityId, out var entity) || entity == null)
-            return new SCGodViewEntityDetail();
+            return new SCGodViewEntityDetail
+            {
+                buffs = new List<SCGodViewEntityDetail.Buff>(),
+                slotSkills = new List<SCGodViewEntityDetail.SlotSkill>(),
+                heldSkills = new List<ushort>(),
+            };
         var info = new SCGodViewEntityDetail
         {
             entityId = entity.id,
@@ -109,21 +114,22 @@ public partial class BattleManager
             name = ResolveGodViewName(entity),
             health = Mathf.Max(0, (int)entity.attributes.Health),
             maxHealth = (int)entity.attributes.MaxHealth,
+            buffs = new List<SCGodViewEntityDetail.Buff>(),
+            slotSkills = new List<SCGodViewEntityDetail.SlotSkill>(),
+            heldSkills = new List<ushort>(),
         };
-        if (entity.skillController != null) entity.skillController.FillGodViewSkills(info);
-        FillGodViewBuffs(entity, info);
+        if (entity.skillController != null) entity.skillController.FillGodViewSkills(ref info);
+        FillGodViewBuffs(entity, ref info);
         return info;
     }
 
     // buff 复用实体表现包的同一份数据（effectController 的运行时快照），条数按同一口径截断
-    private static void FillGodViewBuffs(EntityData entity, SCGodViewEntityDetail info)
+    private static void FillGodViewBuffs(EntityData entity, ref SCGodViewEntityDetail info)
     {
         var display = entity.GetDisplayInfo(true);
-        if (display.buffs == null) return;
         int max = SyncRanges.MaxBuffCount; // global_variables.sync_max_buff_count
         foreach (var buff in display.buffs)
         {
-            if (buff == null) continue;
             if (info.buffs.Count >= max) break;
             info.buffs.Add(new SCGodViewEntityDetail.Buff
             {

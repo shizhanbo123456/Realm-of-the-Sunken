@@ -4,18 +4,18 @@ namespace Ros.Transport
 {
     // 服务器 → 客户端：上帝视角下点选的实体详情（一次性快照，不随帧刷新）
     // 技能分两组：技能栏槽位带当前冷却与库存；未装备的持有技能只给 id
-    public class SCGodViewEntityDetail
+    public struct SCGodViewEntityDetail
     {
         public ushort entityId;   // 0 = 实体已不存在（客户端收起详情面板）
         public EntityType type;
         public EntityCamp camp;
         public int level;
-        public string name = "";
+        public string name;
         public int health;
         public int maxHealth;
-        public List<Buff> buffs = new();
-        public List<SlotSkill> slotSkills = new();
-        public List<ushort> heldSkills = new();
+        public List<Buff> buffs;
+        public List<SlotSkill> slotSkills;
+        public List<ushort> heldSkills;
 
         public struct Buff
         {
@@ -35,8 +35,6 @@ namespace Ros.Transport
     {
         public static bool Serialize(SCGodViewEntityDetail value, byte[] result, ref int indexStart)
         {
-            if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-            if (value == null) return true;
             if (!UshortSerializer.Serialize(value.entityId, result, ref indexStart)) return false;
             if (!EntityTypeSerializer.Serialize(value.type, result, ref indexStart)) return false;
             if (!IntSerializer.Serialize((int)value.camp, result, ref indexStart)) return false;
@@ -45,7 +43,7 @@ namespace Ros.Transport
             if (!IntSerializer.Serialize(value.health, result, ref indexStart)) return false;
             if (!IntSerializer.Serialize(value.maxHealth, result, ref indexStart)) return false;
 
-            int buffCount = value.buffs != null ? value.buffs.Count : 0;
+            int buffCount = value.buffs.Count;
             if (!ByteSerializer.Serialize((byte)buffCount, result, ref indexStart)) return false;
             for (int i = 0; i < buffCount; i++)
             {
@@ -53,7 +51,7 @@ namespace Ros.Transport
                 if (!ByteSerializer.Serialize(value.buffs[i].level, result, ref indexStart)) return false;
             }
 
-            int slotCount = value.slotSkills != null ? value.slotSkills.Count : 0;
+            int slotCount = value.slotSkills.Count;
             if (!ByteSerializer.Serialize((byte)slotCount, result, ref indexStart)) return false;
             for (int i = 0; i < slotCount; i++)
             {
@@ -63,7 +61,7 @@ namespace Ros.Transport
                 if (!IntSerializer.Serialize(slot.store, result, ref indexStart)) return false;
             }
 
-            int heldCount = value.heldSkills != null ? value.heldSkills.Count : 0;
+            int heldCount = value.heldSkills.Count;
             if (!ByteSerializer.Serialize((byte)heldCount, result, ref indexStart)) return false;
             for (int i = 0; i < heldCount; i++)
                 if (!UshortSerializer.Serialize(value.heldSkills[i], result, ref indexStart)) return false;
@@ -72,7 +70,6 @@ namespace Ros.Transport
 
         public static SCGodViewEntityDetail Deserialize(byte[] data, ref int indexStart, int invalidIndex)
         {
-            if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
             var info = new SCGodViewEntityDetail()
             {
                 entityId = UshortSerializer.Deserialize(data, ref indexStart, invalidIndex),

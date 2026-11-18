@@ -154,7 +154,7 @@ public partial class BattleManager
         skills.AddSkill(skillId);
         var held = PlayerSkillList(clientId);
         if (!held.Contains(skillId)) held.Add(skillId); // 玩家级持有表同步，死亡复活后仍在
-        var sync = new SCSkillSync { full = false };
+        var sync = new SCSkillSync { full = false, skills = new List<int>() };
         sync.skills.Add(skillId);
         Tool.NetworkManager.SendSkillSync(clientId, sync);
         SendSkillRecharge(clientId); // 新技能若自动进栏，槽位与根戳要一起补
@@ -172,7 +172,7 @@ public partial class BattleManager
         if (skills == null) return;
         skills.SetSkillList(null);
         ClearPlayerSkills(clientId); // 玩家级持有表一起清，否则复活会把技能带回来
-        Tool.NetworkManager.SendSkillSync(clientId, new SCSkillSync { full = true });
+        Tool.NetworkManager.SendSkillSync(clientId, new SCSkillSync { full = true, skills = new List<int>() });
         SendSkillRecharge(clientId);
     }
 

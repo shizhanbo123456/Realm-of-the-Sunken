@@ -763,6 +763,7 @@ public abstract class EntityData : MonoBehaviour
             hasTransform = withTransform,
             hasHealth = withHealth,
             hasBuffs = withBuffs,
+            buffs = new List<SCEntityDisplayInfo.BuffRuntime>(),
         };
         if (withTransform)
         {
@@ -774,7 +775,7 @@ public abstract class EntityData : MonoBehaviour
             info.health = Mathf.RoundToInt(attributes.Health);
             info.maxHealth = Mathf.RoundToInt(attributes.MaxHealth); // 上限随词条变化，跟生命值一起下发
         }
-        if (withBuffs && effectController != null) effectController.FillDisplayInfo(info);
+        if (withBuffs && effectController != null) effectController.FillDisplayInfo(ref info);
         return info;
     }
 

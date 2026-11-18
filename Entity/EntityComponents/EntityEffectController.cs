@@ -699,9 +699,8 @@ public class EntityEffectController
     }
 
     // 按 type 聚合成一条下发：level = 各层等级之和（协议 4bit，超出部分截断，客户端看不到）
-    public void FillDisplayInfo(SCEntityDisplayInfo info)
+    public void FillDisplayInfo(ref SCEntityDisplayInfo info)
     {
-        if (info == null) return;
         foreach (var pair in effects)
         {
             if (pair.Value.Count == 0) continue;

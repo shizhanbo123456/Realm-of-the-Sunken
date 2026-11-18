@@ -148,8 +148,6 @@ public class ClientSkillManager : ClientSubManager
     // 客户端不做命中预测——推演位置与权威位置的偏差会让接触时刻漂移甚至漏判
     private void OnHitFeel(SCHitFeel info)
     {
-        if (info == null) return;
-
         global_variablesEnum key;
         if (info.role == SCHitFeel.RoleVictim)
         {

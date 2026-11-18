@@ -109,7 +109,11 @@ public class EntitySkillController
     // 下发给客户端的快照：槽位技能 + 各自 cd 根戳
     public SCSkillRecharge BuildRecharge()
     {
-        var info = new SCSkillRecharge();
+        var info = new SCSkillRecharge
+        {
+            skillIds = new List<int>(),
+            roots = new List<float>(),
+        };
         if (!slotBarEnabled) return info;
         info.skillIds.AddRange(slotSkills);
         recharge.ExportRoots(slotSkills, info.roots);
@@ -117,7 +121,7 @@ public class EntitySkillController
     }
 
     // 上帝视角详情：技能栏槽位带当前冷却与库存，未装备的持有技能只给 id
-    public void FillGodViewSkills(SCGodViewEntityDetail info)
+    public void FillGodViewSkills(ref SCGodViewEntityDetail info)
     {
         if (slotBarEnabled)
         {

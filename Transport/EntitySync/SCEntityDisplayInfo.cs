@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Ros.Transport
 {
-    public class SCEntityDisplayInfo
+    public struct SCEntityDisplayInfo
     {
         public ushort entityId;
         public EntityType type;
@@ -19,12 +19,12 @@ namespace Ros.Transport
         public bool hasBuffs;    // 本包含有效 buffs（实体 buff 脏标记置位 / 完整同步 / 首见）
         public int health;
         public int maxHealth;
-        public List<BuffRuntime> buffs = new();
+        public List<BuffRuntime> buffs;
 
-        public class BuffRuntime
+        public struct BuffRuntime
         {
             public int type;
-            public int level = 1;
+            public int level;
         }
     }
 
@@ -34,8 +34,6 @@ namespace Ros.Transport
         {
             if (!EnsInstance.enableBitTransform)
             {
-                if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-                if (value == null) return true;
                 if (!UshortSerializer.Serialize(value.entityId, result, ref indexStart)) return false;
                 if (!EntityTypeSerializer.Serialize(value.type, result, ref indexStart)) return false;
                 if (!IntSerializer.Serialize((int)value.camp, result, ref indexStart)) return false;
@@ -52,14 +50,12 @@ namespace Ros.Transport
                 if (value.hasBuffs)
                 {
                     // 与位级一致：按配表上限截断，写出的条数必须与计数一致，否则读端错位
-                    int buffCount = value.buffs != null ? value.buffs.Count : 0;
+                    int buffCount = value.buffs.Count;
                     if (buffCount > SyncRanges.MaxBuffCount) buffCount = SyncRanges.MaxBuffCount;
                     if (!IntSerializer.Serialize(buffCount, result, ref indexStart)) return false;
                     for (int i = 0; i < buffCount; i++)
                     {
                         var buff = value.buffs[i];
-                        if (!BoolSerializer.Serialize(buff != null, result, ref indexStart)) return false;
-                        if (buff == null) continue;
                         if (!IntSerializer.Serialize(buff.type, result, ref indexStart)) return false;
                         if (!IntSerializer.Serialize(buff.level, result, ref indexStart)) return false;
                     }
@@ -73,52 +69,46 @@ namespace Ros.Transport
             }
             else
             {
-                // 位级：1+15+3+5+5+4flag + [health16*2] + [buffCount4+11/buff] + [位姿81]
+                // 位级：15+3+5+5+3flag + [health16*2] + [buffCount4+10/buff] + [位姿81]
                 BitField.SetBuffer(result, indexStart);
-                BitField.WriteBool(value != null);
-                if (value != null)
+                BitField.WriteInt(value.entityId, 0, SyncRanges.EntityIdMax);
+                BitField.WriteInt((int)value.type.category, 0, 7);
+                BitField.WriteInt(value.type.value, 0, 31);
+                BitField.WriteInt((int)value.camp, 0, 31);
+                BitField.WriteBool(value.hasTransform);
+                BitField.WriteBool(value.hasHealth);
+                BitField.WriteBool(value.hasBuffs);
+
+                if (value.hasHealth)
                 {
-                    BitField.WriteInt(value.entityId, 0, SyncRanges.EntityIdMax);
-                    BitField.WriteInt((int)value.type.category, 0, 7);
-                    BitField.WriteInt(value.type.value, 0, 31);
-                    BitField.WriteInt((int)value.camp, 0, 31);
-                    BitField.WriteBool(value.hasTransform);
-                    BitField.WriteBool(value.hasHealth);
-                    BitField.WriteBool(value.hasBuffs);
+                    BitField.WriteInt(value.health, 0, SyncRanges.MaxHealth);
+                    BitField.WriteInt(value.maxHealth, 0, SyncRanges.MaxHealth);
+                }
 
-                    if (value.hasHealth)
+                if (value.hasBuffs)
+                {
+                    // 条数按配表上限截断：写出的条数必须与计数一致，否则读端错位
+                    int buffCount = value.buffs.Count;
+                    if (buffCount > SyncRanges.MaxBuffCount) buffCount = SyncRanges.MaxBuffCount;
+                    BitField.WriteInt(buffCount, 0, SyncRanges.MaxBuffCount);
+                    for (int i = 0; i < buffCount; i++)
                     {
-                        BitField.WriteInt(value.health, 0, SyncRanges.MaxHealth);
-                        BitField.WriteInt(value.maxHealth, 0, SyncRanges.MaxHealth);
+                        var buff = value.buffs[i];
+                        BitField.WriteInt(buff.type, 0, 63);
+                        BitField.WriteInt(buff.level, 0, 15);
                     }
+                }
 
-                    if (value.hasBuffs)
-                    {
-                        // 条数按配表上限截断：写出的条数必须与计数一致，否则读端错位
-                        int buffCount = value.buffs != null ? value.buffs.Count : 0;
-                        if (buffCount > SyncRanges.MaxBuffCount) buffCount = SyncRanges.MaxBuffCount;
-                        BitField.WriteInt(buffCount, 0, SyncRanges.MaxBuffCount);
-                        for (int i = 0; i < buffCount; i++)
-                        {
-                            var buff = value.buffs[i];
-                            BitField.WriteBool(buff != null);
-                            if (buff == null) continue;
-                            BitField.WriteInt(buff.type, 0, 63);
-                            BitField.WriteInt(buff.level, 0, 15);
-                        }
-                    }
-
-                    if (value.hasTransform)
-                    {
-                        BitField.WriteFloat(value.position.x, 0f, SyncRanges.PositionXZMax, SyncRanges.PositionXZStep);
-                        BitField.WriteFloat(value.position.y, 0f, SyncRanges.PositionYMax, SyncRanges.PositionYStep);
-                        BitField.WriteFloat(value.position.z, 0f, SyncRanges.PositionXZMax, SyncRanges.PositionXZStep);
-                        BitField.WriteFloat(value.yaw, 0f, SyncRanges.YawMax, SyncRanges.YawStep);
-                        BitField.WriteFloat(value.velocity.x, -SyncRanges.VelocityXZRange, SyncRanges.VelocityXZRange, SyncRanges.VelocityXZStep);
-                        BitField.WriteFloat(value.velocity.y, -SyncRanges.VelocityYRange, SyncRanges.VelocityYRange, SyncRanges.VelocityYStep);
-                        BitField.WriteFloat(value.velocity.z, -SyncRanges.VelocityXZRange, SyncRanges.VelocityXZRange, SyncRanges.VelocityXZStep);
-                        BitField.WriteFloat(value.yawSpeed, -SyncRanges.YawSpeedRange, SyncRanges.YawSpeedRange, SyncRanges.YawSpeedStep);
-                    }
+                if (value.hasTransform)
+                {
+                    BitField.WriteFloat(value.position.x, 0f, SyncRanges.PositionXZMax, SyncRanges.PositionXZStep);
+                    BitField.WriteFloat(value.position.y, 0f, SyncRanges.PositionYMax, SyncRanges.PositionYStep);
+                    BitField.WriteFloat(value.position.z, 0f, SyncRanges.PositionXZMax, SyncRanges.PositionXZStep);
+                    BitField.WriteFloat(value.yaw, 0f, SyncRanges.YawMax, SyncRanges.YawStep);
+                    BitField.WriteFloat(value.velocity.x, -SyncRanges.VelocityXZRange, SyncRanges.VelocityXZRange, SyncRanges.VelocityXZStep);
+                    BitField.WriteFloat(value.velocity.y, -SyncRanges.VelocityYRange, SyncRanges.VelocityYRange, SyncRanges.VelocityYStep);
+                    BitField.WriteFloat(value.velocity.z, -SyncRanges.VelocityXZRange, SyncRanges.VelocityXZRange, SyncRanges.VelocityXZStep);
+                    BitField.WriteFloat(value.yawSpeed, -SyncRanges.YawSpeedRange, SyncRanges.YawSpeedRange, SyncRanges.YawSpeedStep);
                 }
                 indexStart += BitField.Flush();
                 return true;
@@ -129,7 +119,6 @@ namespace Ros.Transport
         {
             if (!EnsInstance.enableBitTransform)
             {
-                if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
                 var info = new SCEntityDisplayInfo()
                 {
                     entityId = UshortSerializer.Deserialize(data, ref indexStart, invalidIndex),
@@ -138,6 +127,7 @@ namespace Ros.Transport
                     hasTransform = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
                     hasHealth = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
                     hasBuffs = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
+                    buffs = new List<BuffRuntime>(),
                 };
                 if (info.hasHealth)
                 {
@@ -149,8 +139,6 @@ namespace Ros.Transport
                     int buffCount = IntSerializer.Deserialize(data, ref indexStart, invalidIndex);
                     for (int i = 0; i < buffCount; i++)
                     {
-                        bool hasBuff = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex);
-                        if (!hasBuff) { info.buffs.Add(null); continue; }
                         info.buffs.Add(new SCEntityDisplayInfo.BuffRuntime()
                         {
                             type = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
@@ -167,16 +155,11 @@ namespace Ros.Transport
             }
             else
             {
-                if (invalidIndex - indexStart < 1) throw new Exception("反序列化 SCEntityDisplayInfo 失败：剩余数据不足");
+                if (invalidIndex - indexStart < 4) throw new Exception("反序列化 SCEntityDisplayInfo 失败：剩余数据不足");
 
                 BitField.SetBuffer(data, indexStart);
-                if (!BitField.ReadBool())
-                {
-                    indexStart += 1;
-                    return null;
-                }
-
                 var r = new SCEntityDisplayInfo();
+                r.buffs = new List<BuffRuntime>();
                 r.entityId = (ushort)BitField.ReadInt(0, SyncRanges.EntityIdMax);
                 r.type = new EntityType((EntityCategory)BitField.ReadInt(0, 7), BitField.ReadInt(0, 31));
                 r.camp = (EntityCamp)BitField.ReadInt(0, 31);
@@ -195,7 +178,6 @@ namespace Ros.Transport
                     int buffCount = BitField.ReadInt(0, SyncRanges.MaxBuffCount);
                     for (int i = 0; i < buffCount; i++)
                     {
-                        if (!BitField.ReadBool()) { r.buffs.Add(null); continue; }
                         r.buffs.Add(new SCEntityDisplayInfo.BuffRuntime()
                         {
                             type = BitField.ReadInt(0, 63),

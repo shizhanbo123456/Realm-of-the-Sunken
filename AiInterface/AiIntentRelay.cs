@@ -160,7 +160,6 @@ public partial class BattleManager
     // AI 操控意图入口：客户端 → 服务器。首次意图时建转发器并接管该实体
     public void ReceiveAiIntent(int clientId, CSAiIntent intent)
     {
-        if (intent == null) return;
         if (!PlayerEntityId.TryGetValue(clientId, out var entityId)) return;
         if (!EntityContainer.Entities.TryGetObject(entityId, out var entity) || entity == null) return;
         if (entity is not PlayerEntityData player) return;

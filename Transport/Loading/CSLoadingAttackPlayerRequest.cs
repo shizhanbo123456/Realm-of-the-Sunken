@@ -1,7 +1,7 @@
 namespace Ros.Transport
 {
     // 客户端 → 服务器：请求进攻方玩家表（加载期第 1 步）
-    public class CSLoadingAttackPlayerRequest
+    public struct CSLoadingAttackPlayerRequest
     {
     }
 

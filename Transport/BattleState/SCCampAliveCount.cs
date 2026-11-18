@@ -1,7 +1,7 @@
 namespace Ros.Transport
 {
     // 服务器 → 客户端：双方阵营玩家（真人+AI）总人数、存活人数与观战人数，值变更时下发
-    public class SCCampAliveCount
+    public struct SCCampAliveCount
     {
         public int attackerTotal;
         public int defenseTotal;
@@ -14,8 +14,6 @@ namespace Ros.Transport
     {
         public static bool Serialize(SCCampAliveCount value, byte[] result, ref int indexStart)
         {
-            if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-            if (value == null) return true;
             if (!IntSerializer.Serialize(value.attackerTotal, result, ref indexStart)) return false;
             if (!IntSerializer.Serialize(value.defenseTotal, result, ref indexStart)) return false;
             if (!IntSerializer.Serialize(value.attackerAlive, result, ref indexStart)) return false;
@@ -25,7 +23,6 @@ namespace Ros.Transport
 
         public static SCCampAliveCount Deserialize(byte[] data, ref int indexStart, int invalidIndex)
         {
-            if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
             return new SCCampAliveCount()
             {
                 attackerTotal = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),

@@ -1,6 +1,6 @@
 namespace Ros.Transport
 {
-    public class SCBattleEvent
+    public struct SCBattleEvent
     {
         // 事件语义的唯一判别依据；icon 档位与条目版式由客户端按类型映射，不进协议
         public static class Type
@@ -28,8 +28,6 @@ namespace Ros.Transport
     {
         public static bool Serialize(SCBattleEvent value, byte[] result, ref int indexStart)
         {
-            if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-            if (value == null) return true;
             if (!ByteSerializer.Serialize(value.type, result, ref indexStart)) return false;
             if (!IntSerializer.Serialize(value.textId, result, ref indexStart)) return false;
             return IntSerializer.Serialize(value.textId2, result, ref indexStart);
@@ -37,7 +35,6 @@ namespace Ros.Transport
 
         public static SCBattleEvent Deserialize(byte[] data, ref int indexStart, int invalidIndex)
         {
-            if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
             return new SCBattleEvent()
             {
                 type = ByteSerializer.Deserialize(data, ref indexStart, invalidIndex),

@@ -16,7 +16,7 @@ namespace Ros.Transport
     }
 
     // 客户端 → 服务器：senderClientId 由服务器按连接补齐，客户端只给类型与可选位置
-    public class CSQuickMessage
+    public struct CSQuickMessage
     {
         public int messageId;
         public bool hasTargetPosition;
@@ -27,8 +27,6 @@ namespace Ros.Transport
     {
         public static bool Serialize(CSQuickMessage value, byte[] result, ref int indexStart)
         {
-            if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-            if (value == null) return true;
             if (!IntSerializer.Serialize(value.messageId, result, ref indexStart)) return false;
             if (!BoolSerializer.Serialize(value.hasTargetPosition, result, ref indexStart)) return false;
             if (value.hasTargetPosition && !Vector3Serializer.Serialize(value.targetPosition, result, ref indexStart)) return false;
@@ -37,7 +35,6 @@ namespace Ros.Transport
 
         public static CSQuickMessage Deserialize(byte[] data, ref int indexStart, int invalidIndex)
         {
-            if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
             var value = new CSQuickMessage();
             value.messageId = IntSerializer.Deserialize(data, ref indexStart, invalidIndex);
             value.hasTargetPosition = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex);

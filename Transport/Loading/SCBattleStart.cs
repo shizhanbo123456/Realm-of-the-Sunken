@@ -1,7 +1,7 @@
 namespace Ros.Transport
 {
     // 服务器 → 客户端：开始战斗（已加载完成的客户端才收；未完成的观战方完成后补发），客户端据此隐藏加载界面并切页
-    public class SCBattleStart
+    public struct SCBattleStart
     {
     }
 

@@ -1,7 +1,7 @@
 namespace Ros.Transport
 {
     // 服务器 → 客户端：四个守护点的当前血量与人数倍率，与实体可见性无关，值变更时下发
-    public class SCDefensePointProgress
+    public struct SCDefensePointProgress
     {
         public int mainHealth;
         public int sub1Health;
@@ -14,8 +14,6 @@ namespace Ros.Transport
     {
         public static bool Serialize(SCDefensePointProgress value, byte[] result, ref int indexStart)
         {
-            if (!BoolSerializer.Serialize(value != null, result, ref indexStart)) return false;
-            if (value == null) return true;
             if (!IntSerializer.Serialize(value.mainHealth, result, ref indexStart)) return false;
             if (!IntSerializer.Serialize(value.sub1Health, result, ref indexStart)) return false;
             if (!IntSerializer.Serialize(value.sub2Health, result, ref indexStart)) return false;
@@ -25,7 +23,6 @@ namespace Ros.Transport
 
         public static SCDefensePointProgress Deserialize(byte[] data, ref int indexStart, int invalidIndex)
         {
-            if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
             return new SCDefensePointProgress()
             {
                 mainHealth = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),

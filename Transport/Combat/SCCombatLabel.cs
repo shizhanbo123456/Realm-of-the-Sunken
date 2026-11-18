@@ -5,7 +5,7 @@ namespace Ros.Transport
     using UnityEngine;
 
     // 服务器 → 客户端：战斗飘字（伤害/治疗共用；数值与类型分开传，样式由 FGUI 预设档位按类型决定）
-    public class SCCombatLabel
+    public struct SCCombatLabel
     {
         public int amount;       // 本次数值（伤害量或治疗量，不再用正负号编码暴击）
         public int type;         // 飘字类型，见 CombatLabelType
@@ -20,8 +20,6 @@ namespace Ros.Transport
         {
             if (!EnsInstance.enableBitTransform)
             {
-                if (!BoolSerializer.Serialize(label != null, result, ref indexStart)) return false;
-                if (label == null) return true;
                 if (!IntSerializer.Serialize(label.amount, result, ref indexStart)) return false;
                 if (!IntSerializer.Serialize(label.type, result, ref indexStart)) return false;
                 if (!IntSerializer.Serialize(label.targetId, result, ref indexStart)) return false;
@@ -31,21 +29,17 @@ namespace Ros.Transport
             }
             else
             {
-                // 位级：1+20+4+15+1[+15+13+15]=41/84 位
+                // 位级：20+4+15+1[+15+13+15]=40/83 位
                 BitField.SetBuffer(result, indexStart);
-                BitField.WriteBool(label != null);
-                if (label != null)
+                BitField.WriteInt(label.amount, 0, SyncRanges.CombatLabelAmountMax);
+                BitField.WriteInt(label.type, 0, 15);
+                BitField.WriteInt(label.targetId, -1, SyncRanges.EntityIdMax);
+                BitField.WriteBool(label.hasHitPos);
+                if (label.hasHitPos)
                 {
-                    BitField.WriteInt(label.amount, 0, SyncRanges.CombatLabelAmountMax);
-                    BitField.WriteInt(label.type, 0, 15);
-                    BitField.WriteInt(label.targetId, -1, SyncRanges.EntityIdMax);
-                    BitField.WriteBool(label.hasHitPos);
-                    if (label.hasHitPos)
-                    {
-                        BitField.WriteFloat(label.hitPos.x, 0f, SyncRanges.PositionXZMax, SyncRanges.PositionXZStep);
-                        BitField.WriteFloat(label.hitPos.y, 0f, SyncRanges.PositionYMax, SyncRanges.PositionYStep);
-                        BitField.WriteFloat(label.hitPos.z, 0f, SyncRanges.PositionXZMax, SyncRanges.PositionXZStep);
-                    }
+                    BitField.WriteFloat(label.hitPos.x, 0f, SyncRanges.PositionXZMax, SyncRanges.PositionXZStep);
+                    BitField.WriteFloat(label.hitPos.y, 0f, SyncRanges.PositionYMax, SyncRanges.PositionYStep);
+                    BitField.WriteFloat(label.hitPos.z, 0f, SyncRanges.PositionXZMax, SyncRanges.PositionXZStep);
                 }
                 indexStart += BitField.Flush();
                 return true;
@@ -56,7 +50,6 @@ namespace Ros.Transport
         {
             if (!EnsInstance.enableBitTransform)
             {
-                if (!BoolSerializer.Deserialize(data, ref indexStart, invalidIndex)) return null;
                 var d = new SCCombatLabel()
                 {
                     amount = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
@@ -69,15 +62,9 @@ namespace Ros.Transport
             }
             else
             {
-                if (invalidIndex - indexStart < 1) throw new Exception("反序列化 SCCombatLabel 失败：剩余数据不足");
+                if (invalidIndex - indexStart < 5) throw new Exception("反序列化 SCCombatLabel 失败：剩余数据不足");
 
                 BitField.SetBuffer(data, indexStart);
-                if (!BitField.ReadBool())
-                {
-                    indexStart += 1;
-                    return null;
-                }
-
                 var r = new SCCombatLabel();
                 r.amount = BitField.ReadInt(0, SyncRanges.CombatLabelAmountMax);
                 r.type = BitField.ReadInt(0, 15);
