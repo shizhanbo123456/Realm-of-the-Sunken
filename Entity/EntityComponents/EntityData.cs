@@ -438,9 +438,6 @@ public abstract class EntityData : MonoBehaviour
     }
 
     #region//速度
-    // 停步惯性衰减率（1/秒）：v *= e^(-k·dt)，滑行距离 = 初速/k，与帧率无关
-    private const float nav_stop_damping = 6.3f;
-
     private bool declaredForward;
     private float declaredForwardSpeed;
     private bool declaredHorizontal;
@@ -531,7 +528,8 @@ public abstract class EntityData : MonoBehaviour
         }
         else if (grounded)
         {
-            rb.velocity = baseVel * Mathf.Exp(-nav_stop_damping * deltaTime) + hitbackVelocity;
+            // 停步惯性按秒衰减（配表速率，1/秒）：滑行距离 = 初速/速率，与帧率无关
+            rb.velocity = baseVel * Mathf.Exp(-GlobalVariable.F(global_variablesEnum.move_stop_damping) * deltaTime) + hitbackVelocity;
         }
         else
         {

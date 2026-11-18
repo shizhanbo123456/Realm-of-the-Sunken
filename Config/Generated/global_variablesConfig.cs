@@ -158,6 +158,7 @@ namespace Ros.Config
         hitback_friction,
         hitback_threshold_squared,
         hitback_max_speed,
+        move_stop_damping,
         camera_shake_hurt_normal,
         camera_shake_hurt_crit,
         camera_shake_hurt_shield,
