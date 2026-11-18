@@ -19,6 +19,7 @@ public class EntityAnim : MonoBehaviour
     private const string key_doHit = "DoHit";
     private const string key_combo = "Combo";
     private const string key_breakCombo = "BreakCombo";
+    private const string key_breakComboTo = "BreakComboTo";
     public enum CharcterAnimType
     {
         Spear=0,
@@ -68,6 +69,12 @@ public class EntityAnim : MonoBehaviour
         Sword,      // 刀
         DualSword,  // 双刀
     }
+    public enum BreakComboType
+    {
+        Walk=1,
+        Slide=2,
+        Jump=3,
+    }
     private AnimState currentState = AnimState.Motion;
     public AnimState CurrentState
     {
@@ -102,6 +109,7 @@ public class EntityAnim : MonoBehaviour
 
         // 参数包复位：重复 Init（如视图重建）时清掉上一轮残留的持久参数
         paramPack = AnimParamPack.Default;
+        breakComboTo = 0;
         chargeValue = 0f;
         lastCharge = 0f;
         ApplyBaseAnimSpeed(type); // 基础播放倍率取自配表，服务器与客户端都读同一行
@@ -155,6 +163,7 @@ public class EntityAnim : MonoBehaviour
             animator.SetBool(key_moving, paramPack.moving);
             animator.SetBool(key_slide, paramPack.slide);
             animator.SetInteger(key_hit, paramPack.hit);
+            animator.SetInteger(key_breakComboTo, breakComboTo); // 与字段对齐：值比较的前提
         }
     }
     public void SetType(CharcterAnimType type)
@@ -639,13 +648,33 @@ public class EntityAnim : MonoBehaviour
     public void SetAllowCombo(bool value) => AllowCombo = value;
     public void DoCombo() => SetTriggerAll(key_combo);
 
-    // 按下移动键打断当前攻击段：能否打断只看 Forward 是否被屏蔽（普攻连招不屏蔽 Forward）
-    public void BreakCombo()
+    // 打断当前攻击段：能否打断只看该动作自身的屏蔽位（普攻连招段不屏蔽 前/跳/铲）
+    public bool BreakCombo(BreakComboType type)
     {
-        if (currentState != AnimState.Attack) return;
-        if (data == null || data.InputBlocked(InputBlockOp.Forward)) return;
+        if (currentState != AnimState.Attack) return false;
+        if (data == null || data.InputBlocked(BreakBlockOp(type))) return false;
+        SetBreakComboTo(type);
         SetTriggerAll(key_breakCombo);
+        return true;
     }
+
+    // 断到哪个状态：trigger 的附属值，只在发 BreakCombo 前一刻有效，不进参数包、不参与同步
+    private int breakComboTo;
+    private void SetBreakComboTo(BreakComboType type)
+    {
+        int value = (int)type;
+        if (breakComboTo == value) return;
+        breakComboTo = value;
+        SetIntAll(key_breakComboTo, value);
+    }
+
+    private static InputBlockOp BreakBlockOp(BreakComboType type) => type switch
+    {
+        BreakComboType.Walk => InputBlockOp.Forward,
+        BreakComboType.Slide => InputBlockOp.Slide,
+        BreakComboType.Jump => InputBlockOp.Jump,
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "未知打断连击类型"),
+    };
     public void DoHit(bool longHit)
     {
         SetIntParam(ref paramPack.hit, longHit?1:0, key_hit); // 长短受击选择：值未变时不重写，靠 trigger 负责重播

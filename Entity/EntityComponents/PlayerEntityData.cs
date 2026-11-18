@@ -50,7 +50,7 @@ public class PlayerEntityData : EntityData
         SetMoveInput(Vector3.forward);
         if (anim == null) return;
         anim.Move(true);
-        if (newPress) anim.BreakCombo();
+        if (newPress) anim.BreakCombo(EntityAnim.BreakComboType.Walk);
     }
 
     public void StopMove()
@@ -70,10 +70,10 @@ public class PlayerEntityData : EntityData
         }
         if (InputBlocked(InputBlockOp.Jump)) return;
         flyUpHeld = true;
-        if (!flightMode)
-        {
-            Jump();
-        }
+        if (flightMode) return; // 飞行模式没有跳跃状态，跳跃键只当上升长按
+        // 打断连击后由 BreakComboTo 直接把状态机送进跳跃状态，不再发 Jump 触发器
+        if (anim != null && anim.BreakCombo(EntityAnim.BreakComboType.Jump)) return;
+        Jump();
     }
 
     // 滑铲键：按下切进滑铲（时长由动画模块决定），飞行模式下转为下降长按
@@ -86,7 +86,10 @@ public class PlayerEntityData : EntityData
         }
         if (InputBlocked(InputBlockOp.Slide)) return;
         flyDownHeld = true;
-        if (!flightMode && anim != null) anim.DoSlide();
+        if (flightMode) return;
+        if (anim == null) return;
+        if (anim.BreakCombo(EntityAnim.BreakComboType.Slide)) return; // 断连击：滑铲状态由 BreakComboTo 直接进入，不置 Slide
+        anim.DoSlide();
     }
 
     // 设置屏蔽的瞬间立即收手：前后被屏蔽 = 停下，动作键被屏蔽 = 松手（不等下一次输入）
