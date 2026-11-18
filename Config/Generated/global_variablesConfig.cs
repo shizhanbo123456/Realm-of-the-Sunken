@@ -167,5 +167,6 @@ namespace Ros.Config
         camera_shake_max_roll,
         camera_shake_decay,
         camera_shake_frequency,
+        revive_teammate_range,
     }
 }
