@@ -40,7 +40,7 @@ public partial class BattleManager
             spawnTime = now,
             lastTickTime = now,
             spec = spec,
-            lastHitTime = new Dictionary<ushort, float>(),
+            lastHitTime = new Dictionary<uint, float>(),
         });
     }
 
@@ -114,10 +114,11 @@ public partial class BattleManager
                 if (e == null || !e.Alive) continue;
                 if (attack.shooterCategory is not { } shooterCategory) continue; // 无施法者：不结算敌对判定
                 if (e.id == attack.shooter || !EntityCampUtil.IsHostile(shooterCategory, e.camp)) continue;
-                // 同一目标按伤害间隔冷却重复结算；间隔 <=0 时一目标只结算一次
-                if (b.lastHitTime.TryGetValue(e.id, out float lastHit) &&
+                // 同一目标按伤害间隔冷却重复结算：冷却按命中球段各自记录，段与段互不影响；间隔 <=0 时一段只结算一次
+                uint hitKey = ((uint)h << 16) | e.id;
+                if (b.lastHitTime.TryGetValue(hitKey, out float lastHit) &&
                     (spec.interval <= 0f || now - lastHit < spec.interval)) continue;
-                b.lastHitTime[e.id] = now;
+                b.lastHitTime[hitKey] = now;
 
                 // 命中点取上一帧的命中球心：高速弹一帧穿过目标时用当前位置定方向会反转（也是无攻击者时的击退来源）
                 Vector3 floatPos = new Vector3(e.transform.position.x, prevCenter.y, e.transform.position.z);

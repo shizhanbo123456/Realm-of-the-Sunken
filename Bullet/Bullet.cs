@@ -32,7 +32,7 @@ public struct Bullet
     public float spawnTime;
     public float lastTickTime;                    // 上一帧采样时刻（时间戳差值推进，不累加 deltaTime）
     public BulletHitSpec spec;
-    public Dictionary<ushort, float> lastHitTime; // 每目标上次受伤时刻
+    public Dictionary<uint, float> lastHitTime; // 每 (命中球段, 目标) 上次受伤时刻，键 = 段号 << 16 | 实体 id
 
     public readonly float Age(float now) => now - spawnTime;
 
