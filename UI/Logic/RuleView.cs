@@ -65,6 +65,8 @@ public class RuleView : PageBase
         };
 
         tabs.numItems = tipKeys.Count;
+
+        panel.m_contentList.numItems = 1; // 正文容器是列表，唯一元素只用于撑高滚动
     }
 
     private void SelectTip(int index)
@@ -73,7 +75,10 @@ public class RuleView : PageBase
         var tabs = panel.m_rule_buttons;
         for (int i = 0; i < tabs.numChildren; i++)
             tabs.GetChildAt(i).asButton.selected = i == index; // 页签选中态
-        panel.m_rule_content.text = tipTexts[index];
+
+        var item = panel.m_contentList.GetChildAt(0) as UI_RuleContent;
+        item.m_cotent.text = tipTexts[index];
+        panel.m_contentList.scrollPane.posY = 0; // 切页签回到顶部
     }
     #endregion
 }
