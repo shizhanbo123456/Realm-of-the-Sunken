@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using FairyGUI;
 using Ros.Config;
 using Ros.UI.Main;
@@ -18,12 +18,7 @@ public class RuleView : PageBase
         this.panel = panel;
     }
 
-    protected override UiConfig InitConfig() => new UiConfig
-    {
-        Order = UILayer.Dialog,
-        ShowBlackMask = false,
-        ClickOutsideToClose = false,
-    };
+    public override pageEnum PageKey => pageEnum.rule;
 
     protected override void Init()
     {
@@ -44,7 +39,7 @@ public class RuleView : PageBase
 
     private static void CloseSelf()
     {
-        if (Tool.UIManager != null) Tool.UIManager.HidePage(PageId.Rule);
+        if (Tool.UIManager != null) Tool.UIManager.HidePage(pageEnum.rule);
     }
 
     public override void OnResize(float width, float height)

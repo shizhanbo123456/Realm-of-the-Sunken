@@ -20,6 +20,7 @@ namespace Ros.Config
             LoadentityConfig();
             Loadglobal_variablesConfig();
             Loadgm_commandConfig();
+            LoadpageConfig();
             Loadquick_messageConfig();
             Loadrevive_timeConfig();
             Loadsetting_tipsConfig();

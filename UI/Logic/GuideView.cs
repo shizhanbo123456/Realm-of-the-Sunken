@@ -37,12 +37,7 @@ public class GuideView : PageBase
         this.panel = panel;
     }
 
-    protected override UiConfig InitConfig() => new UiConfig
-    {
-        Order = UILayer.Dialog,
-        ShowBlackMask = false,
-        ClickOutsideToClose = false,
-    };
+    public override pageEnum PageKey => pageEnum.guide;
 
     protected override void Init()
     {
@@ -68,7 +63,7 @@ public class GuideView : PageBase
 
     private static void CloseSelf()
     {
-        if (Tool.UIManager != null) Tool.UIManager.HidePage(PageId.Guide);
+        if (Tool.UIManager != null) Tool.UIManager.HidePage(pageEnum.guide);
     }
 
     public override void OnResize(float width, float height)

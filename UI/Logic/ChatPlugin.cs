@@ -49,12 +49,7 @@ public class ChatPlugin : PageBase
         this.panel = panel;
     }
 
-    protected override UiConfig InitConfig() => new UiConfig
-    {
-        Order = UILayer.Chat,
-        ShowBlackMask = false,
-        ClickOutsideToClose = false,
-    };
+    public override pageEnum PageKey => pageEnum.chat;
 
     protected override void Init()
     {

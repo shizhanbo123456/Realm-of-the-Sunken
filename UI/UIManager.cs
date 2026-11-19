@@ -21,15 +21,15 @@ public class UIManager : MonoBehaviour
     private RobotTvPage robotTv;
 
     // 注册表：ShowPage / HidePage 按 id 找页面，排层按 Order
-    private readonly Dictionary<PageId, PageBase> pages = new();
+    private readonly Dictionary<pageEnum, PageBase> pages = new();
     private readonly List<PageBase> pageList = new();
     private readonly List<PageBase> orderBuffer = new();
 
     // GM 面板打开期间接管键盘：角色操控、技能、指令面板、技能选择都不得响应
-    public bool GmOpen => IsPageVisible(PageId.Gm);
+    public bool GmOpen => IsPageVisible(pageEnum.gm);
 
     // 玩法输入归 UI：GM 面板 / 设置 / 规则 / 图鉴 / 正在文字输入框里打字
-    public bool InputCaptured => GmOpen || IsPageVisible(PageId.Settings) || IsPageVisible(PageId.Rule) || IsPageVisible(PageId.Guide) || IsTypingInTextField;
+    public bool InputCaptured => GmOpen || IsPageVisible(pageEnum.settings) || IsPageVisible(pageEnum.rule) || IsPageVisible(pageEnum.guide) || IsTypingInTextField;
 
     private static bool IsTypingInTextField => GRoot.inst != null && GRoot.inst.focus is GTextInput;
 
@@ -43,7 +43,7 @@ public class UIManager : MonoBehaviour
 
     public LobbyPage Lobby => lobby;
 
-    public bool LoadingVisible => IsPageVisible(PageId.Loading);
+    public bool LoadingVisible => IsPageVisible(pageEnum.loading);
 
     private int lastScreenWidth, lastScreenHeight;    // 全局飘字（任意界面可用，屏幕上方居中、随时间上浮、透明度淡入淡出），用 UI_NoticePanel 承载
     private readonly List<FloatingLabel> floatingLabels = new();
@@ -84,31 +84,31 @@ public class UIManager : MonoBehaviour
             robotTv = new RobotTvPage(UI_RobotTV.CreateInstance());
             Settlement = new SettlementView();
 
-            Register(PageId.Home, home);
-            Register(PageId.Lobby, lobby);
-            Register(PageId.Battle, battle);
-            Register(PageId.Chat, chat);
-            Register(PageId.RobotTv, robotTv);
-            Register(PageId.Gm, gm);
-            Register(PageId.Settings, settings);
-            Register(PageId.Rule, rule);
-            Register(PageId.Guide, guide);
-            Register(PageId.Confirm, confirm);
-            Register(PageId.Loading, loading);
+            Register(home);
+            Register(lobby);
+            Register(battle);
+            Register(chat);
+            Register(robotTv);
+            Register(gm);
+            Register(settings);
+            Register(rule);
+            Register(guide);
+            Register(confirm);
+            Register(loading);
 
             // 先全部挂到 GRoot，再统一 Init：Init 里操作显示对象时父节点已就位；层级最后按 Order 排
             for (int i = 0; i < pageList.Count; i++) pageList[i].AttachTo(GRoot.inst);
             for (int i = 0; i < pageList.Count; i++) pageList[i].InitPage();
             Debug.Log($"[UIManager] 页面已初始化：{pageList.Count} 个");
 
-            settings.OnOpenRule = () => ShowPage(PageId.Rule);
-            settings.OnOpenGuide = () => ShowPage(PageId.Guide);
+            settings.OnOpenRule = () => ShowPage(pageEnum.rule);
+            settings.OnOpenGuide = () => ShowPage(pageEnum.guide);
             settings.OnOpenBridge = OpenBridgeConfirm;
             settings.OnExit = ExitFromSettings;
             Settlement.Construct();
 
             // 助理是常驻表现层，开机就显示
-            ShowPage(PageId.RobotTv);
+            ShowPage(pageEnum.robot_tv);
 
             ApplyResize();
             Debug.Log($"[UIManager] 适配完成：屏幕 {Screen.width}x{Screen.height}，面板宽 {home.PanelWidth:0}，缩放 {home.UiScale:0.00}，GRoot {GRoot.inst.width:0}x{GRoot.inst.height:0}");
@@ -161,8 +161,10 @@ public class UIManager : MonoBehaviour
         for (int i = 0; i < pageList.Count; i++) pageList[i].OnResize(width, 1080f);
     }
 
-    private void Register(PageId id, PageBase page)
+    // 主键由界面自己声明（PageKey），这里只做去重与登记
+    private void Register(PageBase page)
     {
+        pageEnum id = page.PageKey;
         if (pages.ContainsKey(id))
             throw new System.InvalidOperationException($"[UI] 页面 {id} 重复注册");
         pages.Add(id, page);
@@ -173,7 +175,7 @@ public class UIManager : MonoBehaviour
 
     #region 显示与层级
     // 唯一的显示入口：同 Order 的页面互斥，先顶掉旧的再显示新的
-    public void ShowPage(PageId id, ShowParam param = null)
+    public void ShowPage(pageEnum id, ShowParam param = null)
     {
         PageBase page = Require(id);
         for (int i = 0; i < pageList.Count; i++)
@@ -187,16 +189,16 @@ public class UIManager : MonoBehaviour
     }
 
     // 唯一的隐藏入口：状态保留，只是不再显示、不再 Update
-    public void HidePage(PageId id)
+    public void HidePage(pageEnum id)
     {
         PageBase page = Require(id);
         if (page.IsVisible) page.Exit();
         ApplyPageOrder();
     }
 
-    public bool IsPageVisible(PageId id) => pages.TryGetValue(id, out var page) && page.IsVisible;
+    public bool IsPageVisible(pageEnum id) => pages.TryGetValue(id, out var page) && page.IsVisible;
 
-    private PageBase Require(PageId id)
+    private PageBase Require(pageEnum id)
     {
         if (!pages.TryGetValue(id, out var page))
             throw new System.InvalidOperationException($"[UI] 页面 {id} 没有注册");
@@ -230,18 +232,18 @@ public class UIManager : MonoBehaviour
     // 切页时收起所有浮层，避免旧遮罩挡住新页面
     private void HideOverlays()
     {
-        HidePage(PageId.Confirm);
-        HidePage(PageId.Settings);
-        HidePage(PageId.Rule);
-        HidePage(PageId.Guide);
+        HidePage(pageEnum.confirm);
+        HidePage(pageEnum.settings);
+        HidePage(pageEnum.rule);
+        HidePage(pageEnum.guide);
     }
     #endregion
 
     #region 加载界面
     // 显示加载界面：每次随机挑一种页面档位，进度条先收起（等 SetLoadingProgress 再显示）
-    public void ShowLoading() => ShowPage(PageId.Loading);
+    public void ShowLoading() => ShowPage(pageEnum.loading);
 
-    public void HideLoading() => HidePage(PageId.Loading);
+    public void HideLoading() => HidePage(pageEnum.loading);
 
     public void SetLoadingProgress(float progress01, string text) => loading.SetProgress(progress01, text);
 
@@ -269,7 +271,7 @@ public class UIManager : MonoBehaviour
     private void EnterHome()
     {
         HideLoading();
-        ShowPage(PageId.Home);
+        ShowPage(pageEnum.home);
         Debug.Log($"[UIManager] 首页已显示：home.visible={home.IsVisible}，children={GRoot.inst.numChildren}");
     }
     #endregion
@@ -294,15 +296,15 @@ public class UIManager : MonoBehaviour
     public void ShowConfirm(string content, Action onConfirm, Action onCancel = null) => confirm.Show(content, onConfirm, onCancel);
 
     // 关闭确认弹窗（不触发任何回调）
-    public void CloseConfirm() => HidePage(PageId.Confirm);
+    public void CloseConfirm() => HidePage(pageEnum.confirm);
 
     // 打开设置：三个页面上的设置按钮都走这里
-    public void OpenSettings() => ShowPage(PageId.Settings);
+    public void OpenSettings() => ShowPage(pageEnum.settings);
 
     // 设置里的「桥接」：只有 Home 能启动；已在跑就只提示；否则关设置 → 二次确认
     private void OpenBridgeConfirm()
     {
-        if (!IsPageVisible(PageId.Home))
+        if (!IsPageVisible(pageEnum.home))
         {
             ShowFlyText(promptEnum.bridge_unavailable);
             return;
@@ -313,7 +315,7 @@ public class UIManager : MonoBehaviour
             return;
         }
 
-        HidePage(PageId.Settings);
+        HidePage(pageEnum.settings);
         ShowConfirm(MessageVariable.V(message_variablesEnum.ui_confirmStartBridge), StartBridge);
     }
 
@@ -333,11 +335,11 @@ public class UIManager : MonoBehaviour
     private void ExitFromSettings()
     {
         string content;
-        if (IsPageVisible(PageId.Battle)) content = MessageVariable.V(message_variablesEnum.ui_confirmQuitBattle);
-        else if (IsPageVisible(PageId.Lobby)) content = MessageVariable.V(message_variablesEnum.ui_confirmLeaveRoom);
+        if (IsPageVisible(pageEnum.battle)) content = MessageVariable.V(message_variablesEnum.ui_confirmQuitBattle);
+        else if (IsPageVisible(pageEnum.lobby)) content = MessageVariable.V(message_variablesEnum.ui_confirmLeaveRoom);
         else return;
 
-        HidePage(PageId.Settings);
+        HidePage(pageEnum.settings);
         ShowConfirm(content, DoExit);
     }
 
@@ -371,14 +373,14 @@ public class UIManager : MonoBehaviour
     private void OnConnect()
     {
         HideOverlays();
-        ShowPage(PageId.Lobby);
-        ShowPage(PageId.Chat); // 联网后聊天面板常驻，大厅与战斗共用
+        ShowPage(pageEnum.lobby);
+        ShowPage(pageEnum.chat); // 联网后聊天面板常驻，大厅与战斗共用
     }
 
     private void OnBattleStart(int camp)
     {
         HideOverlays();
-        ShowPage(PageId.Battle);
+        ShowPage(pageEnum.battle);
     }
 
     private void OnRestartGame() => ReturnToHome();
@@ -392,8 +394,8 @@ public class UIManager : MonoBehaviour
     {
         if (Tool.ClientLogicManager != null) Tool.ClientLogicManager.EntityPlayers.ClearAll();
         HideOverlays();
-        HidePage(PageId.Chat);
-        ShowPage(PageId.Home);
+        HidePage(pageEnum.chat);
+        ShowPage(pageEnum.home);
     }
     #endregion
 }

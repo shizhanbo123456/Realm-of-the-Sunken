@@ -33,12 +33,7 @@ public class HomePage : PageBase
         this.panel = panel;
     }
 
-    protected override UiConfig InitConfig() => new UiConfig
-    {
-        Order = UILayer.Page,
-        ShowBlackMask = false,
-        ClickOutsideToClose = false,
-    };
+    public override pageEnum PageKey => pageEnum.home;
 
     protected override void Init()
     {

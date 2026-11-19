@@ -66,6 +66,7 @@ namespace Ros.Config
             SettingTipsConfig.Bake(this);
             AssistantExpressionConfig.Bake(this);
             GlobalVariable.Bake(this);
+            PageConfig.Bake(this);
             TerrainGeneration.Bake(this);
             GmCommandConfig.Bake(this);
             AiCommandConfig.Bake(this);

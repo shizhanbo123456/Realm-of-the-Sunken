@@ -1,4 +1,5 @@
 ﻿using FairyGUI;
+using Ros.Config;
 using UnityEngine;
 
 // 本机控制模式：Home 阶段可切换，连接服务器时随 CSLobbyPlayerInfo 上报，连上后不允许再改
@@ -40,7 +41,7 @@ public class InputManager : MonoBehaviour
     private void TickGmHotkey()
     {
         if (Tool.UIManager == null) return;
-        if (Tool.UIManager.IsPageVisible(PageId.Gm) || PlayerInputBlocked) { ResetGmPress(); return; }
+        if (Tool.UIManager.IsPageVisible(pageEnum.gm) || PlayerInputBlocked) { ResetGmPress(); return; }
         if (GRoot.inst != null && GRoot.inst.focus is GTextInput) return; // 正在编辑输入框时不响应，避免 V 误开
         if (!Input.GetKeyDown(GmPanelKey)) return;
 
@@ -53,7 +54,7 @@ public class InputManager : MonoBehaviour
 
         if (gmPressCount < GmPanelPressCount) return;
         ResetGmPress();
-        Tool.UIManager.ShowPage(PageId.Gm);
+        Tool.UIManager.ShowPage(pageEnum.gm);
     }
 
     private void ResetGmPress()

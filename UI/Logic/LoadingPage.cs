@@ -1,5 +1,6 @@
 ﻿using FairyGUI;
 using Ros.UI.Main;
+using Ros.Config;
 using UnityEngine;
 
 // 加载界面：最高的显示层级，盖住所有页面
@@ -14,12 +15,7 @@ public class LoadingPage : PageBase
         this.panel = panel;
     }
 
-    protected override UiConfig InitConfig() => new UiConfig
-    {
-        Order = UILayer.Loading,
-        ShowBlackMask = false,
-        ClickOutsideToClose = false,
-    };
+    public override pageEnum PageKey => pageEnum.loading;
 
     // 每次显示随机挑一种页面档位，进度条先收起（等 SetProgress 再显示）
     public override void Enter(ShowParam param)

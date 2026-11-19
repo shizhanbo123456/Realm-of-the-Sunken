@@ -1,6 +1,7 @@
 ﻿using System;
 using FairyGUI;
 using Ros.UI.Main;
+using Ros.Config;
 using UnityEngine;
 
 // 确认弹窗：全屏拦截层已并入 ConfirmPanel 内部，弹窗本体 opaque 吞掉点击。
@@ -17,12 +18,7 @@ public class ConfirmView : PageBase
         this.panel = panel;
     }
 
-    protected override UiConfig InitConfig() => new UiConfig
-    {
-        Order = UILayer.Confirm,
-        ShowBlackMask = false,
-        ClickOutsideToClose = false,
-    };
+    public override pageEnum PageKey => pageEnum.confirm;
 
     protected override void Init()
     {
@@ -55,7 +51,7 @@ public class ConfirmView : PageBase
         if (panel.m_content != null) panel.m_content.text = content;
 
         ApplyTransform();
-        if (Tool.UIManager != null) Tool.UIManager.ShowPage(PageId.Confirm);
+        if (Tool.UIManager != null) Tool.UIManager.ShowPage(pageEnum.confirm);
     }
 
     // 隐藏时清掉回调：取消按钮与外部 CloseConfirm 都不该再触发上一次的操作
@@ -71,14 +67,14 @@ public class ConfirmView : PageBase
     private void OnConfirmClicked()
     {
         var act = onConfirm;
-        if (Tool.UIManager != null) Tool.UIManager.HidePage(PageId.Confirm);
+        if (Tool.UIManager != null) Tool.UIManager.HidePage(pageEnum.confirm);
         if (act != null) act();
     }
 
     private void OnCancelClicked()
     {
         var act = onCancel;
-        if (Tool.UIManager != null) Tool.UIManager.HidePage(PageId.Confirm);
+        if (Tool.UIManager != null) Tool.UIManager.HidePage(pageEnum.confirm);
         if (act != null) act();
     }
 

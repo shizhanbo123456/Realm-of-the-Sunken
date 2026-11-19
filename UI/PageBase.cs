@@ -1,44 +1,10 @@
 ﻿using FairyGUI;
+using Ros.Config;
 using Ros.UI.Main;
 using UnityEngine;
 
-// 界面配置：Order 越大越靠上，同 Order 互斥；后两项控制本次界面复制出的全屏遮罩
-public struct UiConfig
-{
-    public int Order;
-    public bool ShowBlackMask;       // 是否显示黑屏遮罩（PanelBackground 的 black_mask）
-    public bool ClickOutsideToClose; // 点击遮罩（面板外部）是否收起本界面（PanelBackground 的 full_screen_close）
-}
-
-// 显示层级常量：数字越大越靠上；同值的页面互斥（显示新的会顶掉旧的）
-public static class UILayer
-{
-    public const int Page = 10;      // 首页 / 大厅 / 战斗
-    public const int Chat = 20;
-    public const int RobotTv = 25;
-    public const int Gm = 30;
-    public const int Dialog = 40;    // 设置 / 规则 / 图鉴
-    public const int Confirm = 50;
-    public const int Loading = 999;
-}
-
-// 页面标识：UIManager.ShowPage / HidePage 的入参
-public enum PageId
-{
-    Home,
-    Lobby,
-    Battle,
-    Chat,
-    RobotTv,
-    Gm,
-    Settings,
-    Rule,
-    Guide,
-    Confirm,
-    Loading,
-}
-
-// 所有界面的统一基类：生命周期固定为 InitConfig → Init → Enter/Update/Exit → OnResize
+// 所有界面的统一基类：生命周期固定为 PageKey/配表 → Init → Enter/Update/Exit → OnResize
+// 层级与遮罩开关全部读 page 表，代码里不再写界面配置
 public abstract class PageBase
 {
     protected GComponent Root { get; private set; }
@@ -46,9 +12,9 @@ public abstract class PageBase
     // 每个界面创建时复制一份全屏遮罩，挂在 Root 的最底层
     public UI_PanelBackground Mask { get; private set; }
 
-    public UiConfig Config { get; private set; }
+    public page Config { get; private set; }
 
-    public int Order => Config.Order;
+    public int Order => Config.order;
 
     private bool showBlackMask;
     private bool clickOutsideToClose;
@@ -78,12 +44,12 @@ public abstract class PageBase
         Root = root;
     }
 
-    // 由 UIManager 调用一次：先取显示层级，再做一次性初始化
+    // 由 UIManager 调用一次：先按 page 表取配置，再做一次性初始化
     public void InitPage()
     {
-        Config = InitConfig();
-        if (Config.Order == 0) // 层级没填就没法排序，直接暴露出来
-            throw new System.InvalidOperationException($"[UI] {GetType().Name} 的 UiConfig.Order 未设置");
+        Config = PageConfig.Get(PageKey);
+        if (Config.order == 0) // 层级没填就没法排序，直接暴露出来
+            throw new System.InvalidOperationException($"[UI] {GetType().Name} 在 page 表里的层级未填");
         BuildMask();
         Init();
     }
@@ -91,8 +57,8 @@ public abstract class PageBase
     // 由 UIManager 注入：遮罩点击即收起本界面（同 HidePage）
     public void BindOutsideClose(System.Action close) => outsideClose = close;
 
-    // 显示层级：Init 之前调用，只跑一次
-    protected abstract UiConfig InitConfig();
+    // 本界面在 page 表里的主键：Init 之前读，只读一次
+    public abstract pageEnum PageKey { get; }
 
     // 一次性初始化：绑事件、建渲染器（原 Construct）
     protected virtual void Init() { }
@@ -134,8 +100,8 @@ public abstract class PageBase
         Mask = UI_PanelBackground.CreateInstance();
         Root.AddChildAt(Mask, 0);
         Mask.m_full_screen_close.onClick.Set(OnMaskClicked);
-        showBlackMask = Config.ShowBlackMask;
-        clickOutsideToClose = Config.ClickOutsideToClose;
+        showBlackMask = Config.blackMask;
+        clickOutsideToClose = Config.closeOnOutsideClick;
         ApplyMask();
     }
 

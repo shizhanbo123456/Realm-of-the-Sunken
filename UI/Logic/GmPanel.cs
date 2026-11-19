@@ -36,12 +36,7 @@ public class GmPanel : PageBase
         this.panel = panel;
     }
 
-    protected override UiConfig InitConfig() => new UiConfig
-    {
-        Order = UILayer.Gm,
-        ShowBlackMask = false,
-        ClickOutsideToClose = false,
-    };
+    public override pageEnum PageKey => pageEnum.gm;
 
     public bool IsOpen => IsVisible;
 
@@ -91,7 +86,7 @@ public class GmPanel : PageBase
 
     private static void CloseSelf()
     {
-        if (Tool.UIManager != null) Tool.UIManager.HidePage(PageId.Gm);
+        if (Tool.UIManager != null) Tool.UIManager.HidePage(pageEnum.gm);
     }
 
     // 开战：相位由组队期变对局中，各指令的可用时机随之变化 → 重建菜单

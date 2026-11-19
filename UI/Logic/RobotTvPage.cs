@@ -1,5 +1,6 @@
 ﻿using FairyGUI;
 using Ros.UI.Main;
+using Ros.Config;
 using UnityEngine;
 
 // 电视机助理：常驻表现层，表情与台词全部来自 assistant_expression.csv
@@ -16,12 +17,7 @@ public class RobotTvPage : PageBase
         this.panel = panel;
     }
 
-    protected override UiConfig InitConfig() => new UiConfig
-    {
-        Order = UILayer.RobotTv,
-        ShowBlackMask = false,
-        ClickOutsideToClose = false,
-    };
+    public override pageEnum PageKey => pageEnum.robot_tv;
 
     protected override void Init()
     {

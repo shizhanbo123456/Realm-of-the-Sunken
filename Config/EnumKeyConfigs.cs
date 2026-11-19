@@ -57,6 +57,16 @@ namespace Ros.Config
         public static bool B(terrain_generationEnum key) => Get(key).value != 0f;
     }
 
+    // 界面表：层级、黑屏遮罩、点外关闭全部来自 page.xlsx，代码不再写界面配置
+    public static class PageConfig
+    {
+        private static Dictionary<pageEnum, page> map;
+
+        internal static void Bake(ConfigManager m) => map = m.pageData;
+
+        public static page Get(pageEnum key) => ConfigBinary.Require(map, key, "page");
+    }
+
     // 界面文本统一入口：V 取纯文本，F 按 {0} 占位符填充
     public static class MessageVariable
     {

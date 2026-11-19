@@ -1,5 +1,6 @@
 ﻿using FairyGUI;
 using Ros.UI.Main;
+using Ros.Config;
 using UnityEngine;
 
 // 设置子界面：三个页面共用同一份，显隐由 UIManager 统一管理；勾选态不会丢
@@ -22,12 +23,7 @@ public class SettingsView : PageBase
         this.panel = panel;
     }
 
-    protected override UiConfig InitConfig() => new UiConfig
-    {
-        Order = UILayer.Dialog,
-        ShowBlackMask = false,
-        ClickOutsideToClose = false,
-    };
+    public override pageEnum PageKey => pageEnum.settings;
 
     protected override void Init()
     {
@@ -58,7 +54,7 @@ public class SettingsView : PageBase
 
     private static void CloseSelf()
     {
-        if (Tool.UIManager != null) Tool.UIManager.HidePage(PageId.Settings);
+        if (Tool.UIManager != null) Tool.UIManager.HidePage(pageEnum.settings);
     }
 
     // C 键切视角会写回同一个开关，面板常驻不重建，这里每帧把勾选态跟过去
