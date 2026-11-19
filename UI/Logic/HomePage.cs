@@ -137,6 +137,13 @@ public class HomePage : PageBase
 
     private void OnAiConnect(AiRequest request)
     {
+        // 命令行连接必须先接管：aiTakeover 随连接上报，连上后改不了
+        if (!InputManager.IsAiControl)
+        {
+            request.Reply("必须先接管游戏才能用命令行参与游戏");
+            return;
+        }
+
         // 与连接按钮同一条前置：名字不合法不许连
         if (!TrySetPlayerName(ClientSelection.playerName, out int min, out int max))
         {
