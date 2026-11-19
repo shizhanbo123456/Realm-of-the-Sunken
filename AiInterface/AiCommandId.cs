@@ -19,6 +19,7 @@ public static class AiCommandId
     public const int ReadChatMessage = 9;
     public const int QuickMessage = 10;
     public const int QuickMessageWithPosition = 11;
+    public const int ReadEvents = 34;
 
     // 战斗操作
     public const int MoveTo = 12;

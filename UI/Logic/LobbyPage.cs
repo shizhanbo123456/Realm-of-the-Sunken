@@ -19,6 +19,9 @@ public class LobbyPage : PageBase
     private int defenseRobot;  // 防守方人机数量
     private int humanAttack;
     private int humanDefense;
+    private bool aiBound;      // 本页的 AI 命令是否已注册
+    private PlayerCampType lastCamp = PlayerCampType.Spectator; // 上次记进观察记录的阵营
+    private bool lastReady;                                     // 上次记进观察记录的准备状态
 
     public LobbyPage(UI_LobbyPanel panel) : base(panel)
     {
@@ -54,13 +57,100 @@ public class LobbyPage : PageBase
         // 大厅展示真人成员所选角色的场景模型（战斗页 Enter 时会隐藏，故返回大厅需重建）
         if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
             Tool.ClientLogicManager.HomePreview.ResetLobbyView();
+        BindAiCommands();
     }
 
     public override void Exit()
     {
         base.Exit();
         EventManager.RemoveEvent<SCLobbyInfo>(ClientEvent.OnLobbyInfoUpdate, OnLobbyInfoUpdate);
+        ResignAiCommands();
     }
+
+    public override void Shutdown() => ResignAiCommands();
+
+    // 大厅阶段对 AI 开放的四条命令：进出本页时挂/摘
+    private void BindAiCommands()
+    {
+        if (aiBound) return;
+        aiBound = true;
+        AiCommandBus.Bind(AiCommandId.JoinCamp, OnAiJoinCamp);
+        AiCommandBus.Bind(AiCommandId.LobbyPrepare, OnAiPrepare);
+        AiCommandBus.Bind(AiCommandId.ExitRoom, OnAiExitRoom);
+        AiCommandBus.Bind(AiCommandId.SetRobotCount, OnAiSetRobotCount);
+    }
+
+    private void ResignAiCommands()
+    {
+        if (!aiBound) return;
+        aiBound = false;
+        AiCommandBus.Unbind(AiCommandId.JoinCamp, OnAiJoinCamp);
+        AiCommandBus.Unbind(AiCommandId.LobbyPrepare, OnAiPrepare);
+        AiCommandBus.Unbind(AiCommandId.ExitRoom, OnAiExitRoom);
+        AiCommandBus.Unbind(AiCommandId.SetRobotCount, OnAiSetRobotCount);
+    }
+
+    #region AI 命令（与玩家点界面走同一条链路）
+    private void OnAiJoinCamp(AiRequest request)
+    {
+        int camp = request.Int(0);
+        if (camp < 0 || camp > 2)
+        {
+            request.Reject("阵营只能是 0 进攻 / 1 防守 / 2 观战");
+            return;
+        }
+
+        var reject = JoinCamp((PlayerCampType)camp); // 已准备不许改、真人名额不足会被拦
+        if (reject.HasValue)
+        {
+            request.Reject(reject.Value);
+            return;
+        }
+        request.Reply("已选择阵营 " + camp);
+    }
+
+    // 与准备按钮同一个入口：状态不一致时才切，页面里的准备态始终跟着服务器走
+    private void OnAiPrepare(AiRequest request)
+    {
+        bool want = request.Bool(0);
+        if (want != myReady) ToggleReady();
+        request.Reply(want ? "已准备" : "已取消准备");
+    }
+
+    private void OnAiExitRoom(AiRequest request)
+    {
+        DoExitWorld(); // 玩家那条路径会先弹二次确认，AI 直接退
+        request.Reply("已离开房间");
+    }
+
+    private void OnAiSetRobotCount(AiRequest request)
+    {
+        int camp = request.Int(0);
+        int count = request.Int(1);
+        if (camp != 0 && camp != 1)
+        {
+            request.Reject("camp 只能是 0 进攻方 / 1 防守方");
+            return;
+        }
+
+        bool defense = camp == 1;
+        var side = defense ? PlayerCampType.Defense : PlayerCampType.Attack;
+        int limit = RobotLimit(side);
+        if (count < 0 || count > limit)
+        {
+            request.Reject($"{(defense ? "防守" : "进攻")}方机器人数范围 0~{limit}");
+            return;
+        }
+
+        var reject = SetRobotCount(side, count);
+        if (reject.HasValue)
+        {
+            request.Reject(reject.Value);
+            return;
+        }
+        request.Reply($"已设置{(defense ? "防守" : "进攻")}方机器人数 {count}");
+    }
+    #endregion
 
     #region//Local
     private void WireCamp(UI_LobbCampOperation block, PlayerCampType camp)
@@ -99,6 +189,14 @@ public class LobbyPage : PageBase
         attackRobot = info.attackRobotCount;
         defenseRobot = info.defenseRobotCount;
 
+        // 自己的阵营与准备状态也是玩家看得见的，变了就记一条
+        if (myCamp != lastCamp || myReady != lastReady)
+        {
+            lastCamp = myCamp;
+            lastReady = myReady;
+            AiObservation.Report(AiObservation.FlowCategory, $"大厅 阵营={myCamp} 准备={(myReady ? "是" : "否")}");
+        }
+
         RefreshCampBlock(panel.m_btn_joinAttack, PlayerCampType.Attack, attackRobot);
         RefreshCampBlock(panel.m_btn_joinDefense, PlayerCampType.Defense, defenseRobot);
         panel.m_btn_prepare.selected = myReady; // 选中态跟随服务器，避免残留上一局的已准备
@@ -126,8 +224,8 @@ public class LobbyPage : PageBase
         return count;
     }
 
-    // 阵营唯一的切换入口：大厅按钮与 AI 指令共用，返回拦截原因（null = 已提交）
-    public promptEnum? JoinCamp(PlayerCampType camp)
+    // 阵营唯一的切换入口：大厅按钮与 AI 的加入阵营命令共用，返回拦截原因（null = 已提交）
+    private promptEnum? JoinCamp(PlayerCampType camp)
     {
         if (myReady) return promptEnum.cancel_ready_first; // 已准备（含开战倒计时）不允许改阵营：服务器只在准备状态变化时重算开局条件
         if (camp != myCamp && !HasHumanSeat(camp))
@@ -155,12 +253,12 @@ public class LobbyPage : PageBase
     }
 
     // 机器人数上限（global_variables）
-    public static int RobotLimit(PlayerCampType camp) => camp == PlayerCampType.Defense
+    private static int RobotLimit(PlayerCampType camp) => camp == PlayerCampType.Defense
         ? GlobalVariable.I(global_variablesEnum.player_limit_defenser_AI)
         : GlobalVariable.I(global_variablesEnum.player_limit_attacker_AI);
 
-    // 机器人数唯一的写入口：大厅 +/- 与 AI 指令共用，返回拦截原因（null = 已提交）
-    public promptEnum? SetRobotCount(PlayerCampType camp, int count)
+    // 机器人数唯一的写入口：大厅 +/- 与 AI 的设置机器人数命令共用，返回拦截原因（null = 已提交）
+    private promptEnum? SetRobotCount(PlayerCampType camp, int count)
     {
         if (camp != PlayerCampType.Attack && camp != PlayerCampType.Defense)
             throw new System.ArgumentOutOfRangeException(nameof(camp), camp, "只有进攻/防守阵营有机器人数");

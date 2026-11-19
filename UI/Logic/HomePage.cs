@@ -27,6 +27,7 @@ public class HomePage : PageBase
 
     private readonly UI_HomePanel panel;
     private UI_RemanePanel renamePanel; // 改名弹窗：设计自带全屏遮罩，挂 GRoot 置顶
+    private bool aiBound;               // 本页的 AI 命令是否已注册
 
     public HomePage(UI_HomePanel panel) : base(panel)
     {
@@ -69,13 +70,110 @@ public class HomePage : PageBase
         if (renamePanel != null) renamePanel.visible = false;
         if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
             Tool.ClientLogicManager.HomePreview.ResetHomeView();
+
+        BindAiCommands();
     }
 
     public override void Exit()
     {
         base.Exit();
         if (renamePanel != null) renamePanel.visible = false; // 弹窗挂 GRoot，不收起来会留在别的页面上
+        ResignAiCommands();
     }
+
+    public override void Shutdown() => ResignAiCommands();
+
+    // 首页这个阶段只对 AI 开放这四条命令，离开首页就摘掉
+    private void BindAiCommands()
+    {
+        if (aiBound) return;
+        aiBound = true;
+        AiCommandBus.Bind(AiCommandId.SetMyPlayerName, OnAiSetPlayerName);
+        AiCommandBus.Bind(AiCommandId.SelectCharacter, OnAiSelectCharacter);
+        AiCommandBus.Bind(AiCommandId.ConnectToServer, OnAiConnect);
+        AiCommandBus.Bind(AiCommandId.Takeover, OnAiTakeover);
+    }
+
+    private void ResignAiCommands()
+    {
+        if (!aiBound) return;
+        aiBound = false;
+        AiCommandBus.Unbind(AiCommandId.SetMyPlayerName, OnAiSetPlayerName);
+        AiCommandBus.Unbind(AiCommandId.SelectCharacter, OnAiSelectCharacter);
+        AiCommandBus.Unbind(AiCommandId.ConnectToServer, OnAiConnect);
+        AiCommandBus.Unbind(AiCommandId.Takeover, OnAiTakeover);
+    }
+
+    #region AI 命令（与玩家点界面走同一条链路）
+    private void OnAiSetPlayerName(AiRequest request)
+    {
+        if (!TrySetPlayerName(request.Str(0), out int min, out int max))
+        {
+            request.Reject(string.Format(PromptConfig.Get(promptEnum.name_length_invalid).text, min, max));
+            return;
+        }
+        request.Reply("名称已设为 " + ClientSelection.playerName);
+    }
+
+    private void OnAiSelectCharacter(AiRequest request)
+    {
+        int camp = request.Int(0);
+        int index = request.Int(1);
+        if (camp != 0 && camp != 1)
+        {
+            request.Reject("camp 只能是 0 进攻方 / 1 防守方");
+            return;
+        }
+
+        bool defense = camp == 1;
+        int count = defense ? GlobalConfig.defense_character_count : GlobalConfig.attack_character_count;
+        if (index < 0 || index >= count)
+        {
+            request.Reject($"{(defense ? "防守" : "进攻")}方下标范围 0~{count - 1}");
+            return;
+        }
+
+        SelectCharacter(defense, index); // 与「确认选择」同一个落盘入口：切页签、浏览、刷新预览、写 ClientSelection
+        request.Reply($"已选择 进攻={ClientSelection.selectedAttackIndex} 防守={ClientSelection.selectedDefenseIndex}");
+    }
+
+    private void OnAiConnect(AiRequest request)
+    {
+        // 与连接按钮同一条前置：名字不合法不许连
+        if (!TrySetPlayerName(ClientSelection.playerName, out int min, out int max))
+        {
+            request.Reject(string.Format(PromptConfig.Get(promptEnum.name_length_invalid).text, min, max));
+            return;
+        }
+
+        string ip = request.Str(0);
+        request.Reply("已发起连接：" + (ip.Length == 0 ? "本机" : ip));
+        ConnectAndReport(ip);
+    }
+
+    // 命令行必须当帧返回，连接结果只能事后补一条记录
+    private async void ConnectAndReport(string ip)
+    {
+        try
+        {
+            var result = await ConnectAsync(ip);
+            AiObservation.Report(AiObservation.FlowCategory,
+                result == NetworkManager.ConnectResult.Success ? "连接成功，正在进入房间" : "连接失败：" + result);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError("[AI] 连接异常：" + e.Message);
+            AiObservation.Report(AiObservation.FlowCategory, "连接异常：" + e.Message);
+        }
+    }
+
+    private void OnAiTakeover(AiRequest request)
+    {
+        bool on = request.Bool(0);
+        InputManager.SetControlMode(on ? PlayerControlMode.Ai : PlayerControlMode.Player);
+        request.Reply(on ? "已接管：键鼠与界面点击已屏蔽" : "已解除接管：恢复玩家控制");
+    }
+    #endregion
 
     public override void OnResize(float width, float height)
     {
@@ -108,9 +206,9 @@ public class HomePage : PageBase
 
     private void CloseRename() => renamePanel.visible = false;
 
-    // 玩家名唯一的落盘入口：改名弹窗、连接前校验、AI 指令都走这里
+    // 玩家名唯一的落盘入口：改名弹窗、连接前校验、AI 的改名命令都走这里
     // 返回 false 表示长度不合法，min/max 是配表区间，供调用方提示
-    public bool TrySetPlayerName(string rawName, out int min, out int max)
+    private bool TrySetPlayerName(string rawName, out int min, out int max)
     {
         min = GlobalVariable.I(global_variablesEnum.name_length_min);
         max = GlobalVariable.I(global_variablesEnum.name_length_max);
@@ -250,9 +348,9 @@ public class HomePage : PageBase
             Tool.UIManager.ShowFlyText(promptEnum.character_selected, panel.m_label_character_name.text);
     }
 
-    // 出场选择唯一的落盘入口：首页「确认选择」与 AI 指令都走这里
+    // 出场选择唯一的落盘入口：首页「确认选择」按钮与 AI 的选角命令都走这里
     // 先切到该阵营并浏览到该角色（刷新列表 / 属性 / 场景预览），再落 ClientSelection
-    public void SelectCharacter(bool defense, int index)
+    private void SelectCharacter(bool defense, int index)
     {
         defenseTab = defense;
         Browse(CampOffset + index);
@@ -345,8 +443,8 @@ public class HomePage : PageBase
         await ConnectAsync(panel.m_connectPanel.m_input_ipaddress.m_content.text);
     }
 
-    // 连接唯一的发起入口：连接按钮与 AI 指令共用（名字校验由调用方先走 TrySetPlayerName）
-    public async Task<NetworkManager.ConnectResult> ConnectAsync(string ip)
+    // 连接唯一的发起入口：连接按钮与 AI 的连接命令共用（名字校验由调用方先走 TrySetPlayerName）
+    private async Task<NetworkManager.ConnectResult> ConnectAsync(string ip)
     {
         if (Tool.NetworkManager == null)
             throw new System.InvalidOperationException("[首页] 场景缺少 NetworkManager，无法连接");

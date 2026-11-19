@@ -1072,9 +1072,7 @@ public partial class NetworkManager : EnsBehaviour
     [Rpc]
     private void ClientReceiveAiFeedbackLocal(SCAiFeedback info)
     {
-        var commands = AiCommandLine.Current;
-        if (commands == null) return;
-        commands.OnServerFeedback(info);
+        EventManager.TrigEvent(ClientEvent.OnAiFeedback, info);
     }
     #endregion
 

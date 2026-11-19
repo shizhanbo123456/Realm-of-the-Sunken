@@ -9,9 +9,9 @@ AI 实时操控交互（命令行 + Lua）
   服务器：意图转发 + 行为层，不做任何决策
 
 三条链路：
-  1. 命令行 → 本地 C#（房间流程、聊天、查询类，不联网也能取）
-  2. Lua 状态机 → 本地 C# → 意图上行 → 服务器意图转发器 → 行为层
-  3. 服务器事件 / 用户操作 → 中断原因列表 → ai.interrupts（外部 ai.wait 轮询）
+  1. 命令行 → 事件总线 → 当前阶段的归属方（界面 / BattleManager）→ 玩家同款入口
+  2. Lua 状态机 → 意图事件 / 命令事件 → 上行 → 服务器意图转发器 → 行为层
+  3. 玩家能看到的文本 → 观察缓冲 → readEvents / readChatMessage（外部 ai.wait 轮询中断另算）
 
 行为层复用现有三件套，不新写状态机：
   BehaviorArbiter + IBehaviorHost + IdleBehavior / MoveBehavior / AttackBehavior
@@ -28,6 +28,7 @@ AI 实时操控交互（命令行 + Lua）
   位置只给 XZ（地形是平的），单位米；不传高度，服务器按地面吸附
   朝向为 yaw 度数，0° = +Z，与 PlayerEntityData 的 moveState.yaw 同口径
   昼夜用 BattleManager.CycleTime（0~2 单调，0/2 午夜、1 正午），白天落在 0.5~1.5
+  观察记录里的时间 = 客户端 Time.time（开局计时，秒，两位小数）
 
 交互语义：
   命令一律立即返回（结果作为返回文本），没有阻塞式命令
@@ -35,24 +36,23 @@ AI 实时操控交互（命令行 + Lua）
   移动不做「到达」中断：到没到由 AI 自己查坐标，走不到会收到 MoveFailed
   无命令 = 服务器保持最后一个动作，不设超时兜底
 
-二、命令行：ai_command 配表驱动
+二、命令行：ai_command 配表 + 事件注册
 ----------------------------------------------------
 
 2.1 表结构（Config/Source/ai_command.xlsx，表名 ai_command）
-  列：key / command / commandHelp / home / lobby / battle /
+  列：key / command / commandHelp /
       param1Name / param1Type / param1Desc（param2、param3 同构）
-  home / lobby / battle 为 bool?：填 1 = 该相位可用，留空 = 不可用
   参数类型只允许 int / float / bool / string / List<int>
-  一张表 33 行，主键即命令 id
+  35 行，主键即命令 id；表里不再有 Home/Lobby/Battle 可用性列
 
 2.2 代码接线
   configtool.py 生成 ai_commandConfig.cs + ai_command.bytes，并写入 ConfigManager.LoadAll
   Config/AiCommandConfig（TableConfigs.cs）：content 字典 + ordered（按 key 升序）
-  ConfigManager.InitExtensions 里 Bake，早于 ClientLogicManager.Awake（DefaultExecutionOrder -200）
   AiInterface/AiCommandId.cs：主键常量，配表增删或改 id 时同步改
-  AiCommandLine.RegisterFromConfig：按 ordered 建命令表（名称 / 相位 / 用法串），byName 字典查表
-  AiCommandLine.Dispatch：按 row.key switch 到具体处理函数
-  配表有行但代码没接：返回「错误：命令 id=N 没有对应的处理逻辑」
+  AiInterface/AiEvent.cs：事件 id 契约 + AiRequest 载荷 + AiCommandBus
+  AiCommandLine.RegisterFromConfig：按 ordered 建命令表（名称 / 用法串），byName 字典查表
+  AiCommandLine.Submit：解析 → 参数校验 → 查归属方有没有注册 → 触发命令事件
+  配表有行但没人注册：返回「错误：命令 X 在当前阶段不可用」
 
 2.3 参数规则
   全部在客户端校验，类型或个数不对直接本地拦截，不发服务器
@@ -62,36 +62,49 @@ AI 实时操控交互（命令行 + Lua）
   List<int>：吃掉剩余全部 token，空格或分号分隔，允许为空
   命令名大小写敏感
 
-2.4 相位
-  Offline = 未连上服务器（Home）
-  Lobby   = 已连上、战斗未开始
-  Battle  = 战斗进行中
-  用错相位返回「错误：命令 X 在当前相位 Y 不可用」
+2.4 可用性 = 事件有没有归属方
+  命令事件 id = AiEvent.CommandBase(20000) + ai_command 主键
+  谁掌握这条链路，谁就在自己的生命周期里 AiCommandBus.Bind / Unbind
+  没有订阅 = 当前阶段不提供这条命令，listCommands 也不会列它
+  注册归属：
+    HomePage      进出首页        setMyPlayerName / selectCharacter / connectToServer / takeover
+    LobbyPage     进出大厅        joinCamp / lobbyPrepare / exitRoom / setRobotCount
+    ChatPlugin    进出聊天面板    sendChatMessage
+    BattlePage    进出战斗界面    quickMessage / quickMessageWithPosition / setSkillColumn
+    BattleManager 开战 / 结束     moveTo / collectCoral / castSkill / calculatePath
+                                  startLuaStateMachine / stopLuaStateMachine
+                                  getSkillList / getInfo / currentPos / getSelfStatus
+                                  getGuardProgress / getMinimapEntities / getDayNightInfo
+                                  getCampCount / getPointInfo / setCameraRender / screenshot
+    AiCommandLine 常驻            getMyPlayerName / readChatMessage / readEvents
+                                  reloadLuaCommand / execLuaCommand / listCommands
+  同一命令同时只能有一个归属方：重复注册当场抛 InvalidOperationException
 
-2.5 命令清单（33 条，参数见括号）
-  Home（Offline）
+2.5 命令清单（35 条，参数见括号）
+  首页（进入首页期间可用）
     setMyPlayerName(name:string)      设置本地玩家名称
-    getMyPlayerName()                 读取本地玩家名称（三相位都可用）
     selectCharacter(camp:int,index:int) camp 0 进攻 / 1 防守，index 为该侧角色下标
-    connectToServer(ip:string)        连接服务器，ip 必填
+    connectToServer(ip:string)        连接服务器，ip 必填；立刻返回，结果进观察记录
     takeover(enabled:bool)            true = AI 接管并锁本地输入，false = 还给人
-  Lobby
+  大厅
     joinCamp(camp:int)                0 进攻 / 1 防守 / 2 观战
-    lobbyPrepare(prepared:bool)       准备 / 取消准备
+    lobbyPrepare(prepared:bool)       准备 / 取消准备（与准备按钮同一条链路）
     exitRoom()                        离开房间
-  通讯（Lobby + Battle）
-    sendChatMessage(channel:int,message:string)  0 全频道 / 1 阵营 / 2 附近
+    setRobotCount(camp:int,count:int) 设置该阵营机器人数
+  通讯
+    sendChatMessage(channel:int,message:string)  0 全频道 / 1 阵营 / 2 附近（聊天面板开着才可用）
     readChatMessage(channel:int,count:int)       0 全部 / 1 阵营 / 2 附近 / 3 系统
+    readEvents(count:int)            全部观察记录（聊天 + 提示 + 战斗横幅 + 流程）
     quickMessage(messageId:int)                  对应 quick_message 主键 0~7
     quickMessageWithPosition(messageId:int,x:float,z:float)
-  Battle 操作
+  战斗操作
     moveTo(x:float,z:float)
     collectCoral()                    攻击小地图上最近的珊瑚
     castSkill(skillId:int)            走 CSAiSkillCast 专用通道
     calculatePath(x:float,z:float)    客户端 NavMesh 预估
     startLuaStateMachine()            激活即整份重载拓展脚本 + 状态机脚本
     stopLuaStateMachine()             停决策并下发一次站立
-  Battle 查询
+  战斗查询
     getSkillList()                    槽位 + 冷却进度 + 库存
     setSkillColumn(skillIds:List<int>) 服务器校验后回推快照，空列表 = 清空
     getInfo()                         自身 / 守护点 / 阵营人数 / 昼夜 / 小地图条数
@@ -104,20 +117,43 @@ AI 实时操控交互（命令行 + Lua）
     getPointInfo()                    守护点 / 防御塔 / 中立雕像 / 出生点
     setCameraRender(enabled:bool)     相机渲染开关
     screenshot()                      存到 <项目根>/Screenshots
-  Lua（三相位都可用）
+  常驻
+    getMyPlayerName()                 读取本地玩家名称
     reloadLuaCommand()                只重载 extensions.lua，不动状态机
     execLuaCommand(command:string,args:string)
-    listCommands()                    当前相位可用命令 + lua 拓展命令名
+    listCommands()                    当前可用命令 + lua 拓展命令名
 
 2.6 错误口径
   空命令        → 错误：空命令
   未知命令      → 错误：未知命令 X（用 listCommands 查看）
-  相位不符      → 错误：命令 X 在当前相位 Y 不可用
+  阶段不符      → 错误：命令 X 在当前阶段不可用
   参数个数不符  → 错误：参数数量不符，用法 <command> <name>:<type>…
   参数类型不符  → 错误：参数 X 必须是 Y
   业务前置不满足→ 错误：未联网 / 没有战斗会话 / 本地玩家实体未就绪 等
 
-三、对外入口（StreamingAssets/AiCmd）
+三、观察记录（玩家看到什么，AI 就记什么）
+----------------------------------------------------
+
+结构：
+  AiObservation = 客户端时间 + 分类 + 频道（仅聊天）+ 文本 + 是否自己发的
+  落在 AiObservationLog 环形缓冲，容量 400 条，满了丢最老的
+  AI 只记录玩家在界面上确实能看到的东西，不做任何额外加工
+
+生产者（都由界面在自己的渲染路径上顺手转发）：
+  ChatPlugin    每写一条聊天（自己发的、收到的、状态上报、快捷消息、系统消息）→ AiObservation.ReportChat
+                阵营频道的过滤按玩家看到的结果走，敌方消息默认不进记录
+  BattlePage    特殊技能播报 banner（聊天页签明确跳过的那类）→ AiObservation.Report(战斗)
+  UIManager     所有飘字（ShowFlyText）→ AiObservation.Report(提示)
+  HomePage      连接结果（成功 / 失败 / 异常）→ AiObservation.Report(流程)
+
+输出格式（readEvents / readChatMessage 每行一条，时间在前）：
+  [12.34][全局][进攻]张三: 集合
+  [13.02][系统]天黑
+  [14.10]技能还没冷却完
+  readChatMessage 只取分类「聊天」并按 channel 过滤；readEvents 取全部
+  白天黑夜、击杀播报这类走聊天面板的系统消息页签，所以分类也是「聊天」、channel = 3
+
+四、对外入口（StreamingAssets/AiCmd）
 ----------------------------------------------------
 
 传输：本机 TCP 127.0.0.1:21928（runtime-bridge，随游戏自动开服，ini 在
@@ -140,7 +176,12 @@ AI 实时操控交互（命令行 + Lua）
   bat 必须 CRLF、正文纯 ASCII；中文只作为命令行参数传入
   退出码：0 正常（含超时）/ 1 连接或调用失败 / 2 参数错误
 
-四、Lua 接口
+桥的限制（决定了命令行的写法）：
+  一问一答：一次调用必须当场返回一句文本，桥没有服务端推送通道，等消息只能靠 wait 轮询
+  命令在主线程执行、回包也在主线程同步写出：任何等后续帧 / 等服务器回包的写法都会让那帧卡住
+  所以命令行处理器里不许出现 await、不许等异步结果；连接这类有结果的流程改成「立刻回一句 + 事后记一条观察」
+
+五、Lua 接口
 ----------------------------------------------------
 
 环境：
@@ -151,7 +192,7 @@ AI 实时操控交互（命令行 + Lua）
   脚本抛错 → LogError + LuaError 中断 + 停状态机 + 下发一次站立
 
 ai 表（读：零成本，可每帧调）
-  phase() / connected() / self_id() / self_camp() / self_alive()
+  can(command) / connected() / self_id() / self_camp() / self_alive()
   self_hp() / self_max_hp() / self_x() / self_z() / self_yaw()
   buff_count() / buff(i)
   map_count()（顺带刷新缓存）/ map_id(i) / map_cat(i) / map_val(i) / map_camp(i) / map_x(i) / map_z(i) / map_marked(i)
@@ -160,23 +201,23 @@ ai 表（读：零成本，可每帧调）
   guard_progress(index) 0~100 被打掉的血量百分比，index 0 主 / 1~3 副；无数据 -1
   is_night() / cycle_time()（0~2 单调，0/2 午夜、1 正午）
 
-ai 表（写：只在值变化时上行）
-  stand() / stop() / move_to(x,z) / attack(entityId)
-  cast_skill(skillId)        走 CSAiSkillCast，不做技能注册校验
-  signal(messageId) / signal_at(messageId,x,z)   8 种快捷消息，位置可选
+ai 表（写：与命令行同一条链路，当前阶段没注册就返回 false）
+  stand() / stop() / move_to(x,z) / attack(entityId)   走意图事件
+  cast_skill(skillId)        走 castSkill 命令（会校验技能是否注册）
+  signal(messageId) / signal_at(messageId,x,z)         走 quickMessage 系列命令（含 1 秒防刷）
   interrupt(text)            推一条 LuaTrigger 中断
   register_command(name,fn) / command_count() / command_name(i)
 
 去重：移动/站立/攻击同值不重发；自身实体 id 变化（复活换实体）时缓存作废
 
-五、服务器：接管与意图转发
+六、服务器：接管与意图转发
 ----------------------------------------------------
 
 接管来源：
   客户端在 Home 阶段用 takeover 选定控制模式，连接时随 CSLobbyPlayerInfo.aiTakeover 上报
   BattleManager.AddPlayer 按该标记把 clientId 记进会话级 AiClients
   出战与复活置 aiControlled 后立即 new AiIntentRelay（不等第一条意图）
-  进房后不能再改模式（takeover 只在 Offline 相位注册）
+  进房后不能再改模式（takeover 只在首页注册，进大厅即摘掉）
 
 接管效果：
   PlayerEntityData.aiControlled 决定 OnTickMove 走 TickRobotMove 的自动驱动分支
@@ -198,7 +239,7 @@ ai 表（写：只在值变化时上行）
 攻击类不判距离：超距也会放出去，走到射程内是客户端状态机的职责
 无命令 = 行为层「本拍没意见」，保持当前动作，服务器不做超时兜底
 
-六、默认状态机（StreamingAssets/LuaInterface/state_machine.lua）
+七、默认状态机（StreamingAssets/LuaInterface/state_machine.lua）
 ----------------------------------------------------
 
 状态：站立、移动到位置、攻击敌人、逃跑、寻找珊瑚、追击珊瑚、攻击珊瑚
@@ -214,7 +255,7 @@ ai 表（写：只在值变化时上行）
 
 注意：状态机激活期间，命令行的 move_to / collectCoral 会被状态机节拍覆盖；手动控制先 stopLuaStateMachine
 
-七、中断系统
+八、中断系统
 ----------------------------------------------------
 
 结构：
@@ -225,7 +266,7 @@ ai 表（写：只在值变化时上行）
 类型（只有这 6 种）：
   BattleStart   阵营
   BattleEnd     结算状态码
-  ChatMention   发送者、频道、内容（内容里出现 @自己的名字）
+  ChatMention   内容（转发过来的聊天行里出现 @自己的名字，自己发的不算）
   LuaTrigger    Lua 主动 ai.interrupt(text)
   LuaError      脚本名、错误消息
   MoveFailed    坐标、目标
@@ -233,8 +274,9 @@ ai 表（写：只在值变化时上行）
 语义：
   中断只记录，不打断角色当前动作，也不打断 Lua 执行
   外部阻塞等待由 ai.wait（wait.bat）轮询 ai.interrupts 实现，超时文本由脚本侧合成
+  中断与观察记录是两套东西：中断取走就清空、用于「喊醒」，观察记录可回读、用于「回忆」
 
-八、Lua 命令行拓展
+九、Lua 命令行拓展
 ----------------------------------------------------
 
 注册：Lua 侧 ai.register_command(命令名, 处理函数)，处理函数收一整串参数字符串、返回字符串
@@ -243,21 +285,21 @@ ai 表（写：只在值变化时上行）
 枚举：listCommands 末尾会列出已注册的拓展命令名
 报错：拓展命令抛错进 LuaError 中断并作为返回文本，不影响状态机
 
-九、数据来源对照
+十、数据来源对照
 ----------------------------------------------------
 
-连接 / 进房        NetworkManager.TryConnect · EnterWorld · ExitWorld
-阵营 / 准备        NetworkManager.SendLobbyUpdate(CSLobbyUpdate)
+连接 / 进房        HomePage.ConnectAsync → NetworkManager.TryConnect · EnterWorld
+阵营 / 准备        LobbyPage.JoinCamp / ToggleReady / SetRobotCount → CSLobbyUpdate
 选择角色           ClientSelection.selectedAttackIndex / selectedDefenseIndex
 本地玩家名         ClientSelection.playerName
-发送聊天           NetworkManager.SendChat(CSChat{channel, content})，channel 0~2
+发送聊天           ChatPlugin.Submit → NetworkManager.SendChat(CSChat{channel, content})，channel 0~2
 接收聊天           OnChatMessage ← SCChat{senderClientId, channel, camp, characterIndex, name, content}
                    自己的消息服务器不回送，本地补一条（保证收发都有）
-快捷消息           NetworkManager.SendQuickMessage(CSQuickMessage)
+快捷消息           BattlePage.TrySendQuickMessage → NetworkManager.SendQuickMessage(CSQuickMessage)
 技能列表 / 库存    ClientSkillManager.HeldSkills + Recharge.GetCycleProgress / GetStore
 设置技能栏         ClientSkillManager.TrySetActiveSkills → CSSkillSelection → 服务器回推快照
 小地图实体         OnMinimapUpdate ← SCMinimapEntity{entityId, type, camp, posX, posZ, marked}
-                   自建缓存 + minimap_entity_timeout（1.5s）超时剔除
+                   BattleManager 自建缓存 + minimap_entity_timeout（1.5s）超时剔除
 守护点血量         OnDefensePointProgress ← SCDefensePointProgress{main, sub1~3, healthScale}
 本地玩家状态       OnEntityDisplayUpdate ← SCEntityDisplayInfo（血量、buff）
 阵营人数           NetworkManager.LatestCampAliveCount（值变更时下发）
@@ -266,18 +308,17 @@ ai 表（写：只在值变化时上行）
                    Time01 是折返的白天程度，只在 IsDay / DayFactor 内部使用
 点位               TerrainSpawns（主/副守护点、防御塔、中立雕像、双方出生点）
 路径长度           NavMesh.CalculatePath（客户端场景已烘焙，仅预估）
-意图上行           CSAiIntent → NetworkManager.SendAiIntent → 服务器 AiIntentRelay
+意图上行           AiCommandBus.SendIntent → BattleManager.OnAiIntent* → NetworkManager.SendAiIntent → 服务器 AiIntentRelay
 AI 技能释放        CSAiSkillCast → NetworkManager.SendAiSkillCast → ReceiveAiSkillCast
-服务器回执         SCAiFeedback（移动失败）→ AiCommandLine.OnServerFeedback → MoveFailed 中断
+服务器回执         SCAiFeedback（移动失败）→ ClientEvent.OnAiFeedback → AiCommandLine → MoveFailed 中断
 
-十、已知限制
+十一、已知限制
 ----------------------------------------------------
 
-1. 连接/进房的最终结果不回传：connectToServer 立即返回「已发起连接」，成功失败都不是返回值；
-   判断方式是过几秒发一条 lobby 命令，返回「相位不可用」说明还没进房
+1. connectToServer 立即返回「已发起连接」，成功失败都不是返回值；结果写在观察记录里（readEvents 翻「流程」类）
 2. connectToServer 的 ip 必填，没有「省略就走本机」的写法
 3. selectCharacter 是 camp + index：一次只设一侧的角色下标
-4. takeover 只在 Offline 相位可用；接管期间本机键鼠、相机、战斗页快捷键、GM 快捷键全部失效，
+4. takeover 只在首页可用；接管期间本机键鼠、相机、战斗页快捷键、GM 快捷键全部失效，
    FGUI 也不响应点击；解除只能靠 exec takeover false
 5. 攻击不判距离，超距会空放并进冷却
 6. 移动没有「到达」通知，也只在意图变化时下发；失败后同一意图不重发
@@ -285,14 +326,16 @@ AI 技能释放        CSAiSkillCast → NetworkManager.SendAiSkillCast → Rece
 8. 停发命令 = 保持最后一个动作，不会自动停下
 9. 小地图数据有延迟（1.5s 超时剔除），坐标是近似值
 10. 昼夜是 0~2 的周期值，不是 0~1 的百分比；不要拿折返量当进度
+11. 观察记录只覆盖「玩家看得到的文本」，不含伤害飘字与血条；容量 400 条，读不到的已经滚掉了
+12. 命令可用性跟着界面走：回首页、掉线、结算都会把对应命令摘掉，readEvents 里能看到对应流程
 
-十一、实现状态
+十二、实现状态
 ----------------------------------------------------
 
 已完成：
   配表与代码           ai_command.xlsx → ai_commandConfig.cs / ai_command.bytes / LoadAll
-                       AiCommandConfig、AiCommandId、AiCommandLine 表驱动注册与分发
-  命令行               33 条命令，参数按表类型校验，相位与参数数量在本地拦截
+                       AiCommandConfig、AiCommandId、AiEvent（事件契约 + 命令总线）
+  命令行               35 条命令，参数按表类型校验，可用性按事件注册判定
   客户端 Lua           AiLuaInterface：ai 表读写、状态机驱动、拓展命令注册与重载
   默认状态机           StreamingAssets/LuaInterface/state_machine.lua
   服务器转发器         AiIntentRelay + BattleManager.ReceiveAiIntent / ReceiveAiSkillCast
@@ -300,6 +343,7 @@ AI 技能释放        CSAiSkillCast → NetworkManager.SendAiSkillCast → Rece
                        InputManager.PlayerInputBlocked + GRoot.inst.touchable
   协议                 Transport/Ai/CSAiIntent.cs、CSAiSkillCast.cs、SCAiFeedback.cs
                        三条 RPC 已在 NetworkManager.Generated.cs 中（22 / 23 / 53）
+  观察记录             AiObservationLog + 聊天/横幅/提示/流程四类生产者
   外部调用             StreamingAssets/AiCmd：exec / ping / wait + _env / _call.py / wait.py
 
 未做：

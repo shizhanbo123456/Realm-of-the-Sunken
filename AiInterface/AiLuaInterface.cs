@@ -149,10 +149,9 @@ public sealed class AiLuaInterface : ClientSubManager
         }
         if (!sendStand) return;
 
-        if (!AiCommandLine.TrySendIntent(AiIntent.Stand, Vector2.zero, 0, out string error))
-        {
-            Debug.LogError("[AI][Lua] 停止状态机后站立下发失败：" + error);
-        }
+        var request = new AiIntentRequest(Vector2.zero, 0);
+        bool registered = AiCommandBus.SendIntent(AiIntent.Stand, request);
+        if (registered && request.Rejected) Debug.LogError("[AI][Lua] 停止状态机后站立下发失败：" + request.Error);
     }
 
     private bool LoadStateMachine()
@@ -288,18 +287,18 @@ public sealed class AiLuaInterface : ClientSubManager
 
     internal void CopyMinimap()
     {
-        var commands = AiCommandLine.Current;
-        if (commands == null)
+        var battle = Tool.BattleManager;
+        if (battle == null)
         {
             mapBuffer.Clear();
             return;
         }
-        commands.CopyMinimap(mapBuffer);
+        battle.AiCopyMinimap(mapBuffer);
     }
     #endregion
 }
 
-// 暴露给 lua 的 API 表：读状态零成本可每帧调，写动作经去重后上行（攻击意图例外，它是持续出招的节拍）
+// 暴露给 lua 的 API 表：读状态零成本可每帧调，写动作一律走事件总线（与命令行同一条链路）
 public sealed class AiLuaApi
 {
     private readonly AiLuaInterface owner;
@@ -310,10 +309,17 @@ public sealed class AiLuaApi
     private int lastSelfId;
     private bool hasLast;
 
+    private static BattleManager Battle => Tool.BattleManager;
+
     public AiLuaApi(AiLuaInterface owner) { this.owner = owner; }
 
     #region 读：会话与自身
-    public string phase() => AiCommandLine.CurrentPhase.ToString();
+    // 命令在当前阶段是否可用：与命令行同一口径（看有没有归属方注册了这条命令）
+    public bool can(string command)
+    {
+        var line = AiCommandLine.Current;
+        return line != null && line.Can(command);
+    }
 
     public bool connected() => NetworkManager.CanSendWorldCommand;
 
@@ -335,47 +341,23 @@ public sealed class AiLuaApi
         return loading != null && loading.HasSession && loading.OwnEntityId != 0;
     }
 
-    public int self_hp()
-    {
-        var commands = AiCommandLine.Current;
-        return commands != null ? commands.SelfHealth : 0;
-    }
+    public int self_hp() => Battle != null ? Battle.AiSelfHealth : 0;
 
-    public int self_max_hp()
-    {
-        var commands = AiCommandLine.Current;
-        return commands != null ? commands.SelfMaxHealth : 0;
-    }
+    public int self_max_hp() => Battle != null ? Battle.AiSelfMaxHealth : 0;
 
-    public float self_x()
-    {
-        var commands = AiCommandLine.Current;
-        return commands != null && commands.TryGetSelfPos(out Vector3 pos) ? pos.x : 0f;
-    }
+    public float self_x() => Battle != null && Battle.AiTryGetSelfPos(out Vector3 pos) ? pos.x : 0f;
 
-    public float self_z()
-    {
-        var commands = AiCommandLine.Current;
-        return commands != null && commands.TryGetSelfPos(out Vector3 pos) ? pos.z : 0f;
-    }
+    public float self_z() => Battle != null && Battle.AiTryGetSelfPos(out Vector3 pos) ? pos.z : 0f;
 
-    public float self_yaw()
-    {
-        var commands = AiCommandLine.Current;
-        return commands != null ? commands.SelfYaw() : 0f;
-    }
+    public float self_yaw() => Battle != null ? Battle.AiSelfYaw() : 0f;
 
-    public int buff_count()
-    {
-        var commands = AiCommandLine.Current;
-        return commands != null ? commands.SelfBuffs.Count : 0;
-    }
+    public int buff_count() => Battle != null ? Battle.AiSelfBuffs.Count : 0;
 
     public string buff(int index)
     {
-        var commands = AiCommandLine.Current;
-        if (commands == null || index < 0 || index >= commands.SelfBuffs.Count) return "";
-        return commands.SelfBuffs[index];
+        var buffs = Battle != null ? Battle.AiSelfBuffs : null;
+        if (buffs == null || index < 0 || index >= buffs.Count) return "";
+        return buffs[index];
     }
     #endregion
 
@@ -494,9 +476,8 @@ public sealed class AiLuaApi
     // 0~100 = 被打掉的血量百分比（AI 侧口径），-1 = 还没收到守护点数据
     public int guard_progress(int index)
     {
-        var commands = AiCommandLine.Current;
-        if (commands == null || !commands.HasGuardSnapshot) return -1;
-        var info = commands.GuardSnapshot;
+        if (Battle == null || !Battle.AiHasGuardSnapshot) return -1;
+        var info = Battle.AiGuardSnapshot;
         switch (index)
         {
             case 0: return GlobalConfig.GuardPointDamagedPercent(0, info.mainHealth, info.healthScale);
@@ -515,43 +496,23 @@ public sealed class AiLuaApi
     #endregion
 
     #region 写：意图与动作
-    public bool stand() => Send(AiIntent.Stand, Vector2.zero, 0);
+    public bool stand() => SendIntent(AiIntent.Stand, Vector2.zero, 0);
 
-    public bool stop() => Send(AiIntent.Stop, Vector2.zero, 0);
+    public bool stop() => SendIntent(AiIntent.Stop, Vector2.zero, 0);
 
-    public bool move_to(float x, float z) => Send(AiIntent.MoveTo, new Vector2(x, z), 0);
+    public bool move_to(float x, float z) => SendIntent(AiIntent.MoveTo, new Vector2(x, z), 0);
 
     public bool attack(int entityId)
     {
         if (entityId <= 0) return false;
-        return Send(AiIntent.AttackTarget, Vector2.zero, (ushort)entityId);
+        return SendIntent(AiIntent.AttackTarget, Vector2.zero, (ushort)entityId);
     }
 
-    public bool cast_skill(int skillId)
-    {
-        if (skillId < 0 || !NetworkManager.CanSendWorldCommand) return false;
-        Tool.NetworkManager.SendAiSkillCast(skillId); // AI 专用通道，不受键盘拦截
-        return true;
-    }
+    public bool cast_skill(int skillId) => CallCommand(AiCommandId.CastSkill, skillId);
 
-    public bool signal(int messageId)
-    {
-        if (!NetworkManager.CanSendWorldCommand) return false;
-        Tool.NetworkManager.SendQuickMessage(new CSQuickMessage { messageId = messageId, hasTargetPosition = false });
-        return true;
-    }
+    public bool signal(int messageId) => CallCommand(AiCommandId.QuickMessage, messageId);
 
-    public bool signal_at(int messageId, float x, float z)
-    {
-        if (!NetworkManager.CanSendWorldCommand) return false;
-        Tool.NetworkManager.SendQuickMessage(new CSQuickMessage
-        {
-            messageId = messageId,
-            hasTargetPosition = true,
-            targetPosition = new Vector3(x, 0f, z),
-        });
-        return true;
-    }
+    public bool signal_at(int messageId, float x, float z) => CallCommand(AiCommandId.QuickMessageWithPosition, messageId, x, z);
 
     public void interrupt(string text)
     {
@@ -560,10 +521,11 @@ public sealed class AiLuaApi
         commands.Interrupts.Push(AiInterruptKind.LuaTrigger, string.IsNullOrEmpty(text) ? "lua 触发" : text);
     }
 
-    // 移动/站立同值不重发；攻击每次都发 —— 行为层靠重复请求维持「持续出招」的节拍
-    private bool Send(AiIntent intent, Vector2 position, ushort targetId)
+    // 同值意图不重发（服务器侧转发器每拍重申，同值重发是纯浪费）；复活换实体时缓存作废
+    private bool SendIntent(AiIntent intent, Vector2 position, ushort targetId)
     {
-        // 复活换了实体：去重缓存作废，否则同值意图不会重发，服务器侧转发器建不起来
+        if (!NetworkManager.CanSendWorldCommand) return false;
+
         int selfId = self_id();
         if (selfId != lastSelfId)
         {
@@ -575,9 +537,11 @@ public sealed class AiLuaApi
             && (intent != AiIntent.MoveTo || (position - lastPoint).sqrMagnitude < 0.01f);
         if (same) return true;
 
-        if (!AiCommandLine.TrySendIntent(intent, position, targetId, out string error))
+        var request = new AiIntentRequest(position, targetId);
+        if (!AiCommandBus.SendIntent(intent, request)) return false;
+        if (request.Rejected)
         {
-            Debug.LogError("[AI][Lua] 意图下发失败：" + error);
+            Debug.LogError("[AI][Lua] 意图下发失败：" + request.Error);
             return false;
         }
 
@@ -586,6 +550,19 @@ public sealed class AiLuaApi
         lastTarget = targetId;
         hasLast = true;
         return true;
+    }
+
+    // 有配表命令的动作（放技能、快捷消息）走命令行同一条链路，可用性也跟着命令注册走
+    private static bool CallCommand(int commandId, params object[] values)
+    {
+        if (!AiCommandBus.Ready(commandId)) return false;
+
+        string reply = null;
+        AiCommandBus.Call(commandId, new AiRequest("lua", values, text => reply = text));
+        if (reply == null || !reply.StartsWith("错误：")) return true;
+
+        Debug.LogError("[AI][Lua] 命令下发失败：" + reply);
+        return false;
     }
     #endregion
 

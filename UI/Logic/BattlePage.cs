@@ -45,6 +45,7 @@ public class BattlePage : PageBase
     private readonly Queue<string> importantBannerQueue = new(); // 待播的特殊技能播报文案，按到达顺序逐条播
     private bool importantBannerPlaying;                          // 当前 banner 动画是否在播
     private static string ImportantBannerPrefix => MessageVariable.V(message_variablesEnum.battle_bannerPrefix);
+    private bool aiBound; // 本页的 AI 命令是否已注册
 
     // 本局会话数据全部来自加载期（不再读组队缓存）
     private static ClientLoadingManager Session => ClientLoadingManager.Current;
@@ -134,11 +135,128 @@ public class BattlePage : PageBase
 
     private void SendQuickMessage(int index)
     {
-        float now = Time.time;
-        if (now < nextQuickMessageTime) return; // 防刷：同玩家 1s 一条
-        nextQuickMessageTime = now + GlobalConfig.ai_message_min_interval;
-        if (Tool.NetworkManager != null) Tool.NetworkManager.SendQuickMessage(new CSQuickMessage() { messageId = index });
+        TrySendQuickMessage(index, Vector3.zero, false, out _); // 轮盘连点时静默丢，不打断玩家操作
     }
+
+    // 快捷指令唯一的发送入口：轮盘与 AI 命令共用，同玩家 1s 一条
+    private bool TrySendQuickMessage(int messageId, Vector3 point, bool hasPoint, out string error)
+    {
+        if (!NetworkManager.CanSendWorldCommand)
+        {
+            error = "未联网";
+            return false;
+        }
+
+        float now = Time.time;
+        if (now < nextQuickMessageTime)
+        {
+            error = "发送过于频繁（1 秒一条）";
+            return false;
+        }
+        nextQuickMessageTime = now + GlobalConfig.ai_message_min_interval;
+
+        if (Tool.NetworkManager != null)
+        {
+            Tool.NetworkManager.SendQuickMessage(new CSQuickMessage()
+            {
+                messageId = messageId,
+                hasTargetPosition = hasPoint,
+                targetPosition = point,
+            });
+        }
+        error = null;
+        return true;
+    }
+
+    #region AI 命令（与玩家点界面走同一条链路）
+    public override void Shutdown() => ResignAiCommands();
+
+    private void BindAiCommands()
+    {
+        if (aiBound) return;
+        aiBound = true;
+        AiCommandBus.Bind(AiCommandId.QuickMessage, OnAiQuickMessage);
+        AiCommandBus.Bind(AiCommandId.QuickMessageWithPosition, OnAiQuickMessageAt);
+        AiCommandBus.Bind(AiCommandId.SetSkillColumn, OnAiSetSkillColumn);
+    }
+
+    private void ResignAiCommands()
+    {
+        if (!aiBound) return;
+        aiBound = false;
+        AiCommandBus.Unbind(AiCommandId.QuickMessage, OnAiQuickMessage);
+        AiCommandBus.Unbind(AiCommandId.QuickMessageWithPosition, OnAiQuickMessageAt);
+        AiCommandBus.Unbind(AiCommandId.SetSkillColumn, OnAiSetSkillColumn);
+    }
+
+    private void OnAiQuickMessage(AiRequest request)
+    {
+        int messageId = request.Int(0);
+        if (!QuickMessageConfig.content.TryGetValue(messageId, out var cfg))
+        {
+            request.Reject($"快捷消息 {messageId} 未配置");
+            return;
+        }
+        if (!TrySendQuickMessage(messageId, Vector3.zero, false, out string error))
+        {
+            request.Reject(error);
+            return;
+        }
+        request.Reply("已发送快捷消息 " + cfg.name);
+    }
+
+    private void OnAiQuickMessageAt(AiRequest request)
+    {
+        int messageId = request.Int(0);
+        if (!QuickMessageConfig.content.TryGetValue(messageId, out var cfg))
+        {
+            request.Reject($"快捷消息 {messageId} 未配置");
+            return;
+        }
+
+        float x = request.Float(1);
+        float z = request.Float(2);
+        if (!TrySendQuickMessage(messageId, new Vector3(x, 0f, z), true, out string error))
+        {
+            request.Reject(error);
+            return;
+        }
+        request.Reply($"已发送快捷消息 {cfg.name} 坐标=({x:0.##},{z:0.##})");
+    }
+
+    // 技能栏唯一的提交入口：技能选择界面与 AI 命令共用
+    private void OnAiSetSkillColumn(AiRequest request)
+    {
+        var skills = Skills;
+        if (skills == null)
+        {
+            request.Reject("技能管理器未就绪");
+            return;
+        }
+
+        var ids = request.IntList(0);
+        for (int i = 0; i < ids.Count; i++)
+        {
+            if (ids[i] < 0)
+            {
+                request.Reject("技能 id 必须是非负整数");
+                return;
+            }
+            if (ids.IndexOf(ids[i]) != i)
+            {
+                request.Reject("技能 id 重复 " + ids[i]);
+                return;
+            }
+        }
+
+        if (!skills.TrySetActiveSkills(ids))
+        {
+            request.Reject("技能栏提交被拒（未持有或超过槽位数）");
+            return;
+        }
+        request.Reply("已提交技能栏，等服务器回推快照");
+    }
+    #endregion
 
     #region 快捷指令点位（显示在小地图）
     // 收到同阵营的快捷指令：按配表「点位显示时长」登记一条，0 = 不生成（上报状况）
@@ -270,6 +388,7 @@ public class BattlePage : PageBase
         Skills?.ResetBattle();
         BuildSkillSlots();
         RefreshTimeIcon();
+        BindAiCommands();
     }
 
     public override void Exit()
@@ -301,6 +420,7 @@ public class BattlePage : PageBase
         ClearQuickMessages();
         // 离开战斗界面即销毁地形场景（Culler 与内容根一起销毁，点位数据一并复位）
         if (Tool.ModularTerrainGenerator != null) Tool.ModularTerrainGenerator.Clear();
+        ResignAiCommands();
     }
 
     public override void Update(float deltaTime)
@@ -781,7 +901,12 @@ public class BattlePage : PageBase
     {
         if (e.type == SCBattleEvent.Type.Nightfall) ShowEventBanner(BannerNightfall);     // 天黑横幅
         else if (e.type == SCBattleEvent.Type.Daybreak) ShowEventBanner(BannerDaybreak);  // 天亮横幅
-        else if (e.type == SCBattleEvent.Type.SkillBroadcast) EnqueueImportantBanner(e.textId); // 特殊技能播报
+        else if (e.type == SCBattleEvent.Type.SkillBroadcast)
+        {
+            // 技能播报只在横幅上出现（聊天页签明确跳过这类），所以由这里转给 AI
+            EnqueueImportantBanner(e.textId);
+            AiObservation.Report(AiObservation.BattleCategory, ImportantBannerPrefix + SkillConfig.Get(e.textId).name);
+        }
     }
 
     private void OnCombatLabelDisplay(SCCombatLabel label)

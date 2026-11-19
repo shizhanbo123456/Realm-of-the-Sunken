@@ -43,6 +43,7 @@ public class ChatPlugin : PageBase
     private int viewTab = (int)ChatChannel.All;
     private int sendChannel = (int)ChatChannel.All;
     private float lastSendTime = -999f;
+    private bool aiBound; // 本面板的 AI 命令是否已注册
 
     public ChatPlugin(UI_ChatPanel panel) : base(panel)
     {
@@ -77,10 +78,65 @@ public class ChatPlugin : PageBase
         ClearMessages();
         EnterLobbyMode();
         base.Enter(param);
+        BindAiCommands();
+    }
+
+    public override void Exit()
+    {
+        base.Exit();
+        ResignAiCommands();
+    }
+
+    // 聊天面板开着才允许 AI 发言，和玩家一致
+    private void BindAiCommands()
+    {
+        if (aiBound) return;
+        aiBound = true;
+        AiCommandBus.Bind(AiCommandId.SendChatMessage, OnAiSendChat);
+    }
+
+    private void ResignAiCommands()
+    {
+        if (!aiBound) return;
+        aiBound = false;
+        AiCommandBus.Unbind(AiCommandId.SendChatMessage, OnAiSendChat);
+    }
+
+    private void OnAiSendChat(AiRequest request)
+    {
+        int channel = request.Int(0);
+        if (channel < 0 || channel > 2)
+        {
+            request.Reject("channel 只能是 0 全频道 / 1 阵营 / 2 附近");
+            return;
+        }
+
+        string content = request.Str(1);
+        if (content.Length == 0)
+        {
+            request.Reject("聊天内容不能为空");
+            return;
+        }
+        if (!NetworkManager.CanSendWorldCommand)
+        {
+            request.Reject("未联网");
+            return;
+        }
+
+        var result = Submit(channel, content); // 与输入框同一个入口：长度校验、冷却、本地回显都在里面
+        if (result != ChatSendResult.Sent)
+        {
+            var prompt = RejectPrompt(result);
+            if (prompt.HasValue) request.Reject(prompt.Value);
+            else request.Reject("发送过于频繁，请稍后再试");
+            return;
+        }
+        request.Reply("已发送");
     }
 
     public override void Shutdown()
     {
+        ResignAiCommands();
         //EventManager 是静态的，订阅必须与解绑成对
         EventManager.RemoveEvent<int>(ClientEvent.OnBattleStart, OnBattleStart);
         EventManager.RemoveEvent<int>(ClientEvent.OnBattleEnd, OnBattleEnd);
@@ -140,8 +196,8 @@ public class ChatPlugin : PageBase
 
     private string ItemUrlAt(int index) => UI_ChatItem.URL;
 
-    // 输入框与 AI 指令共用的发送入口：校验 → 本地回显 → 发包，返回拦截原因
-    public ChatSendResult Submit(int channel, string content)
+    // 输入框与 AI 命令共用的发送入口：校验 → 本地回显 → 发包，返回拦截原因
+    private ChatSendResult Submit(int channel, string content)
     {
         content = (content ?? "").Trim();
         // 长度按协议字节数算：StringSerializer.GetLength 含 1 字节长度头，减掉才是正文字节数
@@ -155,7 +211,7 @@ public class ChatPlugin : PageBase
         if (Time.time - lastSendTime < SendInterval) return ChatSendResult.TooFrequent; // 1s 冷却
         lastSendTime = Time.time;
 
-        entries.Add(new ChatEntry()
+        AppendEntry(new ChatEntry()
         {
             channel = channel,
             isSelf = true,
@@ -164,7 +220,6 @@ public class ChatPlugin : PageBase
             name = GetMyName(),
             content = content,
         });
-        RefreshList();
 
         if (Tool.NetworkManager != null)
             Tool.NetworkManager.SendChat(new CSChat() { channel = channel, content = content });
@@ -185,7 +240,7 @@ public class ChatPlugin : PageBase
     }
 
     // 拦截原因对应的配表提示；冷却不配文案，调用方自行处理
-    public static promptEnum? RejectPrompt(ChatSendResult result) => result switch
+    private static promptEnum? RejectPrompt(ChatSendResult result) => result switch
     {
         ChatSendResult.TooShort => promptEnum.chat_too_short,
         ChatSendResult.TooLong => promptEnum.chat_too_long,
@@ -207,7 +262,7 @@ public class ChatPlugin : PageBase
         if (chat.senderClientId == NetworkManager.LocalToken) return; // 自己的已本地回显
         // 阵营频道客户端过滤；GM「敌方对话」开启时放行敌方阵营消息（附近频道已由服务器按距离筛过）
         if (chat.channel == (int)ChatChannel.Camp && chat.camp != GetMyCamp() && !ShowEnemyDialog) return;
-        entries.Add(new ChatEntry()
+        AppendEntry(new ChatEntry()
         {
             channel = chat.channel,
             isSelf = false,
@@ -216,7 +271,6 @@ public class ChatPlugin : PageBase
             name = chat.name,
             content = chat.content,
         });
-        RefreshList();
     }
 
     // 状态上报：协议只带状态、血量、位置与周边敌人数，文本本地拼，统一进阵营频道
@@ -229,7 +283,7 @@ public class ChatPlugin : PageBase
             ? MessageVariable.F(message_variablesEnum.chat_health, report.healthPercent) // 真人上报不带状态
             : MessageVariable.F(message_variablesEnum.chat_healthState, ReportStateText(report.state), report.healthPercent);
 
-        entries.Add(new ChatEntry()
+        AppendEntry(new ChatEntry()
         {
             channel = (int)ChatChannel.Camp,
             isSelf = isSelf,
@@ -238,7 +292,6 @@ public class ChatPlugin : PageBase
             name = GetUnitName(report.senderClientId),
             content = MessageVariable.F(message_variablesEnum.chat_reportLine, head, report.nearbyEnemyCount, PositionText(report.position, isSelf)),
         });
-        RefreshList();
     }
 
     // 快捷指令发进阵营频道；chatText 留空的（上报状况）改走 SCStateReport，这里不出条目
@@ -247,7 +300,7 @@ public class ChatPlugin : PageBase
         var cfg = QuickMessageConfig.Get(message.messageId);
         if (string.IsNullOrEmpty(cfg.chatText)) return;
 
-        entries.Add(new ChatEntry()
+        AppendEntry(new ChatEntry()
         {
             channel = (int)ChatChannel.Camp,
             isSelf = message.senderClientId == NetworkManager.LocalToken,
@@ -256,7 +309,6 @@ public class ChatPlugin : PageBase
             name = GetUnitName(message.senderClientId),
             content = cfg.chatText,
         });
-        RefreshList();
     }
 
     // 位置写成「绝对坐标 + 相对读者方位」，自己的上报只给坐标（相对自己无意义）
@@ -321,20 +373,19 @@ public class ChatPlugin : PageBase
         switch (e.type)
         {
             case SCBattleEvent.Type.PlayerKill:
-                systemEntries.Add(string.Format(SystemMessageConfig.Get(system_messageEnum.player_kill).text,
+                AppendSystem(string.Format(SystemMessageConfig.Get(system_messageEnum.player_kill).text,
                     ResolveEventText(e.textId), ResolveEventText(e.textId2)));
                 break;
             case SCBattleEvent.Type.DeathUnattributed:
-                systemEntries.Add(string.Format(SystemMessageConfig.Get(system_messageEnum.player_defeated).text,
+                AppendSystem(string.Format(SystemMessageConfig.Get(system_messageEnum.player_defeated).text,
                     ResolveEventText(e.textId)));
                 break;
             case SCBattleEvent.Type.SkillBroadcast:
                 return; // 技能播报只进重要事件 banner，不进聊天列表
             default:
-                systemEntries.Add(ResolveEventText(e.textId));
+                AppendSystem(ResolveEventText(e.textId));
                 break;
         }
-        if (viewTab == TabSystem) RefreshList();
     }
 
     // 事件文本统一按数字 id 解析：>=PlayerNameBase 映射为玩家名，否则按 system_message 枚举查表
@@ -358,6 +409,28 @@ public class ChatPlugin : PageBase
         panel.m_content.RemoveChildrenToPool();
         panel.m_content.numItems = count;
         if (count > 0) panel.m_content.ScrollToView(count - 1);
+    }
+
+    // 写一条聊天：刷新页面 + 转发给 AI（AI 记的就是玩家看到的这一行）
+    private void AppendEntry(ChatEntry entry)
+    {
+        entries.Add(entry);
+        RefreshList();
+        AiObservation.ReportChat(entry.channel, PlainLine(entry), entry.isSelf);
+    }
+
+    private void AppendSystem(string text)
+    {
+        systemEntries.Add(text);
+        if (viewTab == TabSystem) RefreshList();
+        AiObservation.ReportChat(TabSystem, "[系统] " + text, false);
+    }
+
+    // 转发给 AI 的纯文本：不带 UBB 颜色标签
+    private static string PlainLine(ChatEntry entry)
+    {
+        string name = string.IsNullOrEmpty(entry.name) ? "#" + entry.senderClientId : entry.name;
+        return $"[{ChannelLabel(entry.channel)}][{(PlayerCampType)entry.camp}]{name}: {entry.content}";
     }
 
     private void RebuildVisibleChat()

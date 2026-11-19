@@ -41,5 +41,6 @@ public static class ClientEvent
     public const int OnCampAliveCount = 10312; // param=SCCampAliveCount 双方总人数、存活数与观战人数（值变更时下发）
     public const int OnQuickMessage = 10313;   // param=SCQuickMessage 同阵营快捷消息（含发送者与人机上报状况）
     public const int OnStateReport = 10314;       // param=SCStateReport 同阵营状态上报（客户端本地拼聊天文本）
+    public const int OnAiFeedback = 10315;        // param=SCAiFeedback AI 意图回执（目前只有移动失败）
     #endregion
 }

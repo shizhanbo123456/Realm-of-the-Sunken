@@ -40,13 +40,6 @@ public class UIManager : MonoBehaviour
     // 结算界面：独立子界面，不参与页面排层（每次结算重建面板）
     public SettlementView Settlement { get; private set; }
 
-    // AI 指令要复用页面的链路，从这里取实例
-    public ChatPlugin Chat => chat;
-
-    public HomePage Home => home;
-
-    public LobbyPage Lobby => lobby;
-
     // 四个从战斗界面抽出去的独立界面：各自管开合与刷新，这里只给入口
     public BattlePage Battle => battle;
 
@@ -309,6 +302,8 @@ public class UIManager : MonoBehaviour
     {
         string text = PromptConfig.Get(promptId).text;
         if (args != null && args.Length > 0) text = string.Format(text, args);
+
+        AiObservation.Report(AiObservation.PromptCategory, text); // 玩家能看到的提示，AI 也记一份
 
         var panel = UI_NoticePanel.CreateInstance();
         if (panel.m_title != null) panel.m_title.text = text;

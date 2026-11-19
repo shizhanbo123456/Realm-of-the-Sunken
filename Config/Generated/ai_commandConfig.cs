@@ -26,12 +26,6 @@ namespace Ros.Config
                     row.key = r.ReadInt32();
                     row.command = ConfigBinary.ReadString(r);
                     row.commandHelp = ConfigBinary.ReadString(r);
-                    byte has2 = r.ReadByte();
-                    row.home = has2 == 1 ? (bool?)(r.ReadByte() != 0) : null;
-                    byte has3 = r.ReadByte();
-                    row.lobby = has3 == 1 ? (bool?)(r.ReadByte() != 0) : null;
-                    byte has4 = r.ReadByte();
-                    row.battle = has4 == 1 ? (bool?)(r.ReadByte() != 0) : null;
                     row.param1Name = ConfigBinary.ReadString(r);
                     row.param1Type = ConfigBinary.ReadString(r);
                     row.param1Desc = ConfigBinary.ReadString(r);
@@ -51,9 +45,6 @@ namespace Ros.Config
         public int key;  // 主键
         public string command;  // 主命令
         public string commandHelp;  // 主命令注释
-        public bool? home;  // Home可用：1=可用，留空=不可用
-        public bool? lobby;  // Lobby可用：1=可用，留空=不可用
-        public bool? battle;  // Battle可用：1=可用，留空=不可用
         public string param1Name;  // 参数1
         public string param1Type;  // 参数1类型：int / float / bool / string / List<int>
         public string param1Desc;  // 参数1含义

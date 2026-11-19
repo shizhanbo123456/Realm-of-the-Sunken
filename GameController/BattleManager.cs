@@ -12,6 +12,7 @@ public partial class BattleManager : EnsBehaviour
     {
         Tool.BattleManager = this;
         ApplyConfigDurations();
+        SubscribeAiStage(); // 开战/结束决定 AI 命令的注册，顺带收集感知缓存
     }
 
     public static bool AtServer => EnsInstance.HasAuthority;
@@ -1257,6 +1258,8 @@ public partial class BattleManager : EnsBehaviour
 
         // 昼夜：两端各自推进，服务器负责广播快照
         UpdateDayNight();
+
+        if (!AtServer) AiPerceptionTick(); // 客户端：小地图缓存按超时剔除
 
         if (!AtServer || !BattleStarted) { Profiler.EndSample(); return; }
 
