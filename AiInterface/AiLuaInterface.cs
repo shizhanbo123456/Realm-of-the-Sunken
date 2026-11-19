@@ -347,7 +347,7 @@ public sealed class AiLuaInterface : ClientSubManager
 
         var commands = AiCommandLine.Current;
         if (commands == null) return;
-        commands.Interrupts.Push(AiInterruptKind.LuaError, "脚本=" + chunk, "错误=" + e.Message);
+        commands.Interrupts.PushLua(AiInterruptKind.LuaError, "脚本=" + chunk, "错误=" + e.Message);
     }
 
     internal List<SCMinimapEntity> MapBuffer => mapBuffer;
@@ -612,7 +612,7 @@ public sealed class AiLuaApi
     {
         var commands = Line;
         if (commands == null) return;
-        commands.Interrupts.Push(AiInterruptKind.LuaTrigger, string.IsNullOrEmpty(text) ? "lua 触发" : text);
+        commands.Interrupts.PushLua(AiInterruptKind.LuaTrigger, string.IsNullOrEmpty(text) ? "lua 触发" : text);
     }
 
     // 同值意图不重发（服务器侧转发器每拍重申，同值重发是纯浪费）；复活换实体时缓存作废
@@ -651,8 +651,10 @@ public sealed class AiLuaApi
     {
         if (!AiCommandBus.Ready(command)) return false;
 
+        AiCommandLog.LuaCall(command.ToString(), values);
         string reply = null;
         AiCommandBus.Call(command, new AiRequest(command.ToString(), values, text => reply = text));
+        if (!string.IsNullOrEmpty(reply)) AiCommandLog.LuaOut(reply);
         if (reply == null || !reply.StartsWith("错误：")) return true;
 
         Debug.LogError("[AI][Lua] 命令下发失败：" + reply);

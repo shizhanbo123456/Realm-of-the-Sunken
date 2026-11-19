@@ -22,6 +22,8 @@ public enum AiInterruptKind
 public sealed class AiInterruptHub
 {
     private const int Capacity = 64;
+    private const string OriginCmd = "cmd";
+    private const string OriginLua = "lua";
 
     private struct Entry
     {
@@ -31,13 +33,37 @@ public sealed class AiInterruptHub
 
     private readonly List<Entry> entries = new();
     private readonly StringBuilder builder = new();
+    private string origin = OriginCmd;
+    private string waitOrigin = OriginCmd;
     private float waitSeconds;
     private float waitDeadline; // <= 0 表示当前没在等
 
-    public void Push(AiInterruptKind kind, params string[] fields)
+    // 只影响日志前缀：Lua 期间产生的中断记作 [lua输出]
+    public void SetOriginLua() => origin = OriginLua;
+
+    public void SetOriginCmd() => origin = OriginCmd;
+
+    public void Push(AiInterruptKind kind, params string[] fields) => PushWith(origin, kind, fields);
+
+    public void PushLua(AiInterruptKind kind, params string[] fields) => PushWith(OriginLua, kind, fields);
+
+    private void PushWith(string from, AiInterruptKind kind, params string[] fields)
     {
-        entries.Add(new Entry { kind = kind, fields = fields });
+        var entry = new Entry { kind = kind, fields = fields };
+        entries.Add(entry);
         while (entries.Count > Capacity) entries.RemoveAt(0);
+#if UNITY_EDITOR
+        Log(entry, from);
+#endif
+    }
+
+    private void Log(Entry entry, string from)
+    {
+        builder.Clear();
+        Append(builder, entry);
+        string text = builder.ToString();
+        if (entry.kind == AiInterruptKind.LuaError || from == OriginLua) AiCommandLog.LuaOut(text);
+        else AiCommandLog.CmdOut(text);
     }
 
     // 等待一定时间后自动触发一次中断：只挂倒计时，命令本身立即返回
@@ -45,13 +71,14 @@ public sealed class AiInterruptHub
     {
         waitSeconds = seconds;
         waitDeadline = Time.time + seconds;
+        waitOrigin = origin;
     }
 
     public void Tick()
     {
         if (waitDeadline <= 0f || Time.time < waitDeadline) return;
         waitDeadline = 0f;
-        Push(AiInterruptKind.WaitTimeout, "等待=" + waitSeconds.ToString("0.##"));
+        PushWith(waitOrigin, AiInterruptKind.WaitTimeout, "等待=" + waitSeconds.ToString("0.##"));
     }
 
     public bool TryDrain(out string text)
@@ -69,14 +96,18 @@ public sealed class AiInterruptHub
         for (int i = 0; i < entries.Count; i++)
         {
             if (i > 0) builder.Append('\n');
-            var e = entries[i];
-            builder.Append('[').Append(Label(e.kind)).Append(']');
-            for (int j = 0; j < e.fields.Length; j++)
-            {
-                builder.Append(j == 0 ? " " : " | ").Append(e.fields[j]);
-            }
+            Append(builder, entries[i]);
         }
         return builder.ToString();
+    }
+
+    private static void Append(StringBuilder text, Entry e)
+    {
+        text.Append('[').Append(Label(e.kind)).Append(']');
+        for (int j = 0; j < e.fields.Length; j++)
+        {
+            text.Append(j == 0 ? " " : " | ").Append(e.fields[j]);
+        }
     }
 
     private static string Label(AiInterruptKind kind)
@@ -154,6 +185,7 @@ public sealed class AiCommandLine : ClientSubManager
     // 外部命令行：结果一律转成中断，调用方等中断而不是等返回值
     public void Submit(string line)
     {
+        AiCommandLog.CmdIn(line ?? "");
         if (string.IsNullOrEmpty(line) || line.Trim().Length == 0)
         {
             PushReply("", "错误：空命令");
@@ -194,6 +226,23 @@ public sealed class AiCommandLine : ClientSubManager
 
     // Lua 内部调用：同一条解析与分发链路，回复直接当返回值，不进中断
     public string Execute(string line)
+    {
+        AiCommandLog.LuaIn(line ?? "");
+        hub.SetOriginLua();
+        string reply;
+        try
+        {
+            reply = ExecuteInternal(line);
+        }
+        finally
+        {
+            hub.SetOriginCmd();
+        }
+        if (!string.IsNullOrEmpty(reply)) AiCommandLog.LuaOut(reply);
+        return reply;
+    }
+
+    private string ExecuteInternal(string line)
     {
         if (string.IsNullOrEmpty(line) || line.Trim().Length == 0) return "错误：空命令";
         if (commands.Count == 0) RegisterFromConfig();
@@ -612,4 +661,44 @@ public sealed class AiCommandLine : ClientSubManager
         return tokens;
     }
     #endregion
+}
+
+// 编辑器下把 AI 命令的收发打到控制台，打包后为空实现
+internal static class AiCommandLog
+{
+    public static void CmdIn(string line)
+    {
+#if UNITY_EDITOR
+        Debug.Log("[cmd输入] " + line);
+#endif
+    }
+
+    public static void CmdOut(string text)
+    {
+#if UNITY_EDITOR
+        Debug.Log("[cmd输出] " + text);
+#endif
+    }
+
+    public static void LuaIn(string line)
+    {
+#if UNITY_EDITOR
+        Debug.Log("[lua输入] " + line);
+#endif
+    }
+
+    // Lua 的 typed API 没有文本行，按「命令 + 参数」拼一行
+    public static void LuaCall(string command, object[] values)
+    {
+#if UNITY_EDITOR
+        Debug.Log("[lua输入] " + (values.Length == 0 ? command : command + " " + string.Join(" ", values)));
+#endif
+    }
+
+    public static void LuaOut(string text)
+    {
+#if UNITY_EDITOR
+        Debug.Log("[lua输出] " + text);
+#endif
+    }
 }
