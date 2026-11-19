@@ -28,6 +28,7 @@ public class HomePage : PageBase
     private readonly UI_HomePanel panel;
     private UI_RemanePanel renamePanel; // 改名弹窗：设计自带全屏遮罩，挂 GRoot 置顶
     private bool aiBound;               // 本页的 AI 命令是否已注册
+    private bool ipRestored;            // 本次运行是否已把存档里的服务器地址填进输入框
 
     public HomePage(UI_HomePanel panel) : base(panel)
     {
@@ -71,7 +72,18 @@ public class HomePage : PageBase
         if (Tool.ClientLogicManager != null && Tool.ClientLogicManager.HomePreview != null)
             Tool.ClientLogicManager.HomePreview.ResetHomeView();
 
+        RestoreServerIp();
         BindAiCommands();
+    }
+
+    // 存档里的服务器地址只在本次运行首次进首页时回填，之后不覆盖玩家正在输入的内容
+    private void RestoreServerIp()
+    {
+        if (ipRestored) return;
+        ipRestored = true;
+        if (Tool.SaveManager == null)
+            throw new System.InvalidOperationException("[首页] 场景缺少 SaveManager，无法读取服务器地址");
+        panel.m_connectPanel.m_input_ipaddress.m_content.text = Tool.SaveManager.lastServerIp;
     }
 
     public override void Exit()
@@ -451,7 +463,10 @@ public class HomePage : PageBase
     {
         if (Tool.NetworkManager == null)
             throw new System.InvalidOperationException("[首页] 场景缺少 NetworkManager，无法连接");
+        if (Tool.SaveManager == null)
+            throw new System.InvalidOperationException("[首页] 场景缺少 SaveManager，无法记录服务器地址");
 
+        Tool.SaveManager.lastServerIp = ip ?? ""; // 空串落盘时写默认本机地址，退出时统一写
         var result = await Tool.NetworkManager.TryConnect(ip);
         if (result != NetworkManager.ConnectResult.Success) return result;
         Tool.NetworkManager.EnterWorld();
