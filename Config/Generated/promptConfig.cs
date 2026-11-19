@@ -67,5 +67,7 @@ namespace Ros.Config
         defeated,
         connect_success,
         lobby_state,
+        battle_start,
+        battle_end,
     }
 }

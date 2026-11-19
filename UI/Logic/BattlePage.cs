@@ -456,11 +456,13 @@ public class BattlePage : PageBase
         BuildSkillSlots();
         RefreshTimeIcon();
         BindAiCommands();
+        Tool.UIManager.ShowFlyText(promptEnum.battle_start); // 进场飘字
     }
 
     public override void Exit()
     {
         base.Exit();
+        Tool.UIManager.ShowFlyText(promptEnum.battle_end); // 离场飘字（结算/退出本局共用这一处）
         EventManager.RemoveEvent<SCEntityDisplayInfo>(ClientEvent.OnEntityDisplayUpdate, OnEntityDisplayUpdate);
         EventManager.RemoveEvent<int>(ClientEvent.OnEntityDisplayRemove, OnEntityDisplayRemove);
         EventManager.RemoveEvent<SCMinimapEntity>(ClientEvent.OnMinimapUpdate, OnMinimapUpdate);
