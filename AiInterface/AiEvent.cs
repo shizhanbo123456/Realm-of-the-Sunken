@@ -17,7 +17,9 @@ public static class AiEvent
 {
     public const int CommandBase = 20000;   // 20000~20099：命令行命令，载荷 AiRequest
     public const int IntentBase = 20200;    // 20200~20203：Lua 意图，载荷 AiIntentRequest
-    public const int Observation = 20400;   // 玩家已经看到的文本，载荷 AiObservation
+    public const int ChatLine = 20400;      // 聊天频道一行，载荷 AiChatLine
+    public const int PromptLine = 20401;    // 飘字提示一行，载荷 AiTextLine
+    public const int ImportantLine = 20402; // 重要事件一行，载荷 AiTextLine
 
     public static int Command(int commandId) => CommandBase + commandId;
 
@@ -27,22 +29,23 @@ public static class AiEvent
 // 命令事件总线：同一阶段只能有一个归属方，重复注册当场抛出来
 public static class AiCommandBus
 {
-    public static void Bind(int commandId, Action<AiRequest> handler)
+    public static void Bind(ai_commandEnum command, Action<AiRequest> handler)
     {
-        int id = AiEvent.Command(commandId);
+        int id = AiEvent.Command((int)command);
         if (EventManager.HasEventSubscriber(id))
-            throw new InvalidOperationException($"[AI] 命令 {commandId} 已有归属方，不能再注册");
+            throw new InvalidOperationException($"[AI] 命令 {command} 已有归属方，不能再注册");
         EventManager.AddEvent(id, handler);
     }
 
-    public static void Unbind(int commandId, Action<AiRequest> handler)
+    public static void Unbind(ai_commandEnum command, Action<AiRequest> handler)
     {
-        EventManager.RemoveEvent(AiEvent.Command(commandId), handler);
+        EventManager.RemoveEvent(AiEvent.Command((int)command), handler);
     }
 
-    public static bool Ready(int commandId) => EventManager.HasEventSubscriber(AiEvent.Command(commandId));
+    public static bool Ready(ai_commandEnum command) => EventManager.HasEventSubscriber(AiEvent.Command((int)command));
 
-    public static void Call(int commandId, AiRequest request) => EventManager.TrigEvent(AiEvent.Command(commandId), request);
+    public static void Call(ai_commandEnum command, AiRequest request) =>
+        EventManager.TrigEvent(AiEvent.Command((int)command), request);
 
     public static void BindIntent(AiIntent kind, Action<AiIntentRequest> handler)
     {
@@ -71,7 +74,7 @@ public static class AiCommandBus
     }
 }
 
-// 一条命令的请求：参数已按配表解析好，处理方在同一帧里回一句文本
+// 一条命令的请求：参数已按配表解析好，处理方回一句文本（无返回值的命令不回）
 public sealed class AiRequest
 {
     private readonly object[] values;
@@ -124,37 +127,39 @@ public sealed class AiIntentRequest
     }
 }
 
-// 一条玩家已经看到的文本：客户端时间 + 分类 + 内容，聊天另外带频道
-public sealed class AiObservation
+// 聊天频道的一行：时间 + 频道 + 文本 + 是否自己发的
+public struct AiChatLine
 {
-    public const string ChatCategory = "聊天";
-    public const string PromptCategory = "提示";
-    public const string BattleCategory = "战斗";
-    public const string FlowCategory = "流程";
-    public const int NoChannel = -1;
+    public float At;
+    public int Channel;
+    public string Text;
+    public bool FromSelf;
+}
 
-    public readonly float At;
-    public readonly string Category;
-    public readonly int Channel;
-    public readonly string Text;
-    public readonly bool FromSelf;
+// 飘字提示 / 重要事件的一行：时间 + 文本
+public struct AiTextLine
+{
+    public float At;
+    public string Text;
+}
 
-    private AiObservation(float at, string category, int channel, string text, bool fromSelf)
-    {
-        At = at;
-        Category = category;
-        Channel = channel;
-        Text = text;
-        FromSelf = fromSelf;
-    }
-
-    public static void Report(string category, string text)
-    {
-        EventManager.TrigEvent(AiEvent.Observation, new AiObservation(Time.time, category, NoChannel, text, false));
-    }
+// 玩家看得到的文本上报点：时间一律取战斗剩余时间（非战斗阶段为 0）
+public static class AiObservation
+{
+    public static float Now => Tool.BattleManager != null ? Tool.BattleManager.BattleRemainTime : 0f;
 
     public static void ReportChat(int channel, string text, bool fromSelf)
     {
-        EventManager.TrigEvent(AiEvent.Observation, new AiObservation(Time.time, ChatCategory, channel, text, fromSelf));
+        EventManager.TrigEvent(AiEvent.ChatLine, new AiChatLine { At = Now, Channel = channel, Text = text, FromSelf = fromSelf });
+    }
+
+    public static void ReportPrompt(string text)
+    {
+        EventManager.TrigEvent(AiEvent.PromptLine, new AiTextLine { At = Now, Text = text });
+    }
+
+    public static void ReportImportant(string text)
+    {
+        EventManager.TrigEvent(AiEvent.ImportantLine, new AiTextLine { At = Now, Text = text });
     }
 }

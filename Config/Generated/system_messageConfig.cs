@@ -25,7 +25,6 @@ namespace Ros.Config
                     system_message row;
                     row.key = (system_messageEnum)r.ReadInt32();
                     row.text = ConfigBinary.ReadString(r);
-                    row.trigInterrupt = r.ReadByte() != 0;
                     system_messageData.Add(row.key, row);
                 }
             }
@@ -35,7 +34,6 @@ namespace Ros.Config
     {
         public system_messageEnum key;  // 主键
         public string text;  // 提示文本：界面上显示的提示文本
-        public bool trigInterrupt;  // 触发中断：AI接管时是否触发中断
     }
     public enum system_messageEnum
     {

@@ -74,20 +74,22 @@ public class LobbyPage : PageBase
     {
         if (aiBound) return;
         aiBound = true;
-        AiCommandBus.Bind(AiCommandId.JoinCamp, OnAiJoinCamp);
-        AiCommandBus.Bind(AiCommandId.LobbyPrepare, OnAiPrepare);
-        AiCommandBus.Bind(AiCommandId.ExitRoom, OnAiExitRoom);
-        AiCommandBus.Bind(AiCommandId.SetRobotCount, OnAiSetRobotCount);
+        AiCommandBus.Bind(ai_commandEnum.lobby_join, OnAiJoinCamp);
+        AiCommandBus.Bind(ai_commandEnum.lobby_prepare, OnAiPrepare);
+        AiCommandBus.Bind(ai_commandEnum.lobby_exit, OnAiExitRoom);
+        AiCommandBus.Bind(ai_commandEnum.lobby_robot, OnAiSetRobotCount);
+        AiCommandBus.Bind(ai_commandEnum.lobby_info, OnAiLobbyInfo);
     }
 
     private void ResignAiCommands()
     {
         if (!aiBound) return;
         aiBound = false;
-        AiCommandBus.Unbind(AiCommandId.JoinCamp, OnAiJoinCamp);
-        AiCommandBus.Unbind(AiCommandId.LobbyPrepare, OnAiPrepare);
-        AiCommandBus.Unbind(AiCommandId.ExitRoom, OnAiExitRoom);
-        AiCommandBus.Unbind(AiCommandId.SetRobotCount, OnAiSetRobotCount);
+        AiCommandBus.Unbind(ai_commandEnum.lobby_join, OnAiJoinCamp);
+        AiCommandBus.Unbind(ai_commandEnum.lobby_prepare, OnAiPrepare);
+        AiCommandBus.Unbind(ai_commandEnum.lobby_exit, OnAiExitRoom);
+        AiCommandBus.Unbind(ai_commandEnum.lobby_robot, OnAiSetRobotCount);
+        AiCommandBus.Unbind(ai_commandEnum.lobby_info, OnAiLobbyInfo);
     }
 
     #region AI 命令（与玩家点界面走同一条链路）
@@ -106,7 +108,6 @@ public class LobbyPage : PageBase
             request.Reject(reject.Value);
             return;
         }
-        request.Reply("已选择阵营 " + camp);
     }
 
     // 与准备按钮同一个入口：状态不一致时才切，页面里的准备态始终跟着服务器走
@@ -114,13 +115,11 @@ public class LobbyPage : PageBase
     {
         bool want = request.Bool(0);
         if (want != myReady) ToggleReady();
-        request.Reply(want ? "已准备" : "已取消准备");
     }
 
     private void OnAiExitRoom(AiRequest request)
     {
         DoExitWorld(); // 玩家那条路径会先弹二次确认，AI 直接退
-        request.Reply("已离开房间");
     }
 
     private void OnAiSetRobotCount(AiRequest request)
@@ -148,7 +147,16 @@ public class LobbyPage : PageBase
             request.Reject(reject.Value);
             return;
         }
-        request.Reply($"已设置{(defense ? "防守" : "进攻")}方机器人数 {count}");
+    }
+
+    // 当前所在阵营 + 双方真人/人机 + 观战人数
+    private void OnAiLobbyInfo(AiRequest request)
+    {
+        int spectator = NetworkManager.HasLobbyInfo ? SpectateCount(NetworkManager.LatestLobbyInfo) : 0;
+        request.Reply($"我的阵营={myCamp} 准备={(myReady ? "是" : "否")}\n"
+                      + $"进攻 真人={humanAttack} 人机={attackRobot} 上限={RobotLimit(PlayerCampType.Attack)}\n"
+                      + $"防守 真人={humanDefense} 人机={defenseRobot} 上限={RobotLimit(PlayerCampType.Defense)}\n"
+                      + $"观战={spectator}");
     }
     #endregion
 
@@ -194,7 +202,7 @@ public class LobbyPage : PageBase
         {
             lastCamp = myCamp;
             lastReady = myReady;
-            AiObservation.Report(AiObservation.FlowCategory, $"大厅 阵营={myCamp} 准备={(myReady ? "是" : "否")}");
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.lobby_state, myCamp, myReady ? "是" : "否");
         }
 
         RefreshCampBlock(panel.m_btn_joinAttack, PlayerCampType.Attack, attackRobot);

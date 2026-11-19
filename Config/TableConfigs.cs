@@ -390,7 +390,7 @@ namespace Ros.Config
 
     public static class AiCommandConfig
     {
-        public static readonly Dictionary<int, ai_command> content = new();
+        public static readonly Dictionary<ai_commandEnum, ai_command> content = new();
         // 按主键升序：命令注册顺序与「获取命令列表」的排列都以它为准
         public static readonly List<ai_command> ordered = new();
 
@@ -403,6 +403,6 @@ namespace Ros.Config
             ordered.Sort((a, b) => a.key.CompareTo(b.key));
         }
 
-        public static ai_command Get(int key) => ConfigBinary.Require(content, key, "ai_command");
+        public static ai_command Get(ai_commandEnum key) => ConfigBinary.Require(content, key, "ai_command");
     }
 }

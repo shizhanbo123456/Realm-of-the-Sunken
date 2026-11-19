@@ -1,5 +1,5 @@
 ﻿using Ros.Config;
-// AI 操控的 Lua 接口：脚本加载与重载、状态机驱动、给 Lua 的读写 API（LuaEnv 本体在 LuaManager，此处只借用）
+// AI 操控的 Lua 接口：Tick 状态机常驻、决策状态机按命令激活，脚本读写 API 都在这里
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -13,13 +13,17 @@ public sealed class AiLuaInterface : ClientSubManager
     public static AiLuaInterface Current { get; private set; }
 
     private const string ScriptFolder = "LuaInterface";
-    private const string StateMachineScript = "state_machine.lua";
+    private const string TickScript = "tick_state_machine.lua";
+    private const string DecisionScript = "state_machine.lua";
     private const string ExtensionScript = "extensions.lua";
 
     private LuaEnv env;          // 当前 LuaEnv 快照，LuaManager 重建后自动切换到新实例
     private bool loaderAdded;
     private bool missingLogged;
-    private LuaFunction onTick;
+    private LuaFunction tickOnTick;         // 常驻 Tick 状态机：盯飘字与 @自己的聊天
+    private LuaFunction decisionOnDecide;   // 决策状态机：控制角色
+    private bool tickLoaded;
+    private bool tickBroken;                // 加载失败过，本次环境不再重试，避免每帧报错
     private bool active;
     private bool extensionsLoaded;
     private readonly object[] tickArgs = new object[1];
@@ -50,16 +54,33 @@ public sealed class AiLuaInterface : ClientSubManager
     public override void Tick(float deltaTime)
     {
         if (!EnsureEnv()) return;
-        if (!active || onTick == null) return;
-
         tickArgs[0] = deltaTime;
+
+        if (EnsureTick())
+        {
+            try
+            {
+                tickOnTick.Call(tickArgs);
+            }
+            catch (Exception e)
+            {
+                Fail(TickScript, e);
+                tickOnTick.Dispose();
+                tickOnTick = null;
+                tickLoaded = false;
+                tickBroken = true;
+            }
+        }
+
+        if (!active || decisionOnDecide == null) return;
+
         try
         {
-            onTick.Call(tickArgs);
+            decisionOnDecide.Call(tickArgs);
         }
         catch (Exception e)
         {
-            Fail("状态机 on_tick", e);
+            Fail("状态机 on_decide", e);
             StopStateMachineInternal(true);
         }
     }
@@ -103,12 +124,23 @@ public sealed class AiLuaInterface : ClientSubManager
     {
         active = false;
         extensionsLoaded = false;
-        if (onTick != null)
+        tickLoaded = false;
+        tickBroken = false;
+        if (tickOnTick != null)
         {
-            onTick.Dispose();
-            onTick = null;
+            tickOnTick.Dispose();
+            tickOnTick = null;
         }
+        ResetDecision();
         ClearCommands();
+    }
+
+    private void ResetDecision()
+    {
+        active = false;
+        if (decisionOnDecide == null) return;
+        decisionOnDecide.Dispose();
+        decisionOnDecide = null;
     }
 
     private void ClearCommands()
@@ -118,14 +150,55 @@ public sealed class AiLuaInterface : ClientSubManager
         commandNames.Clear();
     }
 
-    #region 状态机
-    // 激活即接管：先整份重载（状态机 + 拓展），再从 on_tick 开始逐帧驱动
+    #region Tick 状态机（常驻）
+    // 常驻脚本只跑一次；加载失败就标记坏掉，不再每帧重试
+    private bool EnsureTick()
+    {
+        if (tickLoaded && tickOnTick != null) return true;
+        if (tickBroken) return false;
+
+        string text = ReadScript(TickScript);
+        if (text == null)
+        {
+            tickBroken = true;
+            return false;
+        }
+
+        try
+        {
+            env.DoString(text, TickScript);
+        }
+        catch (Exception e)
+        {
+            Fail(TickScript, e);
+            tickBroken = true;
+            return false;
+        }
+
+        if (tickOnTick != null) tickOnTick.Dispose();
+        tickOnTick = env.Global.Get<LuaFunction>("on_tick");
+        if (tickOnTick == null)
+        {
+            Debug.LogError("[AI][Lua] " + TickScript + " 必须定义全局函数 on_tick(dt)");
+            tickBroken = true;
+            return false;
+        }
+
+        tickLoaded = true;
+        return true;
+    }
+    #endregion
+
+    #region 决策状态机
+    // 激活即接管：整份重载拓展脚本 + 决策脚本，Tick 状态机不跟着重启
     public string ActivateStateMachine()
     {
         if (!EnsureEnv()) return "错误：LuaManager 未就绪";
-        ResetScriptState();
+        ResetDecision();
+        ClearCommands();
+        extensionsLoaded = false;
         if (!LoadExtensions()) return "错误：拓展脚本加载失败（详见控制台）";
-        if (!LoadStateMachine()) return "错误：状态机脚本加载失败（详见控制台）";
+        if (!LoadDecision()) return "错误：状态机脚本加载失败（详见控制台）";
 
         active = true;
         return "状态机已激活";
@@ -141,12 +214,7 @@ public sealed class AiLuaInterface : ClientSubManager
     // 停决策后必须让实体站住：行为层「无请求 = 保持当前动作」，否则角色会一直跑
     private void StopStateMachineInternal(bool sendStand)
     {
-        active = false;
-        if (onTick != null)
-        {
-            onTick.Dispose();
-            onTick = null;
-        }
+        ResetDecision();
         if (!sendStand) return;
 
         var request = new AiIntentRequest(Vector2.zero, 0);
@@ -154,26 +222,25 @@ public sealed class AiLuaInterface : ClientSubManager
         if (registered && request.Rejected) Debug.LogError("[AI][Lua] 停止状态机后站立下发失败：" + request.Error);
     }
 
-    private bool LoadStateMachine()
+    private bool LoadDecision()
     {
-        string text = ReadScript(StateMachineScript);
+        string text = ReadScript(DecisionScript);
         if (text == null) return false;
 
         try
         {
-            env.DoString(text, StateMachineScript);
+            env.DoString(text, DecisionScript);
         }
         catch (Exception e)
         {
-            Fail(StateMachineScript, e);
+            Fail(DecisionScript, e);
             return false;
         }
 
-        if (onTick != null) onTick.Dispose();
-        onTick = env.Global.Get<LuaFunction>("on_tick");
-        if (onTick != null) return true;
+        decisionOnDecide = env.Global.Get<LuaFunction>("on_decide");
+        if (decisionOnDecide != null) return true;
 
-        Debug.LogError("[AI][Lua] 状态机脚本必须定义全局函数 on_tick(dt)");
+        Debug.LogError("[AI][Lua] 状态机脚本必须定义全局函数 on_decide(dt)");
         return false;
     }
     #endregion
@@ -226,7 +293,7 @@ public sealed class AiLuaInterface : ClientSubManager
         return result[0].ToString();
     }
 
-    // 只重载拓展命令：清空注册表后重跑 extensions.lua，不动状态机
+    // 只重载拓展命令：清空注册表后重跑 extensions.lua，不动两个状态机
     public string ReloadExtensions()
     {
         if (!EnsureEnv()) return "错误：LuaManager 未就绪";
@@ -255,7 +322,7 @@ public sealed class AiLuaInterface : ClientSubManager
     #endregion
 
     #region 环境
-    // 重载不清 package.loaded：两个入口脚本每次全量重新执行，require 的用户模块沿用缓存
+    // 重载不清 package.loaded：入口脚本每次全量重新执行，require 的用户模块沿用缓存
     private byte[] Loader(ref string filepath)
     {
         string path = Path.Combine(ScriptRoot, filepath.Replace('.', '/') + ".lua");
@@ -311,14 +378,25 @@ public sealed class AiLuaApi
 
     private static BattleManager Battle => Tool.BattleManager;
 
+    private static AiCommandLine Line => AiCommandLine.Current;
+
     public AiLuaApi(AiLuaInterface owner) { this.owner = owner; }
 
     #region 读：会话与自身
     // 命令在当前阶段是否可用：与命令行同一口径（看有没有归属方注册了这条命令）
     public bool can(string command)
     {
-        var line = AiCommandLine.Current;
+        var line = Line;
         return line != null && line.Can(command);
+    }
+
+    // 任意命令都能从 Lua 调：解析与分发与命令行完全同一条链路，返回回复文本（无回复返回 null）
+    public string call(string command, string args)
+    {
+        var line = Line;
+        if (line == null) return "错误：命令行未就绪";
+        string text = string.IsNullOrEmpty(args) ? command : command + " " + args;
+        return line.Execute(text);
     }
 
     public bool connected() => NetworkManager.CanSendWorldCommand;
@@ -328,6 +406,8 @@ public sealed class AiLuaApi
         var loading = ClientLoadingManager.Current;
         return loading != null && loading.HasSession ? loading.OwnEntityId : 0;
     }
+
+    public string self_name() => ClientSelection.playerName ?? "";
 
     public string self_camp()
     {
@@ -359,6 +439,19 @@ public sealed class AiLuaApi
         if (buffs == null || index < 0 || index >= buffs.Count) return "";
         return buffs[index];
     }
+    #endregion
+
+    #region 读：缓冲
+    // Tick 状态机靠总数判断有没有新内容，再按增量读最近几条
+    public int prompt_total() => Line != null ? Line.PromptTotal : 0;
+
+    public int chat_total() => Line != null ? Line.ChatTotal : 0;
+
+    public string prompt_buffer(int count) => Line != null ? Line.ReadPrompt(count) : "";
+
+    public string chat_recent(int channel, int count) => Line != null ? Line.ReadChat(channel, count) : "";
+
+    public string important_events(int count) => Line != null ? Line.ReadImportant(count) : "";
     #endregion
 
     #region 读：小地图
@@ -508,15 +601,16 @@ public sealed class AiLuaApi
         return SendIntent(AiIntent.AttackTarget, Vector2.zero, (ushort)entityId);
     }
 
-    public bool cast_skill(int skillId) => CallCommand(AiCommandId.CastSkill, skillId);
+    public bool cast_skill(int skillId) => CallCommand(ai_commandEnum.stateMachine_castSkill, skillId);
 
-    public bool signal(int messageId) => CallCommand(AiCommandId.QuickMessage, messageId);
+    public bool signal(int messageId) => CallCommand(ai_commandEnum.quickMessage_send, messageId);
 
-    public bool signal_at(int messageId, float x, float z) => CallCommand(AiCommandId.QuickMessageWithPosition, messageId, x, z);
+    public bool signal_at(int messageId, float x, float z) =>
+        CallCommand(ai_commandEnum.quickMessage_sendPosition, messageId, x, z);
 
     public void interrupt(string text)
     {
-        var commands = AiCommandLine.Current;
+        var commands = Line;
         if (commands == null) return;
         commands.Interrupts.Push(AiInterruptKind.LuaTrigger, string.IsNullOrEmpty(text) ? "lua 触发" : text);
     }
@@ -553,12 +647,12 @@ public sealed class AiLuaApi
     }
 
     // 有配表命令的动作（放技能、快捷消息）走命令行同一条链路，可用性也跟着命令注册走
-    private static bool CallCommand(int commandId, params object[] values)
+    private static bool CallCommand(ai_commandEnum command, params object[] values)
     {
-        if (!AiCommandBus.Ready(commandId)) return false;
+        if (!AiCommandBus.Ready(command)) return false;
 
         string reply = null;
-        AiCommandBus.Call(commandId, new AiRequest("lua", values, text => reply = text));
+        AiCommandBus.Call(command, new AiRequest(command.ToString(), values, text => reply = text));
         if (reply == null || !reply.StartsWith("错误：")) return true;
 
         Debug.LogError("[AI][Lua] 命令下发失败：" + reply);

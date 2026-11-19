@@ -25,7 +25,6 @@ namespace Ros.Config
                     prompt row;
                     row.key = (promptEnum)r.ReadInt32();
                     row.text = ConfigBinary.ReadString(r);
-                    row.trigInterrupt = r.ReadByte() != 0;
                     promptData.Add(row.key, row);
                 }
             }
@@ -35,7 +34,6 @@ namespace Ros.Config
     {
         public promptEnum key;  // 主键
         public string text;  // 提示文本：界面上显示的提示文本
-        public bool trigInterrupt;  // 触发中断：AI接管时是否触发中断
     }
     public enum promptEnum
     {
@@ -65,5 +63,9 @@ namespace Ros.Config
         connect_failed,
         connect_trying,
         connect_in_progress,
+        revived,
+        defeated,
+        connect_success,
+        lobby_state,
     }
 }

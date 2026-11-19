@@ -8,55 +8,50 @@ using UnityEngine;
 
 public enum AiInterruptKind
 {
-    ChatMention,
+    CommandReply,
+    CommandDone,
     LuaTrigger,
+    WaitTimeout,
     LuaError,
     BattleStart,
     BattleEnd,
     MoveFailed,
 }
 
-// 中断原因列表：有界、同类型合并、取走时整批清空
+// 中断信息缓冲：命令回复 / 命令已执行 / Lua 触发 / 等待时间到 都进这里，取走时整批清空
 public sealed class AiInterruptHub
 {
-    private const int Capacity = 16;
-    private const float MergeWindow = 2f;
+    private const int Capacity = 64;
 
-    private sealed class Entry
+    private struct Entry
     {
         public AiInterruptKind kind;
-        public float time;
-        public readonly List<string> fields = new();
-        public int count = 1;
+        public string[] fields;
     }
 
     private readonly List<Entry> entries = new();
     private readonly StringBuilder builder = new();
+    private float waitSeconds;
+    private float waitDeadline; // <= 0 表示当前没在等
 
     public void Push(AiInterruptKind kind, params string[] fields)
     {
-        Entry target = null;
-        for (int i = entries.Count - 1; i >= 0; i--)
-        {
-            if (entries[i].kind != kind) continue;
-            if (Time.time - entries[i].time > MergeWindow) break;
-            target = entries[i];
-            break;
-        }
-
-        if (target != null)
-        {
-            target.fields.Clear();
-            if (fields != null) target.fields.AddRange(fields);
-            target.time = Time.time;
-            target.count++;
-            return;
-        }
-
-        var entry = new Entry { kind = kind, time = Time.time };
-        if (fields != null) entry.fields.AddRange(fields);
-        entries.Add(entry);
+        entries.Add(new Entry { kind = kind, fields = fields });
         while (entries.Count > Capacity) entries.RemoveAt(0);
+    }
+
+    // 等待一定时间后自动触发一次中断：只挂倒计时，命令本身立即返回
+    public void Wait(float seconds)
+    {
+        waitSeconds = seconds;
+        waitDeadline = Time.time + seconds;
+    }
+
+    public void Tick()
+    {
+        if (waitDeadline <= 0f || Time.time < waitDeadline) return;
+        waitDeadline = 0f;
+        Push(AiInterruptKind.WaitTimeout, "等待=" + waitSeconds.ToString("0.##"));
     }
 
     public bool TryDrain(out string text)
@@ -75,14 +70,29 @@ public sealed class AiInterruptHub
         {
             if (i > 0) builder.Append('\n');
             var e = entries[i];
-            builder.Append('[').Append(e.kind.ToString()).Append(']');
-            for (int j = 0; j < e.fields.Count; j++)
+            builder.Append('[').Append(Label(e.kind)).Append(']');
+            for (int j = 0; j < e.fields.Length; j++)
             {
                 builder.Append(j == 0 ? " " : " | ").Append(e.fields[j]);
             }
-            if (e.count > 1) builder.Append(" ×").Append(e.count);
         }
         return builder.ToString();
+    }
+
+    private static string Label(AiInterruptKind kind)
+    {
+        switch (kind)
+        {
+            case AiInterruptKind.CommandReply: return "命令回复";
+            case AiInterruptKind.CommandDone: return "命令已执行";
+            case AiInterruptKind.LuaTrigger: return "Lua触发";
+            case AiInterruptKind.WaitTimeout: return "等待时间到";
+            case AiInterruptKind.LuaError: return "Lua错误";
+            case AiInterruptKind.BattleStart: return "战斗开始";
+            case AiInterruptKind.BattleEnd: return "战斗结束";
+            case AiInterruptKind.MoveFailed: return "移动失败";
+            default: return kind.ToString();
+        }
     }
 }
 
@@ -93,10 +103,12 @@ public sealed class AiCommandLine : ClientSubManager
 
     private sealed class Command
     {
-        public int id;
+        public ai_commandEnum id;
         public string name;
         public string usage;
         public ai_command row;
+        public bool noReply;   // 表里标了「无返回值」：执行完直接推一条「命令已执行」
+        public bool silent;    // 命令自己会产出中断（interrupt / waitForIntrrupt），不再补「命令已执行」
     }
 
     private struct ParamDef
@@ -107,6 +119,7 @@ public sealed class AiCommandLine : ClientSubManager
 
     private const int SystemChannel = 3;
     private const int MaxReadCount = 200;
+    private const string NoReplyMark = "无返回值";
 
     private readonly List<Command> commands = new();
     private readonly Dictionary<string, Command> byName = new();
@@ -116,6 +129,17 @@ public sealed class AiCommandLine : ClientSubManager
 
     public AiInterruptHub Interrupts => hub;
 
+    // 三条缓冲的读取口：命令行命令与 Lua 的 Tick 状态机共用
+    public int ChatTotal => observations.ChatTotal;
+
+    public int PromptTotal => observations.PromptTotal;
+
+    public string ReadChat(int channel, int count) => observations.ReadChat(channel, count);
+
+    public string ReadPrompt(int count) => observations.ReadPrompt(count);
+
+    public string ReadImportant(int count) => observations.ReadImportant(count);
+
     public override void Init(ClientLogicManager owner)
     {
         base.Init(owner);
@@ -124,13 +148,15 @@ public sealed class AiCommandLine : ClientSubManager
         BindSelfCommands();
     }
 
+    public override void Tick(float deltaTime) => hub.Tick();
+
     #region 对外入口
-    public void Submit(string line, Action<string> onResult)
+    // 外部命令行：结果一律转成中断，调用方等中断而不是等返回值
+    public void Submit(string line)
     {
-        if (onResult == null) throw new ArgumentNullException(nameof(onResult));
         if (string.IsNullOrEmpty(line) || line.Trim().Length == 0)
         {
-            onResult("错误：空命令");
+            PushReply("", "错误：空命令");
             return;
         }
         if (commands.Count == 0) RegisterFromConfig();
@@ -139,25 +165,48 @@ public sealed class AiCommandLine : ClientSubManager
         var cmd = Find(tokens[0]);
         if (cmd == null)
         {
-            onResult($"错误：未知命令 {tokens[0]}（用 listCommands 查看）");
+            PushReply(tokens[0], $"错误：未知命令 {tokens[0]}（用 listCommands 查看）");
             return;
         }
 
         if (!AiCommandBus.Ready(cmd.id))
         {
-            onResult($"错误：命令 {cmd.name} 在当前阶段不可用");
+            PushReply(cmd.name, $"错误：命令 {cmd.name} 在当前阶段不可用");
             return;
         }
 
-        var args = new string[tokens.Count - 1];
-        for (int i = 0; i < args.Length; i++) args[i] = tokens[i + 1];
-
-        if (!TryBuildArgs(cmd.row, args, out object[] parsed, out string error))
+        if (!TryParse(cmd, tokens, out object[] parsed, out string error))
         {
-            onResult(error);
+            PushReply(cmd.name, error);
             return;
         }
-        AiCommandBus.Call(cmd.id, new AiRequest(cmd.name, parsed, onResult));
+
+        bool replied = false;
+        AiCommandBus.Call(cmd.id, new AiRequest(cmd.name, parsed, text =>
+        {
+            replied = true;
+            PushReply(cmd.name, text);
+        }));
+
+        if (replied || cmd.silent) return;
+        if (cmd.noReply) hub.Push(AiInterruptKind.CommandDone, cmd.name);
+    }
+
+    // Lua 内部调用：同一条解析与分发链路，回复直接当返回值，不进中断
+    public string Execute(string line)
+    {
+        if (string.IsNullOrEmpty(line) || line.Trim().Length == 0) return "错误：空命令";
+        if (commands.Count == 0) RegisterFromConfig();
+
+        var tokens = SplitArgs(line);
+        var cmd = Find(tokens[0]);
+        if (cmd == null) return $"错误：未知命令 {tokens[0]}";
+        if (!AiCommandBus.Ready(cmd.id)) return $"错误：命令 {cmd.name} 在当前阶段不可用";
+        if (!TryParse(cmd, tokens, out object[] parsed, out string error)) return error;
+
+        string reply = null;
+        AiCommandBus.Call(cmd.id, new AiRequest(cmd.name, parsed, text => reply = text));
+        return reply;
     }
 
     // Lua 侧问「这条命令现在能不能用」，口径与命令行一致
@@ -179,9 +228,11 @@ public sealed class AiCommandLine : ClientSubManager
             var cmd = new Command
             {
                 id = row.key,
-                name = row.command,
+                name = row.key.ToString(),
                 usage = Usage(row),
                 row = row,
+                noReply = row.commandHelp != null && row.commandHelp.Contains(NoReplyMark),
+                silent = row.key == ai_commandEnum.interrupt || row.key == ai_commandEnum.waitForIntrrupt,
             };
             commands.Add(cmd);
             byName[cmd.name] = cmd;
@@ -194,15 +245,31 @@ public sealed class AiCommandLine : ClientSubManager
         }
     }
 
-    // 常驻命令：不依赖任何界面阶段，AI 自己持有
+    // 常驻命令：不依赖任何界面阶段，AI 自己持有（缓冲区与中断都在这里）
     private void BindSelfCommands()
     {
-        AiCommandBus.Bind(AiCommandId.GetMyPlayerName, OnGetPlayerName);
-        AiCommandBus.Bind(AiCommandId.ReadChatMessage, OnReadChat);
-        AiCommandBus.Bind(AiCommandId.ReadEvents, OnReadEvents);
-        AiCommandBus.Bind(AiCommandId.ReloadLuaCommand, OnReloadLua);
-        AiCommandBus.Bind(AiCommandId.ExecLuaCommand, OnRunLuaExtension);
-        AiCommandBus.Bind(AiCommandId.ListCommands, OnListCommands);
+        AiCommandBus.Bind(ai_commandEnum.listCommands, OnListCommands);
+        AiCommandBus.Bind(ai_commandEnum.checkInterrupt, OnCheckInterrupt);
+        AiCommandBus.Bind(ai_commandEnum.interrupt, OnInterrupt);
+        AiCommandBus.Bind(ai_commandEnum.waitForIntrrupt, OnWait);
+        AiCommandBus.Bind(ai_commandEnum.chat_recent, OnChatRecent);
+        AiCommandBus.Bind(ai_commandEnum.prompt_buffer, OnPromptBuffer);
+        AiCommandBus.Bind(ai_commandEnum.lua_reloadExtension, OnReloadLua);
+        AiCommandBus.Bind(ai_commandEnum.lua_execCommand, OnRunLuaExtension);
+        AiCommandBus.Bind(ai_commandEnum.home_getPlayerName, OnGetPlayerName);
+    }
+
+    private void UnbindSelfCommands()
+    {
+        AiCommandBus.Unbind(ai_commandEnum.listCommands, OnListCommands);
+        AiCommandBus.Unbind(ai_commandEnum.checkInterrupt, OnCheckInterrupt);
+        AiCommandBus.Unbind(ai_commandEnum.interrupt, OnInterrupt);
+        AiCommandBus.Unbind(ai_commandEnum.waitForIntrrupt, OnWait);
+        AiCommandBus.Unbind(ai_commandEnum.chat_recent, OnChatRecent);
+        AiCommandBus.Unbind(ai_commandEnum.prompt_buffer, OnPromptBuffer);
+        AiCommandBus.Unbind(ai_commandEnum.lua_reloadExtension, OnReloadLua);
+        AiCommandBus.Unbind(ai_commandEnum.lua_execCommand, OnRunLuaExtension);
+        AiCommandBus.Unbind(ai_commandEnum.home_getPlayerName, OnGetPlayerName);
     }
 
     private Command Find(string name)
@@ -227,7 +294,7 @@ public sealed class AiCommandLine : ClientSubManager
 
     private static string Usage(ai_command row)
     {
-        var builder = new StringBuilder(row.command);
+        var builder = new StringBuilder(row.key.ToString());
         var parameters = Params(row);
         for (int i = 0; i < parameters.Count; i++)
         {
@@ -238,6 +305,13 @@ public sealed class AiCommandLine : ClientSubManager
     #endregion
 
     #region 参数
+    private static bool TryParse(Command cmd, List<string> tokens, out object[] args, out string error)
+    {
+        var rest = new string[tokens.Count - 1];
+        for (int i = 0; i < rest.Length; i++) rest[i] = tokens[i + 1];
+        return TryBuildArgs(cmd.row, rest, out args, out error);
+    }
+
     // 表里的最后一个 string（非首位）与 List<int> 吃掉剩余 token：聊天内容、lua 参数、技能列表都这样传
     private static bool TryBuildArgs(ai_command row, string[] tokens, out object[] args, out string error)
     {
@@ -353,12 +427,17 @@ public sealed class AiCommandLine : ClientSubManager
     #endregion
 
     #region 常驻命令
+    private void PushReply(string command, string text)
+    {
+        hub.Push(AiInterruptKind.CommandReply, string.IsNullOrEmpty(command) ? "-" : command, text);
+    }
+
     private void OnGetPlayerName(AiRequest request)
     {
         request.Reply(string.IsNullOrEmpty(ClientSelection.playerName) ? "名称=（空）" : "名称=" + ClientSelection.playerName);
     }
 
-    private void OnReadChat(AiRequest request)
+    private void OnChatRecent(AiRequest request)
     {
         int channel = request.Int(0);
         if (channel < 0 || channel > SystemChannel)
@@ -366,22 +445,46 @@ public sealed class AiCommandLine : ClientSubManager
             request.Reject("channel 只能是 0 全部 / 1 阵营 / 2 附近 / 3 系统");
             return;
         }
-        request.Reply(ReadObservations(channel, request.Int(1), "聊天"));
-    }
-
-    private void OnReadEvents(AiRequest request)
-    {
-        request.Reply(ReadObservations(-1, request.Int(0), "事件"));
-    }
-
-    private string ReadObservations(int channel, int count, string label)
-    {
-        if (count <= 0 || count > MaxReadCount)
+        int count = Count(request.Int(1));
+        if (count <= 0)
         {
-            return $"错误：数量必须是 1~{MaxReadCount} 的整数";
+            request.Reject($"数量必须是 1~{MaxReadCount} 的整数");
+            return;
         }
-        string text = channel < 0 ? observations.Read(count) : observations.ReadChat(channel, count);
-        return text ?? $"（没有{label}记录）";
+        request.Reply(observations.ReadChat(channel, count) ?? "（没有聊天记录）");
+    }
+
+    private void OnPromptBuffer(AiRequest request)
+    {
+        int count = Count(request.Int(0));
+        if (count <= 0)
+        {
+            request.Reject($"数量必须是 1~{MaxReadCount} 的整数");
+            return;
+        }
+        request.Reply(observations.ReadPrompt(count) ?? "（没有提示记录）");
+    }
+
+    private void OnCheckInterrupt(AiRequest request)
+    {
+        request.Reply(hub.TryDrain(out string text) ? text : "（没有中断）");
+    }
+
+    private void OnInterrupt(AiRequest request)
+    {
+        string message = request.Str(0);
+        hub.Push(AiInterruptKind.LuaTrigger, string.IsNullOrEmpty(message) ? "lua 触发" : message);
+    }
+
+    private void OnWait(AiRequest request)
+    {
+        float seconds = request.Float(0);
+        if (seconds <= 0f)
+        {
+            request.Reject("等待时间必须大于 0");
+            return;
+        }
+        hub.Wait(seconds);
     }
 
     private void OnListCommands(AiRequest request)
@@ -398,7 +501,7 @@ public sealed class AiCommandLine : ClientSubManager
         var lua = AiLuaInterface.Current;
         if (lua != null && lua.CommandNames.Count > 0)
         {
-            builder.Append("\n--- lua 拓展（用 execLuaCommand 调用）---");
+            builder.Append("\n--- lua 拓展（用 lua_execCommand 调用）---");
             for (int i = 0; i < lua.CommandNames.Count; i++)
             {
                 builder.Append('\n').Append(lua.CommandNames[i]);
@@ -428,12 +531,16 @@ public sealed class AiCommandLine : ClientSubManager
         }
         request.Reply(lua.ReloadExtensions());
     }
+
+    private static int Count(int count) => count <= 0 || count > MaxReadCount ? -1 : count;
     #endregion
 
     #region 事件
     protected override void BindEvents()
     {
-        EventManager.AddEvent<AiObservation>(AiEvent.Observation, OnObservation);
+        EventManager.AddEvent<AiChatLine>(AiEvent.ChatLine, OnChatLine);
+        EventManager.AddEvent<AiTextLine>(AiEvent.PromptLine, OnPromptLine);
+        EventManager.AddEvent<AiTextLine>(AiEvent.ImportantLine, OnImportantLine);
         EventManager.AddEvent<SCAiFeedback>(ClientEvent.OnAiFeedback, OnServerFeedback);
         EventManager.AddEvent<int>(ClientEvent.OnBattleStart, OnBattleStart);
         EventManager.AddEvent<int>(ClientEvent.OnBattleEnd, OnBattleEnd);
@@ -441,30 +548,21 @@ public sealed class AiCommandLine : ClientSubManager
 
     protected override void UnbindEvents()
     {
-        EventManager.RemoveEvent<AiObservation>(AiEvent.Observation, OnObservation);
+        EventManager.RemoveEvent<AiChatLine>(AiEvent.ChatLine, OnChatLine);
+        EventManager.RemoveEvent<AiTextLine>(AiEvent.PromptLine, OnPromptLine);
+        EventManager.RemoveEvent<AiTextLine>(AiEvent.ImportantLine, OnImportantLine);
         EventManager.RemoveEvent<SCAiFeedback>(ClientEvent.OnAiFeedback, OnServerFeedback);
         EventManager.RemoveEvent<int>(ClientEvent.OnBattleStart, OnBattleStart);
         EventManager.RemoveEvent<int>(ClientEvent.OnBattleEnd, OnBattleEnd);
-        AiCommandBus.Unbind(AiCommandId.GetMyPlayerName, OnGetPlayerName);
-        AiCommandBus.Unbind(AiCommandId.ReadChatMessage, OnReadChat);
-        AiCommandBus.Unbind(AiCommandId.ReadEvents, OnReadEvents);
-        AiCommandBus.Unbind(AiCommandId.ReloadLuaCommand, OnReloadLua);
-        AiCommandBus.Unbind(AiCommandId.ExecLuaCommand, OnRunLuaExtension);
-        AiCommandBus.Unbind(AiCommandId.ListCommands, OnListCommands);
+        UnbindSelfCommands();
         if (Current == this) Current = null;
     }
 
-    // 界面把玩家看到的每一行都转发过来：进缓冲，@自己的再补一条中断
-    private void OnObservation(AiObservation observation)
-    {
-        observations.Append(observation);
+    private void OnChatLine(AiChatLine line) => observations.AppendChat(line);
 
-        if (observation.Category != AiObservation.ChatCategory || observation.FromSelf) return;
-        string self = ClientSelection.playerName;
-        if (string.IsNullOrEmpty(self)) return;
-        if (observation.Text == null || !observation.Text.Contains("@" + self)) return;
-        hub.Push(AiInterruptKind.ChatMention, "内容=" + observation.Text);
-    }
+    private void OnPromptLine(AiTextLine line) => observations.AppendPrompt(line);
+
+    private void OnImportantLine(AiTextLine line) => observations.AppendImportant(line);
 
     // 服务器回执：目前只有移动失败（目的地算不出路）
     private void OnServerFeedback(SCAiFeedback info)

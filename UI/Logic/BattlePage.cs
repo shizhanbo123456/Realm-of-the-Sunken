@@ -1,5 +1,6 @@
 ﻿using Ros.UI.Main;
 using System.Collections.Generic;
+using System.Text;
 using Ros.Transport;
 using FairyGUI;
 using UnityEngine;
@@ -175,24 +176,30 @@ public class BattlePage : PageBase
     {
         if (aiBound) return;
         aiBound = true;
-        AiCommandBus.Bind(AiCommandId.QuickMessage, OnAiQuickMessage);
-        AiCommandBus.Bind(AiCommandId.QuickMessageWithPosition, OnAiQuickMessageAt);
-        AiCommandBus.Bind(AiCommandId.SetSkillColumn, OnAiSetSkillColumn);
+        AiCommandBus.Bind(ai_commandEnum.quickMessage_send, OnAiQuickMessage);
+        AiCommandBus.Bind(ai_commandEnum.quickMessage_sendPosition, OnAiQuickMessageAt);
+        AiCommandBus.Bind(ai_commandEnum.setSkillColumn, OnAiSetSkillColumn);
+        AiCommandBus.Bind(ai_commandEnum.openSkillSelectPanel, OnAiOpenSkillSelect);
+        AiCommandBus.Bind(ai_commandEnum.cardSelection_openPanel, OnAiOpenCardPanel);
+        AiCommandBus.Bind(ai_commandEnum.cardSelection_selectCard, OnAiSelectCard);
     }
 
     private void ResignAiCommands()
     {
         if (!aiBound) return;
         aiBound = false;
-        AiCommandBus.Unbind(AiCommandId.QuickMessage, OnAiQuickMessage);
-        AiCommandBus.Unbind(AiCommandId.QuickMessageWithPosition, OnAiQuickMessageAt);
-        AiCommandBus.Unbind(AiCommandId.SetSkillColumn, OnAiSetSkillColumn);
+        AiCommandBus.Unbind(ai_commandEnum.quickMessage_send, OnAiQuickMessage);
+        AiCommandBus.Unbind(ai_commandEnum.quickMessage_sendPosition, OnAiQuickMessageAt);
+        AiCommandBus.Unbind(ai_commandEnum.setSkillColumn, OnAiSetSkillColumn);
+        AiCommandBus.Unbind(ai_commandEnum.openSkillSelectPanel, OnAiOpenSkillSelect);
+        AiCommandBus.Unbind(ai_commandEnum.cardSelection_openPanel, OnAiOpenCardPanel);
+        AiCommandBus.Unbind(ai_commandEnum.cardSelection_selectCard, OnAiSelectCard);
     }
 
     private void OnAiQuickMessage(AiRequest request)
     {
         int messageId = request.Int(0);
-        if (!QuickMessageConfig.content.TryGetValue(messageId, out var cfg))
+        if (!QuickMessageConfig.content.TryGetValue(messageId, out _))
         {
             request.Reject($"快捷消息 {messageId} 未配置");
             return;
@@ -200,15 +207,13 @@ public class BattlePage : PageBase
         if (!TrySendQuickMessage(messageId, Vector3.zero, false, out string error))
         {
             request.Reject(error);
-            return;
         }
-        request.Reply("已发送快捷消息 " + cfg.name);
     }
 
     private void OnAiQuickMessageAt(AiRequest request)
     {
         int messageId = request.Int(0);
-        if (!QuickMessageConfig.content.TryGetValue(messageId, out var cfg))
+        if (!QuickMessageConfig.content.TryGetValue(messageId, out _))
         {
             request.Reject($"快捷消息 {messageId} 未配置");
             return;
@@ -219,9 +224,7 @@ public class BattlePage : PageBase
         if (!TrySendQuickMessage(messageId, new Vector3(x, 0f, z), true, out string error))
         {
             request.Reject(error);
-            return;
         }
-        request.Reply($"已发送快捷消息 {cfg.name} 坐标=({x:0.##},{z:0.##})");
     }
 
     // 技能栏唯一的提交入口：技能选择界面与 AI 命令共用
@@ -255,6 +258,68 @@ public class BattlePage : PageBase
             return;
         }
         request.Reply("已提交技能栏，等服务器回推快照");
+    }
+
+    // 打开技能选择界面，顺带把持有与当前栏报一遍
+    private void OnAiOpenSkillSelect(AiRequest request)
+    {
+        var skills = Skills;
+        var view = Tool.UIManager != null ? Tool.UIManager.SkillSelect : null;
+        if (skills == null || view == null)
+        {
+            request.Reject("技能选择界面未就绪");
+            return;
+        }
+        if (!view.OpenFromAi())
+        {
+            request.Reject("技能选择界面打不开（当前不可选择技能）");
+            return;
+        }
+
+        var builder = new StringBuilder();
+        builder.Append("已打开技能选择 槽位=").Append(skills.SlotCapacity);
+        builder.Append(" 持有=");
+        AppendIds(builder, skills.HeldSkills);
+        builder.Append(" 当前栏=");
+        AppendIds(builder, skills.ActiveSkills);
+        request.Reply(builder.ToString());
+    }
+
+    // 抽卡界面用服务器种子铺卡，卡面要等种子回来，回复也等到那时
+    private void OnAiOpenCardPanel(AiRequest request)
+    {
+        var view = Tool.UIManager != null ? Tool.UIManager.SelectCard : null;
+        if (view == null)
+        {
+            request.Reject("抽卡界面未就绪");
+            return;
+        }
+        view.OpenForAi(request.Int(0), request.Reply);
+    }
+
+    private void OnAiSelectCard(AiRequest request)
+    {
+        var view = Tool.UIManager != null ? Tool.UIManager.SelectCard : null;
+        if (view == null)
+        {
+            request.Reject("抽卡界面未就绪");
+            return;
+        }
+        if (!view.SelectForAi(request.Int(0), out string error)) request.Reject(error);
+    }
+
+    private static void AppendIds(StringBuilder builder, IReadOnlyList<int> ids)
+    {
+        if (ids.Count == 0)
+        {
+            builder.Append("无");
+            return;
+        }
+        for (int i = 0; i < ids.Count; i++)
+        {
+            if (i > 0) builder.Append(',');
+            builder.Append(ids[i]);
+        }
     }
     #endregion
 
@@ -475,6 +540,7 @@ public class BattlePage : PageBase
         if (IsOwnEntity(info.entityId))
         {
             localPlayerCamp = (int)info.camp;
+            if (!localPlayerAlive && Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.revived); // 死亡观战期间实体重新出现 = 复活
             localPlayerAlive = true;
             panel.m_onlook.selectedIndex = 0; // 复活/正常出战：血条与技能栏回到显示
             spectateTargetClientId = -1; // 本地实体出现（复活/正常出战）：服务器已退出观战，视角回自身
@@ -494,6 +560,7 @@ public class BattlePage : PageBase
 
         if (lastOwnEntityId != 0 && entityId == lastOwnEntityId)
         {
+            if (localPlayerAlive && Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.defeated);
             localPlayerAlive = false; // 本地死亡：显示观战下拉，进入死亡观战
             panel.m_onlook.selectedIndex = 1; // 死亡等待复活：由 FGUI gear 收起血条与技能栏
         }
@@ -903,9 +970,9 @@ public class BattlePage : PageBase
         else if (e.type == SCBattleEvent.Type.Daybreak) ShowEventBanner(BannerDaybreak);  // 天亮横幅
         else if (e.type == SCBattleEvent.Type.SkillBroadcast)
         {
-            // 技能播报只在横幅上出现（聊天页签明确跳过这类），所以由这里转给 AI
+            // 技能播报只在横幅上出现（聊天页签明确跳过这类），所以由这里转给 AI 的重要事件缓冲
             EnqueueImportantBanner(e.textId);
-            AiObservation.Report(AiObservation.BattleCategory, ImportantBannerPrefix + SkillConfig.Get(e.textId).name);
+            AiObservation.ReportImportant(ImportantBannerPrefix + SkillConfig.Get(e.textId).name);
         }
     }
 
@@ -1092,6 +1159,11 @@ public class BattlePage : PageBase
     #region 局内等级 / 经验（次数与卡面归抽卡界面）
     private int cardLevel = 1;        // 局内等级（左上角等级 + 经验条）
     private int cardExp;              // 当前等级内已积累的经验
+
+    // AI 查询用：等级与经验条
+    public int AiCardLevel => cardLevel;
+
+    public int AiCardExp => cardExp;
 
     private void OnPlayerProgress(SCPlayerProgress info)
     {

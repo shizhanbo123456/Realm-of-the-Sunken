@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using FairyGUI;
 using Ros.Config;
@@ -15,6 +16,8 @@ public class SelectCardView : PageBase
     private readonly int[] pending = new int[CardCatalog.TierCount];
     private CardTier currentTier;   // 最近一次打开的档位（弃卡按它上报）
     private bool awaitingSeed;      // 已经发出种子请求、还没收到回包
+    private readonly List<CardRoll> currentRolls = new(); // 当前铺在界面上的三张卡（AI 选卡按下标取）
+    private Action<string> aiReply; // AI 开面板后等种子回来再回话
 
     public SelectCardView(UI_SelectCardPanel panel) : base(panel)
     {
@@ -24,6 +27,63 @@ public class SelectCardView : PageBase
     public override pageEnum PageKey => pageEnum.select_card;
 
     public bool IsOpen => IsVisible;
+
+    // AI 查询用：某档还剩几次待抽
+    public int AiPendingCount(int tier) => tier >= 0 && tier < pending.Length ? pending[tier] : 0;
+
+    // AI 开面板：卡面要等服务器种子，回复也延迟到铺好那一刻
+    public void OpenForAi(int tier, Action<string> reply)
+    {
+        if (tier < 0 || tier >= CardCatalog.TierCount)
+        {
+            reply("错误：档位只能是 0 白银 / 1 黄金 / 2 炫彩");
+            return;
+        }
+        if (pending[tier] <= 0)
+        {
+            reply("错误：该档没有待抽次数");
+            return;
+        }
+        aiReply = reply;
+        OpenPanel((CardTier)tier);
+    }
+
+    // AI 选卡：下标就是界面上第几张
+    public bool SelectForAi(int index, out string error)
+    {
+        if (!panel.IsOpen)
+        {
+            error = "抽卡界面没有打开";
+            return false;
+        }
+        if (index < 0 || index >= currentRolls.Count)
+        {
+            error = currentRolls.Count == 0 ? "卡面还没铺开" : $"卡面下标只能是 0~{currentRolls.Count - 1}";
+            return false;
+        }
+        error = null;
+        OnCardSelected(index);
+        return true;
+    }
+
+    private void ReplyToAi(string text)
+    {
+        var reply = aiReply;
+        aiReply = null;
+        reply?.Invoke(text);
+    }
+
+    private static string CardText(List<CardRoll> rolls, CardTier tier, int luck)
+    {
+        var builder = new System.Text.StringBuilder();
+        builder.Append("已开卡 档位=").Append(tier).Append(" 幸运=").Append(luck);
+        for (int i = 0; i < rolls.Count; i++)
+        {
+            builder.Append('\n').Append(i).Append(": ").Append(rolls[i].title);
+            if (rolls[i].IsSkill) builder.Append("（技能 ").Append(rolls[i].skillId).Append('）');
+        }
+        return builder.ToString();
+    }
 
     protected override void Init()
     {
@@ -85,6 +145,7 @@ public class SelectCardView : PageBase
     {
         awaitingSeed = false;
         Close();
+        ReplyToAi("错误：抽卡界面已关闭（种子留着，下次打开还是这组）");
     }
 
     // 服务器只下发「每档有多少次」，次数变化即重画悬浮按钮
@@ -95,7 +156,11 @@ public class SelectCardView : PageBase
         pending[2] = info.holo;
 
         // 面板开着但这一档已经被抽完（例如弃卡后服务器结算）→ 收起，避免显示过期卡面
-        if (panel.IsOpen && pending[(int)panel.OpenedTier] <= 0) Close();
+        if (panel.IsOpen && pending[(int)panel.OpenedTier] <= 0)
+        {
+            Close();
+            ReplyToAi("错误：该档次数已用完");
+        }
 
         RefreshHud();
     }
@@ -111,6 +176,7 @@ public class SelectCardView : PageBase
         {
             Close();
             ShowNoCard();
+            ReplyToAi("错误：该档暂无可抽的卡");
             return;
         }
         ShowCardSet(tier, info.seed, info.luck);
@@ -125,11 +191,15 @@ public class SelectCardView : PageBase
         {
             Close();
             ShowNoCard();
+            ReplyToAi("错误：该档暂无可抽的卡");
             return;
         }
         currentTier = tier;
+        currentRolls.Clear();
+        currentRolls.AddRange(rolls);
         panel.Open(rolls, tier, luck);
         if (Tool.UIManager != null) Tool.UIManager.ShowPage(PageKey);
+        ReplyToAi(CardText(rolls, tier, luck));
     }
 
     // 点悬浮按钮：面板先进等待态，种子回来才铺卡
@@ -199,10 +269,12 @@ public class SelectCardView : PageBase
     {
         for (int i = 0; i < pending.Length; i++) pending[i] = 0;
         pendingTiers.Clear();
+        currentRolls.Clear();
         currentTier = CardTier.Silver;
         awaitingSeed = false;
         if (Tool.UIManager != null) Tool.UIManager.HidePage(PageKey);
         RefreshHud();
+        ReplyToAi("错误：抽卡状态已重置");
     }
 
     private static ClientSkillManager Skills => Tool.ClientLogicManager != null ? Tool.ClientLogicManager.SkillVfx : null;

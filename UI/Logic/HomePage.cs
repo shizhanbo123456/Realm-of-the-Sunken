@@ -88,20 +88,20 @@ public class HomePage : PageBase
     {
         if (aiBound) return;
         aiBound = true;
-        AiCommandBus.Bind(AiCommandId.SetMyPlayerName, OnAiSetPlayerName);
-        AiCommandBus.Bind(AiCommandId.SelectCharacter, OnAiSelectCharacter);
-        AiCommandBus.Bind(AiCommandId.ConnectToServer, OnAiConnect);
-        AiCommandBus.Bind(AiCommandId.Takeover, OnAiTakeover);
+        AiCommandBus.Bind(ai_commandEnum.home_setPlayerName, OnAiSetPlayerName);
+        AiCommandBus.Bind(ai_commandEnum.home_selectCharacter, OnAiSelectCharacter);
+        AiCommandBus.Bind(ai_commandEnum.home_connect, OnAiConnect);
+        AiCommandBus.Bind(ai_commandEnum.takeover, OnAiTakeover);
     }
 
     private void ResignAiCommands()
     {
         if (!aiBound) return;
         aiBound = false;
-        AiCommandBus.Unbind(AiCommandId.SetMyPlayerName, OnAiSetPlayerName);
-        AiCommandBus.Unbind(AiCommandId.SelectCharacter, OnAiSelectCharacter);
-        AiCommandBus.Unbind(AiCommandId.ConnectToServer, OnAiConnect);
-        AiCommandBus.Unbind(AiCommandId.Takeover, OnAiTakeover);
+        AiCommandBus.Unbind(ai_commandEnum.home_setPlayerName, OnAiSetPlayerName);
+        AiCommandBus.Unbind(ai_commandEnum.home_selectCharacter, OnAiSelectCharacter);
+        AiCommandBus.Unbind(ai_commandEnum.home_connect, OnAiConnect);
+        AiCommandBus.Unbind(ai_commandEnum.takeover, OnAiTakeover);
     }
 
     #region AI 命令（与玩家点界面走同一条链路）
@@ -112,7 +112,6 @@ public class HomePage : PageBase
             request.Reject(string.Format(PromptConfig.Get(promptEnum.name_length_invalid).text, min, max));
             return;
         }
-        request.Reply("名称已设为 " + ClientSelection.playerName);
     }
 
     private void OnAiSelectCharacter(AiRequest request)
@@ -134,7 +133,6 @@ public class HomePage : PageBase
         }
 
         SelectCharacter(defense, index); // 与「确认选择」同一个落盘入口：切页签、浏览、刷新预览、写 ClientSelection
-        request.Reply($"已选择 进攻={ClientSelection.selectedAttackIndex} 防守={ClientSelection.selectedDefenseIndex}");
     }
 
     private void OnAiConnect(AiRequest request)
@@ -146,24 +144,23 @@ public class HomePage : PageBase
             return;
         }
 
-        string ip = request.Str(0);
-        request.Reply("已发起连接：" + (ip.Length == 0 ? "本机" : ip));
-        ConnectAndReport(ip);
+        ConnectAndReport(request.Str(0));
     }
 
-    // 命令行必须当帧返回，连接结果只能事后补一条记录
+    // 连接是异步的：结果以飘字落地，玩家与 AI 看到的是同一条
     private async void ConnectAndReport(string ip)
     {
         try
         {
             var result = await ConnectAsync(ip);
-            AiObservation.Report(AiObservation.FlowCategory,
-                result == NetworkManager.ConnectResult.Success ? "连接成功，正在进入房间" : "连接失败：" + result);
+            if (Tool.UIManager == null) return;
+            if (result == NetworkManager.ConnectResult.Success) Tool.UIManager.ShowFlyText(promptEnum.connect_success);
+            else Tool.UIManager.ShowFlyText(promptEnum.connect_failed);
         }
         catch (System.Exception e)
         {
             Debug.LogError("[AI] 连接异常：" + e.Message);
-            AiObservation.Report(AiObservation.FlowCategory, "连接异常：" + e.Message);
+            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.connect_failed);
         }
     }
 
@@ -171,7 +168,6 @@ public class HomePage : PageBase
     {
         bool on = request.Bool(0);
         InputManager.SetControlMode(on ? PlayerControlMode.Ai : PlayerControlMode.Player);
-        request.Reply(on ? "已接管：键鼠与界面点击已屏蔽" : "已解除接管：恢复玩家控制");
     }
     #endregion
 

@@ -303,7 +303,7 @@ public class UIManager : MonoBehaviour
         string text = PromptConfig.Get(promptId).text;
         if (args != null && args.Length > 0) text = string.Format(text, args);
 
-        AiObservation.Report(AiObservation.PromptCategory, text); // 玩家能看到的提示，AI 也记一份
+        AiObservation.ReportPrompt(text); // 玩家能看到的提示，AI 也记一份
 
         var panel = UI_NoticePanel.CreateInstance();
         if (panel.m_title != null) panel.m_title.text = text;

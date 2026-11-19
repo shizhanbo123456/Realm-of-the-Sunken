@@ -36,12 +36,22 @@ public class SkillSelectView : PageBase
             panel.Commit();
             return;
         }
+        OpenFromAi();
+    }
+
+    // 打开技能选择：快捷键与 AI 命令共用，条件不满足返回 false
+    public bool OpenFromAi()
+    {
+        if (Tool.UIManager == null) return false;
+        if (panel.IsOpen) return true;
+
         var skills = Skills;
         var battle = Battle;
-        if (skills == null || battle == null || !battle.CanOpenSkillSelect) return;
+        if (skills == null || battle == null || !battle.CanOpenSkillSelect) return false;
 
         panel.Open(skills.HeldSkills, skills.ActiveSkills, skills.SlotCapacity);
         Tool.UIManager.ShowPage(PageKey);
+        return true;
     }
 
     public override void Exit()

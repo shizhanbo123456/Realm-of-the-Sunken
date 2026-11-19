@@ -92,14 +92,14 @@ public class ChatPlugin : PageBase
     {
         if (aiBound) return;
         aiBound = true;
-        AiCommandBus.Bind(AiCommandId.SendChatMessage, OnAiSendChat);
+        AiCommandBus.Bind(ai_commandEnum.chat_send, OnAiSendChat);
     }
 
     private void ResignAiCommands()
     {
         if (!aiBound) return;
         aiBound = false;
-        AiCommandBus.Unbind(AiCommandId.SendChatMessage, OnAiSendChat);
+        AiCommandBus.Unbind(ai_commandEnum.chat_send, OnAiSendChat);
     }
 
     private void OnAiSendChat(AiRequest request)
@@ -131,7 +131,6 @@ public class ChatPlugin : PageBase
             else request.Reject("发送过于频繁，请稍后再试");
             return;
         }
-        request.Reply("已发送");
     }
 
     public override void Shutdown()
