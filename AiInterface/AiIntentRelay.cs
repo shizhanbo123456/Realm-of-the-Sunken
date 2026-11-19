@@ -141,7 +141,11 @@ public sealed class AiIntentRelay : DecisionMachine, IBehaviorHost
 
     void IBehaviorHost.Stop() => Owner.StopMoving();
 
-    void IBehaviorHost.FaceTarget(EntityData target) => Owner.SetRobotFacePoint(target.transform.position);
+    void IBehaviorHost.FaceTarget(EntityData target)
+    {
+        if (target == null) return; // 静止请求可无朝向目标：保持当前朝向
+        Owner.SetRobotFacePoint(target.transform.position);
+    }
 
     // 连招窗口内续接普攻下一段；窗口没开就按技能优先、全不可用退普攻的常规顺序出手
     bool IBehaviorHost.TryAttack(EntityData target)
