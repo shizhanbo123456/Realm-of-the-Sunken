@@ -27,6 +27,9 @@ namespace Ros.Config
                     row.order = r.ReadInt32();
                     row.blackMask = r.ReadByte() != 0;
                     row.closeOnOutsideClick = r.ReadByte() != 0;
+                    row.alignMode = r.ReadInt32();
+                    row.marginX = r.ReadInt32();
+                    row.marginY = r.ReadInt32();
                     pageData.Add(row.key, row);
                 }
             }
@@ -38,6 +41,9 @@ namespace Ros.Config
         public int order;  // 层级：显示层级，越大越靠上；同层级互斥
         public bool blackMask;  // 显示黑屏遮罩：是否显示黑屏遮罩
         public bool closeOnOutsideClick;  // 点击外部关闭：点击面板外部是否收起本界面
+        public int alignMode;  // 适配模式：0=全屏铺满；1=左下 2=正下 3=右下 4=左中 5=正中 6=右中 7=左上 8=正上 9=右上
+        public int marginX;  // 水平边距：贴左右边时留出的距离
+        public int marginY;  // 垂直边距：贴上下边时留出的距离
     }
     public enum pageEnum
     {

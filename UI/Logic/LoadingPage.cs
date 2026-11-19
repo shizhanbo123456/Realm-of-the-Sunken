@@ -32,13 +32,4 @@ public class LoadingPage : PageBase
         panel.m_progressbar.value = Mathf.Clamp01(progress01) * panel.m_progressbar.max;
         panel.m_label.text = text;
     }
-
-    public override void OnResize(float width, float height)
-    {
-        float scale = Screen.height / 1080f;
-        panel.scale = new Vector2(scale, scale);
-        panel.SetXY(
-            (GRoot.inst.width - panel.width * scale) * 0.5f,
-            (GRoot.inst.height - panel.height * scale) * 0.5f);
-    }
 }

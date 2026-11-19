@@ -92,20 +92,7 @@ public class ChatPlugin : PageBase
         EventManager.RemoveEvent(ClientEvent.OnRestartGame, OnLeaveRoom);
     }
 
-    //与页面同规则的整体缩放（设计高度 1080）；贴屏幕左下角
-    public override void OnResize(float width, float height)
-    {
-        UiScale = Screen.height / 1080f;
-        ApplyTransform();
-    }
-
     #region//Local
-    private void ApplyTransform()
-    {
-            panel.scale = new Vector2(UiScale, UiScale);
-            panel.SetXY(0f, GRoot.inst.height - panel.height * UiScale); // x 贴左边缘，y 贴屏幕底
-    }
-
     private void OnBattleStart(int camp)
     {
         SelectTab((int)ChatChannel.All);

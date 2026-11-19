@@ -48,7 +48,6 @@ public class SettingsView : PageBase
     {
         base.Enter(param);
         View.m_in_server.selectedIndex = NetworkManager.IsConnected ? 1 : 0; // 0 未连服务器 / 1 已连服务器
-        ApplyTransform();
         SyncToggles();
     }
 
@@ -61,12 +60,6 @@ public class SettingsView : PageBase
     public override void Update(float deltaTime)
     {
         if (IsOpen) SyncToggles();
-    }
-
-    public override void OnResize(float width, float height)
-    {
-        UiScale = Screen.height / 1080f;
-        ApplyTransform();
     }
 
     #region//Local
@@ -93,16 +86,6 @@ public class SettingsView : PageBase
             View.m_toggle_auto_pitch.selected = ClientSettings.AutoPitch;
         if (View.m_toggle_camea_shake.selected != ClientSettings.CameraShake)
             View.m_toggle_camea_shake.selected = ClientSettings.CameraShake;
-    }
-
-    // 与确认弹窗同规则：按中心锚点居中缩放（面板带全屏拦截层，尺寸不等于弹窗本体）
-    private void ApplyTransform()
-    {
-        if (panel == null) return;
-        panel.scale = new Vector2(UiScale, UiScale);
-        panel.pivotAsAnchor = true;
-        panel.pivot = new Vector2(0.5f, 0.5f);
-        panel.SetXY(GRoot.inst.width * 0.5f, GRoot.inst.height * 0.5f);
     }
     #endregion
 }

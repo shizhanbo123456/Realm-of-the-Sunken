@@ -36,13 +36,6 @@ public class ConfirmView : PageBase
         base.Shutdown();
     }
 
-    // 与页面同规则的整体缩放（设计高度 1080）
-    public override void OnResize(float width, float height)
-    {
-        UiScale = Screen.height / 1080f;
-        ApplyTransform();
-    }
-
     // content = 正文；confirm = 确认回调；cancel = 取消回调（可为空，此时取消按钮只关闭）
     public void Show(string content, Action confirm, Action cancel = null)
     {
@@ -50,7 +43,6 @@ public class ConfirmView : PageBase
         onCancel = cancel;
         if (panel.m_content != null) panel.m_content.text = content;
 
-        ApplyTransform();
         if (Tool.UIManager != null) Tool.UIManager.ShowPage(pageEnum.confirm);
     }
 
@@ -76,16 +68,6 @@ public class ConfirmView : PageBase
         var act = onCancel;
         if (Tool.UIManager != null) Tool.UIManager.HidePage(pageEnum.confirm);
         if (act != null) act();
-    }
-
-    // 居中：面板带全屏拦截层时尺寸不等于弹窗本身，按中心锚点定位才不会被拉偏
-    private void ApplyTransform()
-    {
-        if (panel == null) return;
-        panel.scale = new Vector2(UiScale, UiScale);
-        panel.pivotAsAnchor = true;
-        panel.pivot = new Vector2(0.5f, 0.5f);
-        panel.SetXY(GRoot.inst.width * 0.5f, GRoot.inst.height * 0.5f);
     }
     #endregion
 }

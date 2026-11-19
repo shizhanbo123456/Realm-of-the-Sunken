@@ -39,6 +39,8 @@ public abstract class PageBase
 
     public float PanelWidth { get; private set; } = 1920f;
 
+    private float layoutHeight = 1080f; // 设计高度基准，全屏适配时高度不变
+
     protected PageBase(GComponent root)
     {
         Root = root;
@@ -68,7 +70,7 @@ public abstract class PageBase
     {
         IsVisible = true;
         Root.visible = true;
-        SyncMask();
+        ApplyLayout();
     }
 
     // 每帧，只对可见页面调用
@@ -86,12 +88,47 @@ public abstract class PageBase
 
     public virtual void OnResize(float width, float height)
     {
+        layoutHeight = height;
+        UiScale = Screen.height / height;
         PanelWidth = width;
-        UiScale = Screen.height / 1080f;
-        Root.SetSize(width, height);
+        ApplyLayout();
+    }
+
+    // 适配：alignMode 0 = 全屏（高度不变、按窗口宽高比重设宽度后缩放到刚好铺满）；1~9 = 保持设计尺寸贴到屏幕九宫格
+    private void ApplyLayout()
+    {
+        Root.pivotAsAnchor = false;
+        Root.pivot = Vector2.zero;
         Root.scale = new Vector2(UiScale, UiScale);
-        Root.SetXY(0f, 0f);
+        if (Config.alignMode == 0)
+        {
+            Root.SetSize(layoutHeight * Screen.width / Screen.height, layoutHeight);
+            Root.SetXY(0f, 0f);
+        }
+        else
+        {
+            Root.SetXY(AnchorX(), AnchorY());
+        }
         SyncMask();
+    }
+
+    // 1 左下 / 2 正下 / 3 右下 / 4 左中 / 5 正中 / 6 右中 / 7 左上 / 8 正上 / 9 右上
+    private float AnchorX()
+    {
+        int col = (Config.alignMode - 1) % 3;
+        float width = Root.width * UiScale;
+        if (col == 0) return Config.marginX;
+        if (col == 1) return (GRoot.inst.width - width) * 0.5f;
+        return GRoot.inst.width - width - Config.marginX;
+    }
+
+    private float AnchorY()
+    {
+        int row = (Config.alignMode - 1) / 3; // 0 底 / 1 中 / 2 顶
+        float height = Root.height * UiScale;
+        if (row == 0) return GRoot.inst.height - height - Config.marginY;
+        if (row == 1) return (GRoot.inst.height - height) * 0.5f;
+        return Config.marginY;
     }
 
     // 复制一份全屏遮罩，作为面板最底层的子元素
@@ -115,15 +152,12 @@ public abstract class PageBase
         SyncMask();
     }
 
-    // 铺满屏幕并按 Root 居中：小面板居中缩放时，遮罩也能盖住整屏
+    // 遮罩铺满整屏并对到屏幕左上角：界面居中或贴边都能盖住整屏
     private void SyncMask()
     {
         if (Mask == null) return;
-        float scale = Screen.height / 1080f;
-        float width = Screen.width / scale;
-        const float height = 1080f;
-        Mask.SetSize(width, height);
-        Mask.SetXY((Root.width - width) * 0.5f, (Root.height - height) * 0.5f);
+        Mask.SetSize(Screen.width / UiScale, Screen.height / UiScale);
+        Mask.SetXY(-Root.x / UiScale, -Root.y / UiScale);
     }
 
     private void OnMaskClicked()

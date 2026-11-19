@@ -66,16 +66,6 @@ public class GmPanel : PageBase
         EventManager.RemoveEvent<SCGm>(ClientEvent.OnGmResult, OnGmResult);
     }
 
-    // 与页面同规则的整体缩放（设计高度 1080）；面板居中
-    public override void OnResize(float width, float height)
-    {
-        float uiScale = Screen.height / 1080f;
-        panel.scale = new Vector2(uiScale, uiScale);
-        panel.SetXY(
-            (GRoot.inst.width - panel.width * uiScale) * 0.5f,
-            (GRoot.inst.height - panel.height * uiScale) * 0.5f);
-    }
-
     // 打开由 InputManager 的三连 V 触发：每次打开都重建菜单并清空输出
     public override void Enter(ShowParam param)
     {

@@ -57,19 +57,12 @@ public class GuideView : PageBase
     public override void Enter(ShowParam param)
     {
         base.Enter(param);
-        ApplyTransform();
         SwitchTab(tab);
     }
 
     private static void CloseSelf()
     {
         if (Tool.UIManager != null) Tool.UIManager.HidePage(pageEnum.guide);
-    }
-
-    public override void OnResize(float width, float height)
-    {
-        UiScale = Screen.height / 1080f;
-        ApplyTransform();
     }
 
     #region//Local
@@ -177,15 +170,6 @@ public class GuideView : PageBase
                 scoreTab.m_highlight.selectedIndex = j < score + 1 ? 1 : 0;
             }
         }
-    }
-
-    private void ApplyTransform()
-    {
-        if (panel == null) return;
-        panel.scale = new Vector2(UiScale, UiScale);
-        panel.pivotAsAnchor = true;
-        panel.pivot = new Vector2(0.5f, 0.5f);
-        panel.SetXY(GRoot.inst.width * 0.5f, GRoot.inst.height * 0.5f);
     }
     #endregion
 }

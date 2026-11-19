@@ -33,19 +33,12 @@ public class RuleView : PageBase
     public override void Enter(ShowParam param)
     {
         base.Enter(param);
-        ApplyTransform();
         if (tipKeys.Count > 0) SelectTip(0);
     }
 
     private static void CloseSelf()
     {
         if (Tool.UIManager != null) Tool.UIManager.HidePage(pageEnum.rule);
-    }
-
-    public override void OnResize(float width, float height)
-    {
-        UiScale = Screen.height / 1080f;
-        ApplyTransform();
     }
 
     #region//Local
@@ -81,16 +74,6 @@ public class RuleView : PageBase
         for (int i = 0; i < tabs.numChildren; i++)
             tabs.GetChildAt(i).asButton.selected = i == index; // 页签选中态
         panel.m_rule_content.text = tipTexts[index];
-    }
-
-    // 与确认弹窗同规则：按中心锚点居中缩放
-    private void ApplyTransform()
-    {
-        if (panel == null) return;
-        panel.scale = new Vector2(UiScale, UiScale);
-        panel.pivotAsAnchor = true;
-        panel.pivot = new Vector2(0.5f, 0.5f);
-        panel.SetXY(GRoot.inst.width * 0.5f, GRoot.inst.height * 0.5f);
     }
     #endregion
 }
