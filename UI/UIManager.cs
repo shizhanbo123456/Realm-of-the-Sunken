@@ -14,6 +14,7 @@ public class UIManager : MonoBehaviour
     private ChatPlugin chat;
     private GmPanel gm;
     private SettingsView settings;
+    private RuleView rule;
     private GuideView guide;
     private ConfirmView confirm;
     private LoadingPage loading;
@@ -27,8 +28,8 @@ public class UIManager : MonoBehaviour
     // GM 面板打开期间接管键盘：角色操控、技能、指令面板、技能选择都不得响应
     public bool GmOpen => IsPageVisible(PageId.Gm);
 
-    // 玩法输入归 UI：GM 面板 / 设置 / 图鉴 / 正在文字输入框里打字
-    public bool InputCaptured => GmOpen || IsPageVisible(PageId.Settings) || IsPageVisible(PageId.Guide) || IsTypingInTextField;
+    // 玩法输入归 UI：GM 面板 / 设置 / 规则 / 图鉴 / 正在文字输入框里打字
+    public bool InputCaptured => GmOpen || IsPageVisible(PageId.Settings) || IsPageVisible(PageId.Rule) || IsPageVisible(PageId.Guide) || IsTypingInTextField;
 
     private static bool IsTypingInTextField => GRoot.inst != null && GRoot.inst.focus is GTextInput;
 
@@ -76,6 +77,7 @@ public class UIManager : MonoBehaviour
             chat = new ChatPlugin(UI_ChatPanel.CreateInstance());
             gm = new GmPanel(UI_GmPanel.CreateInstance());
             settings = new SettingsView(UI_SettingsPanel.CreateInstance());
+            rule = new RuleView(UI_RulePanel.CreateInstance());
             guide = new GuideView(UI_GuidePanel.CreateInstance());
             confirm = new ConfirmView(UI_ConfirmPanel.CreateInstance());
             loading = new LoadingPage(UI_LoadingPanel.CreateInstance());
@@ -89,6 +91,7 @@ public class UIManager : MonoBehaviour
             Register(PageId.RobotTv, robotTv);
             Register(PageId.Gm, gm);
             Register(PageId.Settings, settings);
+            Register(PageId.Rule, rule);
             Register(PageId.Guide, guide);
             Register(PageId.Confirm, confirm);
             Register(PageId.Loading, loading);
@@ -98,6 +101,7 @@ public class UIManager : MonoBehaviour
             for (int i = 0; i < pageList.Count; i++) pageList[i].InitPage();
             Debug.Log($"[UIManager] 页面已初始化：{pageList.Count} 个");
 
+            settings.OnOpenRule = () => ShowPage(PageId.Rule);
             settings.OnOpenGuide = () => ShowPage(PageId.Guide);
             settings.OnOpenBridge = OpenBridgeConfirm;
             settings.OnExit = ExitFromSettings;
@@ -227,6 +231,7 @@ public class UIManager : MonoBehaviour
     {
         HidePage(PageId.Confirm);
         HidePage(PageId.Settings);
+        HidePage(PageId.Rule);
         HidePage(PageId.Guide);
     }
     #endregion

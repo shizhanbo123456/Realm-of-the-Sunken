@@ -1,21 +1,15 @@
-﻿using System.Collections.Generic;
-using FairyGUI;
-using Ros.Config;
+﻿using FairyGUI;
 using Ros.UI.Main;
 using UnityEngine;
 
 // 设置子界面：三个页面共用同一份，显隐由 UIManager 统一管理；勾选态不会丢
 public class SettingsView : PageBase
 {
-    // 由 UIManager 注入：这三个动作跨页面，去哪由它决定
+    // 由 UIManager 注入：这四个动作跨页面，去哪由它决定
+    public System.Action OnOpenRule;
     public System.Action OnOpenGuide;
     public System.Action OnOpenBridge;
     public System.Action OnExit;
-
-    // 规则页签按 setting_tips 配表行生成，点页签把该行内容填进右上角正文
-    private readonly List<int> tipKeys = new();
-    private readonly List<string> tipTexts = new();
-    private int tipTab;
 
     private UI_SettingsPanel panel;
 
@@ -42,10 +36,10 @@ public class SettingsView : PageBase
         View.m_back_to_fight.onClick.Set(CloseSelf);
         View.m_back.onClick.Set(CloseSelf);
         View.m_exit.onClick.Set(() => OnExit?.Invoke());
+        View.m_open_rule.onClick.Set(() => OnOpenRule?.Invoke());
         View.m_open_guide.onClick.Set(() => OnOpenGuide?.Invoke());
         View.m_open_bridge.onClick.Set(() => OnOpenBridge?.Invoke());
 
-        BuildTips();
         BindToggles();
     }
 
@@ -55,7 +49,6 @@ public class SettingsView : PageBase
         View.m_in_server.selectedIndex = NetworkManager.IsConnected ? 1 : 0; // 0 未连服务器 / 1 已连服务器
         ApplyTransform();
         SyncToggles();
-        if (tipKeys.Count > 0) SelectTip(tipTab);
     }
 
     private static void CloseSelf()
@@ -76,41 +69,6 @@ public class SettingsView : PageBase
     }
 
     #region//Local
-    private void BuildTips()
-    {
-        var keys = new List<int>(SettingTipsConfig.content.Keys);
-        keys.Sort();
-        foreach (int key in keys)
-        {
-            tipKeys.Add(key);
-            tipTexts.Add(SettingTipsConfig.content[key].text.Replace(@"{\n}", "\n"));
-        }
-
-        var tabs = View.m_rule_buttons;
-        tabs.itemRenderer = (i, obj) =>
-        {
-            var tab = obj.asButton;
-            // 页签标题写在条目自带的文本上（FGUI 里这个文本没命名）
-            var label = tab.GetChild("n3") as GTextField;
-            if (label != null) label.text = SettingTipsConfig.content[tipKeys[i]].name;
-            tab.selected = i == tipTab;
-            int index = i;
-            tab.onClick.Set(() => SelectTip(index));
-        };
-
-        tabs.numItems = tipKeys.Count;
-        if (tipKeys.Count > 0) SelectTip(0);
-    }
-
-    private void SelectTip(int index)
-    {
-        tipTab = index;
-        var tabs = View.m_rule_buttons;
-        for (int i = 0; i < tabs.numChildren; i++)
-            tabs.GetChildAt(i).asButton.selected = i == index; // 页签选中态
-        View.m_rule_content.text = tipTexts[index];
-    }
-
     // 三个勾选直接写 ClientSettings，相机、输入与打击感每帧读它
     private void BindToggles()
     {

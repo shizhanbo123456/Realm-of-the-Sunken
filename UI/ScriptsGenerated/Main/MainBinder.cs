@@ -14,6 +14,7 @@ namespace Ros.UI.Main
             UIObjectFactory.SetPackageItemExtension(UI_PlayerCampIcon.URL, typeof(UI_PlayerCampIcon));
             UIObjectFactory.SetPackageItemExtension(UI_SkillTip.URL, typeof(UI_SkillTip));
             UIObjectFactory.SetPackageItemExtension(UI_TipLevel.URL, typeof(UI_TipLevel));
+            UIObjectFactory.SetPackageItemExtension(UI_RulePanel.URL, typeof(UI_RulePanel));
             UIObjectFactory.SetPackageItemExtension(UI_BattleBarPanel.URL, typeof(UI_BattleBarPanel));
             UIObjectFactory.SetPackageItemExtension(UI_SettingsPanel.URL, typeof(UI_SettingsPanel));
             UIObjectFactory.SetPackageItemExtension(UI_DayNight.URL, typeof(UI_DayNight));

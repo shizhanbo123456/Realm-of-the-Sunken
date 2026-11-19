@@ -15,7 +15,7 @@ public static class UILayer
     public const int Chat = 20;
     public const int RobotTv = 25;
     public const int Gm = 30;
-    public const int Dialog = 40;    // 设置 / 图鉴
+    public const int Dialog = 40;    // 设置 / 规则 / 图鉴
     public const int Confirm = 50;
     public const int Loading = 999;
 }
@@ -30,6 +30,7 @@ public enum PageId
     RobotTv,
     Gm,
     Settings,
+    Rule,
     Guide,
     Confirm,
     Loading,
