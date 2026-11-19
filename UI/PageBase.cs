@@ -2,10 +2,12 @@
 using Ros.UI.Main;
 using UnityEngine;
 
-// 显示层级：Order 越大越靠上；同 Order 的页面互斥，ShowPage 新页面时自动顶掉旧的
+// 界面配置：Order 越大越靠上，同 Order 互斥；后两项控制本次界面复制出的全屏遮罩
 public struct UiConfig
 {
     public int Order;
+    public bool ShowBlackMask;       // 是否显示黑屏遮罩（PanelBackground 的 black_mask）
+    public bool ClickOutsideToClose; // 点击遮罩（面板外部）是否收起本界面（PanelBackground 的 full_screen_close）
 }
 
 // 显示层级常量：数字越大越靠上；同值的页面互斥（显示新的会顶掉旧的）
@@ -41,9 +43,29 @@ public abstract class PageBase
 {
     protected GComponent Root { get; private set; }
 
+    // 每个界面创建时复制一份全屏遮罩，挂在 Root 的最底层
+    public UI_PanelBackground Mask { get; private set; }
+
     public UiConfig Config { get; private set; }
 
     public int Order => Config.Order;
+
+    private bool showBlackMask;
+    private bool clickOutsideToClose;
+    private System.Action outsideClose;
+
+    // 运行期开关：赋值后立刻作用到遮罩上
+    public bool ShowBlackMask
+    {
+        get => showBlackMask;
+        set { showBlackMask = value; ApplyMask(); }
+    }
+
+    public bool ClickOutsideToClose
+    {
+        get => clickOutsideToClose;
+        set { clickOutsideToClose = value; ApplyMask(); }
+    }
 
     public bool IsVisible { get; private set; }
 
@@ -62,8 +84,12 @@ public abstract class PageBase
         Config = InitConfig();
         if (Config.Order == 0) // 层级没填就没法排序，直接暴露出来
             throw new System.InvalidOperationException($"[UI] {GetType().Name} 的 UiConfig.Order 未设置");
+        BuildMask();
         Init();
     }
+
+    // 由 UIManager 注入：遮罩点击即收起本界面（同 HidePage）
+    public void BindOutsideClose(System.Action close) => outsideClose = close;
 
     // 显示层级：Init 之前调用，只跑一次
     protected abstract UiConfig InitConfig();
@@ -76,6 +102,7 @@ public abstract class PageBase
     {
         IsVisible = true;
         Root.visible = true;
+        SyncMask();
     }
 
     // 每帧，只对可见页面调用
@@ -98,6 +125,46 @@ public abstract class PageBase
         Root.SetSize(width, height);
         Root.scale = new Vector2(UiScale, UiScale);
         Root.SetXY(0f, 0f);
+        SyncMask();
+    }
+
+    // 复制一份全屏遮罩，作为面板最底层的子元素
+    private void BuildMask()
+    {
+        Mask = UI_PanelBackground.CreateInstance();
+        Root.AddChildAt(Mask, 0);
+        Mask.m_full_screen_close.onClick.Set(OnMaskClicked);
+        showBlackMask = Config.ShowBlackMask;
+        clickOutsideToClose = Config.ClickOutsideToClose;
+        ApplyMask();
+    }
+
+    // 两个开关都不开时整块遮罩不显示，也不会拦截点击
+    private void ApplyMask()
+    {
+        if (Mask == null) return;
+        Mask.visible = showBlackMask || clickOutsideToClose;
+        Mask.m_black_mask.visible = showBlackMask;
+        Mask.m_full_screen_close.visible = clickOutsideToClose;
+        SyncMask();
+    }
+
+    // 铺满屏幕并按 Root 居中：小面板居中缩放时，遮罩也能盖住整屏
+    private void SyncMask()
+    {
+        if (Mask == null) return;
+        float scale = Screen.height / 1080f;
+        float width = Screen.width / scale;
+        const float height = 1080f;
+        Mask.SetSize(width, height);
+        Mask.SetXY((Root.width - width) * 0.5f, (Root.height - height) * 0.5f);
+    }
+
+    private void OnMaskClicked()
+    {
+        if (outsideClose == null)
+            throw new System.InvalidOperationException($"[UI] {GetType().Name} 未绑定遮罩关闭回调");
+        outsideClose();
     }
 
     // 挂到 GRoot：先挂载再 Init，Init 里就能直接操作显示对象

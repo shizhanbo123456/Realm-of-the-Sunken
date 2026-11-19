@@ -33,7 +33,12 @@ public class HomePage : PageBase
         this.panel = panel;
     }
 
-    protected override UiConfig InitConfig() => new UiConfig { Order = UILayer.Page };
+    protected override UiConfig InitConfig() => new UiConfig
+    {
+        Order = UILayer.Page,
+        ShowBlackMask = false,
+        ClickOutsideToClose = false,
+    };
 
     protected override void Init()
     {

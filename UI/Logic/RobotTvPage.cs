@@ -16,7 +16,12 @@ public class RobotTvPage : PageBase
         this.panel = panel;
     }
 
-    protected override UiConfig InitConfig() => new UiConfig { Order = UILayer.RobotTv };
+    protected override UiConfig InitConfig() => new UiConfig
+    {
+        Order = UILayer.RobotTv,
+        ShowBlackMask = false,
+        ClickOutsideToClose = false,
+    };
 
     protected override void Init()
     {

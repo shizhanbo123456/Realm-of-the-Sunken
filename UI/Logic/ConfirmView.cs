@@ -17,7 +17,12 @@ public class ConfirmView : PageBase
         this.panel = panel;
     }
 
-    protected override UiConfig InitConfig() => new UiConfig { Order = UILayer.Confirm };
+    protected override UiConfig InitConfig() => new UiConfig
+    {
+        Order = UILayer.Confirm,
+        ShowBlackMask = false,
+        ClickOutsideToClose = false,
+    };
 
     protected override void Init()
     {

@@ -18,7 +18,12 @@ public class RuleView : PageBase
         this.panel = panel;
     }
 
-    protected override UiConfig InitConfig() => new UiConfig { Order = UILayer.Dialog };
+    protected override UiConfig InitConfig() => new UiConfig
+    {
+        Order = UILayer.Dialog,
+        ShowBlackMask = false,
+        ClickOutsideToClose = false,
+    };
 
     protected override void Init()
     {

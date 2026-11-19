@@ -167,6 +167,7 @@ public class UIManager : MonoBehaviour
             throw new System.InvalidOperationException($"[UI] 页面 {id} 重复注册");
         pages.Add(id, page);
         pageList.Add(page);
+        page.BindOutsideClose(() => HidePage(id)); // 遮罩点击统一走 HidePage
     }
     #endregion
 

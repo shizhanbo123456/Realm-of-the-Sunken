@@ -14,7 +14,12 @@ public class LoadingPage : PageBase
         this.panel = panel;
     }
 
-    protected override UiConfig InitConfig() => new UiConfig { Order = UILayer.Loading };
+    protected override UiConfig InitConfig() => new UiConfig
+    {
+        Order = UILayer.Loading,
+        ShowBlackMask = false,
+        ClickOutsideToClose = false,
+    };
 
     // 每次显示随机挑一种页面档位，进度条先收起（等 SetProgress 再显示）
     public override void Enter(ShowParam param)

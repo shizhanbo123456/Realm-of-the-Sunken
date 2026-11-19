@@ -36,7 +36,12 @@ public class GmPanel : PageBase
         this.panel = panel;
     }
 
-    protected override UiConfig InitConfig() => new UiConfig { Order = UILayer.Gm };
+    protected override UiConfig InitConfig() => new UiConfig
+    {
+        Order = UILayer.Gm,
+        ShowBlackMask = false,
+        ClickOutsideToClose = false,
+    };
 
     public bool IsOpen => IsVisible;
 
