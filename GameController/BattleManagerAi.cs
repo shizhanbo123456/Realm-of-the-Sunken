@@ -125,6 +125,7 @@ public partial class BattleManager
         AiCommandBus.Bind(ai_commandEnum.terrain_path, OnAiPath);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_all, OnAiGetInfo);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_player, OnAiPlayer);
+        AiCommandBus.Bind(ai_commandEnum.battleInfo_reviveProgress, OnAiReviveProgress);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_pos, OnAiPos);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_importantEvent, OnAiImportantEvent);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_guardProgress, OnAiGuardProgress);
@@ -157,6 +158,7 @@ public partial class BattleManager
         AiCommandBus.Unbind(ai_commandEnum.terrain_path, OnAiPath);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_all, OnAiGetInfo);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_player, OnAiPlayer);
+        AiCommandBus.Unbind(ai_commandEnum.battleInfo_reviveProgress, OnAiReviveProgress);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_pos, OnAiPos);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_importantEvent, OnAiImportantEvent);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_guardProgress, OnAiGuardProgress);
@@ -525,6 +527,44 @@ public partial class BattleManager
         request.Reply(builder.ToString());
     }
 
+    // 复活进度与界面复活条同源：存活时只报累计死亡次数
+    private void OnAiReviveProgress(AiRequest request)
+    {
+        var page = Tool.UIManager != null ? Tool.UIManager.Battle : null;
+        if (page == null)
+        {
+            request.Reject("战斗界面未就绪");
+            return;
+        }
+
+        var builder = new StringBuilder();
+        AppendReviveProgress(builder, page);
+        request.Reply(builder.ToString());
+    }
+
+    private static void AppendReviveProgress(StringBuilder builder, BattlePage page)
+    {
+        if (page == null)
+        {
+            builder.Append("战斗界面未就绪");
+            return;
+        }
+        if (!page.AiReviveActive)
+        {
+            builder.Append("状态=存活 死亡次数=").Append(page.AiReviveDeathCount);
+            return;
+        }
+
+        float duration = page.AiReviveDuration;
+        float elapsed = Mathf.Clamp(page.AiReviveElapsed, 0f, duration);
+        float ratio = duration > 0f ? elapsed / duration : 1f;
+        builder.Append("状态=复活中 死亡次数=").Append(page.AiReviveDeathCount)
+            .Append(" 已等待=").Append(elapsed.ToString("0.##"))
+            .Append(" 总时长=").Append(duration.ToString("0.##"))
+            .Append(" 剩余=").Append((duration - elapsed).ToString("0.##"))
+            .Append(" 进度=").Append((ratio * 100f).ToString("0")).Append('%');
+    }
+
     private static void AppendLevel(StringBuilder builder)
     {
         var battle = Tool.UIManager != null ? Tool.UIManager.Battle : null;
@@ -590,6 +630,9 @@ public partial class BattleManager
         AppendLevel(builder);
         builder.Append(" 坐标=(").Append(pos.x.ToString("0.##")).Append(',').Append(pos.z.ToString("0.##")).Append(')')
             .Append(" 朝向=").Append(AiSelfYaw().ToString("0.#"));
+
+        builder.Append("\n复活 ");
+        AppendReviveProgress(builder, Tool.UIManager != null ? Tool.UIManager.Battle : null);
 
         builder.Append("\n守护点 ");
         if (!aiHasGuardProgress) builder.Append("未收到");

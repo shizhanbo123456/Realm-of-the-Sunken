@@ -34,6 +34,7 @@ public class BattlePage : PageBase
     private bool reviveActive;        // 本地玩家死亡等待中：复活条由客户端按配表本地推演
     private float reviveDuration;     // 本段复活总时长（revive_time.csv，按死亡次数与阵营取）
     private float reviveElapsed;      // 本段已等待时长（起点由服务器包里的 progress 折算）
+    private int reviveDeathCount;     // 累计死亡次数（存活时保留，供 AI 查询）
     private int spectateTargetClientId = -1;  // 当前观战目标玩家 id（-1 = 未观战）
     private int spectateTargetEntityId = -1;  // 观战目标实体 id（-1 = 等待其表现数据到达后绑定相机）
     private float spectatePendingSince;   // 发起观战的时刻（目标数据迟迟不到 = 目标已死，超时重选）
@@ -442,6 +443,7 @@ public class BattlePage : PageBase
         if (NetworkManager.HasDefensePointProgress) OnDefensePointProgress(NetworkManager.LatestDefensePointProgress); // 进入战斗先填一次缓存值，随后由变更包刷新
         reviveActive = false; // 复活条每局从收起状态开始，重新由 SCReviveInfo 驱动
         reviveElapsed = 0f;
+        reviveDeathCount = 0;
         panel.m_showRegenerationBar.selectedIndex = 0; // 上一局死着结算会把它留在 1，进场必须复位
         ClearEntityBars();
         ClearQuickMessages(); // 快捷指令点位只属于本局
@@ -989,6 +991,7 @@ public class BattlePage : PageBase
     private void OnReviveProgressUpdate(SCReviveInfo info)
     {
         if (!HasSession) return;
+        reviveDeathCount = info.deathCount;
 
         if (info.ready)
         {
@@ -1019,6 +1022,15 @@ public class BattlePage : PageBase
         if (panel.m_regeneration_progressbar != null)
             panel.m_regeneration_progressbar.fillAmount = Mathf.Clamp01(reviveElapsed / reviveDuration);
     }
+
+    // AI 查询用：与复活条同一份数据
+    public bool AiReviveActive => reviveActive;
+
+    public int AiReviveDeathCount => reviveDeathCount;
+
+    public float AiReviveElapsed => reviveElapsed;
+
+    public float AiReviveDuration => reviveDuration;
     #endregion
 
     #region//Local
