@@ -56,6 +56,8 @@ public class HomePage : PageBase
 
         panel.m_connectPanel.m_btn_connect.title = MessageVariable.V(message_variablesEnum.home_btnConnect);
         panel.m_connectPanel.m_btn_connect.onClick.Add(OnConnectClicked);
+        // 输入框改一次记一次：不点连接也要把地址记进存档（落盘仍在退出时）
+        panel.m_connectPanel.m_input_ipaddress.m_content.onChanged.Add(OnServerIpChanged);
     }
 
     public override void Enter(ShowParam param)
@@ -84,6 +86,14 @@ public class HomePage : PageBase
         if (Tool.SaveManager == null)
             throw new System.InvalidOperationException("[首页] 场景缺少 SaveManager，无法读取服务器地址");
         panel.m_connectPanel.m_input_ipaddress.m_content.text = Tool.SaveManager.lastServerIp;
+    }
+
+    // 输入框的每次改动都同步进存档字段，避免「只改地址不点连接」时地址丢失
+    private void OnServerIpChanged()
+    {
+        if (Tool.SaveManager == null)
+            throw new System.InvalidOperationException("[首页] 场景缺少 SaveManager，无法记录服务器地址");
+        Tool.SaveManager.lastServerIp = panel.m_connectPanel.m_input_ipaddress.m_content.text;
     }
 
     public override void Exit()

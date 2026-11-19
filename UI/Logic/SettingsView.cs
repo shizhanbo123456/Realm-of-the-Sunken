@@ -63,12 +63,15 @@ public class SettingsView : PageBase
     }
 
     #region//Local
-    // 三个勾选直接写 ClientSettings，相机、输入与打击感每帧读它
+    // 四个勾选全量写 ClientSettings 并随存档落盘；勾选态与运行时是否已接无关
     private void BindToggles()
     {
+        View.m_toggle_caustic.selected = ClientSettings.Caustics;
         View.m_toggle_third_person_perspctivee.selected = ClientSettings.ThirdPersonCamera;
         View.m_toggle_auto_pitch.selected = ClientSettings.AutoPitch;
         View.m_toggle_camea_shake.selected = ClientSettings.CameraShake;
+        View.m_toggle_caustic.onChanged.Add(() =>
+            ClientSettings.Caustics = View.m_toggle_caustic.selected);
         View.m_toggle_third_person_perspctivee.onChanged.Add(() =>
             ClientSettings.ThirdPersonCamera = View.m_toggle_third_person_perspctivee.selected);
         View.m_toggle_auto_pitch.onChanged.Add(() =>
@@ -80,6 +83,8 @@ public class SettingsView : PageBase
     private void SyncToggles()
     {
         if (View == null) return;
+        if (View.m_toggle_caustic.selected != ClientSettings.Caustics)
+            View.m_toggle_caustic.selected = ClientSettings.Caustics;
         if (View.m_toggle_third_person_perspctivee.selected != ClientSettings.ThirdPersonCamera)
             View.m_toggle_third_person_perspctivee.selected = ClientSettings.ThirdPersonCamera;
         if (View.m_toggle_auto_pitch.selected != ClientSettings.AutoPitch)

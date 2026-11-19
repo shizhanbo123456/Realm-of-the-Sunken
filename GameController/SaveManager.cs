@@ -3,7 +3,7 @@
 public class SaveManager : MonoBehaviour
 {
     // 局外只存身份、选角、本地设置与上次服务器地址：等级/经验随局外养成一并删除，旧格式不再兼容
-    public const string SaveKey = "GameSaveDataV7";
+    public const string SaveKey = "GameSaveDataV8";
 
     public const string DefaultServerIp = "127.0.0.1";
 
@@ -44,15 +44,12 @@ public class SaveManager : MonoBehaviour
         }
         int attackIndex;
         int defenseIndex;
-        bool thirdPerson;
-        bool autoPitch;
-        bool cameraShake;
         string serverIp;
         try
         {
             var parts = data.Split('|');
             // 字段数必须与当前格式完全一致：长度不符即判为无效存档
-            int expected = 8; // 名称 / 令牌 / 攻方下标 / 守方下标 / 三人称 / 自动俯仰角 / 镜头震动 / 服务器IP
+            int expected = 6; // 名称 / 令牌 / 攻方下标 / 守方下标 / 设置位串 / 服务器IP
             if (parts.Length != expected)
                 throw new System.FormatException($"字段数 {parts.Length} 与当前存档格式 {expected} 不符");
 
@@ -61,12 +58,11 @@ public class SaveManager : MonoBehaviour
             token = int.Parse(parts[idx++]);
             attackIndex = int.Parse(parts[idx++]);
             defenseIndex = int.Parse(parts[idx++]);
-            thirdPerson = ParseFlag(parts[idx++]);
-            autoPitch = ParseFlag(parts[idx++]);
-            cameraShake = ParseFlag(parts[idx++]);
+            string settingsBits = parts[idx++];
             serverIp = parts[idx++];
             if (!IsTokenValid(token))
                 throw new System.FormatException($"令牌 {token} 越界");
+            ClientSettings.FromBits(settingsBits); // 位串非法与其它字段一样按无效存档处理（整串校验通过才写）
         }
         catch (System.Exception e)
         {
@@ -85,21 +81,11 @@ public class SaveManager : MonoBehaviour
 
         ClientSelection.selectedAttackIndex = InRange(attackIndex, GlobalConfig.attack_character_count);
         ClientSelection.selectedDefenseIndex = InRange(defenseIndex, GlobalConfig.defense_character_count);
-        ClientSettings.ThirdPersonCamera = thirdPerson;
-        ClientSettings.AutoPitch = autoPitch;
-        ClientSettings.CameraShake = cameraShake;
         lastServerIp = string.IsNullOrEmpty(serverIp) ? DefaultServerIp : serverIp;
     }
 
     // 存档里的选中下标超出当前角色数（配表改过）时退回 0
     private static int InRange(int index, int count) => index >= 0 && index < count ? index : 0;
-
-    private static bool ParseFlag(string value)
-    {
-        if (value == "1") return true;
-        if (value == "0") return false;
-        throw new System.FormatException($"开关值 {value} 不是 0/1");
-    }
 
     private static bool IsTokenValid(int value) => value >= TokenMinInclusive && value < TokenMaxExclusive;
 
@@ -112,9 +98,7 @@ public class SaveManager : MonoBehaviour
         sb.Append(token).Append('|');
         sb.Append(ClientSelection.selectedAttackIndex).Append('|');
         sb.Append(ClientSelection.selectedDefenseIndex).Append('|');
-        sb.Append(ClientSettings.ThirdPersonCamera ? "1" : "0").Append('|');
-        sb.Append(ClientSettings.AutoPitch ? "1" : "0").Append('|');
-        sb.Append(ClientSettings.CameraShake ? "1" : "0").Append('|');
+        sb.Append(ClientSettings.ToBits()).Append('|');
         sb.Append(string.IsNullOrEmpty(lastServerIp) ? DefaultServerIp : lastServerIp.Replace("|", ""));
         PlayerPrefs.SetString(SaveKey, sb.ToString());
         PlayerPrefs.Save();
