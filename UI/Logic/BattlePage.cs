@@ -45,8 +45,6 @@ public class BattlePage : PageBase
     private readonly Queue<string> importantBannerQueue = new(); // 待播的特殊技能播报文案，按到达顺序逐条播
     private bool importantBannerPlaying;                          // 当前 banner 动画是否在播
     private static string ImportantBannerPrefix => MessageVariable.V(message_variablesEnum.battle_bannerPrefix);
-    private int godViewPressCount;        // 上帝视角连按计数
-    private float godViewFirstPressTime;  // 本轮第一次按下的时刻（超窗口重算）
 
     // 本局会话数据全部来自加载期（不再读组队缓存）
     private static ClientLoadingManager Session => ClientLoadingManager.Current;
@@ -58,8 +56,23 @@ public class BattlePage : PageBase
     // 剩余时间推演的唯一持有者（起点由服务器快照校准，见 ClientBattleTimeManager）
     private static ClientBattleTimeManager BattleTime => Tool.ClientLogicManager != null ? Tool.ClientLogicManager.BattleTime : null;
 
-    private static ushort OwnEntityId => HasSession ? Session.OwnEntityId : (ushort)0;
+    public static ushort OwnEntityId => HasSession ? Session.OwnEntityId : (ushort)0;
     private bool IsOwnEntity(int entityId) => HasSession && OwnEntityId == entityId;
+
+    // ---- 独立子界面（大地图 / 上帝视角 / 抽卡）读取的战斗会话状态 ----
+    public EntityCamp MyCamp => (EntityCamp)localPlayerCamp;
+
+    public UI_Minimap Minimap => panel.m_Minimap;
+
+    public GList CardButtonList => panel.m_list_selectCard;
+
+    public IReadOnlyList<UI_Minimap.QuickMark> QuickMarks => quickMessageMarks;
+
+    // 技能选择界面的开合前置：观战中、没会话、技能栏还没搭好都不开
+    public bool CanOpenSkillSelect => !spectatorMode && HasSession && SkillBar != null && SkillBar.IsBuilt;
+
+    // 技能选择界面提交后回头刷技能栏（绘制归战斗界面）
+    public void RefreshSkillBarNow() => RefreshSkillBar();
 
     // 技能栏挂在玩家栏里（UI_PlayerPanel.m_skill_list）
     private UI_SkillList SkillBar => panel.m_playerPanel != null ? panel.m_playerPanel.m_skill_list : null;
@@ -87,19 +100,8 @@ public class BattlePage : PageBase
         panel.m_playerPanel.m_buffList.m_list.itemRenderer =
             (i, obj) => ((UI_buffItem)obj).Fill(localBuffs[i].type, localBuffs[i].level);
         levelLabel = panel.m_playerPanel.GetChild("n12") as GTextField; // 等级数字在 FGUI 侧还没命名
-        panel.m_skillSelectPanel.Build(OnSkillSelectCommitted);
-        panel.m_skillSelectPanel.Close();
-        panel.m_selectCardPanel.Build(OnCardSelected, OnCardDiscarded, OnCardPanelClosed); // 关闭 = 不发包，种子留给下次
-        panel.m_selectCardPanel.CloseImmediately();
-        panel.m_list_selectCard.itemRenderer = RenderCardButton;
-        panel.m_largeMinimapPanel.visible = false;
-        panel.m_largeMinimapPanel.touchable = false;
-        panel.m_largeMinimapPanel.m_panel.m_close.onClick.Set(panel.m_largeMinimapPanel.Close);
         if (panel.m_Minimap != null && panel.m_Minimap.m_minimapButton != null)
-            panel.m_Minimap.m_minimapButton.onClick.Set(OpenLargeMinimap); // 点小地图打开大地图，关闭走底框按钮
-        panel.m_godViewPanel.Init();
-        panel.m_godViewPanel.Close();
-        panel.m_godViewPanel.m_panel.m_close.onClick.Set(panel.m_godViewPanel.Close);
+            panel.m_Minimap.m_minimapButton.onClick.Set(OpenLargeMinimap); // 点小地图打开大地图，关闭走大地图自己的底框按钮
     }
 
     // 设置面板是全局子界面，三个页面共用（UIManager 持有）
@@ -193,7 +195,7 @@ public class BattlePage : PageBase
         quickMessages.Clear();
         quickMessageMarks.Clear();
         panel.m_Minimap?.ClearQuickMessages();
-        panel.m_largeMinimapPanel.ClearQuickMessages();
+        if (Tool.UIManager != null) Tool.UIManager.LargeMinimap.ClearQuickMessages();
     }
 
     // 一条生效中的快捷指令：id 只用于小地图侧增删比对
@@ -229,9 +231,6 @@ public class BattlePage : PageBase
         EventManager.AddEvent<int>(ClientEvent.OnEntityDisplayRemove, OnEntityDisplayRemove);
         EventManager.AddEvent<SCMinimapEntity>(ClientEvent.OnMinimapUpdate, OnMinimapUpdate);
         EventManager.AddEvent<float>(ClientEvent.OnMinimapRadiusUpdate, OnMinimapRadiusUpdate);
-        EventManager.AddEvent<SCGodViewEntities>(ClientEvent.OnGodViewEntities, OnGodViewEntities);
-        EventManager.AddEvent<SCGodViewCorals>(ClientEvent.OnGodViewCorals, OnGodViewCorals);
-        EventManager.AddEvent<SCGodViewEntityDetail>(ClientEvent.OnGodViewDetail, OnGodViewDetail);
         EventManager.AddEvent<SCScoreInfo>(ClientEvent.OnScoreUpdate, OnScoreUpdate);
         EventManager.AddEvent<SCBattleEvent>(ClientEvent.OnBattleEvent, OnBattleEvent);
         EventManager.AddEvent<SCCombatLabel>(ClientEvent.OnCombatLabelDisplay, OnCombatLabelDisplay);
@@ -240,7 +239,6 @@ public class BattlePage : PageBase
         EventManager.AddEvent<SCDefensePointProgress>(ClientEvent.OnDefensePointProgress, OnDefensePointProgress);
         EventManager.AddEvent(ClientEvent.OnSkillBarRefresh, OnSkillBarRefresh);
         EventManager.AddEvent<SCPlayerProgress>(ClientEvent.OnPlayerProgress, OnPlayerProgress);
-        EventManager.AddEvent<SCCardSeed>(ClientEvent.OnCardSeed, OnCardSeed);
         EventManager.AddEvent<SCQuickMessage>(ClientEvent.OnQuickMessage, OnQuickMessage);
         if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated += OnCameraUpdated;
 
@@ -257,7 +255,6 @@ public class BattlePage : PageBase
             Tool.ClientLogicManager.HomePreview.Hide();
         ResetGuardStatues();
         HideQuickMessage(); // 快捷消息面板每局从收起状态开始
-        ResetGodViewPress(); // 连按计数每局清零
         HideImportantBanner(); // 重要事件 banner 每局从隐藏状态开始
         if (NetworkManager.HasDefensePointProgress) OnDefensePointProgress(NetworkManager.LatestDefensePointProgress); // 进入战斗先填一次缓存值，随后由变更包刷新
         reviveActive = false; // 复活条每局从收起状态开始，重新由 SCReviveInfo 驱动
@@ -269,10 +266,6 @@ public class BattlePage : PageBase
         localBuffs.Clear();
         panel.m_playerPanel.m_buffList.m_list.numItems = 0;
         panel.m_Minimap?.Reset(GlobalVariable.L(global_variablesEnum.minimap_view_radius)[0]); //每局回到默认档（首档），与服务器 ClearBattleState 对齐
-        panel.m_largeMinimapPanel.Close();
-        panel.m_godViewPanel.Close();
-        panel.m_skillSelectPanel.Close();
-        panel.m_selectCardPanel.CloseImmediately();
         ResetCardState();
         Skills?.ResetBattle();
         BuildSkillSlots();
@@ -286,9 +279,6 @@ public class BattlePage : PageBase
         EventManager.RemoveEvent<int>(ClientEvent.OnEntityDisplayRemove, OnEntityDisplayRemove);
         EventManager.RemoveEvent<SCMinimapEntity>(ClientEvent.OnMinimapUpdate, OnMinimapUpdate);
         EventManager.RemoveEvent<float>(ClientEvent.OnMinimapRadiusUpdate, OnMinimapRadiusUpdate);
-        EventManager.RemoveEvent<SCGodViewEntities>(ClientEvent.OnGodViewEntities, OnGodViewEntities);
-        EventManager.RemoveEvent<SCGodViewCorals>(ClientEvent.OnGodViewCorals, OnGodViewCorals);
-        EventManager.RemoveEvent<SCGodViewEntityDetail>(ClientEvent.OnGodViewDetail, OnGodViewDetail);
         EventManager.RemoveEvent<SCScoreInfo>(ClientEvent.OnScoreUpdate, OnScoreUpdate);
         EventManager.RemoveEvent<SCBattleEvent>(ClientEvent.OnBattleEvent, OnBattleEvent);
         EventManager.RemoveEvent<SCCombatLabel>(ClientEvent.OnCombatLabelDisplay, OnCombatLabelDisplay);
@@ -297,7 +287,6 @@ public class BattlePage : PageBase
         EventManager.RemoveEvent<SCDefensePointProgress>(ClientEvent.OnDefensePointProgress, OnDefensePointProgress);
         EventManager.RemoveEvent(ClientEvent.OnSkillBarRefresh, OnSkillBarRefresh);
         EventManager.RemoveEvent<SCPlayerProgress>(ClientEvent.OnPlayerProgress, OnPlayerProgress);
-        EventManager.RemoveEvent<SCCardSeed>(ClientEvent.OnCardSeed, OnCardSeed);
         EventManager.RemoveEvent<SCQuickMessage>(ClientEvent.OnQuickMessage, OnQuickMessage);
         if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated -= OnCameraUpdated;
         spectatorMode = false;
@@ -306,11 +295,6 @@ public class BattlePage : PageBase
         spectateTargetClientId = -1;
         spectateTargetEntityId = -1;
         if (panel.m_onlook != null) panel.m_onlook.selectedIndex = 0;
-        panel.m_largeMinimapPanel.Close();
-        panel.m_godViewPanel.Close();
-        panel.m_skillSelectPanel.Close();
-        panel.m_selectCardPanel.CloseImmediately();
-        ResetCardState();
         TipHost.Hide();
         HideImportantBanner();
         StopPanelTransitions();
@@ -325,9 +309,9 @@ public class BattlePage : PageBase
         // 输入被 UI 占用或 AI 接管时，技能选择、快捷消息与面板快捷键都不响应
         if (!InputManager.PlayerInputBlocked)
         {
-            if (Input.GetKeyDown(GlobalConfig.skill_select_key)) ToggleSkillSelect();
+            if (Input.GetKeyDown(GlobalConfig.skill_select_key)) Tool.UIManager.SkillSelect.Toggle();
             if (AnyQuickMessageKeyDown(out int quickMessageIndex)) HandleQuickMessageKey(quickMessageIndex);
-            TickGodViewOpenKey();
+            Tool.UIManager.GodView.TickOpenKey();
         }
         //剩余时间（以快照校准的本地推演为准，重连/中途进入的起点由服务器补发）
         if (HasSession && BattleTime != null && panel.m_BattleInfoPanel.m_time_left != null)
@@ -335,7 +319,6 @@ public class BattlePage : PageBase
         RefreshTimeIcon();
         TickQuickMessages(); // 先推进标记，小地图本帧就能按最新锚点落位
         TickMinimap();
-        TickMinimapPanels(deltaTime);
         TickSpectator(deltaTime);
         TickLocalSkillCd(deltaTime);
         TickReviveProgress(deltaTime);
@@ -356,7 +339,6 @@ public class BattlePage : PageBase
     {
         if (SkillBar == null || !SkillBar.IsBuilt) BuildSkillSlots(); // 首包到达时兜底搭栏
         skillCdRefreshTimer = 0f;
-        panel.m_skillSelectPanel.RefreshHeld(Skills?.HeldSkills); // 打开期间新获得的技能要进列表
     }
 
     #region 事件处理
@@ -551,43 +533,6 @@ public class BattlePage : PageBase
         SkillBar.Refresh(skillSlots, Skills != null ? Skills.SelectedSlot : 0);
     }
 
-    #region 技能选择面板
-    private void ToggleSkillSelect()
-    {
-        if (spectatorMode || !HasSession || SkillBar == null || !SkillBar.IsBuilt) return;
-        if (panel.m_skillSelectPanel.IsOpen) panel.m_skillSelectPanel.Commit(); // 关闭即应用，与关闭按钮同一路径
-        else panel.m_skillSelectPanel.Open(Skills?.HeldSkills, Skills?.ActiveSkills, Skills != null ? Skills.SlotCapacity : 0);
-    }
-
-    // 关闭回调：与当前技能栏一致就不上行（随手开一下就关不该清栏），否则交给服务器校验
-    private void OnSkillSelectCommitted()
-    {
-        if (Skills == null) return;
-        var selection = panel.m_skillSelectPanel.Selection;
-        if (SameSkillSet(selection, Skills.ActiveSkills)) return;
-        Skills.TrySetActiveSkills(selection);
-        RefreshSkillBar();
-    }
-
-    // 栏内顺序由服务器按 id 升序排，勾选顺序无意义，按集合比
-    private static bool SameSkillSet(IReadOnlyList<int> a, IReadOnlyList<int> b)
-    {
-        if (a.Count != b.Count) return false;
-        for (int i = 0; i < a.Count; i++)
-        {
-            bool found = false;
-            for (int j = 0; j < b.Count; j++)
-            {
-                if (b[j] != a[i]) continue;
-                found = true;
-                break;
-            }
-            if (!found) return false;
-        }
-        return true;
-    }
-    #endregion
-
     #region 守护点（主点 + 3 个副点）
     private readonly int[] guardianHealth = { -1, -1, -1, -1 }; // 当前血量，-1 = 还没收到/还没生成
     private float guardianHealthScale; // 开局人数倍率：上限 = 配表生命 × 该倍率，0 = 还没收到守护点数据
@@ -736,68 +681,14 @@ public class BattlePage : PageBase
         panel.m_Minimap?.TickQuickMessages(quickMessageMarks, center, hasCenter);
     }
 
-    #region 小地图展开 / 上帝视角
-    private void TickMinimapPanels(float deltaTime)
+    // 小地图：点小地图上的按钮打开大地图，关闭走大地图自己的底框按钮
+    private static void OpenLargeMinimap()
     {
-        if (panel.m_largeMinimapPanel.IsOpen)
-        {
-            bool hasYaw = TryGetSelfYaw(out float yaw);
-            var points = panel.m_Minimap != null ? panel.m_Minimap.CurrentPoints : null;
-            panel.m_largeMinimapPanel.Refresh(points, (EntityCamp)localPlayerCamp, yaw, hasYaw);
-            panel.m_largeMinimapPanel.RefreshQuickMessages(quickMessageMarks);
-        }
-        panel.m_godViewPanel.Tick(deltaTime, (EntityCamp)localPlayerCamp, OwnEntityId);
+        if (Tool.UIManager != null) Tool.UIManager.LargeMinimap.Open();
     }
-
-    // 小地图：点小地图组件上的按钮打开，关闭走底框关闭按钮
-    private void OpenLargeMinimap()
-    {
-        if (!panel.m_largeMinimapPanel.IsOpen) panel.m_largeMinimapPanel.Open();
-    }
-
-    // 上帝视角：窗口期内连按 3 次 G 打开（与 GM 面板同一套连按判定），关闭走底框关闭按钮
-    private void TickGodViewOpenKey()
-    {
-        if (panel.m_godViewPanel.IsOpen)
-        {
-            ResetGodViewPress(); // 已打开时不再累计，避免关闭后残留一半计数
-            return;
-        }
-        if (!Input.GetKeyDown(GlobalConfig.god_view_open_key)) return;
-        if (godViewPressCount == 0 || Time.unscaledTime - godViewFirstPressTime > GlobalConfig.god_view_open_press_window)
-        {
-            godViewPressCount = 1;
-            godViewFirstPressTime = Time.unscaledTime;
-        }
-        else godViewPressCount++;
-        if (godViewPressCount < GlobalConfig.god_view_open_press_count) return;
-        ResetGodViewPress();
-        panel.m_godViewPanel.Open(ResolveGodViewCenter());
-    }
-
-    private void ResetGodViewPress()
-    {
-        godViewPressCount = 0;
-        godViewFirstPressTime = 0f;
-    }
-
-    // 初始区域中心 = 雷达圆心（本地实体 / 观战目标 / 自由视角相机），取不到就从地图正中开始
-    private Vector2 ResolveGodViewCenter()
-    {
-        if (TryGetMinimapCenter(out var center)) return new Vector2(center.x, center.z);
-        float half = GlobalVariable.RangeLength(global_variablesEnum.terrain_size) * 0.5f;
-        return new Vector2(half, half);
-    }
-
-    private void OnGodViewEntities(SCGodViewEntities chunk) => panel.m_godViewPanel.OnEntities(chunk);
-
-    private void OnGodViewCorals(SCGodViewCorals chunk) => panel.m_godViewPanel.OnCorals(chunk);
-
-    private void OnGodViewDetail(SCGodViewEntityDetail info) => panel.m_godViewPanel.OnDetail(info);
-    #endregion
 
     // 自身图标随朝向旋转：地图不转，图标转（每帧读本地玩家推演朝向）
-    private bool TryGetSelfYaw(out float yaw)
+    public bool TryGetSelfYaw(out float yaw)
     {
         yaw = 0f;
         if (!HasSession || Tool.ClientLogicManager == null
@@ -808,7 +699,7 @@ public class BattlePage : PageBase
     }
 
     // 雷达中心 = 本地玩家实体位置；纯观战无本地实体时取观战目标位置；自由视角下取相机自身
-    private bool TryGetMinimapCenter(out Vector3 pos)
+    public bool TryGetMinimapCenter(out Vector3 pos)
     {
         pos = Vector3.zero;
         // 自由视角相机已脱离跟随点：圆心必须跟相机，否则服务器按相机下发的点位会被按旧圆心换算而漂出雷达
@@ -1073,28 +964,14 @@ public class BattlePage : PageBase
 
     #endregion
 
-    #region 抽卡（悬浮按钮 → 抽卡界面 → 选/弃）
-    private readonly List<int> pendingTiers = new();   // 有次数的档位（渲染用，避免每帧分配）
-    private readonly int[] cardPending = new int[CardCatalog.TierCount];
+    #region 局内等级 / 经验（次数与卡面归抽卡界面）
     private int cardLevel = 1;        // 局内等级（左上角等级 + 经验条）
     private int cardExp;              // 当前等级内已积累的经验
-    private CardTier currentCardTier; // 最近一次打开的档位（弃卡按它上报）
-    private bool awaitingSeed;        // 已经发出种子请求、还没收到回包
 
-    // 服务器只下发「每档有多少次」和每组的种子，幸运随种子来，抽到什么两端各算一遍
     private void OnPlayerProgress(SCPlayerProgress info)
     {
         cardLevel = info.level;
         cardExp = info.exp;
-        cardPending[0] = info.silver;
-        cardPending[1] = info.gold;
-        cardPending[2] = info.holo;
-
-        // 面板开着但这一档已经被抽完（例如弃卡后服务器结算）→ 收起，避免显示过期卡面
-        if (panel.m_selectCardPanel.IsOpen && cardPending[(int)panel.m_selectCardPanel.OpenedTier] <= 0)
-            panel.m_selectCardPanel.CloseImmediately();
-
-        RefreshCardButtons();
         RefreshProgressHud();
     }
 
@@ -1110,124 +987,11 @@ public class BattlePage : PageBase
         if (playerPanel.m_label_exp != null) playerPanel.m_label_exp.text = need > 0 ? $"{cardExp}/{need}" : "MAX";
     }
 
-    private void RefreshCardButtons()
-    {
-        pendingTiers.Clear();
-        for (int tier = 0; tier < cardPending.Length; tier++)
-        {
-            if (cardPending[tier] > 0) pendingTiers.Add(tier);
-        }
-        if (panel.m_list_selectCard != null) panel.m_list_selectCard.numItems = pendingTiers.Count;
-    }
-
-    private void RenderCardButton(int index, GObject obj)
-    {
-        if (obj is not UI_btn_SelectCard btn || index >= pendingTiers.Count) return;
-        int tier = pendingTiers[index];
-        if (btn.m_level != null) btn.m_level.selectedIndex = tier;
-        if (btn.m_label_num != null) btn.m_label_num.text = cardPending[tier].ToString();
-        btn.onClick.Set(() => OpenCardPanel((CardTier)tier));
-    }
-
-    // 点悬浮按钮：面板先进等待态，种子回来才铺卡
-    private void OpenCardPanel(CardTier tier)
-    {
-        if (cardPending[(int)tier] <= 0) return;
-        currentCardTier = tier;
-        panel.m_selectCardPanel.WaitForSeed(tier);
-        awaitingSeed = true;
-        SendCardAction(tier, hasChoice: false, choice: 0, requestSeed: true);
-    }
-
-    private void SendCardAction(CardTier tier, bool hasChoice, byte choice, bool requestSeed)
-    {
-        if (Tool.NetworkManager == null) return;
-        Tool.NetworkManager.SendCardAction(new CSCardAction
-        {
-            tier = (byte)tier,
-            hasChoice = hasChoice,
-            choice = choice,
-            requestSeed = requestSeed,
-        });
-    }
-
-    // 种子到了才铺卡：幸运也只在种子里，客户端不再单独存
-    private void OnCardSeed(SCCardSeed info)
-    {
-        if (!awaitingSeed || !panel.m_selectCardPanel.IsOpen) return; // 等的时候界面已经收起就不理会，服务器留着这个种子
-        awaitingSeed = false;
-
-        var tier = (CardTier)info.tier;
-        if (!info.valid)
-        {
-            panel.m_selectCardPanel.Close();
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.no_card_in_tier);
-            return;
-        }
-        ShowCardSet(tier, info.seed, info.luck);
-    }
-
-    // 用种子抽一组卡铺进界面：入口与「选完还有次数」共用
-    private void ShowCardSet(CardTier tier, int seed, int luck)
-    {
-        var held = Skills != null ? new List<int>(Skills.HeldSkills) : new List<int>();
-        var rolls = CardCatalog.Roll(tier, luck, CardCampForRoll(), CardCatalog.RollCount, held, seed);
-        if (rolls.Count == 0)
-        {
-            panel.m_selectCardPanel.Close();
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.no_card_in_tier);
-            return;
-        }
-        currentCardTier = tier;
-        panel.m_selectCardPanel.Open(rolls, tier, luck);
-    }
-
-    // card_option.csv 的阵营限制：0 = 进攻方，1 = 防守方
-    private int CardCampForRoll() => localPlayerCamp == (int)EntityCamp.Defense ? 1 : 0;
-
-    // 选卡只上报第几张：卡牌内容由服务器用同一套伪随机算
-    private void OnCardSelected(int index)
-    {
-        int tier = (int)currentCardTier;
-        if (cardPending[tier] > 0) cardPending[tier]--;
-        RefreshCardButtons();
-
-        bool more = cardPending[tier] > 0;
-        awaitingSeed = more;
-        SendCardAction((CardTier)tier, hasChoice: true, choice: (byte)index, requestSeed: more);
-        if (more) panel.m_selectCardPanel.WaitForSeed((CardTier)tier); // 先隐掉卡面，等下一个种子
-        else panel.m_selectCardPanel.Close();
-    }
-
-    private void OnCardDiscarded()
-    {
-        int tier = (int)currentCardTier;
-        if (cardPending[tier] > 0) cardPending[tier]--;
-        RefreshCardButtons();
-
-        bool more = cardPending[tier] > 0;
-        awaitingSeed = more;
-        SendCardAction((CardTier)tier, hasChoice: true, choice: CSCardAction.DiscardChoice, requestSeed: more);
-        if (more) panel.m_selectCardPanel.WaitForSeed((CardTier)tier);
-        else panel.m_selectCardPanel.Close();
-    }
-
-    // 手动关闭：不发包，服务器保留没用掉的种子（下次点开原样下发）
-    private void OnCardPanelClosed()
-    {
-        awaitingSeed = false;
-    }
-
     private void ResetCardState()
     {
-        for (int i = 0; i < cardPending.Length; i++) cardPending[i] = 0;
-        pendingTiers.Clear();
         cardLevel = 1;
         cardExp = 0;
-        currentCardTier = CardTier.Silver;
-        awaitingSeed = false;
         RefreshProgressHud();
-        if (panel.m_list_selectCard != null) panel.m_list_selectCard.numItems = 0;
     }
     #endregion
 }

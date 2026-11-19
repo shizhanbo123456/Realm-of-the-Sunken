@@ -19,6 +19,10 @@ public class UIManager : MonoBehaviour
     private ConfirmView confirm;
     private LoadingPage loading;
     private RobotTvPage robotTv;
+    private SkillSelectView skillSelect;
+    private LargeMinimapView largeMinimap;
+    private GodViewView godView;
+    private SelectCardView selectCard;
 
     // 注册表：ShowPage / HidePage 按 id 找页面，排层按 Order
     private readonly Dictionary<pageEnum, PageBase> pages = new();
@@ -42,6 +46,17 @@ public class UIManager : MonoBehaviour
     public HomePage Home => home;
 
     public LobbyPage Lobby => lobby;
+
+    // 四个从战斗界面抽出去的独立界面：各自管开合与刷新，这里只给入口
+    public BattlePage Battle => battle;
+
+    public SkillSelectView SkillSelect => skillSelect;
+
+    public LargeMinimapView LargeMinimap => largeMinimap;
+
+    public GodViewView GodView => godView;
+
+    public SelectCardView SelectCard => selectCard;
 
     public bool LoadingVisible => IsPageVisible(pageEnum.loading);
 
@@ -82,6 +97,10 @@ public class UIManager : MonoBehaviour
             confirm = new ConfirmView(UI_ConfirmPanel.CreateInstance());
             loading = new LoadingPage(UI_LoadingPanel.CreateInstance());
             robotTv = new RobotTvPage(UI_RobotTV.CreateInstance());
+            skillSelect = new SkillSelectView(UI_SkillSelectPanel.CreateInstance());
+            largeMinimap = new LargeMinimapView(UI_LargeMinimapPanel.CreateInstance());
+            godView = new GodViewView(UI_GodViewMinimapPanel.CreateInstance());
+            selectCard = new SelectCardView(UI_SelectCardPanel.CreateInstance());
             Settlement = new SettlementView();
 
             Register(home);
@@ -89,6 +108,10 @@ public class UIManager : MonoBehaviour
             Register(battle);
             Register(chat);
             Register(robotTv);
+            Register(skillSelect);
+            Register(largeMinimap);
+            Register(godView);
+            Register(selectCard);
             Register(gm);
             Register(settings);
             Register(rule);
@@ -236,6 +259,11 @@ public class UIManager : MonoBehaviour
         HidePage(pageEnum.settings);
         HidePage(pageEnum.rule);
         HidePage(pageEnum.guide);
+        // 战斗内的独立界面：切场景时一并收起，避免留在新界面上
+        HidePage(pageEnum.skill_select);
+        HidePage(pageEnum.large_minimap);
+        HidePage(pageEnum.god_view);
+        HidePage(pageEnum.select_card);
     }
     #endregion
 

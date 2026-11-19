@@ -52,11 +52,15 @@ namespace Ros.Config
         battle,
         chat,
         robot_tv,
-        gm,
         settings,
         rule,
         guide,
         confirm,
+        gm,
         loading,
+        skill_select,
+        large_minimap,
+        god_view,
+        select_card,
     }
 }
