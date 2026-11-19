@@ -510,7 +510,7 @@ public partial class BattleManager
         skills.Add(skillId);
 
         // 客户端持有表与实体无关：死亡期间也要下发，选择面板才不会把刚拿的技能再抽出来
-        var sync = new Ros.Transport.SCSkillSync { full = false };
+        var sync = new Ros.Transport.SCSkillSync { full = false, skills = new List<int>() };
         sync.skills.Add(skillId);
         Tool.NetworkManager.SendSkillSync(clientId, sync);
 
