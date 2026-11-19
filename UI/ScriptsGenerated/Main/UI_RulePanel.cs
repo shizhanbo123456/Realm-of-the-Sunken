@@ -9,7 +9,7 @@ namespace Ros.UI.Main
     {
         public UI_panel_2 m_panel;
         public GList m_rule_buttons;
-        public GTextField m_rule_content;
+        public GList m_contentList;
         public const string URL = "ui://q68vr2bfhas4t7";
 
         public static UI_RulePanel CreateInstance()
@@ -23,7 +23,7 @@ namespace Ros.UI.Main
 
             m_panel = (UI_panel_2)GetChildAt(0);
             m_rule_buttons = (GList)GetChildAt(2);
-            m_rule_content = (GTextField)GetChildAt(3);
+            m_contentList = (GList)GetChildAt(3);
         }
     }
 }

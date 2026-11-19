@@ -62,6 +62,7 @@ namespace Ros.UI.Main
             UIObjectFactory.SetPackageItemExtension(UI_BattleInfoPanel.URL, typeof(UI_BattleInfoPanel));
             UIObjectFactory.SetPackageItemExtension(UI_CampInfoPanel.URL, typeof(UI_CampInfoPanel));
             UIObjectFactory.SetPackageItemExtension(UI_CampInfo.URL, typeof(UI_CampInfo));
+            UIObjectFactory.SetPackageItemExtension(UI_RuleContent.URL, typeof(UI_RuleContent));
             UIObjectFactory.SetPackageItemExtension(UI_ImportantEventBanner.URL, typeof(UI_ImportantEventBanner));
             UIObjectFactory.SetPackageItemExtension(UI_GuideRareBtoS.URL, typeof(UI_GuideRareBtoS));
             UIObjectFactory.SetPackageItemExtension(UI_GuideScoreTab.URL, typeof(UI_GuideScoreTab));
