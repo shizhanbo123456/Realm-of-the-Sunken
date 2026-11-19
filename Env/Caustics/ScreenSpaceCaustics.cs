@@ -81,6 +81,7 @@ public class ScreenSpaceCaustics : MonoBehaviour
     private bool occlusionActive;
     private bool missingOcclusionWarned;
     private bool ready;
+    private bool renderActive;
     private float mapMin;
     private float mapSize;
 
@@ -131,7 +132,17 @@ public class ScreenSpaceCaustics : MonoBehaviour
         buffer = new CommandBuffer { name = "ScreenSpaceCaustics" };
         buffer.DrawMesh(quad, Matrix4x4.identity, material, 0, 0);
         cam.AddCommandBuffer(CameraEvent.AfterForwardOpaque, buffer);
+        renderActive = true;
         ready = true;
+    }
+
+    // 焦散总开关：摘掉命令缓冲，关闭时连一次全屏绘制都不提交（不是把 intensity 归零）
+    public void SetRenderEnabled(bool value)
+    {
+        if (!ready || value == renderActive) return;
+        renderActive = value;
+        if (value) cam.AddCommandBuffer(CameraEvent.AfterForwardOpaque, buffer);
+        else cam.RemoveCommandBuffer(CameraEvent.AfterForwardOpaque, buffer);
     }
 
     private void Start()

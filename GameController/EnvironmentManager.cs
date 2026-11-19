@@ -49,6 +49,7 @@ public class EnvironmentManager : MonoBehaviour
         if (!ready) return;
 
         ApplyFogDistance();
+        caustics.SetRenderEnabled(ClientSettings.Caustics); // 设置面板的焦散开关：关着时连全屏绘制都不提交
         if (!Mathf.Approximately(time, appliedTime)) Apply(time);
     }
 
