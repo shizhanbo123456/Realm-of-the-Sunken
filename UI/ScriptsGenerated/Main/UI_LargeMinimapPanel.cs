@@ -20,8 +20,8 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
-            m_panel = (UI_panel_2)GetChildAt(1);
-            m_loader = (GLoader)GetChildAt(2);
+            m_panel = (UI_panel_2)GetChildAt(0);
+            m_loader = (GLoader)GetChildAt(1);
         }
     }
 }

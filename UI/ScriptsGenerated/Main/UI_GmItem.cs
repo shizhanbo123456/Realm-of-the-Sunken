@@ -27,9 +27,9 @@ namespace Ros.UI.Main
             m_content = GetControllerAt(0);
             m_type = GetControllerAt(1);
             m_label_main_column = (GTextField)GetChildAt(1);
-            m_label_sub_column = (GTextField)GetChildAt(4);
-            m_input = (GTextInput)GetChildAt(5);
-            m_btn = (GButton)GetChildAt(9);
+            m_label_sub_column = (GTextField)GetChildAt(3);
+            m_input = (GTextInput)GetChildAt(4);
+            m_btn = (GButton)GetChildAt(8);
         }
     }
 }

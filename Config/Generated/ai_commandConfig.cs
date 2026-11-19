@@ -9,8 +9,8 @@ namespace Ros.Config
 {
     public partial class ConfigManager
     {
-        public Dictionary<int, ai_command> ai_commandData;
-        public ai_command Getai_commandConfig(int key)
+        public Dictionary<ai_commandEnum, ai_command> ai_commandData;
+        public ai_command Getai_commandConfig(ai_commandEnum key)
         {
             return ConfigBinary.Require(ai_commandData, key, "ai_command");
         }
@@ -19,12 +19,11 @@ namespace Ros.Config
             using (BinaryReader r = ConfigBinary.Open("ai_command"))
             {
                 int count = r.ReadInt32();
-                ai_commandData = new Dictionary<int, ai_command>(count);
+                ai_commandData = new Dictionary<ai_commandEnum, ai_command>(count);
                 for (int i = 0; i < count; i++)
                 {
                     ai_command row;
-                    row.key = r.ReadInt32();
-                    row.command = ConfigBinary.ReadString(r);
+                    row.key = (ai_commandEnum)r.ReadInt32();
                     row.commandHelp = ConfigBinary.ReadString(r);
                     row.param1Name = ConfigBinary.ReadString(r);
                     row.param1Type = ConfigBinary.ReadString(r);
@@ -42,8 +41,7 @@ namespace Ros.Config
     }
     public struct ai_command
     {
-        public int key;  // 主键
-        public string command;  // 主命令
+        public ai_commandEnum key;  // 主键
         public string commandHelp;  // 主命令注释
         public string param1Name;  // 参数1
         public string param1Type;  // 参数1类型：int / float / bool / string / List<int>
@@ -54,5 +52,50 @@ namespace Ros.Config
         public string param3Name;  // 参数3
         public string param3Type;  // 参数3类型：int / float / bool / string / List<int>
         public string param3Desc;  // 参数3含义
+    }
+    public enum ai_commandEnum
+    {
+        takeover,
+        listCommands,
+        waitForIntrrupt,
+        camera_setActive,
+        camera_screenShot,
+        lua_reloadExtension,
+        lua_execCommand,
+        terrain_points,
+        terrain_path,
+        home_setPlayerName,
+        home_getPlayerName,
+        home_selectCharacter,
+        home_connect,
+        lobby_info,
+        lobby_join,
+        lobby_prepare,
+        lobby_exit,
+        lobby_robot,
+        chat_send,
+        chat_recent,
+        stateMachine_stop,
+        stateMachine_moveTo,
+        stateMachine_attack,
+        stateMachine_collectCoral,
+        stateMachine_castSkill,
+        luaStateMachine_start,
+        luaStateMachine_stop,
+        info_all,
+        info_player,
+        info_pos,
+        info_importantEventBuffer,
+        info_guardProgress,
+        info_minimapEntities,
+        info_dayNightInfo,
+        info_camp,
+        info_cardCount,
+        openSkillSelectPanel,
+        setSkillColumn,
+        quickMessage_send,
+        quickMessage_sendPosition,
+        cardSelection_openPanel,
+        cardSelection_selectCard,
     }
 }

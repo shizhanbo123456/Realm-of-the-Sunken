@@ -31,17 +31,17 @@ namespace Ros.UI.Main
             base.ConstructFromXML(xml);
 
             m_show_character_detail = GetControllerAt(0);
-            m_panel = (UI_panel_2)GetChildAt(1);
-            m_largeMinimapContainer = (UI_GodViewMinimapContainer)GetChildAt(2);
-            m_roleHead = (UI_RoleHead)GetChildAt(3);
-            m_bar_health = (UI_BarHealth)GetChildAt(4);
-            m_label_health = (GTextField)GetChildAt(5);
-            m_buff_list = (UI_buffList)GetChildAt(6);
-            m_campIcon = (UI_PlayerCampIcon)GetChildAt(7);
-            m_entity_name = (GTextField)GetChildAt(8);
-            m_activeSkillList = (GList)GetChildAt(9);
-            m_skillList = (GList)GetChildAt(10);
-            m_scaleButtonList = (GList)GetChildAt(12);
+            m_panel = (UI_panel_2)GetChildAt(0);
+            m_largeMinimapContainer = (UI_GodViewMinimapContainer)GetChildAt(1);
+            m_roleHead = (UI_RoleHead)GetChildAt(2);
+            m_bar_health = (UI_BarHealth)GetChildAt(3);
+            m_label_health = (GTextField)GetChildAt(4);
+            m_buff_list = (UI_buffList)GetChildAt(5);
+            m_campIcon = (UI_PlayerCampIcon)GetChildAt(6);
+            m_entity_name = (GTextField)GetChildAt(7);
+            m_activeSkillList = (GList)GetChildAt(8);
+            m_skillList = (GList)GetChildAt(9);
+            m_scaleButtonList = (GList)GetChildAt(11);
         }
     }
 }

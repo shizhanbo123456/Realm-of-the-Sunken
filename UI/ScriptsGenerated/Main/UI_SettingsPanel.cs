@@ -22,10 +22,10 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
-            m_close2 = (GButton)GetChildAt(1);
-            m_close = (GButton)GetChildAt(2);
-            m_panel = (UI_panel_2)GetChildAt(3);
-            m_settings = (GList)GetChildAt(4);
+            m_close2 = (GButton)GetChildAt(0);
+            m_close = (GButton)GetChildAt(1);
+            m_panel = (UI_panel_2)GetChildAt(2);
+            m_settings = (GList)GetChildAt(3);
         }
     }
 }

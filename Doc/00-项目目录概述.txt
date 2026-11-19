@@ -1,5 +1,5 @@
 电脑环境有openpyxl用于操作xlsx
-严禁项目中全量搜索，Assets也不行，必须列出子目录并不断尝试缩小范围
+严禁项目中全量搜索，Assets也不行，必须列出子目录并不断尝试缩小范围。Scripts目录也较为庞大，也非必要不要全Scripts搜索
 严禁使用git rm/git revert等会造成文件减少的命令，你对命令的理解和使用有误，已经造成了多次重大问题
 删除文件优先让用户删除
 完成功能开发后默认git add+git commit，不push。commit的描述内容尽量简短
@@ -11,3 +11,4 @@
 网络插件目录：D:\Files\unityprojects\RevelryOfSepulcher\Assets\ENS-Netcode
 unity运行时fairy gui目录：D:\Files\unityprojects\RevelryOfSepulcher\Assets\FairyGUI-unity-master
 项目shader目录（不含资源包的）：D:\Files\unityprojects\RevelryOfSepulcher\Assets\Files\Shaders
+桥接工具目录：D:\Files\unityprojects\RevelryOfSepulcher\Assets\unity-python-bridge-runtime

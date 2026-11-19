@@ -8,6 +8,7 @@ namespace Ros.UI.Main
     {
         public static void BindAll()
         {
+            UIObjectFactory.SetPackageItemExtension(UI_PanelBackground.URL, typeof(UI_PanelBackground));
             UIObjectFactory.SetPackageItemExtension(UI_panel_2.URL, typeof(UI_panel_2));
             UIObjectFactory.SetPackageItemExtension(UI_EventBanner.URL, typeof(UI_EventBanner));
             UIObjectFactory.SetPackageItemExtension(UI_LargeMinimapPanel.URL, typeof(UI_LargeMinimapPanel));

@@ -21,9 +21,9 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
-            m_content = (GTextField)GetChildAt(2);
-            m_confirm = (GButton)GetChildAt(3);
-            m_cancel = (GButton)GetChildAt(4);
+            m_content = (GTextField)GetChildAt(1);
+            m_confirm = (GButton)GetChildAt(2);
+            m_cancel = (GButton)GetChildAt(3);
         }
     }
 }

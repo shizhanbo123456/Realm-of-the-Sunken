@@ -23,11 +23,11 @@ namespace Ros.UI.Main
         {
             base.ConstructFromXML(xml);
 
-            m_list = (GList)GetChildAt(1);
-            m_btn_close = (GButton)GetChildAt(2);
-            m_discard = (GButton)GetChildAt(3);
-            m_discard_description = (GTextField)GetChildAt(4);
-            m_current_luck = (GTextField)GetChildAt(6);
+            m_list = (GList)GetChildAt(0);
+            m_btn_close = (GButton)GetChildAt(1);
+            m_discard = (GButton)GetChildAt(2);
+            m_discard_description = (GTextField)GetChildAt(3);
+            m_current_luck = (GTextField)GetChildAt(5);
         }
     }
 }

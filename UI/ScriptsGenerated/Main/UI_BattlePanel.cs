@@ -20,10 +20,6 @@ namespace Ros.UI.Main
         public UI_CampInfoPanel m_CampInfoPanel;
         public UI_BattleInfoPanel m_BattleInfoPanel;
         public UI_ImportantEventBanner m_important_event_banner;
-        public UI_SkillSelectPanel m_skillSelectPanel;
-        public UI_GodViewMinimapPanel m_godViewPanel;
-        public UI_LargeMinimapPanel m_largeMinimapPanel;
-        public UI_SelectCardPanel m_selectCardPanel;
         public Transition m_showBanner;
         public Transition m_showHit;
         public const string URL = "ui://q68vr2bfjtpbhd";
@@ -50,10 +46,6 @@ namespace Ros.UI.Main
             m_CampInfoPanel = (UI_CampInfoPanel)GetChildAt(14);
             m_BattleInfoPanel = (UI_BattleInfoPanel)GetChildAt(15);
             m_important_event_banner = (UI_ImportantEventBanner)GetChildAt(16);
-            m_skillSelectPanel = (UI_SkillSelectPanel)GetChildAt(17);
-            m_godViewPanel = (UI_GodViewMinimapPanel)GetChildAt(18);
-            m_largeMinimapPanel = (UI_LargeMinimapPanel)GetChildAt(19);
-            m_selectCardPanel = (UI_SelectCardPanel)GetChildAt(20);
             m_showBanner = GetTransitionAt(0);
             m_showHit = GetTransitionAt(1);
         }
