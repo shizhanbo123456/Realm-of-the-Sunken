@@ -169,6 +169,13 @@ namespace Ros.Gm
                     output($"雾气：{(env.fogEnabled ? "开" : "关")}");
                     return true;
 
+                case GmCommandId.TempCredential:
+                    if (Tool.SaveManager == null) { output("临时凭证：当前场景没有 SaveManager"); return true; }
+                    Tool.SaveManager.UseTemporaryCredential();
+                    if (Tool.UIManager != null) Tool.UIManager.Home?.RefreshCredential();
+                    output($"已换临时凭证：令牌 {Tool.SaveManager.token}，名字 {ClientSelection.playerName}（重新连接生效，退出不落盘）");
+                    return true;
+
                 default:
                     return false;
             }

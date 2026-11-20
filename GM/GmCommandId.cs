@@ -55,5 +55,8 @@ namespace Ros.Gm
         public const int MeshSurfaceCount = 36;
 
         public const int Fog = 37;
+
+        // 存档
+        public const int TempCredential = 39;
     }
 }

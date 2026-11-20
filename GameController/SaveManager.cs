@@ -29,6 +29,9 @@ public class SaveManager : MonoBehaviour
     // 上次连接用的服务器地址，空串按本机回环落盘
     public string lastServerIp = DefaultServerIp;
 
+    // 临时凭证：只改内存、本次运行退出不落盘（同机双开调试用，见 UseTemporaryCredential）
+    public bool temporaryCredential;
+
     public const int TokenMinInclusive = 1;
     public const int TokenMaxExclusive = 1_000_000_000;
     #endregion
@@ -93,6 +96,7 @@ public class SaveManager : MonoBehaviour
 
     public void Save()
     {
+        if (temporaryCredential) return; // 临时凭证：整局不落盘，退出不覆盖原有存档
         var sb = new System.Text.StringBuilder();
         sb.Append((playerName ?? "").Replace("|", "")).Append('|');
         sb.Append(token).Append('|');
@@ -117,6 +121,18 @@ public class SaveManager : MonoBehaviour
         ClientSelection.selectedAttackIndex = 0;
         ClientSelection.selectedDefenseIndex = 0;
         Save();
+    }
+
+    // 换一套随机身份并停止落盘：同机双开时两个进程令牌不再相同，服务器不会互相顶号
+    public void UseTemporaryCredential()
+    {
+        temporaryCredential = true;
+        playerName = GenerateRandomName();
+        token = GenerateToken();
+        ClientSelection.playerName = playerName;
+        ClientSelection.selectedAttackIndex = 0;
+        ClientSelection.selectedDefenseIndex = 0;
+        ClientSettings.ResetToDefault();
     }
 
     [ContextMenu("ClearSave")]

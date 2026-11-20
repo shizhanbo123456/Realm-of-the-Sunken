@@ -41,5 +41,14 @@ public static class ClientSettings
         CameraShake = bits[2] == '1';
         Caustics = bits[3] == '1';
     }
+
+    // 新建存档的默认值：与上面四个属性的初始值保持一致
+    public static void ResetToDefault()
+    {
+        ThirdPersonCamera = false;
+        AutoPitch = true;
+        CameraShake = true;
+        Caustics = true;
+    }
     #endregion
 }

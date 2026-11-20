@@ -54,6 +54,9 @@ public class UIManager : MonoBehaviour
 
     public SelectCardView SelectCard => selectCard;
 
+    // 首页：换临时凭证后要就地刷新名字与选角显示
+    public HomePage Home => home;
+
     public bool LoadingVisible => IsPageVisible(pageEnum.loading);
 
     private int lastScreenWidth, lastScreenHeight;    // 全局飘字（任意界面可用，屏幕上方居中、随时间上浮、透明度淡入淡出），用 UI_NoticePanel 承载

@@ -262,6 +262,16 @@ public class HomePage : PageBase
         panel.m_playerInfo.m_label_playerName.text = ClientSelection.playerName;
     }
 
+    // GM 换临时凭证后就地刷新：新名字与回零的选角都不必退回首页重进
+    public void RefreshCredential()
+    {
+        defenseTab = false;
+        selectedSaveIndex = ClientSelection.selectedAttackIndex;
+        RefreshPlayerName();
+        Refresh();
+        RefreshPreview();
+    }
+
     // 与页面同比例缩放并居中（弹窗尺寸 400×300，自带全屏遮罩）
     private void ApplyRenameTransform()
     {
