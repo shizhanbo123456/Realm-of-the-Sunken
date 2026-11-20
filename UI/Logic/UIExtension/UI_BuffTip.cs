@@ -13,7 +13,7 @@ namespace Ros.UI.Main
             m_buff_des.text = cfg.description;
         }
 
-        public void ShowAt(GObject anchor) => TipLayout.PlaceAbove(this, anchor);
+        public void ShowAtPointer() => TipLayout.PlaceAtPointer(this);
 
         public void Hide() => visible = false;
     }

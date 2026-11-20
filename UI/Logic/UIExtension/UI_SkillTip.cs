@@ -34,7 +34,7 @@ namespace Ros.UI.Main
             m_score_list.numItems = scores.Count;
         }
 
-        public void ShowAt(GObject anchor) => TipLayout.PlaceAbove(this, anchor);
+        public void ShowAtPointer() => TipLayout.PlaceAtPointer(this);
 
         public void Hide() => visible = false;
     }
