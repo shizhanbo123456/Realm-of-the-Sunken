@@ -59,13 +59,6 @@ public static class GlobalConfig
     public const float neutral_statue_respawn_delay = 60f;
     public const float neutral_statue_angry_health_ratio = 0.5f;    // 生命值低于该比例进入愤怒态
     public const float neutral_statue_angry_interval_ratio = 0.5f;  // 愤怒态施法间隔 = 普通间隔 × 该系数
-    public const float statue_bless_duration = 30f;
-    public const float angel_bless_heal_per_tick = 200f;
-    public const float angel_bless_damage_up = 0.25f;
-    public const float angel_bless_damage_reduce = 0.25f;
-    public const float demon_bless_heal_per_tick = 50f;
-    public const float demon_bless_damage_up = 1f;
-    public const float demon_bless_damage_taken_up = 0.25f;
     #endregion
     #endregion
 
@@ -224,28 +217,13 @@ public static class GlobalConfig
 
     public const float buff_vfx_life_time = 3600f;
 
-    #region 通用 Buff 数值（占位初值，待策划定稿后在此统一调整）
-    public const float buff_attr_ratio = 0.2f;      // 攻击 / 视野 Buff 每级幅度 = 对应属性初始值 × 此系数
-    public const int buff_crit_rate_points = 10;    // 暴击率 Buff 每级加点（百分点，线性叠加）
-    public const int buff_crit_damage_points = 20;  // 暴击伤害 Buff 每级加点（百分点，线性叠加）
-    public const float burning_damage_per_tick = 30f; // 燃烧每跳 = 此值 × 等级
-    public const float poison_damage_ratio = 0.5f;  // 中毒每跳 = 施加者攻击 × 此系数 × 等级
-    public const float reflect_rate = 0.1f;         // 反伤 = 实际受伤 × 此系数 × 等级（向下取整，min=1）
-    public const float buff_scream_attack_ratio = 0.2f;  // 嘶吼增益：攻击 = 初始攻击 × 此系数 × 等级
-    public const int buff_scream_crit_rate_points = 100; // 嘶吼增益：每级暴击率加点（百分点）
-    public const float buff_scream_speed_ratio = 0.2f;   // 嘶吼增益：每级移速增幅
-    #endregion
+    // Buff 的强度系数（每跳伤害 / 属性幅度 / 护盾 / 反伤 / 祝福 / 嘶吼…）在配表 global_variables
 
     #region 防守方技能参数（占位初值，待策划定稿）
-    public const float death_stroll_radius = 4f;
-    public const float death_stroll_dot_ratio = 1.5f; // 死灵漫步光环每跳 = 施加者攻击 × 此系数 × 等级
-    public const float plague_detonate_damage = 20f;
     public const int power_suppress_hits = 3;
     public const float power_suppress_interval = 0.4f;
     public const int power_suppress_vfx_index = 5;   // RangeMagic[5]
     public const float power_suppress_vfx_life = 1f;
-    public const float plague_mark_duration = 30f;   // 瘟疫标记持续时长（主动1 与 瘟疫污染扩散共用）
-    public const float plague_pollute_radius = 8f;   // 珊瑚被摧毁时的瘟疫标记扩散半径
     #endregion
 
     // Buff 持续表现的特效类别/下标在 effect.csv 第 11、12 列（EffectConfig.vfxKind / vfxIndex）

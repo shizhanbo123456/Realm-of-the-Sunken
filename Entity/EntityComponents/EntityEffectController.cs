@@ -28,7 +28,7 @@ public enum EffectType
     GmSpeedUp = 16,                 // GM极速
     // 17 空缺
     BattleFury = 18,                // 愈战愈勇
-    StatueReduce = 19,              // 分层减伤（每存活贤者雕像 25%）
+    StatueReduce = 19,              // 分层减伤（每存活一个副守护点一层）
     MinimapLost = 20,               // 小地图失联
 
     //通用
@@ -247,7 +247,7 @@ public class EntityEffectController
 
     public float GetDamageReduceRate()
     {
-        float rate = GetLevel(EffectType.StatueReduce) * 0.25f;
+        float rate = GetLevel(EffectType.StatueReduce) * GlobalVariable.F(global_variablesEnum.buff_statue_reduce_per_layer);
         if (HasEffect(EffectType.PopeGuard))
             rate += GlobalVariable.F(global_variablesEnum.passive_defense_pope_guard_reduce_rate);
         return Mathf.Clamp01(rate);
@@ -255,17 +255,17 @@ public class EntityEffectController
 
     public float GetOutDamageMultiplier()
     {
-        float m = 1f + GetLevel(EffectType.BattleFury) * 0.1f;
-        if (HasEffect(EffectType.AngelBless)) m *= 1f + GlobalConfig.angel_bless_damage_up;
-        if (HasEffect(EffectType.DemonBless)) m *= 1f + GlobalConfig.demon_bless_damage_up;
+        float m = 1f + GetLevel(EffectType.BattleFury) * GlobalVariable.F(global_variablesEnum.buff_battle_fury_damage_up);
+        if (HasEffect(EffectType.AngelBless)) m *= 1f + GlobalVariable.F(global_variablesEnum.buff_angel_bless_damage_up);
+        if (HasEffect(EffectType.DemonBless)) m *= 1f + GlobalVariable.F(global_variablesEnum.buff_demon_bless_damage_up);
         return m;
     }
 
     public float GetInDamageMultiplier()
     {
-        float m = 1f / (1f + GetLevel(EffectType.BattleFury) * 0.1f);
-        if (HasEffect(EffectType.AngelBless)) m *= 1f - GlobalConfig.angel_bless_damage_reduce;
-        if (HasEffect(EffectType.DemonBless)) m *= 1f + GlobalConfig.demon_bless_damage_taken_up;
+        float m = 1f / (1f + GetLevel(EffectType.BattleFury) * GlobalVariable.F(global_variablesEnum.buff_battle_fury_damage_up));
+        if (HasEffect(EffectType.AngelBless)) m *= 1f - GlobalVariable.F(global_variablesEnum.buff_angel_bless_damage_reduce);
+        if (HasEffect(EffectType.DemonBless)) m *= 1f + GlobalVariable.F(global_variablesEnum.buff_demon_bless_damage_taken_up);
         int curseLevel = GetLevel(EffectType.DeathCurse);
         if (curseLevel > 0) m *= 1f + GlobalVariable.F(global_variablesEnum.death_curse_damage_taken_ratio) * curseLevel;
         return m;
@@ -276,7 +276,7 @@ public class EntityEffectController
     {
         int level = GetLevel(EffectType.Reflect);
         if (level <= 0 || receivedDamage <= 1f) return 0f;
-        return Mathf.Max(1, Mathf.FloorToInt(receivedDamage * level * GlobalConfig.reflect_rate));
+        return Mathf.Max(1, Mathf.FloorToInt(receivedDamage * level * GlobalVariable.F(global_variablesEnum.buff_reflect_rate)));
     }
 
     public bool IsActionBlocked() => blockMove;
@@ -308,7 +308,7 @@ public class EntityEffectController
         if (HasEffect(EffectType.DeathStroll)) m *= GlobalVariable.F(global_variablesEnum.buff_death_stroll_speed_up);
         if (HasEffect(EffectType.GmSpeedUp)) m *= GlobalVariable.F(global_variablesEnum.gm_speed_multiplier);
         int screamLevel = TotalLevel(EffectType.ZombieScreamBoost);
-        if (screamLevel > 0) m *= 1f + GlobalConfig.buff_scream_speed_ratio * screamLevel;
+        if (screamLevel > 0) m *= 1f + GlobalVariable.F(global_variablesEnum.buff_scream_speed_ratio) * screamLevel;
         return m;
     }
 
@@ -359,16 +359,16 @@ public class EntityEffectController
         switch (layer.type)
         {
             case EffectType.Burning:
-                if (owner != null) owner.OnDamaged(GlobalConfig.burning_damage_per_tick * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.Burning);
+                if (owner != null) owner.OnDamaged(GlobalVariable.F(global_variablesEnum.buff_burning_damage_per_tick) * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.Burning);
                 break;
             case EffectType.PaleFire:
-                if (owner != null) owner.OnDamaged(GlobalConfig.burning_damage_per_tick * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.PaleFire);
+                if (owner != null) owner.OnDamaged(GlobalVariable.F(global_variablesEnum.buff_burning_damage_per_tick) * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.PaleFire);
                 break;
             case EffectType.Poison:
             {
                 if (owner == null) break;
                 float stat = SourcePower(layer);
-                owner.OnDamaged(GlobalConfig.poison_damage_ratio * stat * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.Poison);
+                owner.OnDamaged(GlobalVariable.F(global_variablesEnum.buff_poison_damage_ratio) * stat * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.Poison);
                 break;
             }
             case EffectType.DeathStroll:
@@ -377,10 +377,10 @@ public class EntityEffectController
                 float stat = SourcePower(layer);
                 EntityCamp enemyCamp = EntityCampUtil.HostileOf(owner.type.category);
                 s_tickTargets.Clear();
-                BattleManager.EntityContainer.GetAllInCamp(owner.transform.position, GlobalConfig.death_stroll_radius, enemyCamp, s_tickTargets);
+                BattleManager.EntityContainer.GetAllInCamp(owner.transform.position, GlobalVariable.F(global_variablesEnum.buff_death_stroll_radius), enemyCamp, s_tickTargets);
                 for (int i = 0; i < s_tickTargets.Count; i++)
                 {
-                    if (s_tickTargets[i] != null) s_tickTargets[i].OnDamaged(GlobalConfig.death_stroll_dot_ratio * stat * layer.level, owner, fixedDamage: true, damageType: CombatLabelType.DeathStroll);
+                    if (s_tickTargets[i] != null) s_tickTargets[i].OnDamaged(GlobalVariable.F(global_variablesEnum.buff_death_stroll_dot_ratio) * stat * layer.level, owner, fixedDamage: true, damageType: CombatLabelType.DeathStroll);
                 }
                 // 死灵诅咒：光环内敌人每秒刷新一层（叠加模式 2，等级随停留时间累加）
                 s_curseTargets.Clear();
@@ -397,10 +397,10 @@ public class EntityEffectController
                 if (owner != null) owner.OnDamaged(GlobalVariable.F(global_variablesEnum.death_curse_tick_damage) * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.DeathStroll);
                 break;
             case EffectType.AngelBless:
-                HealOwner(GlobalConfig.angel_bless_heal_per_tick * layer.level);
+                HealOwner(GlobalVariable.F(global_variablesEnum.buff_angel_bless_heal_per_tick) * layer.level);
                 break;
             case EffectType.DemonBless:
-                HealOwner(GlobalConfig.demon_bless_heal_per_tick * layer.level);
+                HealOwner(GlobalVariable.F(global_variablesEnum.buff_demon_bless_heal_per_tick) * layer.level);
                 break;
         }
     }
@@ -640,8 +640,8 @@ public class EntityEffectController
             if (pair.Key == EffectType.ZombieScreamBoost)
             {
                 int screamLevel = SumLevel(pair.Value);
-                BuffAttack += owner.attributes.BaseAttack * GlobalConfig.buff_scream_attack_ratio * screamLevel;
-                BuffCritRate += GlobalConfig.buff_scream_crit_rate_points * screamLevel;
+                BuffAttack += owner.attributes.BaseAttack * GlobalVariable.F(global_variablesEnum.buff_scream_attack_ratio) * screamLevel;
+                BuffCritRate += GlobalVariable.F(global_variablesEnum.buff_scream_crit_rate_points) * screamLevel;
                 continue;
             }
             if (!pair.Key.IsAttribute()) continue;
@@ -665,10 +665,10 @@ public class EntityEffectController
         var field = FieldFromType(type);
         float amount = field switch
         {
-            AttrField.CritRate => GlobalConfig.buff_crit_rate_points * level,
-            AttrField.CritDamage => GlobalConfig.buff_crit_damage_points * level,
-            AttrField.Attack => owner.attributes.BaseAttack * GlobalConfig.buff_attr_ratio * level,
-            AttrField.ViewDistance => owner.attributes.BaseViewDistance * GlobalConfig.buff_attr_ratio * level,
+            AttrField.CritRate => GlobalVariable.F(global_variablesEnum.buff_crit_rate_points) * level,
+            AttrField.CritDamage => GlobalVariable.F(global_variablesEnum.buff_crit_damage_points) * level,
+            AttrField.Attack => owner.attributes.BaseAttack * GlobalVariable.F(global_variablesEnum.buff_attr_ratio) * level,
+            AttrField.ViewDistance => owner.attributes.BaseViewDistance * GlobalVariable.F(global_variablesEnum.buff_attr_ratio) * level,
             _ => UnsupportedAttrField(field),
         };
         return type.IsNegative() ? -amount : amount;

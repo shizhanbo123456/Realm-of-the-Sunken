@@ -1,10 +1,9 @@
 using UnityEngine;
 
+using Ros.Config;
+
 public class AnimSlideStartEvent : AnimMotionEvent
 {
-    private const float DodgeBuffDuration = 1f;
-    private const int DodgeBuffLevel = 1;
-
     protected override InputBlockOp blockOp => InputBlockOp.Jump | InputBlockOp.Slide | InputBlockOp.Attack;
     public override EndureType? Endure => EndureType.Super;
     [SerializeField] private AnimationCurve speedCurve;
@@ -18,7 +17,9 @@ public class AnimSlideStartEvent : AnimMotionEvent
         {
             slideTime = 0;
             canEnd = true;
-            data.effectController.AddEffect(EffectType.DodgeBoost, DodgeBuffLevel, DodgeBuffDuration);
+            data.effectController.AddEffect(EffectType.DodgeBoost,
+                GlobalVariable.I(global_variablesEnum.buff_dodge_level),
+                GlobalVariable.F(global_variablesEnum.buff_dodge_duration));
         }
     }
     public override void OnStateUpdate(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)

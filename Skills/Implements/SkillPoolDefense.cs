@@ -261,7 +261,7 @@ namespace Ros.Skill
                 if (target == null || target.effectController == null) continue;
                 int level = target.effectController.GetLevel(EffectType.PlagueMark);
                 if (level <= 0) continue;
-                target.OnDamaged(level * GlobalConfig.plague_detonate_damage, caster, damageType: CombatLabelType.PlagueBurst);
+                target.OnDamaged(level * GlobalVariable.F(global_variablesEnum.buff_plague_detonate_damage), caster, damageType: CombatLabelType.PlagueBurst);
                 target.effectController.RemoveEffect(EffectType.PlagueMark);
             }
         }

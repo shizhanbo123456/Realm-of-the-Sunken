@@ -1,5 +1,7 @@
 ﻿using UnityEngine;
 
+using Ros.Config;
+
 public class CoralEntityData : EntityData
 {
     public override void OnKilled()
@@ -20,13 +22,14 @@ public class CoralEntityData : EntityData
         var source = BattleManager.GetEntity(effectController.GetSourceId(EffectType.PlaguePollute));
         if (source == null) return;
         Vector3 center = transform.position;
-        float sqr = GlobalConfig.plague_pollute_radius * GlobalConfig.plague_pollute_radius;
+        float radius = GlobalVariable.F(global_variablesEnum.buff_plague_pollute_radius);
+        float sqr = radius * radius;
         foreach (var entity in BattleManager.EntityContainer.Entities)
         {
             if (entity == null || !entity.Alive || entity.camp != EntityCamp.Attack) continue;
             if ((entity.transform.position - center).sqrMagnitude > sqr) continue;
             if (entity.effectController == null) continue;
-            entity.effectController.AddEffect(EffectType.PlagueMark, 1, GlobalConfig.plague_mark_duration, source);
+            entity.effectController.AddEffect(EffectType.PlagueMark, 1, GlobalVariable.F(global_variablesEnum.buff_plague_mark_duration), source);
         }
     }
 }
