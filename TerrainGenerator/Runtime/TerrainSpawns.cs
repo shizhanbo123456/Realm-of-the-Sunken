@@ -43,8 +43,9 @@ namespace TerrainGen
             BuildFloorGrid(data);
 
             float cell = data.cellSize;
-            var extras = new List<Vector3>();
             int mainGuardCount = 0;
+            int attackCount = 0;
+            int defenseCount = 0;
 
             for (int i = 0; i < data.points.Count; i++)
             {
@@ -62,37 +63,32 @@ namespace TerrainGen
                     case PointKind.Tower:
                         Towers.Add(world);
                         break;
-                    default:
-                        extras.Add(world);
+                    case PointKind.NeutralStatue:
+                        NeutralStatues.Add(world);
+                        break;
+                    case PointKind.AttackSpawn:
+                        AttackSpawn = world;
+                        attackCount++;
+                        break;
+                    case PointKind.DefenseSpawn:
+                        DefenseSpawn = world;
+                        defenseCount++;
                         break;
                 }
             }
 
             if (mainGuardCount != 1)
-                Debug.LogError($"[地形] 烘焙数据里有 {mainGuardCount} 个主守护点，应当恰好 1 个：国王雕像与攻守出生点无法定位");
+                Debug.LogError($"[地形] 烘焙数据里有 {mainGuardCount} 个主守护点，应当恰好 1 个：国王雕像无法定位");
+            if (attackCount != 1)
+                Debug.LogError($"[地形] 烘焙数据里有 {attackCount} 个进攻出生点，应当恰好 1 个");
+            if (defenseCount != 1)
+                Debug.LogError($"[地形] 烘焙数据里有 {defenseCount} 个防守出生点，应当恰好 1 个");
             if (SubGuards.Count == 0)
                 Debug.LogError("[地形] 烘焙数据里没有副守护点：贤者雕像无法定位");
-
-            BuildSpawnsFromExtras(extras);
-            Built = true;
-        }
-
-        // 普通点位按离主守护点的距离分出攻守出生点，其余作为中立雕像候选
-        private static void BuildSpawnsFromExtras(List<Vector3> extras)
-        {
-            if (extras.Count < 2)
-            {
-                Debug.LogError($"[地形] 烘焙数据里只有 {extras.Count} 个普通点位：至少需要 2 个才能分出进攻/防守出生点");
-                return;
-            }
-
-            extras.Sort((a, b) => SqrDistanceXZ(a, MainGuard).CompareTo(SqrDistanceXZ(b, MainGuard)));
-            DefenseSpawn = extras[0];
-            AttackSpawn = extras[extras.Count - 1];
-            for (int i = 1; i < extras.Count - 1; i++) NeutralStatues.Add(extras[i]);
-
             if (NeutralStatues.Count == 0)
-                Debug.LogWarning("[地形] 普通点位不足 3 个：没有中立雕像刷新点，中立雕像不会生成");
+                Debug.LogWarning("[地形] 烘焙数据里没有中立雕像点位：中立雕像不会生成");
+
+            Built = true;
         }
 
         public static void Reset()
@@ -139,13 +135,6 @@ namespace TerrainGen
             int gx = Mathf.FloorToInt((x - MapMin) / floorCellSize);
             int gz = Mathf.FloorToInt((z - MapMin) / floorCellSize);
             return gx >= 0 && gz >= 0 && gx < floorSizeX && gz < floorSizeZ && floorCells[gx, gz];
-        }
-
-        private static float SqrDistanceXZ(Vector3 a, Vector3 b)
-        {
-            float dx = a.x - b.x;
-            float dz = a.z - b.z;
-            return dx * dx + dz * dz;
         }
         #endregion
 

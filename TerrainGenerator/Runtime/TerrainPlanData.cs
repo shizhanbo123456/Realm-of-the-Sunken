@@ -32,7 +32,7 @@ namespace TerrainGen
     public class TerrainPlanData
     {
         const int Magic = 0x5447524E;
-        const int FormatVersion = 2;
+        const int FormatVersion = 3;
 
         public int seed;
         public int configVersion;
@@ -150,7 +150,13 @@ namespace TerrainGen
                     for (int i = 0; i < pointCount; i++)
                     {
                         var cell = new Vector2Int(r.ReadInt32(), r.ReadInt32());
-                        data.points.Add(new MapPoint(cell, (PointKind)r.ReadByte()));
+                        var kind = (PointKind)r.ReadByte();
+                        if (kind > PointKind.Tower)
+                        {
+                            Debug.LogError($"[地形] {path} 里有点位类型 {(int)kind} 越界：文件已损坏，需要重新烘焙");
+                            return null;
+                        }
+                        data.points.Add(new MapPoint(cell, kind));
                     }
 
                     return data;

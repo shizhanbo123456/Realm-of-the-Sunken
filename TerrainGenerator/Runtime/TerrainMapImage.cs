@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace TerrainGen
 {
-    // 地形底板图：每格有无地面 + 防御塔/守护点格的专用色，烘焙时写到 Resources/Map，小地图三处共用
+    // 地形底板图：每格有无地面 + 防御塔/守护点/中立雕像/攻守出生点格的专用色，烘焙时写到 Resources/Map，小地图三处共用
     public static class TerrainMapImage
     {
         public const string Folder = "Assets/Resources/Map";
@@ -15,8 +15,9 @@ namespace TerrainGen
         static bool tried;
 
         // 每格按整数边界切方块，格子数变动也能铺满整张图；像素行序自下而上，正好对应世界 Z+
-        // 防御塔 / 守护点所在的格整块盖成专门的颜色，点位在小地图上一眼可见
-        public static Texture2D Build(BuildingField field, Color floor, Color voidColor, Color towerColor, Color guardColor)
+        // 点位所在的格整块盖成该类型专门的颜色，点位在小地图上一眼可见
+        public static Texture2D Build(BuildingField field, Color floor, Color voidColor, Color towerColor,
+            Color guardColor, Color statueColor, Color attackColor, Color defenseColor)
         {
             if (field == null || field.SizeX <= 0 || field.SizeZ <= 0) return null;
 
@@ -37,12 +38,22 @@ namespace TerrainGen
 
             Color32 towerPx = towerColor;
             Color32 guardPx = guardColor;
+            Color32 statuePx = statueColor;
+            Color32 attackPx = attackColor;
+            Color32 defensePx = defenseColor;
             foreach (MapPoint p in field.Points)
             {
                 Color32 c;
-                if (p.Kind == PointKind.Tower) c = towerPx;
-                else if (p.Kind == PointKind.MainGuard || p.Kind == PointKind.SubGuard) c = guardPx;
-                else continue;
+                switch (p.Kind)
+                {
+                    case PointKind.Tower: c = towerPx; break;
+                    case PointKind.MainGuard:
+                    case PointKind.SubGuard: c = guardPx; break;
+                    case PointKind.NeutralStatue: c = statuePx; break;
+                    case PointKind.AttackSpawn: c = attackPx; break;
+                    case PointKind.DefenseSpawn: c = defensePx; break;
+                    default: continue;
+                }
 
                 if (p.Cell.x < 0 || p.Cell.y < 0 || p.Cell.x >= field.SizeX || p.Cell.y >= field.SizeZ) continue;
                 CellBounds(field, p.Cell.x, p.Cell.y, out int px0, out int px1, out int pz0, out int pz1);
@@ -72,12 +83,12 @@ namespace TerrainGen
             }
         }
 
-        public static bool Write(BuildingField field, Color floor, Color voidColor, Color towerColor, Color guardColor,
-            out string assetPath)
+        public static bool Write(BuildingField field, Color floor, Color voidColor, Color towerColor,
+            Color guardColor, Color statueColor, Color attackColor, Color defenseColor, out string assetPath)
         {
             assetPath = Folder + "/" + AssetName + ".png";
 
-            Texture2D tex = Build(field, floor, voidColor, towerColor, guardColor);
+            Texture2D tex = Build(field, floor, voidColor, towerColor, guardColor, statueColor, attackColor, defenseColor);
             if (tex == null)
             {
                 Debug.LogError("[地形] 底图生成失败：布局为空");

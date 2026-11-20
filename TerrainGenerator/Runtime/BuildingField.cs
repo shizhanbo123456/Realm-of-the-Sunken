@@ -660,6 +660,7 @@ namespace TerrainGen
             int high = Mathf.Max(TerrainGeneration.I(terrain_generationEnum.extra_point_min), TerrainGeneration.I(terrain_generationEnum.extra_point_max));
             int extraCount = rng.Next(low, high + 1);
             int gap = Mathf.Max(1, TerrainGeneration.I(terrain_generationEnum.point_spacing));
+            var extras = new List<MapPoint>();
             for (int i = 0; i < extraCount; i++)
             {
                 Vector2Int p = PickFarthest(pool, chosen, usedRooms, gap);
@@ -673,12 +674,37 @@ namespace TerrainGen
                     Debug.LogWarning($"[地形] 普通点位只放下 {i} 个 / {extraCount}，空置区域不够");
                     break;
                 }
-                Points.Add(new MapPoint(p, PointKind.Extra));
+                var point = new MapPoint(p, PointKind.NeutralStatue);
+                Points.Add(point);
+                extras.Add(point);
                 chosen.Add(p);
                 usedRooms.Add(Region[p.x, p.y]);
             }
 
+            AssignExtraRoles(extras, main);
             SelectTowerPoints();
+        }
+
+        // 离主守护点最近的普通点位定成防守出生点、最远的定成进攻出生点，其余留作中立雕像
+        static void AssignExtraRoles(List<MapPoint> extras, Vector2Int main)
+        {
+            if (extras.Count < 2)
+            {
+                Debug.LogError($"[地形] 普通点位只有 {extras.Count} 个：分不出进攻/防守出生点，全部当中立雕像");
+                return;
+            }
+
+            var sorted = new List<MapPoint>(extras);
+            sorted.Sort((a, b) => SqrCellDistance(a.Cell, main).CompareTo(SqrCellDistance(b.Cell, main)));
+            sorted[0].SetKind(PointKind.DefenseSpawn);
+            sorted[sorted.Count - 1].SetKind(PointKind.AttackSpawn);
+        }
+
+        static int SqrCellDistance(Vector2Int a, Vector2Int b)
+        {
+            int dx = a.x - b.x;
+            int dz = a.y - b.y;
+            return dx * dx + dz * dz;
         }
 
         // 每个守护点周围按角度均分选几个防御塔点位

@@ -134,7 +134,7 @@ namespace TerrainGen
             float ox = mapMin + data.cellSize * 0.5f;
             float oz = mapMin + data.cellSize * 0.5f;
             int subIndex = 0;
-            int extraIndex = 0;
+            int statueIndex = 0;
             int towerIndex = 0;
 
             for (int i = 0; i < data.points.Count; i++)
@@ -152,13 +152,26 @@ namespace TerrainGen
                         label = "Guard_Sub_" + (++subIndex);
                         color = new Color(1f, 0.75f, 0.2f);
                         break;
+                    case PointKind.NeutralStatue:
+                        label = "Statue_" + (++statueIndex);
+                        color = new Color(0.72f, 0.45f, 1f);
+                        break;
+                    case PointKind.AttackSpawn:
+                        label = "Spawn_Attack";
+                        color = new Color(0.95f, 0.22f, 0.30f);
+                        break;
+                    case PointKind.DefenseSpawn:
+                        label = "Spawn_Defense";
+                        color = new Color(0.30f, 0.60f, 1f);
+                        break;
                     case PointKind.Tower:
                         label = "Tower_" + (++towerIndex);
                         color = new Color(0.35f, 0.95f, 0.45f);
                         break;
                     default:
-                        label = "Open_" + (++extraIndex);
-                        color = new Color(0.25f, 0.8f, 1f);
+                        Debug.LogError($"[地形] 点位 ({p.Cell.x},{p.Cell.y}) 的类型 {(int)p.Kind} 未定义：烘焙数据已损坏，需要重新烘焙");
+                        label = "Unknown";
+                        color = Color.magenta;
                         break;
                 }
 
