@@ -510,14 +510,13 @@ namespace TerrainGen.EditorTools
                 build.minRegionArea = minRegion;
             }
 
-            // 地面按格子铺整块 Box（素材网格自身有缝也能保证底板连续）；其余物件用真实网格但标成 Not Walkable，
-            // 只当障碍、不产生可行走面——否则围栏顶、立柱顶、岩石顶、屋檐全是一块块孤岛。
+            // 地面按格子铺整块 Box；其余物件只认碰撞体、标成 Not Walkable，只当障碍、不产生可行走面。
             // 不用 CollectSources(PhysicsColliders)：编辑器态刚生成的碰撞体还没同步进物理场景，会收错。
             var sources = new List<NavMeshBuildSource>();
             Bounds bounds = default;
             bool hasBounds = false;
             int groundCount = 0;
-            int meshCount = 0;
+            int obstacleCount = 0;
             float cell = data.cellSize;
             var cellSize = new Vector3(cell + 0.1f, 1f, cell + 0.1f); // 略微重叠，保证相邻地块接得上
 
@@ -542,30 +541,23 @@ namespace TerrainGen.EditorTools
                     continue;
                 }
 
-                foreach (MeshFilter filter in item.GetComponentsInChildren<MeshFilter>(true))
+                Collider[] colliders = item.GetComponentsInChildren<Collider>(true);
+                for (int i = 0; i < colliders.Length; i++)
                 {
-                    Mesh mesh = filter.sharedMesh;
-                    if (mesh == null) continue;
+                    Collider collider = colliders[i];
+                    if (!collider.enabled || collider.isTrigger) continue;
+                    if (!TryMakeObstacleSource(collider, out NavMeshBuildSource source, out Bounds sourceBounds)) continue;
 
-                    sources.Add(new NavMeshBuildSource
-                    {
-                        shape = NavMeshBuildSourceShape.Mesh,
-                        sourceObject = mesh,
-                        area = NotWalkableArea,
-                        transform = filter.transform.localToWorldMatrix,
-                    });
-                    meshCount++;
-
-                    var renderer = filter.GetComponent<MeshRenderer>();
-                    if (renderer == null) continue;
-                    if (!hasBounds) { bounds = renderer.bounds; hasBounds = true; }
-                    else bounds.Encapsulate(renderer.bounds);
+                    sources.Add(source);
+                    if (!hasBounds) { bounds = sourceBounds; hasBounds = true; }
+                    else bounds.Encapsulate(sourceBounds);
+                    obstacleCount++;
                 }
             }
 
             if (sources.Count == 0 || !hasBounds)
             {
-                message = "烘焙失败：生成物里没有可用的网格，检查素材表与碰撞体预处理";
+                message = "烘焙失败：生成物里没有可用的碰撞体与地面，检查素材表与碰撞体预处理";
                 return false;
             }
 
@@ -585,10 +577,116 @@ namespace TerrainGen.EditorTools
             }
 
             string path = SaveNavMeshAsset(navData);
-            message = $"NavMesh 已烘焙：地面 {groundCount} 块 + 障碍网格 {meshCount} 个，"
+            message = $"NavMesh 已烘焙：地面 {groundCount} 块 + 障碍碰撞体 {obstacleCount} 个，"
                       + $"范围 X {bounds.min.x:0}~{bounds.max.x:0} / Z {bounds.min.z:0}~{bounds.max.z:0}、Y {bounds.min.y:0.#}~{bounds.max.y:0.#}、"
                       + $"minRegionArea {minRegion:0} 体素²（≈{minRegion * build.voxelSize * build.voxelSize:0.#} m²）→ {path}";
             return true;
+        }
+
+        // 障碍几何只认碰撞体：导航形状与物理一致，镂空的渲染网格（铸铁围栏、雕花柱）不会再被当成实心墙
+        static bool TryMakeObstacleSource(Collider collider, out NavMeshBuildSource source, out Bounds worldBounds)
+        {
+            source = default;
+            worldBounds = default;
+            Transform t = collider.transform;
+
+            if (collider is MeshCollider meshCollider)
+            {
+                Mesh mesh = meshCollider.sharedMesh;
+                if (mesh == null)
+                {
+                    Debug.LogWarning($"[地形] MeshCollider 没有网格，已跳过：{collider.name}", collider);
+                    return false;
+                }
+                source = new NavMeshBuildSource
+                {
+                    shape = NavMeshBuildSourceShape.Mesh,
+                    sourceObject = mesh,
+                    area = NotWalkableArea,
+                    transform = t.localToWorldMatrix,
+                };
+                worldBounds = WorldAabb(mesh.bounds, t.localToWorldMatrix);
+                return true;
+            }
+
+            if (collider is BoxCollider box)
+            {
+                var local = new Bounds(box.center, box.size);
+                source = new NavMeshBuildSource
+                {
+                    shape = NavMeshBuildSourceShape.Box,
+                    size = Vector3.Scale(box.size, AbsScale(t)),
+                    area = NotWalkableArea,
+                    transform = Matrix4x4.TRS(t.TransformPoint(box.center), t.rotation, Vector3.one),
+                };
+                worldBounds = WorldAabb(local, t.localToWorldMatrix);
+                return true;
+            }
+
+            if (collider is SphereCollider sphere)
+            {
+                float radius = sphere.radius * MaxAxis(AbsScale(t));
+                Vector3 center = t.TransformPoint(sphere.center);
+                source = new NavMeshBuildSource
+                {
+                    shape = NavMeshBuildSourceShape.Sphere,
+                    size = Vector3.one * (radius * 2f),
+                    area = NotWalkableArea,
+                    transform = Matrix4x4.TRS(center, Quaternion.identity, Vector3.one),
+                };
+                worldBounds = new Bounds(center, Vector3.one * (radius * 2f));
+                return true;
+            }
+
+            if (collider is CapsuleCollider capsule)
+            {
+                float radius = capsule.radius * MaxAxis(AbsScale(t));
+                float height = Mathf.Max(capsule.height * MaxAxis(AbsScale(t)), radius * 2f);
+                Vector3 center = t.TransformPoint(capsule.center);
+                // capsule 的 size 恒为（直径, 高, 直径），轴朝向靠旋转摆
+                Quaternion axisRotation = Quaternion.identity;
+                Vector3 extent = new Vector3(radius * 2f, height, radius * 2f);
+                if (capsule.direction == 0) { axisRotation = Quaternion.Euler(0f, 0f, 90f); extent = new Vector3(height, radius * 2f, radius * 2f); }
+                else if (capsule.direction == 2) { axisRotation = Quaternion.Euler(90f, 0f, 0f); extent = new Vector3(radius * 2f, radius * 2f, height); }
+
+                source = new NavMeshBuildSource
+                {
+                    shape = NavMeshBuildSourceShape.Capsule,
+                    size = new Vector3(radius * 2f, height, radius * 2f),
+                    area = NotWalkableArea,
+                    transform = Matrix4x4.TRS(center, t.rotation * axisRotation, Vector3.one),
+                };
+                worldBounds = new Bounds(center, extent);
+                return true;
+            }
+
+            Debug.LogError($"[地形] 碰撞体 {collider.name} 的类型 {collider.GetType().Name} 不支持 NavMesh 烘焙，已跳过：请改用 MeshCollider 或 BoxCollider", collider);
+            return false;
+        }
+
+        static Vector3 AbsScale(Transform t)
+        {
+            Vector3 s = t.lossyScale;
+            return new Vector3(Mathf.Abs(s.x), Mathf.Abs(s.y), Mathf.Abs(s.z));
+        }
+
+        static float MaxAxis(Vector3 v) => Mathf.Max(v.x, Mathf.Max(v.y, v.z));
+
+        // 8 角点解析变换求世界 AABB：Collider.bounds 在编辑器态可能还没同步进物理场景，会读到 0
+        static Bounds WorldAabb(Bounds local, Matrix4x4 matrix)
+        {
+            Bounds result = default;
+            for (int i = 0; i < 8; i++)
+            {
+                var corner = new Vector3(
+                    (i & 1) == 0 ? local.min.x : local.max.x,
+                    (i & 2) == 0 ? local.min.y : local.max.y,
+                    (i & 4) == 0 ? local.min.z : local.max.z);
+                Vector3 p = matrix.MultiplyPoint3x4(corner);
+                if (i == 0) result = new Bounds(p, Vector3.zero);
+                else result.Encapsulate(p);
+            }
+            return result;
         }
 
         static string SaveNavMeshAsset(NavMeshData data)
