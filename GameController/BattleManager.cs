@@ -1124,7 +1124,8 @@ public partial class BattleManager : EnsBehaviour
         minimapTicker = new Ticker(GlobalConfig.minimap_sync_interval);
         zombieSpawnTicker = new Ticker(GlobalVariable.F(global_variablesEnum.zombie_spawn_attempt_interval));
         coralSpawnTicker = new Ticker(GlobalVariable.F(global_variablesEnum.coral_spawn_attempt_interval));
-        fallCheckTicker = new Ticker(GlobalConfig.entity_fall_check_interval);
+        playerBoundsTicker = new Ticker(GlobalConfig.entity_bounds_check_interval_player);
+        boundsCheckTicker = new Ticker(GlobalConfig.entity_bounds_check_interval);
 
         // 玩家实体重与 AI 同路径（AI clientId 为负虚拟 id），仅输入来源不同：真人 CSMove/CSJump/CSSlide、AI UpdateAI
         foreach (var pair in PlayerInfoList)
@@ -1240,7 +1241,7 @@ public partial class BattleManager : EnsBehaviour
     private const string kTickBulletsTag = "BattleManager.TickBullets";
     private const string kTickReviveTag = "BattleManager.TickRevive";
     private const string kTickWorldRespawnTag = "BattleManager.TickWorldRespawn";
-    private const string kFallRecoverTag = "BattleManager.TickFallRecover";
+    private const string kBoundsCheckTag = "BattleManager.TickOutOfBounds";
     private const string kProcessKilledTag = "BattleManager.ProcessKilled";
     private const string kCampAliveCountTag = "BattleManager.CampAliveCount";
     private const string kDefensePointTag = "BattleManager.DefensePointProgress";
@@ -1291,8 +1292,8 @@ public partial class BattleManager : EnsBehaviour
         Profiler.BeginSample(kTickMovementTag);
         TickMovement();
         Profiler.EndSample();
-        Profiler.BeginSample(kFallRecoverTag);
-        TickFallRecover(); // 早于 SyncTransforms：传送当帧即同步给物理
+        Profiler.BeginSample(kBoundsCheckTag);
+        TickOutOfBounds(); // 早于 SyncTransforms：传送当帧即同步给物理
         Profiler.EndSample();
         Profiler.BeginSample(kSyncTransformsTag);
         Physics.SyncTransforms(); //位移已由刚体积分，此处兜底按 transform 移动的对象（项目关闭了自动同步）

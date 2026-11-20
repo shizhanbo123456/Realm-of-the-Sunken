@@ -302,26 +302,49 @@ public partial class BattleManager
         }
     }
 
-    #region 掉落回收（y < 0 的实体落回 Terrain 表面上方）
+    #region 越界处理（掉出地形下沿判死，其余方向夹回配表地图矩形）
 
-    private Ticker fallCheckTicker;
+    private Ticker playerBoundsTicker; // 玩家：掉出后很快就会复活，检查得更勤
+    private Ticker boundsCheckTicker;  // 其它实体（僵尸 / 雕像 / 珊瑚）
 
-    private void TickFallRecover()
+    // 竖直有效范围取配表 terrain_height，水平取 terrain_size
+    private void TickOutOfBounds()
     {
-        if (!fallCheckTicker) return;
+        bool checkPlayers = playerBoundsTicker;
+        bool checkOthers = boundsCheckTicker;
+        if (!checkPlayers && !checkOthers) return;
+
+        float minY = GlobalVariable.RangeMin(global_variablesEnum.terrain_height);
+        float maxY = GlobalVariable.RangeMax(global_variablesEnum.terrain_height);
+        float minXZ = TerrainSpawns.MapMin;
+        float maxXZ = TerrainSpawns.MapMax;
 
         foreach (var entity in EntityContainer.Entities)
         {
-            if (entity == null || entity.rb == null || !entity.Alive) continue; // 无刚体的雕像/珊瑚不会掉落
-            Vector3 pos = entity.transform.position;
-            if (pos.y >= 0f) continue;
-            if (!TerrainSpawns.TrySampleGroundY(pos.x, pos.z, out float groundY)) continue;
+            if (entity == null || !entity.Alive) continue;
+            if (entity is PlayerEntityData ? !checkPlayers : !checkOthers) continue;
 
-            pos.y = groundY + GlobalConfig.entity_fall_recover_height;
-            entity.transform.position = pos;
-            entity.rb.position = pos;
+            Vector3 pos = entity.transform.position;
+            if (pos.y < minY)
+            {
+                entity.Kill(); // 掉出地形下沿：走正常死亡流程（掉落结算 / 复活由 HandleDeath 处理）
+                continue;
+            }
+
+            float x = Mathf.Clamp(pos.x, minXZ, maxXZ);
+            float y = Mathf.Clamp(pos.y, minY, maxY);
+            float z = Mathf.Clamp(pos.z, minXZ, maxXZ);
+            if (x == pos.x && y == pos.y && z == pos.z) continue;
+
+            Vector3 clamped = new Vector3(x, y, z);
+            entity.transform.position = clamped;
+            if (entity.rb == null) continue;
+            entity.rb.position = clamped;
+            // 只清被夹轴的轴向速度，否则下次物理步会再次冲出边界
             Vector3 velocity = entity.rb.velocity;
-            velocity.y = 0f;
+            if (x != pos.x) velocity.x = 0f;
+            if (y != pos.y) velocity.y = 0f;
+            if (z != pos.z) velocity.z = 0f;
             entity.rb.velocity = velocity;
         }
     }

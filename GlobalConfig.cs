@@ -196,9 +196,9 @@ public static class GlobalConfig
     public const float ai_ignore_unreachable_time = 3f; // 目标不可达后忽略多久，避免放弃后立刻又锁回同一个
     #endregion
 
-    #region 掉落回收
-    public const float entity_fall_check_interval = 5f;   // 每 5 秒检查一次 y<0 的实体
-    public const float entity_fall_recover_height = 1f;   // 落点 = Terrain 高度 + 1
+    #region 越界处理
+    public const float entity_bounds_check_interval_player = 0.2f; // 玩家越界检查间隔
+    public const float entity_bounds_check_interval = 5f;          // 其它实体越界检查间隔
     #endregion
 
     // 人形实体生成时相对地面抬升，脚底与地面完全重合会陷进去
