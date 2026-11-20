@@ -1641,7 +1641,7 @@ namespace Ros.Skill
         }
     }
 
-    // 黑洞爆破：自身前后左右各布一个黑洞，持续 6 秒不断把附近的敌人吸进去
+    // 黑洞爆破：自身前后左右各布一个黑洞，持续 4 秒不断把附近的敌人吸进去
     public class SkillBlastKnockback : SkillBase
     {
         public override int Id => (int)SkillType.SkillBlastKnockback;
@@ -1649,10 +1649,10 @@ namespace Ros.Skill
         private const int Vfx = 2;                 // Bullet 黑洞红
         private const int Fields = 4;
         private const float FieldDistance = 3.5f;
-        private const float FieldLife = 6f;
+        private const float FieldHeight = 1.5f;    // 黑洞悬浮高度
+        private const float FieldLife = 4f;
         private const float PullInterval = 0.4f;
         private const float PullWindow = 0.5f;
-        private const int PullTicks = 15;
 
         protected override void OnCast(EntityData caster)
         {
@@ -1660,16 +1660,17 @@ namespace Ros.Skill
             Vector3[] points = FieldPoints(pos, caster.transform.rotation);
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
             var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), Fields);
+            int ticks = Mathf.CeilToInt(FieldLife / PullInterval);
             for (int i = 0; i < Fields; i++)
             {
                 Vector3 point = points[i];
                 Tool.BattleManager.ShootBullet(caster, attack,
-                    new SkillTrajectoryPoint(point, FieldLife), FieldLife, spec);
-                Timer.AddTimer(0, _ => PullAround(caster, point), PullInterval, PullTicks, true);
+                    new SkillTrajectoryPoint(Lift(point), FieldLife), FieldLife, spec);
+                Timer.AddTimer(0, _ => PullAround(caster, point), PullInterval, ticks, true);
             }
             SendWave(caster, 0, context =>
             {
-                for (int i = 0; i < Fields; i++) context.WriteVector3(points[i]);
+                for (int i = 0; i < Fields; i++) context.WriteVector3(Lift(points[i]));
             });
         }
 
@@ -1681,6 +1682,9 @@ namespace Ros.Skill
             pos + rotation * new Vector3(FieldDistance, 0f, 0f),
             pos + rotation * new Vector3(-FieldDistance, 0f, 0f),
         };
+
+        // 抬升只作用于黑洞本体，牵引范围仍按地面点算
+        private static Vector3 Lift(Vector3 point) => point + Vector3.up * FieldHeight;
 
         // 每隔一小段重新施加牵引，保证走进来的敌人也会被持续拉向黑洞
         private void PullAround(EntityData caster, Vector3 center)
