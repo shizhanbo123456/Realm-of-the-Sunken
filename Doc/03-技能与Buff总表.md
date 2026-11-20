@@ -75,7 +75,7 @@
 | 43 | 涡爆 | SkillVortexBomb | RangeMagic[1]（涡心落在最近敌人处） | 命中挂 MotionAttract 牵引 |
 | 44 | 六点灼阵 | SkillSixOrbs | RangeMagic[3] ×6（定点） | 无 |
 | 45 | 禁言之落 | SkillSkyfallSilence | RangeMagic[4]（落在索敌目标脚下） | 命中挂沉默 10s |
-| 46 | 黑洞爆破 | SkillBlastKnockback | Bullet[2] ×4（自身前后左右，悬浮 1.5m，持续 4s） | 灼烧 3 级 10s |
+| 46 | 黑洞爆破 | SkillBlastKnockback | Bullet[2] ×4（自身前后左右，悬浮离地 1m，持续 4s） | 灼烧 3 级 10s |
 | 47 | 弧刃背袭 | SkillBackArcWeapons | Slash[2] ×6（身后两侧水平刀光） | 无 |
 | 48 | 锐意共鸣 | SkillAllyCritBoost | 无 | 5 级暴击率 + 5 级暴伤 20s（自身+附近友方） |
 | 49 | 圣域壁垒 | SkillAllyShieldTwentyFive | 无（护盾 buff 自带） | 25 级护盾 30s（全体友方） |

@@ -1649,7 +1649,7 @@ namespace Ros.Skill
         private const int Vfx = 2;                 // Bullet 黑洞红
         private const int Fields = 4;
         private const float FieldDistance = 3.5f;
-        private const float FieldHeight = 1.5f;    // 黑洞悬浮高度
+        private const float FieldHeight = 1f;      // 黑洞悬浮高度（离地）
         private const float FieldLife = 4f;
         private const float PullInterval = 0.4f;
         private const float PullWindow = 0.5f;
