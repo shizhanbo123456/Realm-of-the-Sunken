@@ -38,7 +38,7 @@ public class ChatPlugin : PageBase
 
     private readonly UI_ChatPanel panel;
     private readonly List<ChatEntry> entries = new();
-    private readonly List<ChatEntry> visibleChat = new(); // 当前页签下可见的条目（渲染器按索引读取）
+    private readonly List<ChatEntry> visibleChat = new(); // 当前页签下可见的条目（全频道含其它频道；渲染器按索引读取）
     private readonly List<string> systemEntries = new();  // 系统消息纯文本，整局常驻，战斗结束后清空
     private int viewTab = (int)ChatChannel.All;
     private int sendChannel = (int)ChatChannel.All;
@@ -432,13 +432,15 @@ public class ChatPlugin : PageBase
         return $"[{ChannelLabel(entry.channel)}][{(PlayerCampType)entry.camp}]{name}: {entry.content}";
     }
 
+    // 全频道汇总全部频道（系统消息单列，不进这里）；其余页签只按本频道过滤
     private void RebuildVisibleChat()
     {
         visibleChat.Clear();
         if (viewTab == TabSystem) return;
+        bool all = viewTab == (int)ChatChannel.All;
         for (int i = 0; i < entries.Count; i++)
         {
-            if (entries[i].channel == viewTab) visibleChat.Add(entries[i]);
+            if (all || entries[i].channel == viewTab) visibleChat.Add(entries[i]);
         }
     }
 
