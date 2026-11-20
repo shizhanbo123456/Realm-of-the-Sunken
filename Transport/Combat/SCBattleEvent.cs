@@ -22,6 +22,8 @@ namespace Ros.Transport
         public byte type;
         public int textId;   // 第一段文本
         public int textId2;  // 第二段文本（仅 PlayerKill 使用）
+        public int posX;     // 事件地点世界坐标 X（仅 NeutralStatueRespawn 使用，取整与聊天坐标同口径）
+        public int posZ;     // 事件地点世界坐标 Z
     }
 
     public struct SCBattleEventSerializer
@@ -30,7 +32,9 @@ namespace Ros.Transport
         {
             if (!ByteSerializer.Serialize(value.type, result, ref indexStart)) return false;
             if (!IntSerializer.Serialize(value.textId, result, ref indexStart)) return false;
-            return IntSerializer.Serialize(value.textId2, result, ref indexStart);
+            if (!IntSerializer.Serialize(value.textId2, result, ref indexStart)) return false;
+            if (!IntSerializer.Serialize(value.posX, result, ref indexStart)) return false;
+            return IntSerializer.Serialize(value.posZ, result, ref indexStart);
         }
 
         public static SCBattleEvent Deserialize(byte[] data, ref int indexStart, int invalidIndex)
@@ -40,6 +44,8 @@ namespace Ros.Transport
                 type = ByteSerializer.Deserialize(data, ref indexStart, invalidIndex),
                 textId = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
                 textId2 = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
+                posX = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
+                posZ = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
             };
         }
     }

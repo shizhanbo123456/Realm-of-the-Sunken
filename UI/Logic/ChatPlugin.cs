@@ -441,6 +441,9 @@ public class ChatPlugin : PageBase
                 break;
             case SCBattleEvent.Type.SkillBroadcast:
                 return; // 技能播报只进重要事件 banner，不进聊天列表
+            case SCBattleEvent.Type.NeutralStatueRespawn:
+                AppendSystem(string.Format(SystemMessageConfig.Get(system_messageEnum.neutral_statue_respawn).text, e.posX, e.posZ));
+                break;
             default:
                 AppendSystem(ResolveEventText(e.textId));
                 break;

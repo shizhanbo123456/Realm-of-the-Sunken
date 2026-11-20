@@ -166,13 +166,16 @@ public partial class BattleManager
         if (list.Count == 0) return; // 没有中立刷新点则不刷
         // 白天刷天使雕像、夜晚刷恶魔雕像（两者行为一致，只有外观与 value 不同）
         EntityType statue = IsDay ? EntityType.AngelStatue : EntityType.DemonStatue;
-        SpawnEntity(statue, 1, TerrainSpawns.RandomOf(list), EntityCamp.Neutral);
+        Vector3 pos = TerrainSpawns.RandomOf(list);
+        SpawnEntity(statue, 1, pos, EntityCamp.Neutral);
 
-        // 中立雕像刷新播报（首次出生与重生都算刷新）
+        // 中立雕像刷新播报（首次出生与重生都算刷新），带上刷新点坐标供客户端显示
         Tool.NetworkManager.SendBattleEvent(new SCBattleEvent()
         {
             type = SCBattleEvent.Type.NeutralStatueRespawn,
             textId = (int)system_messageEnum.neutral_statue_respawn,
+            posX = Mathf.RoundToInt(pos.x),
+            posZ = Mathf.RoundToInt(pos.z),
         });
     }
 
