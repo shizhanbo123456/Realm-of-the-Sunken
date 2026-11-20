@@ -240,13 +240,13 @@ public class ChatPlugin : PageBase
         if (prompt.HasValue && Tool.UIManager != null) Tool.UIManager.ShowFlyText(prompt.Value);
     }
 
-    // 系统页签的输入按 GM 命令处理：「命令名 副命令 参数…」，如 player tp 10 20 30
+    // 系统页签的输入按 GM 命令处理：「命令名 副命令 [参数]」，如 player tp 10,20,30
     private void TrySendGmCommand(string raw)
     {
         string[] tokens = (raw ?? string.Empty).Split(new[] { ' ', '\t', '\u3000' }, System.StringSplitOptions.RemoveEmptyEntries);
         if (tokens.Length < 2)
         {
-            AppendSystem("GM 命令格式：命令名 副命令 参数…（如 debug delay 200）");
+            AppendSystem("GM 命令格式：命令名 副命令 [参数]（如 debug delay 200）");
             return;
         }
         if (!GmCommandRunner.TryFind(tokens[0], tokens[1], out var row))
@@ -261,7 +261,7 @@ public class ChatPlugin : PageBase
         }
 
         string paramText = ParamText(row, tokens, out string error);
-        if (error != null) { AppendSystem($"{row.subMenuName} 参数不合法：{error}（输入：{paramText}）"); return; }
+        if (error != null) { AppendSystem($"{row.subMenuName} 参数不合法：{error}"); return; }
 
         if (!GmCommandRunner.TryParseParam(row, paramText, out var arg, out error))
         {
@@ -273,7 +273,7 @@ public class ChatPlugin : PageBase
         panel.m_input.text = string.Empty;
     }
 
-    // 参数文本：Vector 把「(10, 20, 30)」「10,20,30」「10 20 30」统一成逗号分隔
+    // 参数段：一条命令只取 tokens[2] 这一个参数，多出来的空格段一律报错，避免拆法有歧义
     private static string ParamText(gm_command row, string[] tokens, out string error)
     {
         error = null;
@@ -283,18 +283,19 @@ public class ChatPlugin : PageBase
             if (count > 0) error = "不接受参数";
             return string.Empty;
         }
-        if (count == 0) { error = "缺少参数"; return string.Empty; }
-
-        int type = row.paramType.Value;
-        if (type != GmCommandRunner.ParamVector2 && type != GmCommandRunner.ParamVector3)
+        if (count != 1)
         {
-            if (count > 1) error = "只接受一个参数";
-            return tokens[2];
+            error = count == 0 ? "缺少参数" : ParamHint(row);
+            return string.Empty;
         }
+        return tokens[2];
+    }
 
-        var parts = new List<string>(count);
-        for (int i = 2; i < tokens.Length; i++) parts.Add(tokens[i].Trim('(', ')', ','));
-        return string.Join(",", parts);
+    // Vector 的分量必须写在同一个参数段里，不能靠空格拆
+    private static string ParamHint(gm_command row)
+    {
+        bool isVector = row.paramType == GmCommandRunner.ParamVector2 || row.paramType == GmCommandRunner.ParamVector3;
+        return isVector ? "只接受一个参数，Vector 写成 (x,y) 或 x,y，不要用空格分隔" : "只接受一个参数";
     }
 
     // 拦截原因对应的配表提示；冷却不配文案，调用方自行处理
