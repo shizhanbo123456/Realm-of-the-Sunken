@@ -6,20 +6,20 @@ using UnityEngine;
 
 namespace Ros.Config
 {
-    // 生成的配表代码统一经此读二进制；二进制由 Config/configtool.py 产出到 Assets/Resources/Config
+    // 生成的配表代码统一经此读二进制；二进制由 Config/configtool.py 产出到 Assets/StreamingAssets/Config
     public static class ConfigBinary
     {
-        private const string ResourceDir = "Config/";
+        private const string Folder = "Config";
         private const int Version = 1;
         private static readonly byte[] Magic = { (byte)'R', (byte)'O', (byte)'S', (byte)'C' };
 
         public static BinaryReader Open(string table)
         {
-            TextAsset asset = Resources.Load<TextAsset>(ResourceDir + table);
-            if (asset == null)
-                throw new FileNotFoundException($"[配表] 找不到 Resources/{ResourceDir}{table}.bytes，请先运行 Config/configtool.py");
+            string path = Path.Combine(Application.streamingAssetsPath, Folder, table + ".bytes");
+            if (!File.Exists(path))
+                throw new FileNotFoundException($"[配表] 找不到 {path}，请先运行 Config/发布配表.bat");
 
-            BinaryReader reader = new BinaryReader(new MemoryStream(asset.bytes, false), Encoding.UTF8);
+            BinaryReader reader = new BinaryReader(new MemoryStream(File.ReadAllBytes(path), false), Encoding.UTF8);
             for (int i = 0; i < Magic.Length; i++)
             {
                 if (reader.ReadByte() == Magic[i]) continue;
