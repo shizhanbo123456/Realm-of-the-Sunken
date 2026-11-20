@@ -169,5 +169,10 @@ namespace Ros.Config
         camera_shake_decay,
         camera_shake_frequency,
         revive_teammate_range,
+        attack_adhesion_search_distance,
+        attack_adhesion_min_distance,
+        attack_adhesion_stop_distance,
+        attack_adhesion_speed_start,
+        attack_adhesion_speed_end,
     }
 }
