@@ -93,17 +93,15 @@ public class EntityEffectController
     private const float TickInterval = 1f; // 固定间隔生效统一 1s 一跳
     private const int MaxSyncLevel = 15;   // 协议 level 字段 4bit
 
-    // 一层运行时：叠加模式 1 下一层一条，其它模式恒为一条
+    // 一层运行时：叠加模式 1 下一层一条，其它模式恒为一条（类型由 effects 的 key 给出）
     public struct EffectLayer
     {
-        public EffectType type;
-        public int serial;                      // 层身份，OnUpdate 快照遍历后按 id 回写/移除
+        public int serial;                      // 层身份，OnUpdate 快照遍历后按 id 精确移除
         public int level;
         public float shieldValue;               // 护盾剩余值（仅护盾类，每层独立）
         public ushort sourceId;                 // 施加者 id（DoT 击杀归属）
         public DamageStat sourceStat;           // 施加者出伤快照（值类型，施加时的独立拷贝）
         public float endTime;                   // 本层结束时间戳（永久 = float.MaxValue）
-        public float nextTickTime;              // 本层下次生效时刻
         public bool isNegative;
     }
 
@@ -116,6 +114,7 @@ public class EntityEffectController
     public float BuffViewDistance { get; private set; }
 
     private readonly Dictionary<EffectType, List<EffectLayer>> effects = new();
+    private readonly Dictionary<EffectType, float> tickTimes = new(); // 每类一份下一跳时刻：同类各层同拍结算，避免每层各飘一个字
     private readonly List<EffectType> iterateKeys = new();
     private readonly List<EffectLayer> layerSnapshot = new();
     private readonly List<int> shieldOrder = new();
@@ -132,6 +131,7 @@ public class EntityEffectController
     {
         owner = data;
         effects.Clear();
+        tickTimes.Clear();
         nextSerial = 1;
         RefreshState();
     }
@@ -139,6 +139,7 @@ public class EntityEffectController
     public void Clear()
     {
         effects.Clear();
+        tickTimes.Clear();
         nextSerial = 1;
         if (owner != null) owner.buffDirty = true;
         RefreshState();
@@ -151,7 +152,8 @@ public class EntityEffectController
     {
         if (owner != null) owner.buffDirty = true;
         float endTime = duration < 0f ? float.MaxValue : Time.time + duration;
-        if (!effects.TryGetValue(type, out var layers))
+        bool isNewType = !effects.TryGetValue(type, out var layers);
+        if (isNewType)
         {
             layers = new List<EffectLayer>();
             effects[type] = layers;
@@ -162,6 +164,7 @@ public class EntityEffectController
             effects.Remove(type); // 模式 0 的低等级添加不生效，别留下空表
             return;
         }
+        if (isNewType) tickTimes[type] = Time.time + TickInterval; // 新叠的层沿用同类节拍，不重置时钟
 
         if (NeedsAttrRecompute(type)) RecomputeAttributes();
         RefreshState();
@@ -177,6 +180,7 @@ public class EntityEffectController
     public void RemoveEffect(EffectType type)
     {
         if (!effects.Remove(type)) return;
+        tickTimes.Remove(type);
         if (owner != null) owner.buffDirty = true;
         if (NeedsAttrRecompute(type)) RecomputeAttributes();
         RefreshState();
@@ -330,78 +334,76 @@ public class EntityEffectController
     public void OnUpdate()
     {
         if (effects.Count == 0) return;
-        // 先快照 key 与层：TickEffect 会走 OnDamaged → 可能施加/移除效果（苍白转化、死亡清空等）
+        // 先快照 key：TickEffect 会走 OnDamaged → 可能施加/移除效果（苍白转化、死亡清空等）
         iterateKeys.Clear();
         iterateKeys.AddRange(effects.Keys);
-        foreach (var key in iterateKeys)
+        for (int k = 0; k < iterateKeys.Count; k++)
         {
-            if (!effects.TryGetValue(key, out var layers)) continue;
+            var type = iterateKeys[k];
+            if (!effects.TryGetValue(type, out var layers)) continue;
             layerSnapshot.Clear();
             layerSnapshot.AddRange(layers);
             for (int i = 0; i < layerSnapshot.Count; i++)
             {
-                var layer = layerSnapshot[i];
-                if (Time.time >= layer.endTime)
-                {
-                    RemoveLayer(key, layer.serial);
-                    continue;
-                }
-                if (!layer.type.IsTicking() || Time.time < layer.nextTickTime) continue;
-                layer.nextTickTime = Time.time + TickInterval;
-                if (!WriteBackLayer(key, layer)) continue; // 快照层已被本轮结算移除
-                TickEffect(layer);
+                if (Time.time >= layerSnapshot[i].endTime) RemoveLayer(type, layerSnapshot[i].serial);
             }
+            if (!effects.TryGetValue(type, out layers)) continue; // 全层到期已移表
+            if (!type.IsTicking() || Time.time < tickTimes[type]) continue;
+            tickTimes[type] = Time.time + TickInterval;
+            layerSnapshot.Clear();
+            layerSnapshot.AddRange(layers);
+            TickEffect(type, layerSnapshot); // 同类各层合并成一次结算
         }
     }
 
-    private void TickEffect(EffectLayer layer)
+    // 该类型全部层一次性结算：数值求和后只走一次 OnDamaged，飘字只有一个
+    private void TickEffect(EffectType type, List<EffectLayer> layers)
     {
-        switch (layer.type)
+        if (owner == null || layers.Count == 0) return;
+        switch (type)
         {
             case EffectType.Burning:
-                if (owner != null) owner.OnDamaged(GlobalVariable.F(global_variablesEnum.buff_burning_damage_per_tick) * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.Burning);
+                owner.OnDamaged(GlobalVariable.F(global_variablesEnum.buff_burning_damage_per_tick) * SumLevel(layers), FindEntity(layers), fixedDamage: true, damageType: CombatLabelType.Burning);
                 break;
             case EffectType.PaleFire:
-                if (owner != null) owner.OnDamaged(GlobalVariable.F(global_variablesEnum.buff_burning_damage_per_tick) * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.PaleFire);
+                owner.OnDamaged(GlobalVariable.F(global_variablesEnum.buff_burning_damage_per_tick) * SumLevel(layers), FindEntity(layers), fixedDamage: true, damageType: CombatLabelType.PaleFire);
                 break;
             case EffectType.Poison:
-            {
-                if (owner == null) break;
-                float stat = SourcePower(layer);
-                owner.OnDamaged(GlobalVariable.F(global_variablesEnum.buff_poison_damage_ratio) * stat * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.Poison);
+                owner.OnDamaged(SumDamageOf(layers, GlobalVariable.F(global_variablesEnum.buff_poison_damage_ratio)), FindEntity(layers), fixedDamage: true, damageType: CombatLabelType.Poison);
                 break;
-            }
             case EffectType.DeathStroll:
-            {
-                if (owner == null) break;
-                float stat = SourcePower(layer);
-                EntityCamp enemyCamp = EntityCampUtil.HostileOf(owner.type.category);
-                s_tickTargets.Clear();
-                BattleManager.EntityContainer.GetAllInCamp(owner.transform.position, GlobalVariable.F(global_variablesEnum.buff_death_stroll_radius), enemyCamp, s_tickTargets);
-                for (int i = 0; i < s_tickTargets.Count; i++)
-                {
-                    if (s_tickTargets[i] != null) s_tickTargets[i].OnDamaged(GlobalVariable.F(global_variablesEnum.buff_death_stroll_dot_ratio) * stat * layer.level, owner, fixedDamage: true, damageType: CombatLabelType.DeathStroll);
-                }
-                // 死灵诅咒：光环内敌人每秒刷新一层（叠加模式 2，等级随停留时间累加）
-                s_curseTargets.Clear();
-                BattleManager.EntityContainer.GetAllInCamp(owner.transform.position, GlobalVariable.F(global_variablesEnum.death_curse_radius), enemyCamp, s_curseTargets);
-                for (int i = 0; i < s_curseTargets.Count; i++)
-                {
-                    var cursed = s_curseTargets[i];
-                    if (cursed != null && cursed.Alive && cursed.effectController != null)
-                        cursed.effectController.AddEffect(EffectType.DeathCurse, 1, GlobalVariable.F(global_variablesEnum.death_curse_duration), owner);
-                }
+                TickDeathStroll(layers);
                 break;
-            }
             case EffectType.DeathCurse:
-                if (owner != null) owner.OnDamaged(GlobalVariable.F(global_variablesEnum.death_curse_tick_damage) * layer.level, FindEntity(layer.sourceId), fixedDamage: true, damageType: CombatLabelType.DeathStroll);
+                owner.OnDamaged(GlobalVariable.F(global_variablesEnum.death_curse_tick_damage) * SumLevel(layers), FindEntity(layers), fixedDamage: true, damageType: CombatLabelType.DeathStroll);
                 break;
             case EffectType.AngelBless:
-                HealOwner(GlobalVariable.F(global_variablesEnum.buff_angel_bless_heal_per_tick) * layer.level);
+                HealOwner(GlobalVariable.F(global_variablesEnum.buff_angel_bless_heal_per_tick) * SumLevel(layers));
                 break;
             case EffectType.DemonBless:
-                HealOwner(GlobalVariable.F(global_variablesEnum.buff_demon_bless_heal_per_tick) * layer.level);
+                HealOwner(GlobalVariable.F(global_variablesEnum.buff_demon_bless_heal_per_tick) * SumLevel(layers));
                 break;
+        }
+    }
+
+    // 光环伤害对每个目标只结算这一次；诅咒刷新每跳一次（叠加模式 2，等级随停留时间累加）
+    private void TickDeathStroll(List<EffectLayer> layers)
+    {
+        float damage = SumDamageOf(layers, GlobalVariable.F(global_variablesEnum.buff_death_stroll_dot_ratio));
+        EntityCamp enemyCamp = EntityCampUtil.HostileOf(owner.type.category);
+        s_tickTargets.Clear();
+        BattleManager.EntityContainer.GetAllInCamp(owner.transform.position, GlobalVariable.F(global_variablesEnum.buff_death_stroll_radius), enemyCamp, s_tickTargets);
+        for (int i = 0; i < s_tickTargets.Count; i++)
+        {
+            if (s_tickTargets[i] != null) s_tickTargets[i].OnDamaged(damage, owner, fixedDamage: true, damageType: CombatLabelType.DeathStroll);
+        }
+        s_curseTargets.Clear();
+        BattleManager.EntityContainer.GetAllInCamp(owner.transform.position, GlobalVariable.F(global_variablesEnum.death_curse_radius), enemyCamp, s_curseTargets);
+        for (int i = 0; i < s_curseTargets.Count; i++)
+        {
+            var cursed = s_curseTargets[i];
+            if (cursed != null && cursed.Alive && cursed.effectController != null)
+                cursed.effectController.AddEffect(EffectType.DeathCurse, 1, GlobalVariable.F(global_variablesEnum.death_curse_duration), owner);
         }
     }
 
@@ -411,10 +413,18 @@ public class EntityEffectController
         owner.attributes.Heal(amount);
     }
 
-    // 施加者快照里的攻击；无施加者时为 0
-    private static float SourcePower(EffectLayer layer)
+    // 击杀归属与伤害来源取最新施加的一层
+    private static EntityData FindEntity(List<EffectLayer> layers)
     {
-        return layer.sourceStat.attack;
+        return FindEntity(layers[layers.Count - 1].sourceId);
+    }
+
+    // Σ(系数 × 该层施加者快照攻击 × 该层等级)：多层混伤时各层按自己的快照算
+    private static float SumDamageOf(List<EffectLayer> layers, float ratio)
+    {
+        float sum = 0f;
+        for (int i = 0; i < layers.Count; i++) sum += ratio * layers[i].sourceStat.attack * layers[i].level;
+        return sum;
     }
 
     private static EntityData FindEntity(ushort entityId)
@@ -499,12 +509,10 @@ public class EntityEffectController
     {
         var layer = new EffectLayer()
         {
-            type = type,
             serial = nextSerial++,
             level = level,
             shieldValue = type.IsShield() ? ShieldValueOf(level) : 0f,
             endTime = endTime,
-            nextTickTime = Time.time + TickInterval,
             isNegative = type.IsNegative(),
         };
         ApplySource(ref layer, source);
@@ -517,18 +525,6 @@ public class EntityEffectController
         layer.sourceStat = source != null && source.attributes != null ? source.attributes.SnapshotDamage() : default;
     }
 
-    private bool WriteBackLayer(EffectType type, EffectLayer layer)
-    {
-        if (!effects.TryGetValue(type, out var layers)) return false;
-        for (int i = 0; i < layers.Count; i++)
-        {
-            if (layers[i].serial != layer.serial) continue;
-            layers[i] = layer;
-            return true;
-        }
-        return false;
-    }
-
     private void RemoveLayer(EffectType type, int serial)
     {
         if (!effects.TryGetValue(type, out var layers)) return;
@@ -538,7 +534,11 @@ public class EntityEffectController
             layers.RemoveAt(i);
             break;
         }
-        if (layers.Count == 0) effects.Remove(type);
+        if (layers.Count == 0)
+        {
+            effects.Remove(type);
+            tickTimes.Remove(type);
+        }
         if (owner != null) owner.buffDirty = true;
         if (NeedsAttrRecompute(type)) RecomputeAttributes();
         RefreshState();
@@ -574,7 +574,11 @@ public class EntityEffectController
             if (layers[i].shieldValue > 0f) continue;
             layers.RemoveAt(i);
         }
-        if (layers.Count == 0) effects.Remove(type);
+        if (layers.Count == 0)
+        {
+            effects.Remove(type);
+            tickTimes.Remove(type);
+        }
         if (owner != null) owner.buffDirty = true;
     }
 
