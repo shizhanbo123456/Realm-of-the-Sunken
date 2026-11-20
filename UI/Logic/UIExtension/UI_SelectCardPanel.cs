@@ -178,6 +178,14 @@ namespace Ros.UI.Main
                 face.m_skillpreview.m_loader_icon.visible = icon != null;
             }
 
+            // 卡面由列表复用，事件每次重挂；非技能卡的图标被控制器隐藏，不会弹提示
+            var preview = face.m_skillpreview;
+            if (preview != null)
+            {
+                preview.onRollOver.Set(() => { if (roll.IsSkill) TipHost.ShowSkill(roll.skillId, preview); });
+                preview.onRollOut.Set(TipHost.Hide);
+            }
+
             if (face.m_btn_select != null) face.m_btn_select.onClick.Set(() => Select(index));
             RevealAfter(card, index * CardShowStagger);
         }
