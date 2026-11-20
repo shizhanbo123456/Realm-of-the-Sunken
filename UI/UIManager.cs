@@ -43,6 +43,9 @@ public class UIManager : MonoBehaviour
     // 四个从战斗界面抽出去的独立界面：各自管开合与刷新，这里只给入口
     public BattlePage Battle => battle;
 
+    // 聊天面板：GM 面板的输出也要往系统栏写一条
+    public ChatPlugin Chat => chat;
+
     public SkillSelectView SkillSelect => skillSelect;
 
     public LargeMinimapView LargeMinimap => largeMinimap;

@@ -5,6 +5,7 @@ using Ros.UI.Main;
 using UnityEngine;
 
 using Ros.Config;
+using Ros.Gm;
 //全局聊天面板：联网后常驻显示，大厅与战斗共用；离开房间清空并隐藏
 public class ChatPlugin : PageBase
 {
@@ -28,7 +29,7 @@ public class ChatPlugin : PageBase
 
     private class ChatEntry
     {
-        public int channel;        // ChatChannel 值，页签按它过滤
+        public int channel;        // ChatChannel 值，系统消息记 TabSystem；页签按它过滤
         public bool isSelf;
         public int senderClientId;
         public int camp;           // 发送方阵营：0 进攻 / 1 防守 / 2 观战
@@ -38,8 +39,7 @@ public class ChatPlugin : PageBase
 
     private readonly UI_ChatPanel panel;
     private readonly List<ChatEntry> entries = new();
-    private readonly List<ChatEntry> visibleChat = new(); // 当前页签下可见的条目（全频道含其它频道；渲染器按索引读取）
-    private readonly List<string> systemEntries = new();  // 系统消息纯文本，整局常驻，战斗结束后清空
+    private readonly List<ChatEntry> visibleChat = new(); // 当前页签下可见的条目（全频道汇总全部；渲染器按索引读取）
     private int viewTab = (int)ChatChannel.All;
     private int sendChannel = (int)ChatChannel.All;
     private float lastSendTime = -999f;
@@ -156,8 +156,8 @@ public class ChatPlugin : PageBase
 
     private void OnBattleEnd(int gameState)
     {
-        systemEntries.Clear(); // 系统消息只属于本局
-        EnterLobbyMode();      // 结算后回到组队：页签收起、频道回全频道
+        entries.RemoveAll(e => e.channel == TabSystem); // 系统消息只属于本局
+        EnterLobbyMode();                                // 结算后回到组队：页签收起、频道回全频道
     }
 
     // 组队界面：隐藏频道页签，默认显示全频道
@@ -176,12 +176,11 @@ public class ChatPlugin : PageBase
     private void ClearMessages()
     {
         entries.Clear();
-        systemEntries.Clear();
         RefreshList();
         panel.m_input.text = string.Empty;
     }
 
-    // 页签即频道，系统消息页签只管看，不参与发送频道
+    // 页签即频道；系统页签不参与发送频道（它的输入是 GM 命令）
     private void SelectTab(int tab)
     {
         viewTab = tab;
@@ -227,6 +226,9 @@ public class ChatPlugin : PageBase
 
     private void TrySend()
     {
+        // 系统页签的输入走 GM 命令，不聊天
+        if (viewTab == TabSystem) { TrySendGmCommand(panel.m_input.text); return; }
+
         ChatSendResult result = Submit(sendChannel, panel.m_input.text);
         if (result == ChatSendResult.Sent)
         {
@@ -236,6 +238,63 @@ public class ChatPlugin : PageBase
         // 冷却没有配表文案，输入框这里保持静默，只做本地节流
         promptEnum? prompt = RejectPrompt(result);
         if (prompt.HasValue && Tool.UIManager != null) Tool.UIManager.ShowFlyText(prompt.Value);
+    }
+
+    // 系统页签的输入按 GM 命令处理：「命令名 副命令 参数…」，如 player tp 10 20 30
+    private void TrySendGmCommand(string raw)
+    {
+        string[] tokens = (raw ?? string.Empty).Split(new[] { ' ', '\t', '\u3000' }, System.StringSplitOptions.RemoveEmptyEntries);
+        if (tokens.Length < 2)
+        {
+            AppendSystem("GM 命令格式：命令名 副命令 参数…（如 debug delay 200）");
+            return;
+        }
+        if (!GmCommandRunner.TryFind(tokens[0], tokens[1], out var row))
+        {
+            AppendSystem($"未知 GM 命令：{tokens[0]} {tokens[1]}");
+            return;
+        }
+        if (!GmCommandRunner.Available(row))
+        {
+            AppendSystem($"{row.subMenuName}：当前相位不可用");
+            return;
+        }
+
+        string paramText = ParamText(row, tokens, out string error);
+        if (error != null) { AppendSystem($"{row.subMenuName} 参数不合法：{error}（输入：{paramText}）"); return; }
+
+        if (!GmCommandRunner.TryParseParam(row, paramText, out var arg, out error))
+        {
+            AppendSystem($"{row.subMenuName} 参数不合法：{error}（输入：{paramText}）");
+            return;
+        }
+
+        GmCommandRunner.Run(row, arg, AppendSystem);
+        panel.m_input.text = string.Empty;
+    }
+
+    // 参数文本：Vector 把「(10, 20, 30)」「10,20,30」「10 20 30」统一成逗号分隔
+    private static string ParamText(gm_command row, string[] tokens, out string error)
+    {
+        error = null;
+        int count = tokens.Length - 2;
+        if (!row.paramType.HasValue)
+        {
+            if (count > 0) error = "不接受参数";
+            return string.Empty;
+        }
+        if (count == 0) { error = "缺少参数"; return string.Empty; }
+
+        int type = row.paramType.Value;
+        if (type != GmCommandRunner.ParamVector2 && type != GmCommandRunner.ParamVector3)
+        {
+            if (count > 1) error = "只接受一个参数";
+            return tokens[2];
+        }
+
+        var parts = new List<string>(count);
+        for (int i = 2; i < tokens.Length; i++) parts.Add(tokens[i].Trim('(', ')', ','));
+        return string.Join(",", parts);
     }
 
     // 拦截原因对应的配表提示；冷却不配文案，调用方自行处理
@@ -403,7 +462,7 @@ public class ChatPlugin : PageBase
     private void RefreshList()
     {
         RebuildVisibleChat();
-        int count = viewTab == TabSystem ? systemEntries.Count : visibleChat.Count;
+        int count = visibleChat.Count;
         // 页签切换会换内容，先回收现有条目，再按 itemProvider 重建
         panel.m_content.RemoveChildrenToPool();
         panel.m_content.numItems = count;
@@ -418,10 +477,11 @@ public class ChatPlugin : PageBase
         AiObservation.ReportChat(entry.channel, PlainLine(entry), entry.isSelf);
     }
 
-    private void AppendSystem(string text)
+    // 系统消息与聊天同列表，频道记 TabSystem（客户端本地，不上协议），全频道也会显示
+    public void AppendSystem(string text)
     {
-        systemEntries.Add(text);
-        if (viewTab == TabSystem) RefreshList();
+        entries.Add(new ChatEntry() { channel = TabSystem, content = text });
+        if (viewTab == TabSystem || viewTab == (int)ChatChannel.All) RefreshList();
         AiObservation.ReportChat(TabSystem, "[系统] " + text, false);
     }
 
@@ -432,11 +492,10 @@ public class ChatPlugin : PageBase
         return $"[{ChannelLabel(entry.channel)}][{(PlayerCampType)entry.camp}]{name}: {entry.content}";
     }
 
-    // 全频道汇总全部频道（系统消息单列，不进这里）；其余页签只按本频道过滤
+    // 全频道汇总所有频道（含系统消息）；其余页签只看本频道
     private void RebuildVisibleChat()
     {
         visibleChat.Clear();
-        if (viewTab == TabSystem) return;
         bool all = viewTab == (int)ChatChannel.All;
         for (int i = 0; i < entries.Count; i++)
         {
@@ -447,8 +506,9 @@ public class ChatPlugin : PageBase
     private void RenderItem(int index, GObject obj)
     {
         if (obj is not UI_ChatItem item) return;
+        if (index >= visibleChat.Count) { item.m_content.text = string.Empty; return; } // 回收中的旧 item 可能拿到越界索引
         item.m_content.UBBEnabled = true;
-        item.m_content.text = viewTab == TabSystem ? SystemLine(index) : ChatLine(index);
+        item.m_content.text = visibleChat[index].channel == TabSystem ? SystemLine(index) : ChatLine(index);
     }
 
     // 频道名 + 发送者 + 内容，三段颜色都取自 InfoManager
@@ -466,10 +526,10 @@ public class ChatPlugin : PageBase
 
     private string SystemLine(int index)
     {
-        if (index >= systemEntries.Count) return string.Empty;
+        if (index >= visibleChat.Count) return string.Empty;
         var info = RequireInfoManager();
         return $"[color=#{info.ChatChannelColorHex}]{MessageVariable.V(message_variablesEnum.chat_tagSystem)}[/color] "
-             + $"[color=#{info.ChatContentColorHex}]{systemEntries[index]}[/color]";
+             + $"[color=#{info.ChatContentColorHex}]{visibleChat[index].content}[/color]";
     }
 
     // 聊天配色的唯一来源：场景里没有 InfoManager 就报出来，不静默用默认色

@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
+﻿using System.Collections.Generic;
 using FairyGUI;
 using Ros.Config;
 using Ros.Gm;
@@ -17,19 +15,6 @@ public class GmPanel : PageBase
     private readonly List<int> subIds = new();      // 二级菜单：当前组下的配表主键（显示名取 subMenuName）
     private string curGroup;
     private int curId = -1;
-
-    // 参数类型编码，与配表 paramType 一致
-    private const int ParamInt = 0;
-    private const int ParamBool = 1;
-    private const int ParamFloat = 2;
-    private const int ParamVector2 = 3;
-    private const int ParamVector3 = 4;
-
-    private struct GmArg
-    {
-        public int i;
-        public float v0, v1, v2;
-    }
 
     public GmPanel(UI_GmPanel panel) : base(panel)
     {
@@ -82,21 +67,17 @@ public class GmPanel : PageBase
     // 开战：相位由组队期变对局中，各指令的可用时机随之变化 → 重建菜单
     private void OnBattleStartChanged(int camp) => OnNetChanged();
 
-    private static bool Online => Tool.NetworkManager != null && NetworkManager.CanSendWorldCommand;
-
     private void OnNetChanged() { if (IsVisible) BuildGroups(); }
 
-    // 输出框每次覆盖，不追加
-    private void Output(string text) => panel.m_logOutput.text = text;
-
-    #region//菜单
-    // 当前相位对应的配表列
-    private static bool Available(gm_command row)
+    // 输出框每次覆盖、不追加；非空文本同时进聊天系统栏
+    private void Output(string text)
     {
-        if (!Online) return row.home ?? false;
-        return NetworkManager.BattleRunning ? row.battle ?? false : row.lobby ?? false;
+        panel.m_logOutput.text = text;
+        if (text.Length == 0) return;
+        if (Tool.UIManager != null) Tool.UIManager.Chat.AppendSystem(text);
     }
 
+    #region//菜单
     // numItems 置相同值不会重刷，先置 0 再置 N
     private static void Refresh(GList list, int count)
     {
@@ -109,7 +90,7 @@ public class GmPanel : PageBase
         groups.Clear();
         foreach (var row in GmCommandConfig.ordered)
         {
-            if (!Available(row)) continue;
+            if (!GmCommandRunner.Available(row)) continue;
             if (!groups.Contains(row.commandName)) groups.Add(row.commandName);
         }
         Refresh(panel.m_firstMenu.m_button_list, groups.Count);
@@ -124,7 +105,7 @@ public class GmPanel : PageBase
         subIds.Clear();
         foreach (var row in GmCommandConfig.ordered)
         {
-            if (row.commandName != group || !Available(row)) continue;
+            if (row.commandName != group || !GmCommandRunner.Available(row)) continue;
             subIds.Add(row.key);
         }
         Refresh(panel.m_secondMenu.m_button_list, subIds.Count);
@@ -191,11 +172,11 @@ public class GmPanel : PageBase
 
     private static string ContentPage(int paramType) => paramType switch
     {
-        ParamInt => "int",
-        ParamBool => "bool",
-        ParamFloat => "float",
-        ParamVector2 => "v2",
-        ParamVector3 => "v3",
+        GmCommandRunner.ParamInt => "int",
+        GmCommandRunner.ParamBool => "bool",
+        GmCommandRunner.ParamFloat => "float",
+        GmCommandRunner.ParamVector2 => "v2",
+        GmCommandRunner.ParamVector3 => "v3",
         _ => "int",
     };
 
@@ -208,7 +189,7 @@ public class GmPanel : PageBase
         if (curId < 0 || !GmCommandConfig.content.TryGetValue(curId, out var row)) return;
 
         string raw = row.paramType.HasValue && ItemAt(1) is UI_GmItem input ? input.m_input.text : string.Empty;
-        if (!TryParseParam(row, raw, out GmArg arg, out string error))
+        if (!GmCommandRunner.TryParseParam(row, raw, out var arg, out string error))
         {
             string msg = $"{row.subMenuName} 参数解析失败：{error}（输入：{raw}）";
             Output(msg);
@@ -216,158 +197,7 @@ public class GmPanel : PageBase
             return;
         }
 
-        if (RunLocal(row, arg)) return;
-
-        if (!Online) { Output($"{row.subMenuName}：需要联网执行"); return; }
-        Tool.NetworkManager.SendGm(new CSGm { type = row.key, i = arg.i, v0 = arg.v0, v1 = arg.v1, v2 = arg.v2 });
-    }
-
-    // 参数解析：int/bool/float 直接读，Vector2/3 用 "(1.1,2.2)" 形式
-    private static bool TryParseParam(gm_command row, string raw, out GmArg arg, out string error)
-    {
-        arg = default;
-        error = null;
-        if (!row.paramType.HasValue) return true;
-
-        string text = (raw ?? string.Empty).Trim();
-        if (text.Length == 0) { error = "未填参数"; return false; }
-
-        switch (row.paramType.Value)
-        {
-            case ParamInt:
-                if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int i)) { arg.i = i; return true; }
-                error = "需要整数";
-                return false;
-
-            case ParamBool:
-                if (TryParseBool(text, out bool b)) { arg.i = b ? 1 : 0; return true; }
-                error = "需要 1/0（也接受 true/false、t/f）";
-                return false;
-
-            case ParamFloat:
-                if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out float f)) { arg.v0 = f; return true; }
-                error = "需要小数";
-                return false;
-
-            case ParamVector2:
-                if (TryParseVector(text, 2, out float[] v2)) { arg.v0 = v2[0]; arg.v1 = v2[1]; return true; }
-                error = "需要 (x,y) 两个分量";
-                return false;
-
-            case ParamVector3:
-                if (TryParseVector(text, 3, out float[] v3)) { arg.v0 = v3[0]; arg.v1 = v3[1]; arg.v2 = v3[2]; return true; }
-                error = "需要 (x,y,z) 三个分量";
-                return false;
-
-            default:
-                error = $"配表 paramType={row.paramType.Value} 不认识（只支持 0~4）";
-                return false;
-        }
-    }
-
-    private static bool TryParseBool(string text, out bool value)
-    {
-        switch (text.ToLowerInvariant())
-        {
-            case "1": case "t": case "true": value = true; return true;
-            case "0": case "f": case "false": value = false; return true;
-            default: value = false; return false;
-        }
-    }
-
-    private static bool TryParseVector(string text, int count, out float[] values)
-    {
-        values = null;
-        string s = text.Trim();
-        if (s.StartsWith("(")) s = s.Substring(1);
-        if (s.EndsWith(")")) s = s.Substring(0, s.Length - 1);
-        s = s.Replace('，', ',');
-        string[] parts = s.Split(',');
-        if (parts.Length != count) return false;
-
-        float[] result = new float[count];
-        for (int k = 0; k < count; k++)
-        {
-            if (!float.TryParse(parts[k].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out result[k])) return false;
-        }
-        values = result;
-        return true;
-    }
-    #endregion
-
-    #region//本地指令（不联网也生效；返回 true 表示已处理）
-    private bool RunLocal(gm_command row, GmArg arg)
-    {
-        switch (row.key)
-        {
-            case GmCommandId.ShowEnemyCampConversation:
-                ChatPlugin.ShowEnemyDialog = arg.i != 0;
-                Output($"敌方阵营聊天：{(ChatPlugin.ShowEnemyDialog ? "开" : "关")}");
-                return true;
-
-            case GmCommandId.SettlementView:
-                if (Tool.UIManager != null) Tool.UIManager.Settlement.PlayDemo();
-                Output("已播放结算界面演示");
-                return true;
-
-            case GmCommandId.Delay:
-                if (arg.i < 0) { Output("延迟不能为负"); return true; }
-                if (Tool.Instance != null) Tool.Instance.delay = arg.i;
-                Output($"本地延迟已设为 {arg.i} ms");
-                return true;
-
-            case GmCommandId.DebugFps:
-                Output($"{(1f / Mathf.Max(Time.unscaledDeltaTime, 1e-5f)).ToString("0")} FPS");
-                return true;
-
-            case GmCommandId.DebugEntityCount:
-                Output($"客户端实体数量：{CountEntities()}");
-                return true;
-
-            case GmCommandId.ClientTime:
-                Output($"客户端时间：{Time.time.ToString("0.0")}");
-                return true;
-
-            case GmCommandId.MeshSurfaceCount:
-                Output($"模型网格面数：{CountSceneMeshFaces()}");
-                return true;
-
-            case GmCommandId.Fog:
-                var env = Tool.EnvironmentManager;
-                if (env == null) { Output("雾气：当前场景没有 EnvironmentManager"); return true; }
-                env.SetFogEnabled(arg.i != 0);
-                Output($"雾气：{(env.fogEnabled ? "开" : "关")}");
-                return true;
-
-            default:
-                return false;
-        }
-    }
-
-    private static int CountEntities()
-    {
-        var players = Tool.ClientLogicManager != null ? Tool.ClientLogicManager.EntityPlayers : null;
-        if (players == null) return 0;
-        int count = 0;
-        foreach (var _ in players.AllViews) count++;
-        return count;
-    }
-
-    // 模型网格面数：遍历场景中所有网格物体累加三角面
-    private static long CountSceneMeshFaces()
-    {
-        long faces = 0;
-        foreach (var mf in UnityEngine.Object.FindObjectsOfType<MeshFilter>())
-        {
-            var mesh = mf.sharedMesh;
-            if (mesh != null) faces += mesh.triangles.Length / 3L;
-        }
-        foreach (var smr in UnityEngine.Object.FindObjectsOfType<SkinnedMeshRenderer>())
-        {
-            var mesh = smr.sharedMesh;
-            if (mesh != null) faces += mesh.triangles.Length / 3L;
-        }
-        return faces;
+        GmCommandRunner.Run(row, arg, Output); // 输出框与聊天系统栏同时收到结果
     }
     #endregion
 
