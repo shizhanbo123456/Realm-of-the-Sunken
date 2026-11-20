@@ -227,38 +227,42 @@ namespace Ros.Skill
             return rates[index];
         }
 
-        // 第 11 列：伤害倍率。空 = 全 1；只有 1 项 = 所有段共用；多项 = 按段序取
-        private float[] SegmentRates(int segments)
+        // 第 11 列：伤害倍率。空 = 全 1（不摊分）；只有 1 项 = 所有段共用；多项 = 按段序取。
+        // 表里填的是一次施放的总量，按发数均摊到每颗子弹：一个子弹结算多次伤害也只算一发
+        private float[] SegmentRates(int segments, int bullets)
         {
             var rates = SkillConfig.Get(Id).damageRates;
             if (rates.Count == 0) return null;
             if (rates.Count == 1)
             {
                 var same = new float[segments];
-                for (int i = 0; i < segments; i++) same[i] = rates[0];
+                for (int i = 0; i < segments; i++) same[i] = rates[0] / bullets;
                 return same;
             }
             if (rates.Count < segments)
                 throw new FormatException($"[配表] skill.csv 技能 {Id} 伤害倍率只有 {rates.Count} 项，不够 {segments} 段用");
             var arr = new float[segments];
-            rates.CopyTo(0, arr, 0, segments);
+            for (int i = 0; i < segments; i++) arr[i] = rates[i] / bullets;
             return arr;
         }
 
         // 组装子弹命中判定参数：命中球与存活时长取特效预制体，倍率/间隔取配表
-        protected BulletHitSpec HitSpec(SkillVfxKind kind, int vfxIndex, float scale)
+        // bullets = 本次施放共发射几颗子弹（含多波累加、含分裂），单发技能不用传
+        protected BulletHitSpec HitSpec(SkillVfxKind kind, int vfxIndex, float scale, int bullets = 1)
         {
+            if (bullets <= 0) throw new ArgumentOutOfRangeException(nameof(bullets), bullets, "发数必须 > 0");
             var hits = VfxHitSource.GetHits(kind, vfxIndex);
-            return new BulletHitSpec(hits, SegmentRates(hits.Length), scale, DamageInterval,
+            return new BulletHitSpec(hits, SegmentRates(hits.Length, bullets), scale, DamageInterval,
                 VfxHitSource.GetLifeTime(kind, vfxIndex), $"{kind}[{vfxIndex}]");
         }
 
         // 整段共用同一倍率：二次爆炸这类独立效果只从第 11 列取指定项，与命中球段数无关
-        protected BulletHitSpec HitSpec(SkillVfxKind kind, int vfxIndex, float scale, float rate)
+        protected BulletHitSpec HitSpec(SkillVfxKind kind, int vfxIndex, float scale, float rate, int bullets = 1)
         {
+            if (bullets <= 0) throw new ArgumentOutOfRangeException(nameof(bullets), bullets, "发数必须 > 0");
             var hits = VfxHitSource.GetHits(kind, vfxIndex);
             var rates = new float[hits.Length];
-            for (int i = 0; i < rates.Length; i++) rates[i] = rate;
+            for (int i = 0; i < rates.Length; i++) rates[i] = rate / bullets;
             return new BulletHitSpec(hits, rates, scale, DamageInterval,
                 VfxHitSource.GetLifeTime(kind, vfxIndex), $"{kind}[{vfxIndex}]");
         }

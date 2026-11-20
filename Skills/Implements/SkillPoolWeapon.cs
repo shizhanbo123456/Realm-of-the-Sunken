@@ -89,7 +89,7 @@ namespace Ros.Skill
             Vector3 aim = Aim(caster, origin);
             int seed = SkillSeed.New();
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
-            var spec = HitSpec(SkillVfxKind.Projection, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Projection, Vfx, VfxScale(), Shots);
             Spread.SineFan(origin, aim, seed, SpreadDeg, Shots, ShotGap, Amplitude, Cycles, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec));
             SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); context.WriteInt(seed); });
@@ -121,7 +121,7 @@ namespace Ros.Skill
             Vector3 aim = Aim(caster, origin);
             int seed = SkillSeed.New();
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
-            var spec = HitSpec(SkillVfxKind.Projection, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Projection, Vfx, VfxScale(), Shots);
             Spread.MachineGun(origin, aim, seed, SpreadDeg, Shots, ShotGap, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec));
             SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); context.WriteInt(seed); });
@@ -179,7 +179,7 @@ namespace Ros.Skill
             Vector3 aim = Aim(caster, origin);
             int seed = SkillSeed.New();
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
-            var spec = HitSpec(SkillVfxKind.Projection, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Projection, Vfx, VfxScale(), Shots);
             Spread.ChargeSweep(origin, aim, seed, Radius, Shots, Hold, Flight,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, 0f, spec));
             SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); context.WriteInt(seed); });
@@ -214,7 +214,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpFront, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
-            var spec = HitSpec(SkillVfxKind.Projection, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Projection, Vfx, VfxScale(), Spread.Count(Shots, Waves, ShotsOfWave));
             Spread.Fan(origin, aim, Shots, Waves, 0f, WaveGap, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec),
                 ShotsOfWave, SpreadOfWave);
@@ -245,7 +245,7 @@ namespace Ros.Skill
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Weapon, WeaponOf(caster), VfxScale());
+            var spec = HitSpec(SkillVfxKind.Weapon, WeaponOf(caster), VfxScale(), Shots);
             for (int i = 0; i < Shots; i++)
             {
                 Tool.BattleManager.ShootBullet(caster, attack,
@@ -313,7 +313,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Projection, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Projection, Vfx, VfxScale(), Shots);
             Spread.Fan(origin, aim, Shots, 1, SpreadDeg, 0f, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec));
             SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
@@ -342,7 +342,7 @@ namespace Ros.Skill
             Vector3 aim = Aim(caster, origin);
             int vfx = WeaponOf(caster);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Weapon, vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Weapon, vfx, VfxScale(), Shots);
             Spread.Fan(origin, aim, Shots, 1, SpreadDeg, 0f, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec));
             SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
@@ -371,7 +371,7 @@ namespace Ros.Skill
             Vector3 aim = Aim(caster, origin);
             int vfx = WeaponOf(caster);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Weapon, vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Weapon, vfx, VfxScale(), Shots);
             Spread.Fan(origin, aim, Shots, 1, SpreadDeg, 0f, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec));
             SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
@@ -495,7 +495,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             int vfx = WeaponOf(caster);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Weapon, vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Weapon, vfx, VfxScale(), Shots);
             for (int i = 0; i < Shots; i++)
             {
                 Tool.BattleManager.ShootBullet(caster, attack,
@@ -566,7 +566,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpFront, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
-            var spec = HitSpec(SkillVfxKind.Slash, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Slash, Vfx, VfxScale(), Shots);
             Spread.Fan(origin, aim, Shots, 1, SpreadDeg, 0f, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec));
             SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
@@ -600,7 +600,7 @@ namespace Ros.Skill
             int seed = SkillSeed.New();
             Quaternion rotation = caster.transform.rotation;
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), Shots);
             var rng = SkillSeed.Rng(seed);
             for (int i = 0; i < Shots; i++)
             {
@@ -653,7 +653,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpFront, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), Spread.Count(1, Waves));
             Spread.Fan(origin, aim, 1, Waves, 0f, WaveGap, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec),
                 null, SpreadOfWave);
@@ -712,7 +712,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), Shots);
             Vector3[] dests = SpreadStyle.FanDests(origin, aim, Shots, SpreadDeg);
             for (int i = 0; i < Shots; i++)
             {
@@ -753,7 +753,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpFront, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), Spread.Count(3, Waves, ShotsOfWave));
             Spread.Fan(origin, aim, 3, Waves, SpreadDeg, WaveGap, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec),
                 ShotsOfWave, null);
@@ -786,7 +786,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpFront, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), Spread.Count(Shots, Waves));
             Spread.Fan(origin, aim, Shots, Waves, SpreadDeg, WaveGap, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec));
             SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
@@ -842,7 +842,7 @@ namespace Ros.Skill
         {
             Vector3 center = caster.transform.position; // 落点中心是自己脚下
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.RangeMagic, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.RangeMagic, Vfx, VfxScale(), Shots);
             Vector3[] dests = SpreadStyle.CircleDests(Vector3.zero, Ring, Shots);
             for (int i = 0; i < Shots; i++)
             {
@@ -880,7 +880,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Weapon, WeaponOf(caster), VfxScale());
+            var spec = HitSpec(SkillVfxKind.Weapon, WeaponOf(caster), VfxScale(), Spread.Count(Shots, Waves));
             for (int wave = 0; wave < Waves; wave++)
             {
                 int w = wave;
@@ -944,7 +944,7 @@ namespace Ros.Skill
             Vector3 center = LockCenter(caster);
             Vector3[] lands = LandPoints(center);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Weapon, WeaponOf(caster), VfxScale());
+            var spec = HitSpec(SkillVfxKind.Weapon, WeaponOf(caster), VfxScale(), Shots);
             for (int i = 0; i < Shots; i++)
             {
                 int index = i;
@@ -1051,7 +1051,7 @@ namespace Ros.Skill
         {
             Vector3 center = LandCenter(caster);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.RangeMagic, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.RangeMagic, Vfx, VfxScale(), Spread.Count(Shots, Waves));
             for (int wave = 0; wave < Waves; wave++)
             {
                 int w = wave;
@@ -1157,7 +1157,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), SplitCount + 1);
             Spread.Fan(origin, aim, 1, 1, 0f, 0f, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec));
             Timer.AddTimer(0, _ => Split(caster, origin, aim), BulletLife, 1, false);
@@ -1168,7 +1168,7 @@ namespace Ros.Skill
         {
             if (caster == null) return;
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Bullet, SplitVfx, VfxScale(1));
+            var spec = HitSpec(SkillVfxKind.Bullet, SplitVfx, VfxScale(1), SplitCount + 1);
             Vector3[] dests = SpreadStyle.FanDests(origin, aim, SplitCount, SplitSpread);
             for (int i = 0; i < SplitCount; i++)
             {
@@ -1243,7 +1243,7 @@ namespace Ros.Skill
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), Shots);
             Vector3[] ring = SpreadStyle.CircleDests(Vector3.zero, Ring, Shots);
             for (int i = 0; i < Shots; i++)
             {
@@ -1279,7 +1279,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), Shots);
             Spread.Fan(origin, aim, Shots, 1, SpreadDeg, 0f, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec));
             SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
@@ -1310,7 +1310,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), Spread.Count(1, Waves));
             for (int wave = 0; wave < Waves; wave++)
             {
                 int w = wave;
@@ -1428,7 +1428,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), Shots);
             for (int shot = 0; shot < Shots; shot++)
             {
                 int s = shot;
@@ -1479,7 +1479,7 @@ namespace Ros.Skill
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), Shots);
             for (int shot = 0; shot < Shots; shot++)
             {
                 int s = shot;
@@ -1530,7 +1530,7 @@ namespace Ros.Skill
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             Vector3 aim = Aim(caster, origin);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), Shots);
             Spread.Fan(origin, aim, Shots, 1, SpreadDeg, 0f, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec));
             SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
@@ -1591,7 +1591,7 @@ namespace Ros.Skill
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.RangeMagic, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.RangeMagic, Vfx, VfxScale(), Shots);
             Vector3[] ring = SpreadStyle.CircleDests(Vector3.zero, Ring, Shots);
             for (int i = 0; i < Shots; i++)
             {
@@ -1659,7 +1659,7 @@ namespace Ros.Skill
             Vector3 pos = caster.transform.position;
             Vector3[] points = FieldPoints(pos, caster.transform.rotation);
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), Fields);
             for (int i = 0; i < Fields; i++)
             {
                 Vector3 point = points[i];
@@ -1724,7 +1724,7 @@ namespace Ros.Skill
             int seed = SkillSeed.New();
             Vector3[] starts = StartPoints(caster, aim, seed);
             var attack = BuildAttack(caster);
-            var spec = HitSpec(SkillVfxKind.Slash, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Slash, Vfx, VfxScale(), Shots);
             for (int wave = 0; wave < Waves; wave++)
             {
                 int w = wave;

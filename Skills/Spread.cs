@@ -7,6 +7,18 @@ namespace Ros.Skill
     // 扇形齐射：N 发 × M 波，双端共用同一套展开角度与波次时序，每发把轨迹交给 emit
     public static class Spread
     {
+        // 一次施放的总发数：与 Fan 的发射口径完全一致（多波累加，发数随波变化时按 shotsOfWave 求和）
+        // 技能的伤害倍率按这个数均摊，所以两边必须是同一个口径
+        public static int Count(int shots, int waves, Func<int, int> shotsOfWave = null)
+        {
+            if (waves <= 0) throw new ArgumentOutOfRangeException(nameof(waves), waves, "波数必须 > 0");
+            if (shots <= 0) throw new ArgumentOutOfRangeException(nameof(shots), shots, "发数必须 > 0");
+            int total = 0;
+            for (int wave = 0; wave < waves; wave++)
+                total += Mathf.Max(1, shotsOfWave == null ? shots : shotsOfWave(wave));
+            return total;
+        }
+
         public static void Fan(Vector3 origin, Vector3 aim, int shots, int waves, float spreadDeg, float waveGap,
             float bulletLife, Action<BulletTrajectory> emit,
             Func<int, int> shotsOfWave = null, Func<int, float> spreadOfWave = null)

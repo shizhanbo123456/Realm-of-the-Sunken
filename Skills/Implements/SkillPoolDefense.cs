@@ -74,7 +74,8 @@ namespace Ros.Skill
                 BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0)),
                 new SkillTrajectoryPoint(caster.transform.position, GlobalConfig.power_suppress_vfx_life),
                 GlobalConfig.power_suppress_vfx_life,
-                HitSpec(SkillVfxKind.RangeMagic, GlobalConfig.power_suppress_vfx_index, VfxScale()));
+                HitSpec(SkillVfxKind.RangeMagic, GlobalConfig.power_suppress_vfx_index, VfxScale(),
+                    GlobalConfig.power_suppress_hits));
         }
 
         public override void PlayWave(SCSkillDisplayContext context)
@@ -285,7 +286,7 @@ namespace Ros.Skill
             Vector3 aim = Aim(caster, origin);
             int seed = SkillSeed.New();
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), Shots);
             Spread.MachineGun(origin, aim, seed, SpreadDeg, Shots, ShotGap, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec));
             SendWave(caster, 0, context =>
@@ -320,7 +321,7 @@ namespace Ros.Skill
             Vector3 aim = Aim(caster, origin);
             int seed = SkillSeed.New();
             var attack = BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0));
-            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale());
+            var spec = HitSpec(SkillVfxKind.Bullet, Vfx, VfxScale(), Shots);
             Spread.MachineGun(origin, aim, seed, SpreadDeg, Shots, ShotGap, BulletLife,
                 trajectory => Tool.BattleManager.ShootBullet(caster, attack, trajectory, BulletLife, spec));
             SendWave(caster, 0, context =>
