@@ -20,8 +20,6 @@ public class LobbyPage : PageBase
     private int humanAttack;
     private int humanDefense;
     private bool aiBound;      // 本页的 AI 命令是否已注册
-    private PlayerCampType lastCamp = PlayerCampType.Spectator; // 上次记进观察记录的阵营
-    private bool lastReady;                                     // 上次记进观察记录的准备状态
 
     public LobbyPage(UI_LobbyPanel panel) : base(panel)
     {
@@ -196,14 +194,6 @@ public class LobbyPage : PageBase
 
         attackRobot = info.attackRobotCount;
         defenseRobot = info.defenseRobotCount;
-
-        // 自己的阵营与准备状态也是玩家看得见的，变了就记一条
-        if (myCamp != lastCamp || myReady != lastReady)
-        {
-            lastCamp = myCamp;
-            lastReady = myReady;
-            if (Tool.UIManager != null) Tool.UIManager.ShowFlyText(promptEnum.lobby_state, myCamp, myReady ? "是" : "否");
-        }
 
         RefreshCampBlock(panel.m_btn_joinAttack, PlayerCampType.Attack, attackRobot);
         RefreshCampBlock(panel.m_btn_joinDefense, PlayerCampType.Defense, defenseRobot);
