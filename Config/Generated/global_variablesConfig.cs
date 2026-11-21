@@ -156,6 +156,7 @@ namespace Ros.Config
         passive_defense_pale_mixed_stacks,
         passive_defense_pale_control_duration,
         passive_defense_pale_burn_duration,
+        buff_pale_fire_damage_per_tick,
         passive_defense_zombie_spawn_level_boost,
         buff_mire_speed_rate,
         buff_death_stroll_speed_up,
@@ -192,6 +193,5 @@ namespace Ros.Config
         buff_speed_down,
         gm_speed_multiplier,
         buff_shield_health_ratio,
-        buff_pale_fire_damage_per_tick,
     }
 }

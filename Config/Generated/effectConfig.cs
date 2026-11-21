@@ -54,7 +54,7 @@ namespace Ros.Config
         public int key;  // 主键
         public string name;  // 名称
         public string description;  // 描述
-        public int stackMode;  // 叠加模式（）：0：高等级覆盖低等级，相同等级刷新时间；1：多层buff分别生效，分别计算剩余时间；2：刷新时间并叠加等级；3：强制1级，重复添加仅取最大时间
+        public int stackMode;  // 叠加模式：0：高等级覆盖低等级，相同等级刷新时间；1：多层buff分别生效，分别计算剩余时间；2：刷新时间并叠加等级；3：强制1级，重复添加仅取最大时间
         public bool? lockMoveInput;  // 禁止移动输入
         public bool? lockSkillInput;  // 禁止技能输入
         public bool? freezeAnimation;  // 冻结动画
