@@ -6,9 +6,11 @@ namespace Ros.UI.Main
     // 快捷指令悬浮提示：正文取自 quick_message.uiText
     public partial class UI_QuickMessageTip
     {
+        private const string LineBreak = "[Space]"; // 配表用该标记表示换行
+
         public void Fill(int messageId)
         {
-            m_title.text = QuickMessageConfig.Get(messageId).uiText;
+            m_title.text = QuickMessageConfig.Get(messageId).uiText.Replace(LineBreak, "\n");
         }
 
         public void ShowAtPointer() => TipLayout.PlaceAtPointer(this);
