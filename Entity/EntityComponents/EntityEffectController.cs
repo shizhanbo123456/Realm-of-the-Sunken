@@ -305,11 +305,11 @@ public class EntityEffectController
     public float GetMoveAnimSpeedMultiplier()
     {
         float m = 1f;
-        if (HasEffect(EffectType.SpeedUp)) m *= GlobalVariable.F(global_variablesEnum.buff_speed_up);
-        if (HasEffect(EffectType.SlowDown)) m *= GlobalVariable.F(global_variablesEnum.buff_speed_down);
-        if (HasEffect(EffectType.Mire)) m *= GlobalVariable.F(global_variablesEnum.buff_mire_speed_rate);
-        if (HasEffect(EffectType.DeathStroll)) m *= GlobalVariable.F(global_variablesEnum.buff_death_stroll_speed_up);
-        if (HasEffect(EffectType.GmSpeedUp)) m *= GlobalVariable.F(global_variablesEnum.gm_speed_multiplier);
+        m *= LeveledRate(EffectType.SpeedUp, GlobalVariable.F(global_variablesEnum.buff_speed_up));
+        m *= LeveledRate(EffectType.SlowDown, GlobalVariable.F(global_variablesEnum.buff_speed_down));
+        m *= LeveledRate(EffectType.Mire, GlobalVariable.F(global_variablesEnum.buff_mire_speed_rate));
+        m *= LeveledRate(EffectType.DeathStroll, GlobalVariable.F(global_variablesEnum.buff_death_stroll_speed_up));
+        m *= LeveledRate(EffectType.GmSpeedUp, GlobalVariable.F(global_variablesEnum.gm_speed_multiplier));
         int screamLevel = TotalLevel(EffectType.ZombieScreamBoost);
         if (screamLevel > 0) m *= 1f + GlobalVariable.F(global_variablesEnum.buff_scream_speed_ratio) * screamLevel;
         return m;
@@ -326,6 +326,14 @@ public class EntityEffectController
     private int TotalLevel(EffectType type)
     {
         return effects.TryGetValue(type, out var layers) ? SumLevel(layers) : 0;
+    }
+
+    // 每级乘一次倍率：等级 N → rate 自乘 N 次；没有该 Buff 时为 1
+    private float LeveledRate(EffectType type, float rate)
+    {
+        int level = TotalLevel(type);
+        if (level <= 0) return 1f;
+        return Mathf.Pow(rate, level);
     }
     #endregion
 
