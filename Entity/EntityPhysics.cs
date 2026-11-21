@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 命中判定的唯一入口：全部在 XZ 平面计算（Y 不参与），不走物理查询
+// 命中判定的唯一入口：XZ 平面算圆柱足迹（Y 不参与距离），Y 轴只判区间是否重叠；不走物理查询
 public static class EntityPhysics
 {
     private static readonly HashSet<int> s_hitIds = new();
@@ -15,11 +15,13 @@ public static class EntityPhysics
     public static int OverlapCapsuleXZ(Vector3 from, Vector3 to, float radius, EntityData[] results)
         => OverlapSegmentXZ(from, to, radius, results);
 
-    // 判定体 = 线段 + 半径（圆头胶囊），目标 = 圆心 + 半径；两者距离用平面距离比较
+    // 判定体 = 线段 + 半径（圆头胶囊），目标 = 圆心 + 半径；两者在 XZ 用平面距离，Y 重叠才命中（圆柱对圆柱）
     private static int OverlapSegmentXZ(Vector3 from, Vector3 to, float radius, EntityData[] results)
     {
         var entities = BattleManager.EntityContainer.Entities;
         float half = (to - from).magnitude * 0.5f;
+        float minY = Mathf.Min(from.y, to.y) - radius;
+        float maxY = Mathf.Max(from.y, to.y) + radius;
         // 区块集合当宽相位：半径带上最大实体半径，保证边界附近的目标不会漏
         entities.GetIdsInRelativeBlocks((from + to) * 0.5f, half + radius + EntityData.MaxHitRadiusXZ, s_hitIds);
 
@@ -36,8 +38,11 @@ public static class EntityPhysics
                 break;
             }
             if (!entities.TryGetObject(id, out var entity) || entity == null) continue;
+            Vector3 center = entity.HitCenter;
             float sum = radius + entity.HitRadiusXZ;
-            if (SqrDistPointSegmentXZ(entity.HitCenterXZ, from, to) > sum * sum) continue;
+            if (SqrDistPointSegmentXZ(center, from, to) > sum * sum) continue;
+            float entityHalfY = entity.HitHalfHeight;
+            if (maxY < center.y - entityHalfY || minY > center.y + entityHalfY) continue;
             results[count++] = entity;
         }
         return count;

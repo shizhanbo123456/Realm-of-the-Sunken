@@ -834,10 +834,12 @@ public abstract class EntityData : MonoBehaviour
     private float capsuleBaseBottom;      // 建胶囊时的下边界（本地 Y）
     private float capsuleBaseTop;         // 建胶囊时的上边界（本地 Y）
 
-    // 平面判定足迹：胶囊压扁到 XZ 就是圆心 + 半径，高度与半径无关（radius 全程不变）
+    // 命中足迹近似为竖直圆柱：XZ 用圆心 + 半径，Y 用中心 ± 半高（半高跟随动态脚/头收紧）
     public float HitRadiusXZ { get; private set; }
 
-    public Vector3 HitCenterXZ => capsule.transform.TransformPoint(capsule.center);
+    public Vector3 HitCenter => capsule.transform.TransformPoint(capsule.center);
+
+    public float HitHalfHeight => capsule.height * 0.5f * Mathf.Abs(capsule.transform.lossyScale.y);
 
     // 宽相位取区块用的半径上限：实体创建时更新，只增不减
     public static float MaxHitRadiusXZ { get; private set; }
