@@ -832,7 +832,7 @@ namespace Ros.Skill
         }
     }
 
-    // 天罗：自身周围 5 个点各自天降，起点与落点都在自己脚下周围
+    // 天罗：自身周围 5 个定点爆炸，引爆时刻由命中窗口决定
     public class SkillSkyfallVolley : SkillBase
     {
         public override int Id => (int)SkillType.SkillSkyfallVolley;
@@ -851,7 +851,7 @@ namespace Ros.Skill
             for (int i = 0; i < Shots; i++)
             {
                 Tool.BattleManager.ShootBullet(caster, attack,
-                    new SkillTrajectorySkyFall(center, center + dests[i], BulletLife), BulletLife, spec);
+                    new SkillTrajectoryPoint(center + dests[i], BulletLife), BulletLife, spec);
             }
             SendWave(caster, 0, context => context.WriteVector3(center));
         }
@@ -863,7 +863,7 @@ namespace Ros.Skill
             for (int i = 0; i < Shots; i++)
             {
                 VfxHelper.PlayOne(SkillVfxKind.RangeMagic, Vfx,
-                    new SkillTrajectorySkyFall(center, center + dests[i], BulletLife), VfxScale());
+                    new SkillTrajectoryPoint(center + dests[i], BulletLife), VfxScale());
             }
         }
     }
@@ -1080,7 +1080,7 @@ namespace Ros.Skill
                 // 第 0 发砸在正中心，贴身敌人也吃得到
                 Vector3 land = i == 0 ? center : center + ring[(wave * (Shots - 1) + i - 1) % 8];
                 Tool.BattleManager.ShootBullet(caster, attack,
-                    new SkillTrajectorySkyFall(center + Vector3.up * 10f, land, BulletLife), BulletLife, spec);
+                    new SkillTrajectoryPoint(land, BulletLife), BulletLife, spec);
             }
         }
 
@@ -1102,7 +1102,7 @@ namespace Ros.Skill
             {
                 Vector3 land = i == 0 ? center : center + ring[(wave * (Shots - 1) + i - 1) % 8];
                 VfxHelper.PlayOne(SkillVfxKind.RangeMagic, Vfx,
-                    new SkillTrajectorySkyFall(center + Vector3.up * 10f, land, BulletLife), VfxScale());
+                    new SkillTrajectoryPoint(land, BulletLife), VfxScale());
             }
         }
     }
@@ -1623,7 +1623,6 @@ namespace Ros.Skill
 
         private const int Vfx = 6;                 // RangeMagic 水墨爆炸
         private const float BulletLife = 1.1f;
-        private const float DropHeight = 10f;
 
         protected override void OnCast(EntityData caster)
         {
@@ -1632,7 +1631,7 @@ namespace Ros.Skill
             EntityData target = ResolveTarget(caster);
             Vector3 land = target != null ? target.transform.position : Aim(caster, origin);
             Tool.BattleManager.ShootBullet(caster, BuildAttack(caster, addEffect: ConfigHitBuff(caster, 0)),
-                new SkillTrajectorySkyFall(land + Vector3.up * DropHeight, land, BulletLife), BulletLife,
+                new SkillTrajectoryPoint(land, BulletLife), BulletLife,
                 HitSpec(SkillVfxKind.RangeMagic, Vfx, VfxScale()));
             SendWave(caster, 0, context => context.WriteVector3(land));
         }
@@ -1641,7 +1640,7 @@ namespace Ros.Skill
         {
             Vector3 land = context.ReadVector3();
             VfxHelper.PlayOne(SkillVfxKind.RangeMagic, Vfx,
-                new SkillTrajectorySkyFall(land + Vector3.up * DropHeight, land, BulletLife), VfxScale());
+                new SkillTrajectoryPoint(land, BulletLife), VfxScale());
         }
     }
 
