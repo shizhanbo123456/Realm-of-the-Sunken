@@ -77,6 +77,7 @@ namespace Ros.UI.Main
             UIObjectFactory.SetPackageItemExtension(UI_buffItemMask.URL, typeof(UI_buffItemMask));
             UIObjectFactory.SetPackageItemExtension(UI_buffList.URL, typeof(UI_buffList));
             UIObjectFactory.SetPackageItemExtension(UI_avaterMask.URL, typeof(UI_avaterMask));
+            UIObjectFactory.SetPackageItemExtension(UI_QuickMessageTip.URL, typeof(UI_QuickMessageTip));
             UIObjectFactory.SetPackageItemExtension(UI_ChatPanel.URL, typeof(UI_ChatPanel));
             UIObjectFactory.SetPackageItemExtension(UI_ChatItem.URL, typeof(UI_ChatItem));
             UIObjectFactory.SetPackageItemExtension(UI_LoadingPanel.URL, typeof(UI_LoadingPanel));
