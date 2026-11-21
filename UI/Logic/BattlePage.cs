@@ -93,10 +93,7 @@ public class BattlePage : PageBase
         battleInfo.m_btn_settings.onClick.Add(OpenSettings);
         battleInfo.m_btn_quick_message.onClick.Add(ToggleQuickMessage);
 
-        // 快捷指令轮盘挂在战斗信息面板里，FGUI 侧还没命名
-        quickMessagePanel = battleInfo.GetChild("n5") as UI_QuickMessagePanel;
-        if (quickMessagePanel == null)
-            throw new System.FormatException("[战斗界面] BattleInfoPanel 的第 6 个子件不是快捷指令面板，检查 FGUI 结构");
+        quickMessagePanel = battleInfo.m_quickMessagePanel;
         quickMessagePanel.Build(SendQuickMessage);
 
         panel.m_showRegenerationBar.selectedIndex = 0; // 复活进度默认隐藏
@@ -116,16 +113,14 @@ public class BattlePage : PageBase
     // 快捷指令轮盘：点信息面板上的按钮开关；展开时按键 = 发送并收起
     private void ToggleQuickMessage()
     {
-        if (quickMessagePanel == null) return;
         if (quickMessagePanel.IsOpen) quickMessagePanel.Close();
         else quickMessagePanel.Open();
     }
 
-    private void HideQuickMessage() => quickMessagePanel?.Close();
+    private void HideQuickMessage() => quickMessagePanel.Close();
 
     private void HandleQuickMessageKey(int index)
     {
-        if (quickMessagePanel == null) return;
         if (!quickMessagePanel.IsOpen)
         {
             quickMessagePanel.Open();
