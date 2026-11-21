@@ -56,9 +56,7 @@ public class RuleView : PageBase
         tabs.itemRenderer = (i, obj) =>
         {
             var tab = obj.asButton;
-            // 页签标题写在条目自带的文本上（FGUI 里这个文本没命名）
-            var label = tab.GetChild("n3") as GTextField;
-            if (label != null) label.text = SettingTipsConfig.content[tipKeys[i]].name;
+            tab.title = SettingTipsConfig.content[tipKeys[i]].name; // 条目子文本命名为 title，走 GButton 内置 title
             tab.selected = i == tipTab;
             int index = i;
             tab.onClick.Set(() => SelectTip(index));
