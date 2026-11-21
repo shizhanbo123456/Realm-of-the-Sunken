@@ -11,11 +11,13 @@ public class SettlementView
     private const float DetailStartDelay = 0.5f;   // 面板转场后首条细节出现
     private const float DetailItemInterval = 0.3f; // 相邻两条细节的间隔
     private const float FadeDuration = 0.5f;       // 点关闭后整个面板的淡出时长
+    private const float AutoCloseDelay = 10f;      // 进入结算后的自动关闭倒计时（秒）
 
     private UI_SettlementPanel panel;
     private readonly List<UI_BattleResultDetailItem> items = new();
     private readonly List<string> rows = new();
     private Timer.TransitionHandle transition;
+    private Timer.TransitionHandle autoCloseTimer;
     private int pendingAppear; // 还没播完出现动画的明细条数
     private int showSerial;    // 每次显示递增，用来丢弃上一次面板残留的动画回调
     private bool canClose;     // 出现动画全部播完才允许关闭
@@ -30,6 +32,7 @@ public class SettlementView
     public void Shutdown()
     {
         EventManager.RemoveEvent<SettlementResult>(ClientEvent.OnSettlementResult, OnSettlementResult);
+        CancelAutoClose();
         CancelAnimations();
     }
 
@@ -95,12 +98,39 @@ public class SettlementView
         pendingAppear = items.Count;
         if (pendingAppear == 0) canClose = true; // 没有明细就没有待播的出现动画
         ScheduleAppear(++showSerial);
+        StartAutoClose();
+    }
+
+    // 进入结算即开始倒计时，到点走与手动关闭相同的淡出流程
+    private void StartAutoClose()
+    {
+        CancelAutoClose();
+        autoCloseTimer = Timer.AddTransition(0, AutoCloseDelay, (_, t01) =>
+        {
+            if (t01 < 1f) return;
+            autoCloseTimer = null; // 自身已结束，避免在回调内 Cancel 自身
+            AutoClose();
+        });
+    }
+
+    private void CancelAutoClose()
+    {
+        if (autoCloseTimer != null) autoCloseTimer.Cancel();
+        autoCloseTimer = null;
+    }
+
+    private void AutoClose()
+    {
+        if (closing || panel == null) return;
+        closing = true;
+        FadeOut();
     }
 
     // 关闭按钮：出现动画没播完、或正在淡出时一律不响应
     private void OnCloseClick()
     {
         if (!canClose || closing || panel == null) return;
+        CancelAutoClose(); // 手动关闭即停止自动关闭计时
         closing = true;
         FadeOut();
     }
@@ -196,6 +226,7 @@ public class SettlementView
     // 淡出结束：销毁面板（标题、明细与关闭按钮都是面板子对象，随面板一起销毁）；战斗结束流程再恢复组队面板
     private void Close()
     {
+        CancelAutoClose();
         CancelAnimations();
         if (panel != null)
         {
