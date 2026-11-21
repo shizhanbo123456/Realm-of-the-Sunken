@@ -386,13 +386,14 @@ namespace Ros.Skill
         }
     }
 
-    // 武器本体在目标头顶 10m 生成，垂直砸下
+    // 武器本体在目标头顶 10m 生成，垂直砸到目标脚下再没入地下 5m
     public class SkillSkyfallWeapon : SkillBase
     {
         public override int Id => (int)SkillType.SkillSkyfallWeapon;
 
-        private const float BulletLife = 0.45f;
+        private const float BulletLife = 2.5f;
         private const float DropHeight = 10f;
+        private const float SinkDepth = 5f;
 
         protected override void OnCast(EntityData caster)
         {
@@ -402,8 +403,8 @@ namespace Ros.Skill
             Vector3 land = target != null ? target.transform.position : Aim(caster, origin);
             int vfx = WeaponOf(caster);
             Tool.BattleManager.ShootBullet(caster, BuildAttack(caster),
-                new SkillTrajectoryLine(land + Vector3.up * DropHeight, land, BulletLife), BulletLife,
-                HitSpec(SkillVfxKind.Weapon, vfx, VfxScale()));
+                new SkillTrajectoryLine(land + Vector3.up * DropHeight, land + Vector3.down * SinkDepth, BulletLife),
+                BulletLife, HitSpec(SkillVfxKind.Weapon, vfx, VfxScale()));
             SendWave(caster, 0, context => context.WriteVector3(land));
         }
 
@@ -411,7 +412,8 @@ namespace Ros.Skill
         {
             Vector3 land = context.ReadVector3();
             VfxHelper.PlayOne(SkillVfxKind.Weapon, DisplayWeapon(context),
-                new SkillTrajectoryLine(land + Vector3.up * DropHeight, land, BulletLife), VfxScale());
+                new SkillTrajectoryLine(land + Vector3.up * DropHeight, land + Vector3.down * SinkDepth, BulletLife),
+                VfxScale());
         }
     }
     #endregion
