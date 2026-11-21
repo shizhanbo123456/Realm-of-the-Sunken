@@ -24,7 +24,6 @@ public class BattlePage : PageBase
     private readonly List<QuickMessageState> quickMessages = new(); // 生效中的快捷指令点位（显示在小地图上）
     private readonly List<UI_Minimap.QuickMark> quickMessageMarks = new(); // 每帧换算给小地图的标记快照
     private int nextQuickMessageId;
-    private GTextField levelLabel;    // 玩家栏等级数字（FGUI 侧未命名，按 n12 取）
     private int localPlayerCamp = -1; // 本地玩家阵营（随本地实体摘要更新；小地图敌我识别用）
     private EntityType localAvatarType;   // 玩家栏头像当前用的角色类型（同类型不重设贴图）
     private bool localAvatarSet;
@@ -99,7 +98,6 @@ public class BattlePage : PageBase
         panel.m_showRegenerationBar.selectedIndex = 0; // 复活进度默认隐藏
         panel.m_playerPanel.m_buffList.m_list.itemRenderer =
             (i, obj) => ((UI_buffItem)obj).Fill(localBuffs[i].type, localBuffs[i].level);
-        levelLabel = panel.m_playerPanel.GetChild("n12") as GTextField; // 等级数字在 FGUI 侧还没命名
         if (panel.m_Minimap != null && panel.m_Minimap.m_minimapButton != null)
             panel.m_Minimap.m_minimapButton.onClick.Set(OpenLargeMinimap); // 点小地图打开大地图，关闭走大地图自己的底框按钮
     }
@@ -1187,7 +1185,7 @@ public class BattlePage : PageBase
         var playerPanel = panel.m_playerPanel;
         if (playerPanel == null) return;
         int need = CharacterExpConfig.NeedExp(cardLevel + 1);
-        if (levelLabel != null) levelLabel.text = cardLevel.ToString();
+        playerPanel.m_label_level.text = cardLevel.ToString();
         if (playerPanel.m_bar_exp != null && playerPanel.m_bar_exp.m_fill != null)
             playerPanel.m_bar_exp.m_fill.fillAmount = need > 0 ? Mathf.Clamp01((float)cardExp / need) : 1f;
         if (playerPanel.m_label_exp != null) playerPanel.m_label_exp.text = need > 0 ? $"{cardExp}/{need}" : "MAX";
