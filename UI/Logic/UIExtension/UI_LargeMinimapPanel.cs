@@ -53,7 +53,8 @@ namespace Ros.UI.Main
                 var item = EnsureItem(point);
                 if (item == null) continue;
                 item.m_type.selectedIndex = UI_Minimap.PageOf(point.category, point.type, point.camp, point.self, myCamp);
-                item.m_highlight.selectedIndex = point.marked ? 1 : 0;
+                if (point.marked) item.m_highlight.selectedIndex = 1;
+                else item.m_highlight.selectedIndex = 0;
                 if (point.self && hasSelfYaw) item.rotation = selfYaw;
                 Place(item, point);
                 staleIds.Remove(point.id);

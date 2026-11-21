@@ -97,7 +97,8 @@ public class GuideView : PageBase
 
         var list = panel.m_item_list;
         list.numItems = 0;
-        list.defaultItem = index == 0 ? UI_GuideItemSkill.URL : UI_GuideItemBuff.URL;
+        if (index == 0) list.defaultItem = UI_GuideItemSkill.URL;
+        else list.defaultItem = UI_GuideItemBuff.URL;
         list.numItems = entries.Count;
 
         if (index == 0 && entries.Count > 0) ShowDetail(0);
@@ -106,7 +107,8 @@ public class GuideView : PageBase
     private void RenderItem(int index, GObject obj)
     {
         var entry = entries[index];
-        var tex = entry.icon != null ? new NTexture(entry.icon) : null;
+        NTexture tex = null;
+        if (entry.icon != null) tex = new NTexture(entry.icon);
         if (tab == 0)
         {
             var item = (UI_GuideItemSkill)obj;
@@ -155,19 +157,22 @@ public class GuideView : PageBase
         var entry = entries[index];
         var detail = panel.m_skill_detail;
         detail.m_Name.text = entry.title;
-        detail.m_slot.m_mask.m_icon.texture = entry.icon != null ? new NTexture(entry.icon) : null;
+        if (entry.icon != null) detail.m_slot.m_mask.m_icon.texture = new NTexture(entry.icon);
+        else detail.m_slot.m_mask.m_icon.texture = null;
         detail.m_rank.m_level.selectedIndex = entry.quality;
 
         int[] scores = entry.scores;
         for (int i = 0; i < detail.m_rankList.numItems; i++)
         {
             var rank = (UI_GuideDetailSkillRank)detail.m_rankList.GetChildAt(i);
-            int score = scores != null && i < scores.Length ? scores[i] : 0;
+            int score = 0;
+            if (scores != null && i < scores.Length) score = scores[i];
             rank.m_rank.m_level.selectedIndex = score;
             for (int j = 0; j < rank.m_rank_tabs.numItems; j++)
             {
                 var scoreTab = (UI_GuideScoreTab)rank.m_rank_tabs.GetChildAt(j);
-                scoreTab.m_highlight.selectedIndex = j < score + 1 ? 1 : 0;
+                if (j < score + 1) scoreTab.m_highlight.selectedIndex = 1;
+                else scoreTab.m_highlight.selectedIndex = 0;
             }
         }
     }

@@ -53,12 +53,33 @@ public class BattlePage : PageBase
     private static bool HasSession => Session != null && Session.HasSession;
 
     // 客户端技能状态（持有表 / 技能栏 / 冷却库存）全在它身上
-    private static ClientSkillManager Skills => Tool.ClientLogicManager != null ? Tool.ClientLogicManager.SkillVfx : null;
+    private static ClientSkillManager Skills
+    {
+        get
+        {
+            if (Tool.ClientLogicManager == null) return null;
+            return Tool.ClientLogicManager.SkillVfx;
+        }
+    }
 
     // 剩余时间推演的唯一持有者（起点由服务器快照校准，见 ClientBattleTimeManager）
-    private static ClientBattleTimeManager BattleTime => Tool.ClientLogicManager != null ? Tool.ClientLogicManager.BattleTime : null;
+    private static ClientBattleTimeManager BattleTime
+    {
+        get
+        {
+            if (Tool.ClientLogicManager == null) return null;
+            return Tool.ClientLogicManager.BattleTime;
+        }
+    }
 
-    public static ushort OwnEntityId => HasSession ? Session.OwnEntityId : (ushort)0;
+    public static ushort OwnEntityId
+    {
+        get
+        {
+            if (!HasSession) return 0;
+            return Session.OwnEntityId;
+        }
+    }
     private bool IsOwnEntity(int entityId) => HasSession && OwnEntityId == entityId;
 
     // ---- 独立子界面（大地图 / 上帝视角 / 抽卡）读取的战斗会话状态 ----
@@ -77,7 +98,14 @@ public class BattlePage : PageBase
     public void RefreshSkillBarNow() => RefreshSkillBar();
 
     // 技能栏挂在玩家栏里（UI_PlayerPanel.m_skill_list）
-    private UI_SkillList SkillBar => panel.m_playerPanel != null ? panel.m_playerPanel.m_skill_list : null;
+    private UI_SkillList SkillBar
+    {
+        get
+        {
+            if (panel.m_playerPanel == null) return null;
+            return panel.m_playerPanel.m_skill_list;
+        }
+    }
 
     public BattlePage(UI_BattlePanel panel) : base(panel)
     {
@@ -258,7 +286,8 @@ public class BattlePage : PageBase
     private void OnAiOpenSkillSelect(AiRequest request)
     {
         var skills = Skills;
-        var view = Tool.UIManager != null ? Tool.UIManager.SkillSelect : null;
+        SkillSelectView view = null;
+        if (Tool.UIManager != null) view = Tool.UIManager.SkillSelect;
         if (skills == null || view == null)
         {
             request.Reject("技能选择界面未就绪");
@@ -282,7 +311,8 @@ public class BattlePage : PageBase
     // 抽卡界面用服务器种子铺卡，卡面要等种子回来，回复也等到那时
     private void OnAiOpenCardPanel(AiRequest request)
     {
-        var view = Tool.UIManager != null ? Tool.UIManager.SelectCard : null;
+        SelectCardView view = null;
+        if (Tool.UIManager != null) view = Tool.UIManager.SelectCard;
         if (view == null)
         {
             request.Reject("抽卡界面未就绪");
@@ -293,7 +323,8 @@ public class BattlePage : PageBase
 
     private void OnAiSelectCard(AiRequest request)
     {
-        var view = Tool.UIManager != null ? Tool.UIManager.SelectCard : null;
+        SelectCardView view = null;
+        if (Tool.UIManager != null) view = Tool.UIManager.SelectCard;
         if (view == null)
         {
             request.Reject("抽卡界面未就绪");
@@ -362,7 +393,8 @@ public class BattlePage : PageBase
         }
         if (!HasSession) return;
         int entityId = Session.GetEntityId(state.senderClientId);
-        var players = Tool.ClientLogicManager != null ? Tool.ClientLogicManager.EntityPlayers : null;
+        EntityPlayerManager players = null;
+        if (Tool.ClientLogicManager != null) players = Tool.ClientLogicManager.EntityPlayers;
         if (entityId > 0 && players != null && players.TryGetEntityPosition((ushort)entityId, out var position))
             state.anchor = position;
     }
@@ -371,7 +403,7 @@ public class BattlePage : PageBase
     {
         quickMessages.Clear();
         quickMessageMarks.Clear();
-        panel.m_Minimap?.ClearQuickMessages();
+        if (panel.m_Minimap != null) panel.m_Minimap.ClearQuickMessages();
         if (Tool.UIManager != null) Tool.UIManager.LargeMinimap.ClearQuickMessages();
     }
 
@@ -422,9 +454,11 @@ public class BattlePage : PageBase
         localPlayerCamp = -1;
         localAvatarSet = false;
         spectatorMode = Session != null && Session.IsSpectator;
-        lastOwnEntityId = Session != null ? Session.OwnEntityId : (ushort)0;
+        if (Session != null) lastOwnEntityId = Session.OwnEntityId;
+        else lastOwnEntityId = 0;
         localPlayerAlive = !spectatorMode;
-        panel.m_onlook.selectedIndex = spectatorMode ? 1 : 0; // onlook=1：FGUI 自动隐藏血条/技能等非观战元素
+        if (spectatorMode) panel.m_onlook.selectedIndex = 1; // onlook=1：FGUI 自动隐藏血条/技能等非观战元素
+        else panel.m_onlook.selectedIndex = 0;
         if (panel.m_onlookComboBox != null) panel.m_onlookComboBox.onChanged.Set(OnOnlookComboBoxChanged);
         if (NetworkManager.HasCampAliveCount) RefreshCampAliveCount(NetworkManager.LatestCampAliveCount); // 进入战斗先填一次缓存值，随后由变更包刷新
         // 首页/大厅展示的选角预览模型只属于那两个界面，进战斗前清掉（否则会残留在地图的预览锚点上）
@@ -443,9 +477,9 @@ public class BattlePage : PageBase
         TipHost.Hide();
         localBuffs.Clear();
         panel.m_playerPanel.m_buffList.m_list.numItems = 0;
-        panel.m_Minimap?.Reset(GlobalVariable.L(global_variablesEnum.minimap_view_radius)[0]); //每局回到默认档（首档），与服务器 ClearBattleState 对齐
+        if (panel.m_Minimap != null) panel.m_Minimap.Reset(GlobalVariable.L(global_variablesEnum.minimap_view_radius)[0]); //每局回到默认档（首档），与服务器 ClearBattleState 对齐
         ResetCardState();
-        Skills?.ResetBattle();
+        if (Skills != null) Skills.ResetBattle();
         BuildSkillSlots();
         RefreshTimeIcon();
         BindAiCommands();
@@ -553,7 +587,7 @@ public class BattlePage : PageBase
     {
         RemoveEntityBar((ushort)entityId);
         entityVitals.Remove((ushort)entityId);
-        panel.m_Minimap?.Remove((ushort)entityId);
+        if (panel.m_Minimap != null) panel.m_Minimap.Remove((ushort)entityId);
 
         if (lastOwnEntityId != 0 && entityId == lastOwnEntityId)
         {
@@ -588,7 +622,8 @@ public class BattlePage : PageBase
                 if (currentEntity != spectateTargetEntityId)
                 {
                     spectateTargetEntityId = currentEntity;
-                    spectatePendingSince = HasSpectateView(currentEntity) ? 0f : Time.time;
+                    if (HasSpectateView(currentEntity)) spectatePendingSince = 0f;
+                    else spectatePendingSince = Time.time;
                 }
                 // 目标实体视图未建（目标已死亡 / 表现数据没到）：3 秒后重选
                 if (HasSpectateView(spectateTargetEntityId)) spectatePendingSince = 0f;
@@ -625,11 +660,16 @@ public class BattlePage : PageBase
         if (targetClientId == -1) return;
         spectateTargetClientId = targetClientId;
         spectateTargetEntityId = ResolveSpectateEntityId(targetClientId);
-        spectatePendingSince = HasSpectateView(spectateTargetEntityId) ? 0f : Time.time;
+        if (HasSpectateView(spectateTargetEntityId)) spectatePendingSince = 0f;
+        else spectatePendingSince = Time.time;
         NetworkManager.RequestSpectate(targetClientId);
     }
 
-    private int ResolveSpectateEntityId(int clientId) => HasSession ? Session.GetEntityId(clientId) : -1;
+    private int ResolveSpectateEntityId(int clientId)
+    {
+        if (!HasSession) return -1;
+        return Session.GetEntityId(clientId);
+    }
 
     private static bool HasSpectateView(int entityId)
     {
@@ -686,9 +726,10 @@ public class BattlePage : PageBase
     // 技能栏条目数 = 本局角色技能槽位数
     private void BuildSkillSlots()
     {
-        int count = Skills != null ? Skills.SlotCapacity : 0;
+        int count = 0;
+        if (Skills != null) count = Skills.SlotCapacity;
         if (count <= 0) count = 1; // 观战/属性取不到时至少露出一格
-        SkillBar?.Build(count);
+        if (SkillBar != null) SkillBar.Build(count);
         RefreshSkillBar();
     }
 
@@ -698,10 +739,11 @@ public class BattlePage : PageBase
         if (SkillBar == null || !SkillBar.IsBuilt) return;
         skillSlots.Clear();
         int count = SkillBar.SlotCount;
-        var recharge = Skills != null ? Skills.Recharge : null;
+        ClientSkillManager skills = Skills;
         for (int i = 0; i < count; i++)
         {
-            int skillId = Skills != null ? Skills.GetSlotSkillId(i) : -1;
+            int skillId = -1;
+            if (skills != null) skillId = skills.GetSlotSkillId(i);
             if (skillId < 0)
             {
                 skillSlots.Add(new UI_SkillList.Slot(-1, 1f, 0, true));
@@ -709,12 +751,18 @@ public class BattlePage : PageBase
             }
             // 无限库存没有充能概念，不显示次数
             bool unlimited = SkillManager.GetSkillStore(skillId) < 0;
-            skillSlots.Add(new UI_SkillList.Slot(skillId,
-                unlimited || recharge == null ? 1f : recharge.GetCycleProgress(skillId),
-                unlimited || recharge == null ? 0 : recharge.GetStore(skillId),
-                unlimited));
+            float progress = 1f;
+            int store = 0;
+            if (!unlimited && skills != null)
+            {
+                progress = skills.Recharge.GetCycleProgress(skillId);
+                store = skills.Recharge.GetStore(skillId);
+            }
+            skillSlots.Add(new UI_SkillList.Slot(skillId, progress, store, unlimited));
         }
-        SkillBar.Refresh(skillSlots, Skills != null ? Skills.SelectedSlot : 0);
+        int selected = 0;
+        if (skills != null) selected = skills.SelectedSlot;
+        SkillBar.Refresh(skillSlots, selected);
     }
 
     #region 守护点（主点 + 3 个副点）
@@ -758,7 +806,7 @@ public class BattlePage : PageBase
         if (guardian.m_health_percentage != null) guardian.m_health_percentage.text = $"{Mathf.RoundToInt(ratio * 100f)}%";
         // 守护层数 = 还没被打掉的副点数量
         if (guardian.m_protection_layer_count != null) guardian.m_protection_layer_count.text = AliveSubCount().ToString();
-        SetGuardianBarFill(guardian.m_bar?.m_fill, ratio);
+        if (guardian.m_bar != null) SetGuardianBarFill(guardian.m_bar.m_fill, ratio);
     }
 
     private void ApplySubGuardian(UI_SubGuardianPanel guardian, int index)
@@ -767,15 +815,20 @@ public class BattlePage : PageBase
         float ratio = GuardRatio(index, out _, out _);
         if (guardian.m_guardian_name != null) guardian.m_guardian_name.text = GlobalConfig.GuardPointConfig(index).name;
         if (guardian.m_health_percentage != null) guardian.m_health_percentage.text = $"{Mathf.RoundToInt(ratio * 100f)}%";
-        if (guardian.m_killed != null) guardian.m_killed.selectedIndex = ratio <= 0f ? 1 : 0;
-        SetGuardianBarFill(guardian.m_bar?.m_fill, ratio);
+        if (guardian.m_killed != null)
+        {
+            if (ratio <= 0f) guardian.m_killed.selectedIndex = 1;
+            else guardian.m_killed.selectedIndex = 0;
+        }
+        if (guardian.m_bar != null) SetGuardianBarFill(guardian.m_bar.m_fill, ratio);
     }
 
     // 血量未知（守护点还没生成）按满血算，避免开局显示成空槽
     private float GuardRatio(int index, out int health, out int max)
     {
         max = Mathf.Max(1, Mathf.RoundToInt(GlobalConfig.GuardPointMaxHealth(index, guardianHealthScale)));
-        health = guardianHealth[index] < 0 ? max : guardianHealth[index];
+        if (guardianHealth[index] < 0) health = max;
+        else health = guardianHealth[index];
         return Mathf.Clamp01((float)health / max);
     }
 
@@ -801,7 +854,11 @@ public class BattlePage : PageBase
         if (playerPanel == null) return;
         var vitals = ResolveVitals(info);
         if (playerPanel.m_bar_health != null && playerPanel.m_bar_health.m_fill != null)
-            playerPanel.m_bar_health.m_fill.fillAmount = vitals.maxHealth > 0 ? Mathf.Clamp01((float)vitals.health / vitals.maxHealth) : 0f;
+        {
+            float healthRatio = 0f;
+            if (vitals.maxHealth > 0) healthRatio = Mathf.Clamp01((float)vitals.health / vitals.maxHealth);
+            playerPanel.m_bar_health.m_fill.fillAmount = healthRatio;
+        }
         if (playerPanel.m_label_health != null) playerPanel.m_label_health.text = $"{vitals.health}/{vitals.maxHealth}";
         if (info.hasBuffs) RefreshBuffList(playerPanel.m_buffList.m_list, localBuffs, info.buffs);
     }
@@ -810,9 +867,9 @@ public class BattlePage : PageBase
     private void RefreshPlayerAvatar(SCEntityDisplayInfo info)
     {
         if (localAvatarSet && localAvatarType.Equals(info.type)) return;
-        var icons = info.camp == EntityCamp.Defense
-            ? Tool.ResourceManager.DefenseCharacterIcons
-            : Tool.ResourceManager.AttackCharacterIcons;
+        List<Texture2D> icons;
+        if (info.camp == EntityCamp.Defense) icons = Tool.ResourceManager.DefenseCharacterIcons;
+        else icons = Tool.ResourceManager.AttackCharacterIcons;
         panel.m_playerPanel.m_avater_icon_mask.m_content.texture = new NTexture(icons[info.type.value]);
         localAvatarType = info.type;
         localAvatarSet = true;
@@ -840,29 +897,36 @@ public class BattlePage : PageBase
         if (row == null) return;
         if (row.m_member_count != null) row.m_member_count.text = count.ToString();
         if (row.m_is_in_tis_camp != null)
-            row.m_is_in_tis_camp.selectedIndex = row.m_c1 != null && row.m_c1.selectedIndex == localPlayerCamp ? 1 : 0;
+        {
+            bool sameCamp = row.m_c1 != null && row.m_c1.selectedIndex == localPlayerCamp;
+            if (sameCamp) row.m_is_in_tis_camp.selectedIndex = 1;
+            else row.m_is_in_tis_camp.selectedIndex = 0;
+        }
     }
 
     private void OnMinimapUpdate(SCMinimapEntity e)
     {
         // 每个实体一个独立包：只登记坐标与类别，换算和显隐交给小地图自身
-        panel.m_Minimap?.Push(new UI_Minimap.Point(e.entityId, e.type.category, e.type, e.camp,
+        if (panel.m_Minimap == null) return;
+        panel.m_Minimap.Push(new UI_Minimap.Point(e.entityId, e.type.category, e.type, e.camp,
             e.marked, IsOwnEntity(e.entityId), new Vector2(e.posX, e.posZ)), (EntityCamp)localPlayerCamp);
     }
 
     //F 键切换雷达显示半径：服务器权威回应，客户端换用新半径做裁剪与缩放（点位下一帧即按新半径重排）
     private void OnMinimapRadiusUpdate(float radius)
     {
-        panel.m_Minimap?.SetRadius(radius);
+        if (panel.m_Minimap == null) return;
+        panel.m_Minimap.SetRadius(radius);
     }
 
     // 圆心与自身朝向的取数在这边（相机/会话/实体表现都在战斗页的依赖里），换算与绘制全在小地图自身
     private void TickMinimap()
     {
+        if (panel.m_Minimap == null) return;
         bool hasCenter = TryGetMinimapCenter(out var center);
         bool hasYaw = TryGetSelfYaw(out float yaw);
-        panel.m_Minimap?.Tick(center, hasCenter, yaw, hasYaw);
-        panel.m_Minimap?.TickQuickMessages(quickMessageMarks, center, hasCenter);
+        panel.m_Minimap.Tick(center, hasCenter, yaw, hasYaw);
+        panel.m_Minimap.TickQuickMessages(quickMessageMarks, center, hasCenter);
     }
 
     // 小地图：点小地图上的按钮打开大地图，关闭走大地图自己的底框按钮
@@ -998,7 +1062,8 @@ public class BattlePage : PageBase
         // 只拿死亡次数：复活总时长由客户端读配表算，progress 只作为起点（重连补发时非 0）
         var revive = ReviveTimeConfig.GetClamped(Mathf.Max(1, info.deathCount));
         bool isAttack = Session.Camp == EntityCamp.Attack;
-        reviveDuration = isAttack ? revive.attackReviveSeconds : revive.defenseReviveSeconds;
+        if (isAttack) reviveDuration = revive.attackReviveSeconds;
+        else reviveDuration = revive.defenseReviveSeconds;
         reviveElapsed = Mathf.Clamp01(info.progress) * reviveDuration;
         reviveActive = true;
         panel.m_showRegenerationBar.selectedIndex = 1;
@@ -1037,17 +1102,20 @@ public class BattlePage : PageBase
             panel.m_world_element_container.AddChild(bar); // 挂在世界层：压在战斗界面各元素之下
             entityBars[info.entityId] = bar;
         }
-        string name = withName && HasSession ? Session.GetNameByEntity(info.entityId) : "";
+        string name = "";
+        if (withName && HasSession) name = Session.GetNameByEntity(info.entityId);
         var vitals = ResolveVitals(info);
-        bar.Bind(vitals.health, vitals.maxHealth, info.camp, (EntityCamp)localPlayerCamp, name,
-            info.hasBuffs ? ToBarBuffs(info.buffs) : null);
+        IReadOnlyList<UI_EntityBar.Buff> buffs = null;
+        if (info.hasBuffs) buffs = ToBarBuffs(info.buffs);
+        bar.Bind(vitals.health, vitals.maxHealth, info.camp, (EntityCamp)localPlayerCamp, name, buffs);
     }
 
     // 血量段只在置脏/全量包携带：带则刷新缓存，不带则沿用上次值（首见包必为全量）
     private (int health, int maxHealth) ResolveVitals(SCEntityDisplayInfo info)
     {
         if (info.hasHealth) entityVitals[info.entityId] = (info.health, info.maxHealth);
-        return entityVitals.TryGetValue(info.entityId, out var vitals) ? vitals : default;
+        if (entityVitals.TryGetValue(info.entityId, out var vitals)) return vitals;
+        return default;
     }
 
     // 协议 buff 列表 → 血条条目数据（复用缓冲，避免每个摘要包都分配）
@@ -1149,7 +1217,8 @@ public class BattlePage : PageBase
 
     private void RefreshTimeIcon()
     {
-        var dayNight = panel.m_BattleInfoPanel != null ? panel.m_BattleInfoPanel.m_display_day_night : null;
+        UI_DayNight dayNight = null;
+        if (panel.m_BattleInfoPanel != null) dayNight = panel.m_BattleInfoPanel.m_display_day_night;
         if (dayNight == null || dayNight.m_pointer == null) return;
         // 用单调的 CycleTime 驱动整圈旋转；Time01 是亮度三角波，会在正午/午夜折返
         dayNight.m_pointer.rotation = 180f - BattleManager.CycleTime * 180f;
@@ -1187,8 +1256,16 @@ public class BattlePage : PageBase
         int need = CharacterExpConfig.NeedExp(cardLevel + 1);
         playerPanel.m_label_level.text = cardLevel.ToString();
         if (playerPanel.m_bar_exp != null && playerPanel.m_bar_exp.m_fill != null)
-            playerPanel.m_bar_exp.m_fill.fillAmount = need > 0 ? Mathf.Clamp01((float)cardExp / need) : 1f;
-        if (playerPanel.m_label_exp != null) playerPanel.m_label_exp.text = need > 0 ? $"{cardExp}/{need}" : "MAX";
+        {
+            float expRatio = 1f;
+            if (need > 0) expRatio = Mathf.Clamp01((float)cardExp / need);
+            playerPanel.m_bar_exp.m_fill.fillAmount = expRatio;
+        }
+        if (playerPanel.m_label_exp != null)
+        {
+            if (need > 0) playerPanel.m_label_exp.text = $"{cardExp}/{need}";
+            else playerPanel.m_label_exp.text = "MAX";
+        }
     }
 
     private void ResetCardState()

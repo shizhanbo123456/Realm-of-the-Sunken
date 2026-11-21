@@ -119,7 +119,9 @@ public class GmPanel : PageBase
         curId = subIds[index];
         Refresh(panel.m_secondMenu.m_button_list, subIds.Count); // 重刷二级菜单，否则上一个子项的高亮会残留
         var row = GmCommandConfig.Get(curId);
-        Refresh(panel.m_GmItemList, row.paramType.HasValue ? 3 : 2);
+        int itemCount = 2;
+        if (row.paramType.HasValue) itemCount = 3;
+        Refresh(panel.m_GmItemList, itemCount);
     }
 
     private void ClearItems() => Refresh(panel.m_GmItemList, 0);
@@ -188,7 +190,8 @@ public class GmPanel : PageBase
     {
         if (curId < 0 || !GmCommandConfig.content.TryGetValue(curId, out var row)) return;
 
-        string raw = row.paramType.HasValue && ItemAt(1) is UI_GmItem input ? input.m_input.text : string.Empty;
+        string raw = string.Empty;
+        if (row.paramType.HasValue && ItemAt(1) is UI_GmItem input) raw = input.m_input.text;
         if (!GmCommandRunner.TryParseParam(row, raw, out var arg, out string error))
         {
             string msg = $"{row.subMenuName} 参数解析失败：{error}（输入：{raw}）";

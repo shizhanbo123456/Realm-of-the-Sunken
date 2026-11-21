@@ -197,7 +197,9 @@ public class ChatPlugin : PageBase
     // 输入框与 AI 命令共用的发送入口：校验 → 本地回显 → 发包，返回拦截原因
     private ChatSendResult Submit(int channel, string content)
     {
-        content = (content ?? "").Trim();
+        string text = content;
+        if (text == null) text = "";
+        content = text.Trim();
         // 长度按协议字节数算：StringSerializer.GetLength 含 1 字节长度头，减掉才是正文字节数
         int byteLength = StringSerializer.GetLength(content) - 1;
         int minLength = (int)GlobalVariable.RangeMin(global_variablesEnum.chat_message_length);
@@ -243,7 +245,9 @@ public class ChatPlugin : PageBase
     // 系统页签的输入按 GM 命令处理：「命令名 副命令 [参数]」，如 player tp 10,20,30
     private void TrySendGmCommand(string raw)
     {
-        string[] tokens = (raw ?? string.Empty).Split(new[] { ' ', '\t', '\u3000' }, System.StringSplitOptions.RemoveEmptyEntries);
+        string line = raw;
+        if (line == null) line = string.Empty;
+        string[] tokens = line.Split(new[] { ' ', '\t', '\u3000' }, System.StringSplitOptions.RemoveEmptyEntries);
         if (tokens.Length < 2)
         {
             AppendSystem("GM 命令格式：命令名 副命令 [参数]（如 debug delay 200）");
@@ -285,7 +289,8 @@ public class ChatPlugin : PageBase
         }
         if (count != 1)
         {
-            error = count == 0 ? "缺少参数" : ParamHint(row);
+            if (count == 0) error = "缺少参数";
+            else error = ParamHint(row);
             return string.Empty;
         }
         return tokens[2];
@@ -295,7 +300,8 @@ public class ChatPlugin : PageBase
     private static string ParamHint(gm_command row)
     {
         bool isVector = row.paramType == GmCommandRunner.ParamVector2 || row.paramType == GmCommandRunner.ParamVector3;
-        return isVector ? "只接受一个参数，Vector 写成 (x,y) 或 x,y，不要用空格分隔" : "只接受一个参数";
+        if (isVector) return "只接受一个参数，Vector 写成 (x,y) 或 x,y，不要用空格分隔";
+        return "只接受一个参数";
     }
 
     // 拦截原因对应的配表提示；冷却不配文案，调用方自行处理
@@ -312,7 +318,8 @@ public class ChatPlugin : PageBase
         get
         {
             var loading = ClientLoadingManager.Current;
-            return loading != null && loading.HasSession ? loading.OwnEntityId : (ushort)0;
+            if (loading != null && loading.HasSession) return loading.OwnEntityId;
+            return 0;
         }
     }
 
@@ -338,9 +345,11 @@ public class ChatPlugin : PageBase
         if (report.camp != GetMyCamp() && !ShowEnemyDialog) return; // 与聊天同规则：阵营频道只显示同阵营
 
         bool isSelf = report.senderClientId == NetworkManager.LocalToken; // 自己没有本地回显，靠这条显示
-        string head = report.state == (int)EntityReportState.None
-            ? MessageVariable.F(message_variablesEnum.chat_health, report.healthPercent) // 真人上报不带状态
-            : MessageVariable.F(message_variablesEnum.chat_healthState, ReportStateText(report.state), report.healthPercent);
+        string head;
+        if (report.state == (int)EntityReportState.None)
+            head = MessageVariable.F(message_variablesEnum.chat_health, report.healthPercent); // 真人上报不带状态
+        else
+            head = MessageVariable.F(message_variablesEnum.chat_healthState, ReportStateText(report.state), report.healthPercent);
 
         AppendEntry(new ChatEntry()
         {
@@ -379,7 +388,8 @@ public class ChatPlugin : PageBase
 
         var loading = ClientLoadingManager.Current;
         if (loading == null || !loading.HasSession || loading.OwnEntityId == 0) return text; // 观战无自身实体：只报坐标
-        var players = Tool.ClientLogicManager != null ? Tool.ClientLogicManager.EntityPlayers : null;
+        EntityPlayerManager players = null;
+        if (Tool.ClientLogicManager != null) players = Tool.ClientLogicManager.EntityPlayers;
         if (players == null || !players.TryGetEntityPosition(loading.OwnEntityId, out var mine)) return text;
 
         float dx = position.x - mine.x;
@@ -460,7 +470,8 @@ public class ChatPlugin : PageBase
     private static string GetUnitName(int clientId)
     {
         var loading = ClientLoadingManager.Current;
-        return loading != null && loading.HasSession ? loading.GetName(clientId) : MessageVariable.F(message_variablesEnum.default_playerName, clientId);
+        if (loading != null && loading.HasSession) return loading.GetName(clientId);
+        return MessageVariable.F(message_variablesEnum.default_playerName, clientId);
     }
 
     private void RefreshList()
@@ -492,7 +503,8 @@ public class ChatPlugin : PageBase
     // 转发给 AI 的纯文本：不带 UBB 颜色标签
     private static string PlainLine(ChatEntry entry)
     {
-        string name = string.IsNullOrEmpty(entry.name) ? "#" + entry.senderClientId : entry.name;
+        string name = entry.name;
+        if (string.IsNullOrEmpty(name)) name = "#" + entry.senderClientId;
         return $"[{ChannelLabel(entry.channel)}][{(PlayerCampType)entry.camp}]{name}: {entry.content}";
     }
 
@@ -511,8 +523,8 @@ public class ChatPlugin : PageBase
     {
         if (obj is not UI_ChatItem item) return;
         if (index >= visibleChat.Count) { item.m_content.text = string.Empty; return; } // 回收中的旧 item 可能拿到越界索引
-        item.m_content.UBBEnabled = true;
-        item.m_content.text = visibleChat[index].channel == TabSystem ? SystemLine(index) : ChatLine(index);
+        if (visibleChat[index].channel == TabSystem) item.m_content.text = SystemLine(index);
+        else item.m_content.text = ChatLine(index);
     }
 
     // 频道名 + 发送者 + 内容，三段颜色都取自 InfoManager
@@ -522,7 +534,8 @@ public class ChatPlugin : PageBase
         var e = visibleChat[index];
         var info = RequireInfoManager();
         string channel = ChannelLabel(e.channel);
-        string name = string.IsNullOrEmpty(e.name) ? MessageVariable.F(message_variablesEnum.default_playerName, e.senderClientId) : e.name;
+        string name = e.name;
+        if (string.IsNullOrEmpty(name)) name = MessageVariable.F(message_variablesEnum.default_playerName, e.senderClientId);
         return $"[color=#{info.ChatChannelColorHex}][{channel}][/color] "
              + $"[color=#{info.ChatNameColorHex(e.camp)}]{name}[/color]: "
              + $"[color=#{info.ChatContentColorHex}]{e.content}[/color]";
@@ -563,7 +576,8 @@ public class ChatPlugin : PageBase
         if (!NetworkManager.HasLobbyInfo) return (int)PlayerCampType.Spectator;
         var info = NetworkManager.LatestLobbyInfo;
         int index = info.members.FindIndex(m => m.clientId == NetworkManager.LocalToken);
-        return index >= 0 ? info.members[index].camp : (int)PlayerCampType.Spectator;
+        if (index >= 0) return info.members[index].camp;
+        return (int)PlayerCampType.Spectator;
     }
 
     public string GetMyName()
@@ -571,7 +585,8 @@ public class ChatPlugin : PageBase
         var loading = ClientLoadingManager.Current;
         if (NetworkManager.BattleRunning && loading != null && loading.HasSession) return loading.GetName(NetworkManager.LocalToken);
         if (NetworkManager.TryGetLobbyPlayerName(NetworkManager.LocalToken, out var lobbyName)) return lobbyName;
-        return !string.IsNullOrEmpty(ClientSelection.playerName) ? ClientSelection.playerName : MessageVariable.F(message_variablesEnum.default_playerName, NetworkManager.LocalToken);
+        if (!string.IsNullOrEmpty(ClientSelection.playerName)) return ClientSelection.playerName;
+        return MessageVariable.F(message_variablesEnum.default_playerName, NetworkManager.LocalToken);
     }
     #endregion
 }

@@ -68,7 +68,15 @@ namespace Ros.UI.Main
         internal IReadOnlyDictionary<ushort, Point> CurrentPoints => points;
 
         // 自身点位：固定在雷达中心且永远置顶
-        private UI_MinimapItem SelfItem => selfId != 0 && items.TryGetValue(selfId, out var item) ? item : null;
+        private UI_MinimapItem SelfItem
+        {
+            get
+            {
+                if (selfId == 0) return null;
+                if (items.TryGetValue(selfId, out var item)) return item;
+                return null;
+            }
+        }
 
         // 每局进战斗：复位半径与点位、重算图标缩放、补建地形底图
         public void Reset(float defaultRadius)
@@ -135,7 +143,8 @@ namespace Ros.UI.Main
                 var point = pair.Value;
                 var item = EnsureItem(point);
                 item.m_type.selectedIndex = GetPage(point);
-                item.m_highlight.selectedIndex = point.marked ? 1 : 0; // 白眼标记随包同步
+                if (point.marked) item.m_highlight.selectedIndex = 1; // 白眼标记随包同步
+                else item.m_highlight.selectedIndex = 0;
                 if (!PlaceItem(item, point, center)) culledIds.Add(point.id);
             }
             foreach (var id in culledIds) Remove(id);
@@ -182,9 +191,9 @@ namespace Ros.UI.Main
             float py = item.pivot.y;
             float sx = item.scale.x;
             float sy = item.scale.y;
-            return item.pivotAsAnchor
-                ? new Vector2(item.width * sx * (0.5f - px), item.height * sy * (0.5f - py))
-                : new Vector2(item.width * (px * (1f - sx) + 0.5f * sx), item.height * (py * (1f - sy) + 0.5f * sy));
+            if (item.pivotAsAnchor)
+                return new Vector2(item.width * sx * (0.5f - px), item.height * sy * (0.5f - py));
+            return new Vector2(item.width * (px * (1f - sx) + 0.5f * sx), item.height * (py * (1f - sy) + 0.5f * sy));
         }
 
         // 实体类别 → 点位档位（0 自己 / 1 队友 / 2 敌人 / 3~9 场景与守卫），展开图与雷达共用
@@ -195,13 +204,16 @@ namespace Ros.UI.Main
                 case EntityCategory.Character_Attack:
                 case EntityCategory.Character_Defense:
                     if (self) return 0;
-                    return camp == myCamp ? 1 : 2;
+                    if (camp == myCamp) return 1;
+                    return 2;
                 case EntityCategory.NeutralStatue: return 3;
                 case EntityCategory.Coral: return 4;
                 case EntityCategory.CrystalStatue: return 5;
                 case EntityCategory.Zombie: return 6;
                 case EntityCategory.EliteZombie: return 7;
-                case EntityCategory.GuardStatue: return type == EntityType.KingStatue ? 8 : 9;
+                case EntityCategory.GuardStatue:
+                    if (type == EntityType.KingStatue) return 8;
+                    return 9;
                 default:
                     Debug.LogError($"[Minimap] 未处理的实体类别：{category}");
                     return 7;
@@ -299,7 +311,8 @@ namespace Ros.UI.Main
             float upper = 1f;
             for (GObject o = this; o != null && o.parent != GRoot.inst; o = o.parent)
                 if (o.scale.x > 0.0001f) upper *= o.scale.x;
-            itemScale = upper > 0.0001f ? 1f / upper : 1f;
+            if (upper > 0.0001f) itemScale = 1f / upper;
+            else itemScale = 1f;
         }
 
         // 遮罩内创建地形底图 Loader：只建一次，被重建时补建

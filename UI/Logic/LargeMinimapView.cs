@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Ros.Config;
 using Ros.UI.Main;
 
@@ -27,7 +28,9 @@ public class LargeMinimapView : PageBase
         var battle = Battle;
         if (battle == null) return;
         bool hasYaw = battle.TryGetSelfYaw(out float yaw);
-        panel.Refresh(battle.Minimap != null ? battle.Minimap.CurrentPoints : null, battle.MyCamp, yaw, hasYaw);
+        IReadOnlyDictionary<ushort, UI_Minimap.Point> points = null;
+        if (battle.Minimap != null) points = battle.Minimap.CurrentPoints;
+        panel.Refresh(points, battle.MyCamp, yaw, hasYaw);
         panel.RefreshQuickMessages(battle.QuickMarks);
     }
 
@@ -51,5 +54,12 @@ public class LargeMinimapView : PageBase
 
     public void ClearQuickMessages() => panel.ClearQuickMessages();
 
-    private static BattlePage Battle => Tool.UIManager != null ? Tool.UIManager.Battle : null;
+    private static BattlePage Battle
+    {
+        get
+        {
+            if (Tool.UIManager == null) return null;
+            return Tool.UIManager.Battle;
+        }
+    }
 }

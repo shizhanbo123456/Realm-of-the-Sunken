@@ -14,7 +14,14 @@ public class SettingsView : PageBase
 
     private UI_SettingsPanel panel;
 
-    private UI_SettingScrollView View => panel != null ? panel.m_settings.GetChildAt(0) as UI_SettingScrollView : null;
+    private UI_SettingScrollView View
+    {
+        get
+        {
+            if (panel == null) return null;
+            return panel.m_settings.GetChildAt(0) as UI_SettingScrollView;
+        }
+    }
 
     public bool IsOpen => IsVisible;
 
@@ -36,18 +43,39 @@ public class SettingsView : PageBase
         panel.m_panel.m_close.onClick.Set(CloseSelf); // 底框关闭按钮
         View.m_back_to_fight.onClick.Set(CloseSelf);
         View.m_back.onClick.Set(CloseSelf);
-        View.m_exit.onClick.Set(() => OnExit?.Invoke());
-        View.m_open_rule.onClick.Set(() => OnOpenRule?.Invoke());
-        View.m_open_guide.onClick.Set(() => OnOpenGuide?.Invoke());
-        View.m_open_bridge.onClick.Set(() => OnOpenBridge?.Invoke());
+        View.m_exit.onClick.Set(InvokeExit);
+        View.m_open_rule.onClick.Set(InvokeOpenRule);
+        View.m_open_guide.onClick.Set(InvokeOpenGuide);
+        View.m_open_bridge.onClick.Set(InvokeOpenBridge);
 
         BindToggles();
+    }
+
+    private void InvokeExit()
+    {
+        if (OnExit != null) OnExit();
+    }
+
+    private void InvokeOpenRule()
+    {
+        if (OnOpenRule != null) OnOpenRule();
+    }
+
+    private void InvokeOpenGuide()
+    {
+        if (OnOpenGuide != null) OnOpenGuide();
+    }
+
+    private void InvokeOpenBridge()
+    {
+        if (OnOpenBridge != null) OnOpenBridge();
     }
 
     public override void Enter(ShowParam param)
     {
         base.Enter(param);
-        View.m_in_server.selectedIndex = NetworkManager.IsConnected ? 1 : 0; // 0 未连服务器 / 1 已连服务器
+        if (NetworkManager.IsConnected) View.m_in_server.selectedIndex = 1;
+        else View.m_in_server.selectedIndex = 0; // 0 未连服务器 / 1 已连服务器
         SyncToggles();
     }
 

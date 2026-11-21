@@ -57,7 +57,8 @@ namespace Ros.UI.Main
         private void RenderSlot(int index, GObject obj)
         {
             if (obj is not UI_SkillListItem slot) return;
-            Slot data = index < slots.Count ? slots[index] : new Slot(-1, 1f, 0, true);
+            Slot data = new Slot(-1, 1f, 0, true);
+            if (index < slots.Count) data = slots[index];
             slot.Fill(data, index == selectedSlot);
         }
 
@@ -65,9 +66,11 @@ namespace Ros.UI.Main
         internal static Texture ResolveIcon(int skillId)
         {
             if (skillId < 0) return null;
-            var map = Tool.ResourceManager != null ? Tool.ResourceManager.SkillIconMap : null;
+            Dictionary<int, Texture> map = null;
+            if (Tool.ResourceManager != null) map = Tool.ResourceManager.SkillIconMap;
             if (map == null) return null;
-            return map.TryGetValue(skillId, out var icon) ? icon : null; // 没配图标 → 不显示
+            if (map.TryGetValue(skillId, out var icon)) return icon; // 没配图标 → 不显示
+            return null;
         }
 
         // 列表宽度 = 全部条目宽度之和（FGUI 里是横向单行、不会自己撑开）

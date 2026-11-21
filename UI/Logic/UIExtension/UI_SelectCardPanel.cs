@@ -66,7 +66,7 @@ namespace Ros.UI.Main
 
         private void PlayFadeIn()
         {
-            fadeTween?.Kill();
+            if (fadeTween != null) fadeTween.Kill();
             alpha = 0f;
             fadeTween = GTween.To(0f, 1f, PanelFadeDuration).OnUpdate(t => alpha = t.value.x);
         }
@@ -109,7 +109,7 @@ namespace Ros.UI.Main
 
         private void HideImmediately()
         {
-            fadeTween?.Kill();
+            if (fadeTween != null) fadeTween.Kill();
             fadeTween = null;
             revealToken++;
             visible = false;
@@ -138,7 +138,7 @@ namespace Ros.UI.Main
             if (!IsOpen) return;
             var action = onClose;
             Close();
-            action?.Invoke();
+            if (action != null) action.Invoke();
         }
 
         // 选中后收面板还是就地等下一组，由调用方决定（这里不再自行关闭）
@@ -169,12 +169,18 @@ namespace Ros.UI.Main
             face.m_level.selectedIndex = (int)roll.tier;
             if (face.m_title != null) face.m_title.text = roll.title;
             if (face.m_des != null) face.m_des.text = roll.description;
-            if (face.m_show_skill_display != null) face.m_show_skill_display.selectedIndex = roll.IsSkill ? 1 : 0;
+            if (face.m_show_skill_display != null)
+            {
+                if (roll.IsSkill) face.m_show_skill_display.selectedIndex = 1;
+                else face.m_show_skill_display.selectedIndex = 0;
+            }
 
-            Texture icon = roll.IsSkill ? UI_SkillList.ResolveIcon(roll.skillId) : null;
+            Texture icon = null;
+            if (roll.IsSkill) icon = UI_SkillList.ResolveIcon(roll.skillId);
             if (face.m_skillpreview != null && face.m_skillpreview.m_loader_icon != null)
             {
-                face.m_skillpreview.m_loader_icon.texture = icon != null ? new NTexture(icon) : null;
+                if (icon != null) face.m_skillpreview.m_loader_icon.texture = new NTexture(icon);
+                else face.m_skillpreview.m_loader_icon.texture = null;
                 face.m_skillpreview.m_loader_icon.visible = icon != null;
             }
 

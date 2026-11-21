@@ -1,4 +1,5 @@
-﻿using FairyGUI;
+﻿using System.Collections.Generic;
+using FairyGUI;
 using UnityEngine;
 
 using Ros.Config;
@@ -13,11 +14,14 @@ namespace Ros.UI.Main
         public void Fill(int buffType, int level)
         {
             var cfg = EffectConfig.Get(buffType);
-            m_negative.selectedIndex = cfg.positive == true ? 0 : 1; // 0 正面 / 1 负面
+            if (cfg.positive == true) m_negative.selectedIndex = 0; // 0 正面
+            else m_negative.selectedIndex = 1;                      // 1 负面
             Texture icon = null;
-            var map = Tool.ResourceManager != null ? Tool.ResourceManager.BuffIconMap : null;
+            Dictionary<int, Texture> map = null;
+            if (Tool.ResourceManager != null) map = Tool.ResourceManager.BuffIconMap;
             if (map != null && map.TryGetValue(cfg.iconId, out var tex)) icon = tex;
-            m_mask.m_loader.texture = icon != null ? new NTexture(icon) : null; // 没配图标 → 不显示
+            if (icon != null) m_mask.m_loader.texture = new NTexture(icon); // 没配图标 → 不显示
+            else m_mask.m_loader.texture = null;
             // level 即显示层数：逐层计时类 = 各层等级之和，单层类 = 该条等级（服务端已聚合）
             m_layer_count.text = level.ToString();
 

@@ -117,7 +117,7 @@ namespace Ros.UI.Main
                     throw new FormatException($"[助理表情] 第 {row.key} 条的图片档位 {row.image} 超出控制器 m_c1 的 0~{m_graphic.m_c1.pageCount - 1} 页");
 
                 // 权重只认该动画第一个非零值；后续帧重复填同一个权重属冗余，忽略
-                if (clip.weight == 0) clip.weight = row.weight ?? 0;
+                if (clip.weight == 0 && row.weight.HasValue) clip.weight = row.weight.Value;
 
                 clip.frames.Add(row);
             }

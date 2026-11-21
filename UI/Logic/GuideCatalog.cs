@@ -50,12 +50,13 @@ public static class GuideCatalog
             var skill = pair.Value;
             var icon = SkillIcon(skill.key);
             if (icon == null) continue; // 无图标的是非玩家技能，不进图鉴
-            string store = skill.storeLimit < 0
-                ? MessageVariable.V(message_variablesEnum.guide_storeUnlimited)
-                : skill.storeLimit.ToString();
+            string store;
+            if (skill.storeLimit < 0) store = MessageVariable.V(message_variablesEnum.guide_storeUnlimited);
+            else store = skill.storeLimit.ToString();
             string des = MessageVariable.F(message_variablesEnum.guide_skillDesc, skill.description, skill.cd, store);
-            list.Add(new Entry(skill.name, des, icon,
-                SkillConfig.QualityRank(skill), skill.scores != null ? skill.scores.ToArray() : null));
+            int[] scores = null;
+            if (skill.scores != null) scores = skill.scores.ToArray();
+            list.Add(new Entry(skill.name, des, icon, SkillConfig.QualityRank(skill), scores));
         }
         return list;
     }
@@ -73,14 +74,20 @@ public static class GuideCatalog
 
     private static Texture SkillIcon(int skillId)
     {
-        var map = Tool.ResourceManager != null ? Tool.ResourceManager.SkillIconMap : null;
-        return map != null && map.TryGetValue(skillId, out var tex) ? tex : null;
+        Dictionary<int, Texture> map = null;
+        if (Tool.ResourceManager != null) map = Tool.ResourceManager.SkillIconMap;
+        if (map == null) return null;
+        if (map.TryGetValue(skillId, out var tex)) return tex;
+        return null;
     }
 
     private static Texture BuffIcon(int iconId)
     {
-        var map = Tool.ResourceManager != null ? Tool.ResourceManager.BuffIconMap : null;
-        return map != null && map.TryGetValue(iconId, out var tex) ? tex : null;
+        Dictionary<int, Texture> map = null;
+        if (Tool.ResourceManager != null) map = Tool.ResourceManager.BuffIconMap;
+        if (map == null) return null;
+        if (map.TryGetValue(iconId, out var tex)) return tex;
+        return null;
     }
 
     private static List<KeyValuePair<int, T>> SortedKeys<T>(Dictionary<int, T> source)

@@ -186,7 +186,8 @@ public abstract class PageBase
 
     public Vector2 WorldToPanel(Vector3 worldPos, Camera camera = null)
     {
-        var cam = camera != null ? camera : Camera.main;
+        Camera cam = camera;
+        if (cam == null) cam = Camera.main;
         if (cam == null) return Vector2.zero;
         var screen = cam.WorldToScreenPoint(worldPos);
         // Unity 屏幕 y 轴向上（原点左下），FGUI 局部 y 轴向下（原点左上），需翻转

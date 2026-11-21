@@ -49,7 +49,7 @@ namespace Ros.UI.Main
         {
             bool wasOpen = IsOpen;
             Close();
-            if (wasOpen) onCommit?.Invoke();
+            if (wasOpen && onCommit != null) onCommit.Invoke();
         }
 
         // 只收起（进/出战斗重置用）；勾选留到下次 Open 重置为当前技能栏，关闭回调还要读它
@@ -79,7 +79,8 @@ namespace Ros.UI.Main
             Texture icon = UI_SkillList.ResolveIcon(skillId);
             if (item.m_loader_icon != null)
             {
-                item.m_loader_icon.texture = icon != null ? new NTexture(icon) : null;
+                if (icon != null) item.m_loader_icon.texture = new NTexture(icon);
+                else item.m_loader_icon.texture = null;
                 item.m_loader_icon.visible = icon != null;
             }
             item.selected = selection.Contains(skillId);

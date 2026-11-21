@@ -29,7 +29,11 @@ public class SelectCardView : PageBase
     public bool IsOpen => IsVisible;
 
     // AI 查询用：某档还剩几次待抽
-    public int AiPendingCount(int tier) => tier >= 0 && tier < pending.Length ? pending[tier] : 0;
+    public int AiPendingCount(int tier)
+    {
+        if (tier < 0 || tier >= pending.Length) return 0;
+        return pending[tier];
+    }
 
     // AI 开面板：卡面要等服务器种子，回复也延迟到铺好那一刻
     public void OpenForAi(int tier, Action<string> reply)
@@ -58,7 +62,8 @@ public class SelectCardView : PageBase
         }
         if (index < 0 || index >= currentRolls.Count)
         {
-            error = currentRolls.Count == 0 ? "卡面还没铺开" : $"卡面下标只能是 0~{currentRolls.Count - 1}";
+            if (currentRolls.Count == 0) error = "卡面还没铺开";
+            else error = $"卡面下标只能是 0~{currentRolls.Count - 1}";
             return false;
         }
         error = null;
@@ -70,7 +75,7 @@ public class SelectCardView : PageBase
     {
         var reply = aiReply;
         aiReply = null;
-        reply?.Invoke(text);
+        if (reply != null) reply.Invoke(text);
     }
 
     private static string CardText(List<CardRoll> rolls, CardTier tier, int luck)
@@ -185,7 +190,8 @@ public class SelectCardView : PageBase
     // 用种子抽一组卡铺进界面：入口与「选完还有次数」共用
     private void ShowCardSet(CardTier tier, int seed, int luck)
     {
-        var held = Skills != null ? new List<int>(Skills.HeldSkills) : new List<int>();
+        List<int> held = new List<int>();
+        if (Skills != null) held = new List<int>(Skills.HeldSkills);
         var rolls = CardCatalog.Roll(tier, luck, CardCampForRoll(), CardCatalog.RollCount, held, seed);
         if (rolls.Count == 0)
         {
@@ -239,7 +245,8 @@ public class SelectCardView : PageBase
     private int CardCampForRoll()
     {
         var battle = Battle;
-        return battle != null && battle.MyCamp == EntityCamp.Defense ? 1 : 0;
+        if (battle != null && battle.MyCamp == EntityCamp.Defense) return 1;
+        return 0;
     }
 
     // 悬浮按钮：只放仍有次数的档位
@@ -277,9 +284,31 @@ public class SelectCardView : PageBase
         ReplyToAi("错误：抽卡状态已重置");
     }
 
-    private static ClientSkillManager Skills => Tool.ClientLogicManager != null ? Tool.ClientLogicManager.SkillVfx : null;
+    private static ClientSkillManager Skills
+    {
+        get
+        {
+            if (Tool.ClientLogicManager == null) return null;
+            return Tool.ClientLogicManager.SkillVfx;
+        }
+    }
 
-    private static BattlePage Battle => Tool.UIManager != null ? Tool.UIManager.Battle : null;
+    private static BattlePage Battle
+    {
+        get
+        {
+            if (Tool.UIManager == null) return null;
+            return Tool.UIManager.Battle;
+        }
+    }
 
-    private static GList HudList => Battle != null ? Battle.CardButtonList : null;
+    private static GList HudList
+    {
+        get
+        {
+            BattlePage battle = Battle;
+            if (battle == null) return null;
+            return battle.CardButtonList;
+        }
+    }
 }

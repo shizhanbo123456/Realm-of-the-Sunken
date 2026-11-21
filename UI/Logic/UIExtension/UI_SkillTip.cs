@@ -20,15 +20,15 @@ namespace Ros.UI.Main
             m_SkillName.text = cfg.name;
             m_skillDes.text = cfg.description;
             m_label_cd.text = MessageVariable.F(message_variablesEnum.skill_cdFormat, cfg.cd);
-            m_label_store.text = cfg.storeLimit < 0
-                ? MessageVariable.V(message_variablesEnum.skill_storeUnlimited)
-                : cfg.storeLimit.ToString();
+            if (cfg.storeLimit < 0) m_label_store.text = MessageVariable.V(message_variablesEnum.skill_storeUnlimited);
+            else m_label_store.text = cfg.storeLimit.ToString();
 
             var scores = cfg.scores;
             m_score_list.itemRenderer = (i, obj) =>
             {
                 if (obj is not UI_TipLevel row) return;
-                row.m_title.text = i < ScoreNames.Length ? MessageVariable.V(ScoreNames[i]) : "";
+                if (i < ScoreNames.Length) row.m_title.text = MessageVariable.V(ScoreNames[i]);
+                else row.m_title.text = "";
                 row.m_level.selectedIndex = Mathf.Clamp(scores[i], 0, 4); // 0~4 = D/C/B/A/S
             };
             m_score_list.numItems = scores.Count;

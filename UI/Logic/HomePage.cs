@@ -147,10 +147,13 @@ public class HomePage : PageBase
         }
 
         bool defense = camp == 1;
-        int count = defense ? GlobalConfig.defense_character_count : GlobalConfig.attack_character_count;
+        int count = GlobalConfig.attack_character_count;
+        if (defense) count = GlobalConfig.defense_character_count;
         if (index < 0 || index >= count)
         {
-            request.Reject($"{(defense ? "防守" : "进攻")}方下标范围 0~{count - 1}");
+            string campName = "进攻";
+            if (defense) campName = "防守";
+            request.Reject($"{campName}方下标范围 0~{count - 1}");
             return;
         }
 
@@ -196,7 +199,8 @@ public class HomePage : PageBase
     private void OnAiTakeover(AiRequest request)
     {
         bool on = request.Bool(0);
-        InputManager.SetControlMode(on ? PlayerControlMode.Ai : PlayerControlMode.Player);
+        if (on) InputManager.SetControlMode(PlayerControlMode.Ai);
+        else InputManager.SetControlMode(PlayerControlMode.Player);
     }
     #endregion
 
@@ -237,7 +241,9 @@ public class HomePage : PageBase
     {
         min = GlobalVariable.I(global_variablesEnum.name_length_min);
         max = GlobalVariable.I(global_variablesEnum.name_length_max);
-        string name = (rawName ?? "").Trim();
+        string name = rawName;
+        if (name == null) name = "";
+        name = name.Trim();
         if (name.Length < min || name.Length > max) return false;
 
         ClientSelection.playerName = name;
@@ -296,23 +302,42 @@ public class HomePage : PageBase
     // 当前浏览的角色（仅本页内存状态，不进存档、不进 ClientSelection）
     private int selectedSaveIndex;
 
-    private int CampOffset => defenseTab ? GlobalConfig.attack_character_count : 0;
+    private int CampOffset
+    {
+        get
+        {
+            if (defenseTab) return GlobalConfig.attack_character_count;
+            return 0;
+        }
+    }
 
     // 本阵营已选角色的存档下标
-    private int ChosenSaveIndex => CampOffset + (defenseTab ? ClientSelection.selectedDefenseIndex : ClientSelection.selectedAttackIndex);
+    private int ChosenSaveIndex
+    {
+        get
+        {
+            int selected = ClientSelection.selectedAttackIndex;
+            if (defenseTab) selected = ClientSelection.selectedDefenseIndex;
+            return CampOffset + selected;
+        }
+    }
 
     private void Refresh()
     {
         var selection = panel.m_character_selection_panel;
-        int count = defenseTab ? GlobalConfig.defense_character_count : GlobalConfig.attack_character_count;
-        selection.m_current_selected_camp.selectedIndex = defenseTab ? 1 : 0;
+        int count = GlobalConfig.attack_character_count;
+        if (defenseTab) count = GlobalConfig.defense_character_count;
+        if (defenseTab) selection.m_current_selected_camp.selectedIndex = 1;
+        else selection.m_current_selected_camp.selectedIndex = 0;
         selection.m_tab_attacker.selected = !defenseTab;
         selection.m_tab_defenser.selected = defenseTab;
         selection.m_characterList.numItems = count;
         // numItems 不变时 FGUI 不重绘已有条目，切页签与选中变化都要手动重画
         for (int i = 0; i < count; i++) RenderCharacter(i, selection.m_characterList.GetChildAt(i));
 
-        panel.m_character_attr_panel.m_character_selcted.selectedIndex = selectedSaveIndex == ChosenSaveIndex ? 1 : 0;
+        int selectedMode = 0;
+        if (selectedSaveIndex == ChosenSaveIndex) selectedMode = 1;
+        panel.m_character_attr_panel.m_character_selcted.selectedIndex = selectedMode;
         RefreshAttrList();
         RefreshSpecialAbilities();
         RefreshCharacterInfo();
@@ -330,16 +355,15 @@ public class HomePage : PageBase
     private void RefreshSpecialAbilities()
     {
         int saveIndex = selectedSaveIndex;
-        entity info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
+        entity info = GetCharacterInfo(saveIndex);
         var entries = GuideCatalog.BuildCharacterAbilities(info);
 
         var list = panel.m_character_attr_panel.m_special_ability_list;
         list.itemRenderer = (i, obj) =>
         {
             var item = (UI_HomeSpecialAbility)obj;
-            item.m_label.text = string.IsNullOrEmpty(entries[i].description)
-                ? entries[i].title
-                : $"{entries[i].title}：{entries[i].description}";
+            if (string.IsNullOrEmpty(entries[i].description)) item.m_label.text = entries[i].title;
+            else item.m_label.text = $"{entries[i].title}：{entries[i].description}";
         };
         list.numItems = entries.Count;
     }
@@ -348,17 +372,24 @@ public class HomePage : PageBase
     {
         var head = (UI_RoleHead)obj;
         int saveIndex = CampOffset + index;
-        entity info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
+        entity info = GetCharacterInfo(saveIndex);
 
         head.m_roleName.text = DisplayName(info, saveIndex);
 
         // 头像：图标列表未导入或下标越界时置空
-        var icons = Tool.ResourceManager == null ? null
-            : defenseTab ? Tool.ResourceManager.DefenseCharacterIcons : Tool.ResourceManager.AttackCharacterIcons;
+        List<Texture2D> icons = null;
+        if (Tool.ResourceManager != null)
+        {
+            if (defenseTab) icons = Tool.ResourceManager.DefenseCharacterIcons;
+            else icons = Tool.ResourceManager.AttackCharacterIcons;
+        }
         bool hasIcon = icons != null && index < icons.Count && icons[index] != null;
-        head.m_headIcon.texture = hasIcon ? new NTexture(icons[index]) : null;
+        if (hasIcon) head.m_headIcon.texture = new NTexture(icons[index]);
+        else head.m_headIcon.texture = null;
         head.m_lock.selectedIndex = 0; // 全角色默认解锁
-        head.m_confirm.selectedIndex = saveIndex == ChosenSaveIndex ? 1 : 0;
+        int confirmMode = 0;
+        if (saveIndex == ChosenSaveIndex) confirmMode = 1;
+        head.m_confirm.selectedIndex = confirmMode;
 
         // 点击浏览（FGUI onClick 为追加制，先清后加以防列表复用叠加）
         head.onClick.Set(() => { });
@@ -395,7 +426,7 @@ public class HomePage : PageBase
     private void RefreshAttrList()
     {
         int saveIndex = selectedSaveIndex;
-        entity info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
+        entity info = GetCharacterInfo(saveIndex);
         int[] values = ToValues(info.GetAttribute());
         bool defense = IsDefense(saveIndex);
 
@@ -413,7 +444,8 @@ public class HomePage : PageBase
     private static int RangeKey(int attrIndex, bool defense)
     {
         if (attrIndex != AttrIndexHealth) return attrIndex;
-        return defense ? RangeKeyHealthDefense : RangeKeyHealthAttack;
+        if (defense) return RangeKeyHealthDefense;
+        return RangeKeyHealthAttack;
     }
 
     // 属性条 = 固定 10 格：按 attr_range.csv 的区间把数值映射成点亮格数（非零至少亮 1 格）
@@ -425,7 +457,11 @@ public class HomePage : PageBase
 
         bar.itemRenderer = (i, obj) =>
         {
-            if (obj is UI_AttrValueItem cell && cell.m_filled != null) cell.m_filled.selectedIndex = i < filled ? 1 : 0;
+            if (obj is UI_AttrValueItem cell && cell.m_filled != null)
+            {
+                if (i < filled) cell.m_filled.selectedIndex = 1;
+                else cell.m_filled.selectedIndex = 0;
+            }
         };
         bar.numItems = AttrBarSegments;
     }
@@ -433,17 +469,24 @@ public class HomePage : PageBase
     private void RefreshCharacterInfo()
     {
         int saveIndex = selectedSaveIndex;
-        entity info = Tool.InfoManager != null ? Tool.InfoManager.GetPlayerCharacterInfo(saveIndex) : default;
+        entity info = GetCharacterInfo(saveIndex);
         panel.m_label_character_name.text = DisplayName(info, saveIndex);
+    }
+
+    // 角色配表信息：InfoManager 由场景提供，缺失时返回默认值
+    private static entity GetCharacterInfo(int saveIndex)
+    {
+        if (Tool.InfoManager == null) return default;
+        return Tool.InfoManager.GetPlayerCharacterInfo(saveIndex);
     }
 
     // 列表条目与右侧标题共用一个名字口径：配表没名字时退回「进攻/防守角色 + 阵营内下标」
     private static string DisplayName(entity info, int saveIndex)
     {
         if (!string.IsNullOrEmpty(info.name)) return info.name;
-        return IsDefense(saveIndex)
-            ? MessageVariable.F(message_variablesEnum.home_roleName_defense, saveIndex - GlobalConfig.attack_character_count)
-            : MessageVariable.F(message_variablesEnum.home_roleName_attack, saveIndex);
+        if (IsDefense(saveIndex))
+            return MessageVariable.F(message_variablesEnum.home_roleName_defense, saveIndex - GlobalConfig.attack_character_count);
+        return MessageVariable.F(message_variablesEnum.home_roleName_attack, saveIndex);
     }
 
     // 属性一律取整显示
@@ -461,9 +504,9 @@ public class HomePage : PageBase
     {
         if (Tool.ClientLogicManager == null || Tool.ClientLogicManager.HomePreview == null) return;
         int saveIndex = selectedSaveIndex;
-        var type = IsDefense(saveIndex)
-            ? EntityType.Defense(saveIndex - GlobalConfig.attack_character_count)
-            : EntityType.Attack(saveIndex);
+        EntityType type;
+        if (IsDefense(saveIndex)) type = EntityType.Defense(saveIndex - GlobalConfig.attack_character_count);
+        else type = EntityType.Attack(saveIndex);
         Tool.ClientLogicManager.HomePreview.RefreshHome(type);
     }
 
@@ -486,7 +529,9 @@ public class HomePage : PageBase
         if (Tool.SaveManager == null)
             throw new System.InvalidOperationException("[首页] 场景缺少 SaveManager，无法记录服务器地址");
 
-        Tool.SaveManager.lastServerIp = ip ?? ""; // 空串落盘时写默认本机地址，退出时统一写
+        string serverIp = ip;
+        if (serverIp == null) serverIp = "";
+        Tool.SaveManager.lastServerIp = serverIp; // 空串落盘时写默认本机地址，退出时统一写
         var result = await Tool.NetworkManager.TryConnect(ip);
         if (result != NetworkManager.ConnectResult.Success) return result;
         Tool.NetworkManager.EnterWorld();

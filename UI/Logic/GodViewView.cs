@@ -102,5 +102,12 @@ public class GodViewView : PageBase
 
     private void OnDetail(SCGodViewEntityDetail info) => panel.OnDetail(info);
 
-    private static BattlePage Battle => Tool.UIManager != null ? Tool.UIManager.Battle : null;
+    private static BattlePage Battle
+    {
+        get
+        {
+            if (Tool.UIManager == null) return null;
+            return Tool.UIManager.Battle;
+        }
+    }
 }

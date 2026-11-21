@@ -7,8 +7,14 @@ namespace Ros.UI.Main
     internal static class WorldLayer
     {
         public static Camera ProjectionCamera
-            => Tool.CameraController != null && Tool.CameraController.WorldCamera != null
-                ? Tool.CameraController.WorldCamera : Camera.main;
+        {
+            get
+            {
+                if (Tool.CameraController != null && Tool.CameraController.WorldCamera != null)
+                    return Tool.CameraController.WorldCamera;
+                return Camera.main;
+            }
+        }
 
         public static float UiScale => Screen.height / 1080f;
 
@@ -24,8 +30,10 @@ namespace Ros.UI.Main
         // 挂点元素（父节点即世界层容器）的局部坐标
         public static Vector2 ToLayer(GObject child, Vector2 panelPoint)
         {
-            var container = child != null ? child.parent as GComponent : null;
-            var root = container != null ? RootOf(container) : null;
+            GComponent container = null;
+            if (child != null) container = child.parent as GComponent;
+            GComponent root = null;
+            if (container != null) root = RootOf(container);
             if (root == null) return panelPoint;
             return container.GlobalToLocal(root.LocalToGlobal(panelPoint));
         }

@@ -85,7 +85,9 @@ namespace Ros.UI.Main
         // 页面根 = 锚点往上第一个挂在 GRoot 下的组件（提示层要压在页面所有元素之上）
         private static GComponent PageRoot(GObject from)
         {
-            for (GObject p = from != null ? from.parent : null; p != null; p = p.parent)
+            GObject start = null;
+            if (from != null) start = from.parent;
+            for (GObject p = start; p != null; p = p.parent)
                 if (p is GComponent root && (root.parent == null || root.parent is GRoot)) return root;
             return GRoot.inst;
         }

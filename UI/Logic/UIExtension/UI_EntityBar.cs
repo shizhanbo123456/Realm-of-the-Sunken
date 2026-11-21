@@ -27,11 +27,18 @@ namespace Ros.UI.Main
             IReadOnlyList<Buff> buffData)
         {
             m_campIcon.m_player_camp.selectedIndex = (int)ToPlayerCamp(camp); // 档位即 PlayerCampIcon 页序
-            m_is_enemy.selectedIndex = IsEnemy(camp, myCamp) ? 1 : 0;
-            if (m_entity_name != null) m_entity_name.text = entityName ?? "";
+            if (IsEnemy(camp, myCamp)) m_is_enemy.selectedIndex = 1;
+            else m_is_enemy.selectedIndex = 0;
+            if (m_entity_name != null)
+            {
+                string name = entityName;
+                if (name == null) name = "";
+                m_entity_name.text = name;
+            }
 
             // 血条只有一条，敌我配色由 m_is_enemy 换色，比例直接写进填充图
-            float ratio = maxHealth > 0 ? Mathf.Clamp01((float)health / maxHealth) : 0f;
+            float ratio = 0f;
+            if (maxHealth > 0) ratio = Mathf.Clamp01((float)health / maxHealth);
             if (m_bar != null && m_bar.m_fill != null) m_bar.m_fill.fillAmount = ratio;
             if (m_label_health != null) m_label_health.text = $"{health}/{maxHealth}";
 

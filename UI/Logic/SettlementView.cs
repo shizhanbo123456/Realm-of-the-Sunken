@@ -56,7 +56,9 @@ public class SettlementView
         if (Tool.ClientLogicManager != null) Tool.ClientLogicManager.EntityPlayers.ClearAll();
 
         var loading = ClientLoadingManager.Current;
-        Show(r, loading != null && loading.HasSession ? loading.Camp : EntityCamp.None, true);
+        EntityCamp camp = EntityCamp.None;
+        if (loading != null && loading.HasSession) camp = loading.Camp;
+        Show(r, camp, true);
 
         // 战斗页退出（HUD 随 Exit 隐藏），组队页留到结算关闭时再恢复
         if (Tool.UIManager != null) Tool.UIManager.HidePage(pageEnum.battle);
@@ -132,9 +134,10 @@ public class SettlementView
             rows.Add(MessageVariable.F(message_variablesEnum.settlement_defenseScore, (int)r.defenseScore));
         }
         rows.Add(MessageVariable.F(message_variablesEnum.settlement_kill, r.killScore));
-        rows.Add(camp == EntityCamp.Attack
-            ? MessageVariable.F(message_variablesEnum.settlement_guardDamage, (int)r.expGain)
-            : MessageVariable.F(message_variablesEnum.settlement_guardHealth, (int)r.guardStatueHealth));
+        if (camp == EntityCamp.Attack)
+            rows.Add(MessageVariable.F(message_variablesEnum.settlement_guardDamage, (int)r.expGain));
+        else
+            rows.Add(MessageVariable.F(message_variablesEnum.settlement_guardHealth, (int)r.guardStatueHealth));
 
         var list = panel.m_battle_result_detail.m_resultList;
         list.itemRenderer = RenderRow;
@@ -145,7 +148,8 @@ public class SettlementView
     {
         if (obj is not UI_BattleResultDetailItem item) return;
         item.alpha = 0f; // 出现前整体隐藏，到点播放 t0 时解开
-        item.m_content.text = index < rows.Count ? rows[index] : string.Empty;
+        if (index < rows.Count) item.m_content.text = rows[index];
+        else item.m_content.text = string.Empty;
         if (!items.Contains(item)) items.Add(item); // 动画序列按此顺序逐条播放
     }
 
@@ -212,7 +216,8 @@ public class SettlementView
     {
         bool win = (gameState == 1 && camp == EntityCamp.Attack)
                 || (gameState == 2 && camp == EntityCamp.Defense);
-        return MessageVariable.V(win ? message_variablesEnum.settlement_win : message_variablesEnum.settlement_end);
+        if (win) return MessageVariable.V(message_variablesEnum.settlement_win);
+        return MessageVariable.V(message_variablesEnum.settlement_end);
     }
     #endregion
 }

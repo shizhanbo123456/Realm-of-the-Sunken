@@ -60,9 +60,23 @@ public class SkillSelectView : PageBase
         base.Exit();
     }
 
-    private static ClientSkillManager Skills => Tool.ClientLogicManager != null ? Tool.ClientLogicManager.SkillVfx : null;
+    private static ClientSkillManager Skills
+    {
+        get
+        {
+            if (Tool.ClientLogicManager == null) return null;
+            return Tool.ClientLogicManager.SkillVfx;
+        }
+    }
 
-    private static BattlePage Battle => Tool.UIManager != null ? Tool.UIManager.Battle : null;
+    private static BattlePage Battle
+    {
+        get
+        {
+            if (Tool.UIManager == null) return null;
+            return Tool.UIManager.Battle;
+        }
+    }
 
     // 持有表变化：打开期间新获得的技能要进列表
     private void OnSkillBarRefresh()

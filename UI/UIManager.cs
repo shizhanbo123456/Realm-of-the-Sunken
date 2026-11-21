@@ -82,7 +82,9 @@ public class UIManager : MonoBehaviour
             Debug.Log("[UIManager] 启动：加载 Main 包...");
 
             UIPackage.AddPackage("GUI/Main");
-            Debug.Log($"[UIManager] 包已加载：{(UIPackage.GetByName("Main") != null ? "成功" : "失败")}");
+            string packageState = "失败";
+            if (UIPackage.GetByName("Main") != null) packageState = "成功";
+            Debug.Log($"[UIManager] 包已加载：{packageState}");
             MainBinder.BindAll();
 
             home = new HomePage(UI_HomePanel.CreateInstance());

@@ -276,7 +276,15 @@ namespace Ros.UI.Main
         #region 区域与底图
         private float Edge => GlobalVariable.RangeLength(global_variablesEnum.terrain_size) / GlobalVariable.L(global_variablesEnum.godView_scale)[scaleIndex];
 
-        private float PixelsPerMeter => Edge > 0f ? m_largeMinimapContainer.width / Edge : 0f;
+        private float PixelsPerMeter
+        {
+            get
+            {
+                float edge = Edge;
+                if (edge > 0f) return m_largeMinimapContainer.width / edge;
+                return 0f;
+            }
+        }
 
         private Vector2 ClampCenter(Vector2 value)
         {
@@ -307,7 +315,8 @@ namespace Ros.UI.Main
 
         private void EnsureMapImage()
         {
-            var loader = m_largeMinimapContainer != null ? m_largeMinimapContainer.m_loader : null;
+            GLoader loader = null;
+            if (m_largeMinimapContainer != null) loader = m_largeMinimapContainer.m_loader;
             if (loader == null) return;
             loader.fill = FillType.Scale;
             if (mapTexture == null)
@@ -324,7 +333,8 @@ namespace Ros.UI.Main
             float upper = 1f;
             for (GObject o = m_largeMinimapContainer; o != null && o.parent != GRoot.inst; o = o.parent)
                 if (o.scale.x > 0.0001f) upper *= o.scale.x;
-            float design = upper > 0.0001f ? 1f / upper : 1f;
+            float design = 1f;
+            if (upper > 0.0001f) design = 1f / upper;
             itemScale = design * GlobalVariable.F(global_variablesEnum.godView_marker_scale);
         }
 
@@ -378,14 +388,20 @@ namespace Ros.UI.Main
         {
             bool isCharacter = info.type.category == EntityCategory.Character_Attack
                 || info.type.category == EntityCategory.Character_Defense;
-            var icons = Tool.ResourceManager == null ? null
-                : info.camp == EntityCamp.Defense ? Tool.ResourceManager.DefenseCharacterIcons : Tool.ResourceManager.AttackCharacterIcons;
+            List<Texture2D> icons = null;
+            if (Tool.ResourceManager != null)
+            {
+                if (info.camp == EntityCamp.Defense) icons = Tool.ResourceManager.DefenseCharacterIcons;
+                else icons = Tool.ResourceManager.AttackCharacterIcons;
+            }
             int index = info.type.value;
             bool hasIcon = isCharacter && icons != null && index >= 0 && index < icons.Count && icons[index] != null;
             if (m_roleHead != null)
             {
-                m_roleHead.m_headIcon.texture = hasIcon ? new NTexture(icons[index]) : null;
-                m_roleHead.m_show_default_icon.selectedIndex = hasIcon ? 0 : 1;
+                if (hasIcon) m_roleHead.m_headIcon.texture = new NTexture(icons[index]);
+                else m_roleHead.m_headIcon.texture = null;
+                if (hasIcon) m_roleHead.m_show_default_icon.selectedIndex = 0;
+                else m_roleHead.m_show_default_icon.selectedIndex = 1;
                 m_roleHead.m_level.selectedIndex = Mathf.Clamp(info.level - 1, 0, 4); // 头像控制器只有 5 档
             }
             if (m_entity_name != null) m_entity_name.text = info.name;
@@ -394,7 +410,8 @@ namespace Ros.UI.Main
 
         private void FillHealth(SCGodViewEntityDetail info)
         {
-            float ratio = info.maxHealth > 0 ? Mathf.Clamp01((float)info.health / info.maxHealth) : 0f;
+            float ratio = 0f;
+            if (info.maxHealth > 0) ratio = Mathf.Clamp01((float)info.health / info.maxHealth);
             if (m_bar_health != null && m_bar_health.m_fill != null) m_bar_health.m_fill.fillAmount = ratio;
             if (m_label_health != null) m_label_health.text = $"{info.health}/{info.maxHealth}";
         }
@@ -442,7 +459,9 @@ namespace Ros.UI.Main
         private static void FillSkillItem(GObject obj, List<UI_SkillList.Slot> source, int index)
         {
             if (obj is not UI_SkillListItem slot) return;
-            slot.Fill(index < source.Count ? source[index] : new UI_SkillList.Slot(-1, 1f, 0, true));
+            UI_SkillList.Slot data = new UI_SkillList.Slot(-1, 1f, 0, true);
+            if (index < source.Count) data = source[index];
+            slot.Fill(data);
         }
         #endregion
 

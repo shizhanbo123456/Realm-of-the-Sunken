@@ -28,7 +28,8 @@ namespace Ros.UI.Main
             if (m_arrow == null) return;
             m_arrow.visible = true;
             float angle = Mathf.Atan2(direction.x, -direction.y) * Mathf.Rad2Deg;
-            m_arrow.rotation = angle < 0f ? angle + 360f : angle;
+            if (angle < 0f) m_arrow.rotation = angle + 360f;
+            else m_arrow.rotation = angle;
         }
 
         public void DestroySelf()
