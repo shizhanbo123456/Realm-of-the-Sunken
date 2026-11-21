@@ -36,6 +36,34 @@ public partial class BattleManager
         public string text;
     }
 
+    // 阵营分档计数：摘要不把各阵营混成一个总数，进攻/防守/中立分开数
+    private struct CampTally
+    {
+        public int attack;
+        public int defense;
+        public int neutral;
+        public int none;
+
+        public int Total => attack + defense + neutral + none;
+
+        public void Add(EntityCamp camp)
+        {
+            if ((camp & EntityCamp.Attack) != 0) attack++;
+            else if ((camp & EntityCamp.Defense) != 0) defense++;
+            else if ((camp & EntityCamp.Neutral) != 0) neutral++;
+            else none++;
+        }
+
+        public void AppendTo(StringBuilder builder)
+        {
+            builder.Append("（进攻=").Append(attack)
+                .Append(" 防守=").Append(defense)
+                .Append(" 中立=").Append(neutral);
+            if (none > 0) builder.Append(" 未定=").Append(none);
+            builder.Append('）');
+        }
+    }
+
     private int aiSelfHealth;
     private int aiSelfMaxHealth;
     private SCDefensePointProgress aiGuardProgress;
@@ -727,21 +755,48 @@ public partial class BattleManager
         return string.Join(",", buffs);
     }
 
-    // 可见实体条数（去掉自己）：与 battleInfo_nearby 同一口径，管理器没就绪返回 -1
-    private static int VisibleEntityCount()
+    // 小地图实体按阵营分档
+    private CampTally MinimapTally()
     {
+        var tally = new CampTally();
+        foreach (var pair in aiMinimap) tally.Add(pair.Value.camp);
+        return tally;
+    }
+
+    // 可见实体按阵营分档（去掉自己）：与 battleInfo_nearby 同一口径，管理器没就绪返回 false
+    private static bool TryVisibleTally(out CampTally tally)
+    {
+        tally = new CampTally();
         var players = Tool.ClientLogicManager != null ? Tool.ClientLogicManager.EntityPlayers : null;
-        if (players == null) return -1;
+        if (players == null) return false;
         var loading = ClientLoadingManager.Current;
         ushort selfId = loading != null && loading.HasSession ? loading.OwnEntityId : (ushort)0;
 
-        int count = 0;
         foreach (var view in players.AllViews)
         {
             if (view == null || view.id == selfId) continue;
-            count++;
+            tally.Add(view.camp);
         }
-        return count;
+        return true;
+    }
+
+    // 摘要写法：总数 + 各阵营分档，battleInfo_all / battleInfo_common 共用
+    private void AppendMinimapSummary(StringBuilder builder)
+    {
+        var tally = MinimapTally();
+        builder.Append(tally.Total);
+        tally.AppendTo(builder);
+    }
+
+    private static void AppendVisibleSummary(StringBuilder builder)
+    {
+        if (!TryVisibleTally(out var tally))
+        {
+            builder.Append("未就绪");
+            return;
+        }
+        builder.Append(tally.Total);
+        tally.AppendTo(builder);
     }
 
     // 自身 + 守护点 + 阵营人数 + 昼夜 + 小地图条数 + 三条缓冲的未读，一次取全现场
@@ -801,14 +856,15 @@ public partial class BattleManager
         builder.Append("\n昼夜 ").Append(IsDay ? "白天" : "夜晚")
             .Append(" 周期时间=").Append(CycleTime.ToString("0.##"));
 
-        builder.Append("\n小地图 ").Append(aiMinimap.Count);
+        builder.Append("\n小地图 ");
+        AppendMinimapSummary(builder);
 
         builder.Append("\n卡牌 ");
         AppendCardCount(builder);
 
         builder.Append("\n剩余时间 ").Append(BattleRemainTime.ToString("0.##")).Append('秒');
-        int visible = VisibleEntityCount();
-        builder.Append("\n可见实体 ").Append(visible < 0 ? "未就绪" : visible.ToString());
+        builder.Append("\n可见实体 ");
+        AppendVisibleSummary(builder);
         builder.Append("\n飘字未读 ").Append(commands.ReadPromptUnread() ?? "（无）");
         builder.Append("\n聊天未读 ").Append(commands.ReadChatUnread() ?? "（无）");
         builder.Append("\n重要播报未读 ").Append(commands.ReadImportantUnread() ?? "（无）");
