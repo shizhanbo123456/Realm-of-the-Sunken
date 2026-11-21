@@ -78,7 +78,7 @@ namespace Ros.Config
         public int expDrop;  // 被击败时掉落的经验
         public bool dropToCamp;  // 被击败时的掉落物生效范围：单人；1：击杀方阵营
         public string passiveSkillDes;  // 被动描述：仅仅玩家角色有
-        public int hitProtection;  // 击打保护分积累速率：受到多少比例的伤害进入保护
+        public int hitProtection;  // 击打保护触发比例（%）：累计受到占生命上限该比例（%）的伤害后进入一条保护；0 = 无击打保护
         public float? animMovementSpeed;  // 基础移动动画速度：人形实体基础移动倍率
         public float? animAttackSpeed;  // 基础攻击动画速度：人形实体基础攻击动画倍率
     }

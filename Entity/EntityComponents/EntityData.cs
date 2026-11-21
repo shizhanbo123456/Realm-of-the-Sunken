@@ -47,10 +47,9 @@ public abstract class EntityData : MonoBehaviour
     [HideInInspector] public Vector3 hitbackVelocity;
     private Vector3 lastHitback; // 上一帧写进刚体的击退分量，混合前先剔除，避免被惯性反复放大
 
-    private const float HitProtectDuration = 3f; // 击打保护持续时长
-    private const float HitProtectionScoreMax = 100f; // 击打保护分满值
-    private int hitProtectionRate; // entity.csv「击打保护分积累速率」：掉血 1/速率 的生命上限即满一条保护
-    private float hitProtectionScore;
+    private const float HitProtectionScoreMax = 100f; // 保护分满分 = 生命上限的 100%
+    private int hitProtectionRatio; // entity.csv「击打保护触发比例（%）」
+    private float hitProtectionScore; // 已累计的掉血比例（%）
     private float hitProtectEndTime;
 
     [HideInInspector] public Vector3 moveInput;
@@ -131,7 +130,7 @@ public abstract class EntityData : MonoBehaviour
             var config = Tool.InfoManager.GetEntityConfig(type);
             defaultEndure = config.endureLevel == true ? EndureType.Super : EndureType.None; // entity.csv「霸体等级」列：霸体下限
             weaponId = config.weaponId ?? -1;         // entity.csv「武器编号」列：实体固定武器
-            hitProtectionRate = config.hitProtection;  // entity.csv「击打保护分积累速率」列：0 = 无击打保护
+            hitProtectionRatio = config.hitProtection; // entity.csv「击打保护触发比例（%）」列：累计掉血达到该比例进保护，0 = 无保护
         }
         effectController = new EntityEffectController();
         effectController.Init(this);
@@ -618,14 +617,14 @@ public abstract class EntityData : MonoBehaviour
         hitbackVelocity = Vector3.ClampMagnitude(hitbackVelocity, GlobalVariable.F(global_variablesEnum.hitback_max_speed));
     }
 
-    // 击打保护：只有直接挨打计分，按本次实际掉血占生命上限的比例积累（速率 10 = 掉 10% 生命进入保护）
+    // 击打保护：按本次实际掉血占生命上限的比例累计，达到配表比例进入一条保护
     private void AddHitProtection(float appliedDamage)
     {
-        if (hitProtectionRate <= 0 || appliedDamage <= 0f || attributes.MaxHealth <= 0f || !Alive) return;
-        hitProtectionScore += appliedDamage / attributes.MaxHealth * HitProtectionScoreMax * hitProtectionRate;
-        if (hitProtectionScore < HitProtectionScoreMax) return;
+        if (hitProtectionRatio <= 0 || appliedDamage <= 0f || attributes.MaxHealth <= 0f || !Alive) return;
+        hitProtectionScore += appliedDamage / attributes.MaxHealth * HitProtectionScoreMax;
+        if (hitProtectionScore < hitProtectionRatio) return;
         hitProtectionScore = 0f;
-        hitProtectEndTime = Time.time + HitProtectDuration;
+        hitProtectEndTime = Time.time + GlobalVariable.F(global_variablesEnum.hit_protect_duration);
     }
 
     // 击打保护期内命中只飘字，不结算伤害/buff/击退/受击
