@@ -171,6 +171,13 @@ public sealed class AiCommandLine : ClientSubManager
 
     public string ReadImportant(int count) => observations.ReadImportant(count);
 
+    // 未读的读：取走游标之后的全部内容，读一次就消费掉
+    public string ReadChatUnread() => observations.ReadChatUnread();
+
+    public string ReadPromptUnread() => observations.ReadPromptUnread();
+
+    public string ReadImportantUnread() => observations.ReadImportantUnread();
+
     public override void Init(ClientLogicManager owner)
     {
         base.Init(owner);
@@ -298,11 +305,16 @@ public sealed class AiCommandLine : ClientSubManager
     private void BindSelfCommands()
     {
         AiCommandBus.Bind(ai_commandEnum.listCommands, OnListCommands);
+        AiCommandBus.Bind(ai_commandEnum.listAllCommands, OnListAllCommands);
         AiCommandBus.Bind(ai_commandEnum.checkInterrupt, OnCheckInterrupt);
         AiCommandBus.Bind(ai_commandEnum.interrupt, OnInterrupt);
         AiCommandBus.Bind(ai_commandEnum.waitForIntrrupt, OnWait);
         AiCommandBus.Bind(ai_commandEnum.chat_recent, OnChatRecent);
+        AiCommandBus.Bind(ai_commandEnum.chat_unread, OnChatUnread);
         AiCommandBus.Bind(ai_commandEnum.prompt_buffer, OnPromptBuffer);
+        AiCommandBus.Bind(ai_commandEnum.prompt_unread, OnPromptUnread);
+        AiCommandBus.Bind(ai_commandEnum.importantEvent_buffer, OnImportantEventBuffer);
+        AiCommandBus.Bind(ai_commandEnum.importantEvent_unread, OnImportantEventUnread);
         AiCommandBus.Bind(ai_commandEnum.lua_reloadExtension, OnReloadLua);
         AiCommandBus.Bind(ai_commandEnum.lua_execCommand, OnRunLuaExtension);
         AiCommandBus.Bind(ai_commandEnum.home_getPlayerName, OnGetPlayerName);
@@ -311,11 +323,16 @@ public sealed class AiCommandLine : ClientSubManager
     private void UnbindSelfCommands()
     {
         AiCommandBus.Unbind(ai_commandEnum.listCommands, OnListCommands);
+        AiCommandBus.Unbind(ai_commandEnum.listAllCommands, OnListAllCommands);
         AiCommandBus.Unbind(ai_commandEnum.checkInterrupt, OnCheckInterrupt);
         AiCommandBus.Unbind(ai_commandEnum.interrupt, OnInterrupt);
         AiCommandBus.Unbind(ai_commandEnum.waitForIntrrupt, OnWait);
         AiCommandBus.Unbind(ai_commandEnum.chat_recent, OnChatRecent);
+        AiCommandBus.Unbind(ai_commandEnum.chat_unread, OnChatUnread);
         AiCommandBus.Unbind(ai_commandEnum.prompt_buffer, OnPromptBuffer);
+        AiCommandBus.Unbind(ai_commandEnum.prompt_unread, OnPromptUnread);
+        AiCommandBus.Unbind(ai_commandEnum.importantEvent_buffer, OnImportantEventBuffer);
+        AiCommandBus.Unbind(ai_commandEnum.importantEvent_unread, OnImportantEventUnread);
         AiCommandBus.Unbind(ai_commandEnum.lua_reloadExtension, OnReloadLua);
         AiCommandBus.Unbind(ai_commandEnum.lua_execCommand, OnRunLuaExtension);
         AiCommandBus.Unbind(ai_commandEnum.home_getPlayerName, OnGetPlayerName);
@@ -514,6 +531,32 @@ public sealed class AiCommandLine : ClientSubManager
         request.Reply(observations.ReadPrompt(count) ?? "（没有提示记录）");
     }
 
+    private void OnChatUnread(AiRequest request)
+    {
+        request.Reply(observations.ReadChatUnread() ?? "（没有未读聊天）");
+    }
+
+    private void OnPromptUnread(AiRequest request)
+    {
+        request.Reply(observations.ReadPromptUnread() ?? "（没有未读提示）");
+    }
+
+    private void OnImportantEventBuffer(AiRequest request)
+    {
+        int count = Count(request.Int(0));
+        if (count <= 0)
+        {
+            request.Reject($"数量必须是 1~{MaxReadCount} 的整数");
+            return;
+        }
+        request.Reply(observations.ReadImportant(count) ?? "（没有重要事件）");
+    }
+
+    private void OnImportantEventUnread(AiRequest request)
+    {
+        request.Reply(observations.ReadImportantUnread() ?? "（没有未读重要事件）");
+    }
+
     private void OnCheckInterrupt(AiRequest request)
     {
         request.Reply(hub.TryDrain(out string text) ? text : "（没有中断）");
@@ -536,13 +579,20 @@ public sealed class AiCommandLine : ClientSubManager
         hub.Wait(seconds);
     }
 
-    private void OnListCommands(AiRequest request)
+    // 常用命令：表里 frequently_used 打勾的，且当前阶段真的能用
+    private void OnListCommands(AiRequest request) => ReplyCommandList(request, true);
+
+    // 全部命令：表里有的全列，不管当前阶段能不能用
+    private void OnListAllCommands(AiRequest request) => ReplyCommandList(request, false);
+
+    private void ReplyCommandList(AiRequest request, bool frequentOnly)
     {
         var builder = new StringBuilder();
         for (int i = 0; i < commands.Count; i++)
         {
             var cmd = commands[i];
-            if (!AiCommandBus.Ready(cmd.id)) continue;
+            if (frequentOnly && cmd.row.frequently_used != true) continue;
+            if (frequentOnly && !AiCommandBus.Ready(cmd.id)) continue;
             if (builder.Length > 0) builder.Append('\n');
             builder.Append(cmd.usage);
         }

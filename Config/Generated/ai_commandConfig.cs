@@ -24,6 +24,8 @@ namespace Ros.Config
                 {
                     ai_command row;
                     row.key = (ai_commandEnum)r.ReadInt32();
+                    byte has0 = r.ReadByte();
+                    row.frequently_used = has0 == 1 ? (bool?)(r.ReadByte() != 0) : null;
                     row.commandHelp = ConfigBinary.ReadString(r);
                     row.param1Name = ConfigBinary.ReadString(r);
                     row.param1Type = ConfigBinary.ReadString(r);
@@ -42,6 +44,7 @@ namespace Ros.Config
     public struct ai_command
     {
         public ai_commandEnum key;  // 主键
+        public bool? frequently_used;  // 常用命令
         public string commandHelp;  // 主命令注释
         public string param1Name;  // 参数1
         public string param1Type;  // 参数1类型：int / float / bool / string / List<int>
@@ -57,6 +60,7 @@ namespace Ros.Config
     {
         takeover,
         listCommands,
+        listAllCommands,
         waitForIntrrupt,
         checkInterrupt,
         interrupt,
@@ -67,6 +71,7 @@ namespace Ros.Config
         terrain_points,
         terrain_path,
         prompt_buffer,
+        prompt_unread,
         home_setPlayerName,
         home_getPlayerName,
         home_selectCharacter,
@@ -78,6 +83,7 @@ namespace Ros.Config
         lobby_robot,
         chat_send,
         chat_recent,
+        chat_unread,
         stateMachine_stop,
         stateMachine_moveTo,
         stateMachine_attack,
@@ -86,15 +92,18 @@ namespace Ros.Config
         luaStateMachine_start,
         luaStateMachine_stop,
         battleInfo_all,
+        battleInfo_timeLeft,
         battleInfo_player,
         battleInfo_reviveProgress,
         battleInfo_pos,
-        battleInfo_importantEvent,
         battleInfo_guardProgress,
         battleInfo_minimapEntities,
         battleInfo_dayNightInfo,
         battleInfo_camp,
         battleInfo_cardCount,
+        battleInfo_nearby,
+        importantEvent_buffer,
+        importantEvent_unread,
         openSkillSelectPanel,
         setSkillColumn,
         quickMessage_send,

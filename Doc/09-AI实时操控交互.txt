@@ -5,10 +5,15 @@ ai输入后，命令行侧等待中断返回（轮询中断信息内容缓冲区
 
 缓冲区有：
 （带时间的内容，时间都是当前战斗剩余的时间，而非Time.time）
-中断信息内容的缓冲区
+中断信息内容的缓冲区（读走即清空）
 聊天频道内容（带时间）
 重要事件内容（带时间）
 飘字提示内容（带时间）
+
+后三条的读法分两种，游标只有一份，命令行与lua共用：
+按数量读（chat_recent / prompt_buffer / importantEvent_buffer）只看最近N条，不消费未读
+读未读（chat_unread / prompt_unread / importantEvent_unread）取走游标之后的全部内容，读完即置已读
+未读超过缓冲容量时最早的部分被覆盖，回复首行会标明被覆盖的条数
 
 中断来源有：
 Lua触发
@@ -22,3 +27,5 @@ Tick状态机（监控飘字提示内容和聊天频道内容中@自己的内容
 
 命令清单：
 包含ai_command表的条目，允许命令行和lua调用
+listCommands 只列 frequently_used 打勾的常用命令（且当前阶段可用）
+listAllCommands 列全表所有命令，不看阶段

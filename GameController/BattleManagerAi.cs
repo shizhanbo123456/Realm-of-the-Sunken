@@ -12,12 +12,29 @@ public partial class BattleManager
 {
     private const string ScreenshotFolder = "Screenshots";
     private const float CameraRestoreDelay = 0.2f;
-    private const int ImportantReadCount = 20;
 
     private readonly Dictionary<ushort, SCMinimapEntity> aiMinimap = new();
     private readonly Dictionary<ushort, float> aiMinimapSeen = new();
+    private readonly Dictionary<ushort, AiEntityState> aiEntityStates = new();
     private readonly List<ushort> aiMinimapExpired = new();
     private readonly List<string> aiSelfBuffs = new();
+
+    // 可见实体的血量/buff 缓存：显示包按脏标记下发，没带的字段沿用上次的值
+    private sealed class AiEntityState
+    {
+        public int health;
+        public int maxHealth;
+        public bool hasHealth;
+        public readonly List<string> buffs = new();
+        public bool hasBuffs;
+        public float seen;
+    }
+
+    private struct NearbyEntry
+    {
+        public float distance;
+        public string text;
+    }
 
     private int aiSelfHealth;
     private int aiSelfMaxHealth;
@@ -124,15 +141,16 @@ public partial class BattleManager
         AiCommandBus.Bind(ai_commandEnum.terrain_points, OnAiPoints);
         AiCommandBus.Bind(ai_commandEnum.terrain_path, OnAiPath);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_all, OnAiGetInfo);
+        AiCommandBus.Bind(ai_commandEnum.battleInfo_timeLeft, OnAiTimeLeft);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_player, OnAiPlayer);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_reviveProgress, OnAiReviveProgress);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_pos, OnAiPos);
-        AiCommandBus.Bind(ai_commandEnum.battleInfo_importantEvent, OnAiImportantEvent);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_guardProgress, OnAiGuardProgress);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_minimapEntities, OnAiMinimapEntities);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_dayNightInfo, OnAiDayNightInfo);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_camp, OnAiCampCount);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_cardCount, OnAiCardCount);
+        AiCommandBus.Bind(ai_commandEnum.battleInfo_nearby, OnAiNearby);
         AiCommandBus.Bind(ai_commandEnum.camera_setActive, OnAiSetCameraRender);
         AiCommandBus.Bind(ai_commandEnum.camera_screenShot, OnAiScreenshot);
 
@@ -157,15 +175,16 @@ public partial class BattleManager
         AiCommandBus.Unbind(ai_commandEnum.terrain_points, OnAiPoints);
         AiCommandBus.Unbind(ai_commandEnum.terrain_path, OnAiPath);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_all, OnAiGetInfo);
+        AiCommandBus.Unbind(ai_commandEnum.battleInfo_timeLeft, OnAiTimeLeft);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_player, OnAiPlayer);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_reviveProgress, OnAiReviveProgress);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_pos, OnAiPos);
-        AiCommandBus.Unbind(ai_commandEnum.battleInfo_importantEvent, OnAiImportantEvent);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_guardProgress, OnAiGuardProgress);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_minimapEntities, OnAiMinimapEntities);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_dayNightInfo, OnAiDayNightInfo);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_camp, OnAiCampCount);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_cardCount, OnAiCardCount);
+        AiCommandBus.Unbind(ai_commandEnum.battleInfo_nearby, OnAiNearby);
         AiCommandBus.Unbind(ai_commandEnum.camera_setActive, OnAiSetCameraRender);
         AiCommandBus.Unbind(ai_commandEnum.camera_screenShot, OnAiScreenshot);
 
@@ -181,23 +200,47 @@ public partial class BattleManager
         aiMinimapSeen[entity.entityId] = Time.time;
     }
 
+    // 显示包对每个客户端可见实体都会来：自身留一份，其余进「周围可见」的缓存
     private void OnAiEntityDisplay(SCEntityDisplayInfo info)
     {
+        var state = EntityState(info.entityId);
+        state.seen = Time.time;
+        if (info.hasHealth)
+        {
+            state.health = info.health;
+            state.maxHealth = info.maxHealth;
+            state.hasHealth = true;
+        }
+        if (info.hasBuffs)
+        {
+            state.buffs.Clear();
+            for (int i = 0; i < info.buffs.Count; i++)
+            {
+                state.buffs.Add(info.buffs[i].type + ":" + info.buffs[i].level);
+            }
+            state.hasBuffs = true;
+        }
+
         var loading = ClientLoadingManager.Current;
         if (loading == null || info.entityId != loading.OwnEntityId) return;
 
-        if (info.hasHealth)
+        if (state.hasHealth)
         {
-            aiSelfHealth = info.health;
-            aiSelfMaxHealth = info.maxHealth;
+            aiSelfHealth = state.health;
+            aiSelfMaxHealth = state.maxHealth;
         }
-        if (!info.hasBuffs) return;
+        if (!state.hasBuffs) return;
 
         aiSelfBuffs.Clear();
-        for (int i = 0; i < info.buffs.Count; i++)
-        {
-            aiSelfBuffs.Add(info.buffs[i].type + ":" + info.buffs[i].level);
-        }
+        for (int i = 0; i < state.buffs.Count; i++) aiSelfBuffs.Add(state.buffs[i]);
+    }
+
+    private AiEntityState EntityState(ushort id)
+    {
+        if (aiEntityStates.TryGetValue(id, out var state)) return state;
+        state = new AiEntityState();
+        aiEntityStates.Add(id, state);
+        return state;
     }
 
     private void OnAiGuardUpdate(SCDefensePointProgress info)
@@ -206,15 +249,15 @@ public partial class BattleManager
         aiHasGuardProgress = true;
     }
 
-    // 小地图缓存按 minimap_entity_timeout 剔除，ManagedUpdate 每帧推一次
+    // 小地图与实体状态缓存都按 minimap_entity_timeout 剔除，ManagedUpdate 每帧推一次
     private void AiPerceptionTick()
     {
-        if (aiMinimapSeen.Count == 0) return;
+        float timeout = GlobalConfig.minimap_entity_timeout;
 
         aiMinimapExpired.Clear();
         foreach (var pair in aiMinimapSeen)
         {
-            if (Time.time - pair.Value <= GlobalConfig.minimap_entity_timeout) continue;
+            if (Time.time - pair.Value <= timeout) continue;
             aiMinimapExpired.Add(pair.Key);
         }
         for (int i = 0; i < aiMinimapExpired.Count; i++)
@@ -223,6 +266,19 @@ public partial class BattleManager
             aiMinimapSeen.Remove(id);
             aiMinimap.Remove(id);
         }
+
+        if (aiEntityStates.Count == 0) return;
+
+        // 血量/buff 是脏标记下发的，静止实体可能很久没有新包：视图还在就保留缓存，视图没了才回收
+        var players = Tool.ClientLogicManager != null ? Tool.ClientLogicManager.EntityPlayers : null;
+        aiMinimapExpired.Clear();
+        foreach (var pair in aiEntityStates)
+        {
+            if (Time.time - pair.Value.seen <= timeout) continue;
+            if (players != null && players.GetView(pair.Key) != null) continue;
+            aiMinimapExpired.Add(pair.Key);
+        }
+        for (int i = 0; i < aiMinimapExpired.Count; i++) aiEntityStates.Remove(aiMinimapExpired[i]);
     }
     #endregion
 
@@ -599,15 +655,96 @@ public partial class BattleManager
         request.Reply(builder.ToString());
     }
 
-    // 重要事件 = 战斗中技能播报那条 banner，玩家看得到的就这些
-    private void OnAiImportantEvent(AiRequest request)
+    private void OnAiTimeLeft(AiRequest request)
     {
-        var line = AiCommandLine.Current;
-        string text = line != null ? line.ReadImportant(ImportantReadCount) : null;
-        request.Reply(text ?? "（没有重要事件）");
+        request.Reply("剩余=" + BattleRemainTime.ToString("0.##") + "秒");
     }
 
-    // 自身 + 守护点 + 阵营人数 + 昼夜 + 小地图条数，一次取全现场
+    // 客户端可见实体 = 已经有视图的实体（玩家看得到模型的那批），血量/buff 取显示包缓存
+    private void OnAiNearby(AiRequest request)
+    {
+        if (!AiTryGetSelfPos(out Vector3 self))
+        {
+            request.Reject("本地玩家实体未就绪");
+            return;
+        }
+        var players = Tool.ClientLogicManager != null ? Tool.ClientLogicManager.EntityPlayers : null;
+        if (players == null)
+        {
+            request.Reject("实体管理器未就绪");
+            return;
+        }
+        var loading = ClientLoadingManager.Current;
+        ushort selfId = loading != null && loading.HasSession ? loading.OwnEntityId : (ushort)0;
+
+        var entries = new List<NearbyEntry>();
+        var line = new StringBuilder();
+        foreach (var view in players.AllViews)
+        {
+            if (view == null || view.id == selfId) continue;
+
+            Vector3 at = view.transform.position;
+            float dx = at.x - self.x;
+            float dz = at.z - self.z;
+            float distance = Mathf.Sqrt(dx * dx + dz * dz);
+
+            line.Clear();
+            line.Append("id=").Append(view.id)
+                .Append(" 类型=").Append(view.type.category).Append(':').Append(view.type.value)
+                .Append(" 阵营=").Append(view.camp)
+                .Append(" 距离=").Append(distance.ToString("0.#"))
+                .Append(" 坐标=(").Append(at.x.ToString("0.##")).Append(',').Append(at.z.ToString("0.##")).Append(')');
+
+            if (aiEntityStates.TryGetValue(view.id, out var state))
+            {
+                line.Append(" 血量=");
+                if (state.hasHealth) line.Append(state.health).Append('/').Append(state.maxHealth);
+                else line.Append("未知");
+                line.Append(" buff=").Append(state.hasBuffs ? BuffText(state.buffs) : "未知");
+            }
+            else line.Append(" 血量=未知 buff=未知");
+
+            entries.Add(new NearbyEntry { distance = distance, text = line.ToString() });
+        }
+
+        if (entries.Count == 0)
+        {
+            request.Reply("（周围没有可见实体）");
+            return;
+        }
+
+        entries.Sort((a, b) => a.distance.CompareTo(b.distance));
+        var builder = new StringBuilder();
+        builder.Append("自身=(").Append(self.x.ToString("0.##")).Append(',').Append(self.z.ToString("0.##"))
+            .Append(") 可见=").Append(entries.Count);
+        for (int i = 0; i < entries.Count; i++) builder.Append('\n').Append(entries[i].text);
+        request.Reply(builder.ToString());
+    }
+
+    private static string BuffText(List<string> buffs)
+    {
+        if (buffs.Count == 0) return "无";
+        return string.Join(",", buffs);
+    }
+
+    // 可见实体条数（去掉自己）：与 battleInfo_nearby 同一口径，管理器没就绪返回 -1
+    private static int VisibleEntityCount()
+    {
+        var players = Tool.ClientLogicManager != null ? Tool.ClientLogicManager.EntityPlayers : null;
+        if (players == null) return -1;
+        var loading = ClientLoadingManager.Current;
+        ushort selfId = loading != null && loading.HasSession ? loading.OwnEntityId : (ushort)0;
+
+        int count = 0;
+        foreach (var view in players.AllViews)
+        {
+            if (view == null || view.id == selfId) continue;
+            count++;
+        }
+        return count;
+    }
+
+    // 自身 + 守护点 + 阵营人数 + 昼夜 + 小地图条数 + 三条缓冲的未读，一次取全现场
     private void OnAiGetInfo(AiRequest request)
     {
         var loading = ClientLoadingManager.Current;
@@ -619,6 +756,13 @@ public partial class BattleManager
         if (!AiTryGetSelfPos(out Vector3 pos))
         {
             request.Reject("本地玩家实体未就绪");
+            return;
+        }
+        var commands = AiCommandLine.Current;
+        if (commands == null)
+        {
+            Debug.LogError("[AI] AiCommandLine 未就绪，battleInfo_all 取不到未读缓冲");
+            request.Reject("AI 命令行未就绪");
             return;
         }
 
@@ -661,6 +805,13 @@ public partial class BattleManager
 
         builder.Append("\n卡牌 ");
         AppendCardCount(builder);
+
+        builder.Append("\n剩余时间 ").Append(BattleRemainTime.ToString("0.##")).Append('秒');
+        int visible = VisibleEntityCount();
+        builder.Append("\n可见实体 ").Append(visible < 0 ? "未就绪" : visible.ToString());
+        builder.Append("\n飘字未读 ").Append(commands.ReadPromptUnread() ?? "（无）");
+        builder.Append("\n聊天未读 ").Append(commands.ReadChatUnread() ?? "（无）");
+        builder.Append("\n重要播报未读 ").Append(commands.ReadImportantUnread() ?? "（无）");
 
         request.Reply(builder.ToString());
     }
