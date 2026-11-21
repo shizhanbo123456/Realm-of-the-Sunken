@@ -14,6 +14,8 @@ ai输入后，命令行侧等待中断返回（轮询中断信息内容缓冲区
 按数量读（chat_recent / prompt_buffer / importantEvent_buffer）只看最近N条，不消费未读
 读未读（chat_unread / prompt_unread / importantEvent_unread）取走游标之后的全部内容，读完即置已读
 未读超过缓冲容量时最早的部分被覆盖，回复首行会标明被覆盖的条数
+退出战斗（含掉线、退出世界）时四条缓冲区一并清空，聊天面板里的聊天内容同时清空；
+清空只丢内容不归零总数，Lua 靠总数差判增量，不受影响
 
 中断来源有：
 Lua触发

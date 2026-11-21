@@ -47,17 +47,15 @@ public sealed class AiObservationLog
         while (important.Count > ImportantCapacity) important.RemoveAt(0);
     }
 
+    // 清空内容但保留总数：总数只增，Lua 的 Tick 状态机靠它判增量，归零会让差分永远追不上
     public void Clear()
     {
         chat.Clear();
         prompts.Clear();
         important.Clear();
-        ChatTotal = 0;
-        PromptTotal = 0;
-        importantTotal = 0;
-        chatRead = 0;
-        promptRead = 0;
-        importantRead = 0;
+        chatRead = ChatTotal;
+        promptRead = PromptTotal;
+        importantRead = importantTotal;
     }
 
     // 带数量的读：只看最近 count 条，不推进未读游标

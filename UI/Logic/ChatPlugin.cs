@@ -6,7 +6,7 @@ using UnityEngine;
 
 using Ros.Config;
 using Ros.Gm;
-//全局聊天面板：联网后常驻显示，大厅与战斗共用；离开房间清空并隐藏
+//全局聊天面板：联网后常驻显示，大厅与战斗共用；退出战斗与离开房间都清空聊天内容
 public class ChatPlugin : PageBase
 {
     // Submit 的结果：Sent 之外都是拦截原因
@@ -156,8 +156,8 @@ public class ChatPlugin : PageBase
 
     private void OnBattleEnd(int gameState)
     {
-        entries.RemoveAll(e => e.channel == TabSystem); // 系统消息只属于本局
-        EnterLobbyMode();                                // 结算后回到组队：页签收起、频道回全频道
+        ClearMessages();   // 退出战斗：上一局的聊天内容不带到大厅
+        EnterLobbyMode();  // 结算后回到组队：页签收起、频道回全频道
     }
 
     // 组队界面：隐藏频道页签，默认显示全频道

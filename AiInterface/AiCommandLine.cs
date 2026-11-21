@@ -90,6 +90,15 @@ public sealed class AiInterruptHub
         return true;
     }
 
+    // 退出战斗整条缓冲清空：上一局的回复/触发不再回放，挂着的等待也一并取消
+    public void Clear()
+    {
+        entries.Clear();
+        waitDeadline = 0f;
+        origin = OriginCmd;
+        waitOrigin = OriginCmd;
+    }
+
     private string Build()
     {
         builder.Clear();
@@ -643,6 +652,8 @@ public sealed class AiCommandLine : ClientSubManager
         EventManager.AddEvent<SCAiFeedback>(ClientEvent.OnAiFeedback, OnServerFeedback);
         EventManager.AddEvent<int>(ClientEvent.OnBattleStart, OnBattleStart);
         EventManager.AddEvent<int>(ClientEvent.OnBattleEnd, OnBattleEnd);
+        EventManager.AddEvent(ClientEvent.OnExitWorld, OnLeaveWorld);
+        EventManager.AddEvent(ClientEvent.OnRestartGame, OnLeaveWorld); // 掉线也走这条
     }
 
     protected override void UnbindEvents()
@@ -653,6 +664,8 @@ public sealed class AiCommandLine : ClientSubManager
         EventManager.RemoveEvent<SCAiFeedback>(ClientEvent.OnAiFeedback, OnServerFeedback);
         EventManager.RemoveEvent<int>(ClientEvent.OnBattleStart, OnBattleStart);
         EventManager.RemoveEvent<int>(ClientEvent.OnBattleEnd, OnBattleEnd);
+        EventManager.RemoveEvent(ClientEvent.OnExitWorld, OnLeaveWorld);
+        EventManager.RemoveEvent(ClientEvent.OnRestartGame, OnLeaveWorld);
         UnbindSelfCommands();
         if (Current == this) Current = null;
     }
@@ -678,7 +691,21 @@ public sealed class AiCommandLine : ClientSubManager
 
     private void OnBattleStart(int camp) => hub.Push(AiInterruptKind.BattleStart, "阵营=" + (EntityCamp)camp);
 
-    private void OnBattleEnd(int gameState) => hub.Push(AiInterruptKind.BattleEnd, "结算=" + gameState);
+    // 退出战斗：三条观察缓冲与中断缓冲先清空，再补一条「战斗结束」给命令行，AI 不会读到上一局的残留
+    private void OnBattleEnd(int gameState)
+    {
+        ClearBuffers();
+        hub.Push(AiInterruptKind.BattleEnd, "结算=" + gameState);
+    }
+
+    // 掉线/退出世界：战斗已经没了，缓冲一并清掉（不再补中断，控制台那边没人等）
+    private void OnLeaveWorld() => ClearBuffers();
+
+    private void ClearBuffers()
+    {
+        observations.Clear();
+        hub.Clear();
+    }
     #endregion
 
     #region 工具
