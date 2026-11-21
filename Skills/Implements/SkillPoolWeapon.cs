@@ -391,7 +391,7 @@ namespace Ros.Skill
     {
         public override int Id => (int)SkillType.SkillSkyfallWeapon;
 
-        private const float BulletLife = 2.5f;
+        private const float BulletLife = 2.5f / 3f; // 弹速为原值 3 倍
         private const float DropHeight = 10f;
         private const float SinkDepth = 5f;
 
