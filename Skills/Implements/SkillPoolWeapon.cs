@@ -386,30 +386,32 @@ namespace Ros.Skill
         }
     }
 
+    // 武器本体在目标头顶 10m 生成，垂直砸下
     public class SkillSkyfallWeapon : SkillBase
     {
         public override int Id => (int)SkillType.SkillSkyfallWeapon;
 
-        private const int Shots = 1;
-        private const float BulletLife = 1.1f;
+        private const float BulletLife = 0.45f;
+        private const float DropHeight = 10f;
 
         protected override void OnCast(EntityData caster)
         {
             Vector3 origin = OriginPos(caster, EntityAnchor.UpCenter, Vector3.zero);
-            Vector3 aim = Aim(caster, origin);
+            // 落点取索敌目标脚下，不按射程归一化
+            EntityData target = ResolveTarget(caster);
+            Vector3 land = target != null ? target.transform.position : Aim(caster, origin);
             int vfx = WeaponOf(caster);
             Tool.BattleManager.ShootBullet(caster, BuildAttack(caster),
-                new SkillTrajectorySkyFall(origin, aim, BulletLife), BulletLife,
+                new SkillTrajectoryLine(land + Vector3.up * DropHeight, land, BulletLife), BulletLife,
                 HitSpec(SkillVfxKind.Weapon, vfx, VfxScale()));
-            SendWave(caster, 0, context => { context.WriteVector3(origin); context.WriteVector3(aim); });
+            SendWave(caster, 0, context => context.WriteVector3(land));
         }
 
         public override void PlayWave(SCSkillDisplayContext context)
         {
-            Vector3 origin = context.ReadVector3();
-            Vector3 aim = context.ReadVector3();
+            Vector3 land = context.ReadVector3();
             VfxHelper.PlayOne(SkillVfxKind.Weapon, DisplayWeapon(context),
-                new SkillTrajectorySkyFall(origin, aim, BulletLife), VfxScale());
+                new SkillTrajectoryLine(land + Vector3.up * DropHeight, land, BulletLife), VfxScale());
         }
     }
     #endregion
