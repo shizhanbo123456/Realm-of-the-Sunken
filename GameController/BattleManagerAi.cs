@@ -169,6 +169,7 @@ public partial class BattleManager
         AiCommandBus.Bind(ai_commandEnum.terrain_points, OnAiPoints);
         AiCommandBus.Bind(ai_commandEnum.terrain_path, OnAiPath);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_all, OnAiGetInfo);
+        AiCommandBus.Bind(ai_commandEnum.battleInfo_common, OnAiCommon);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_timeLeft, OnAiTimeLeft);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_player, OnAiPlayer);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_reviveProgress, OnAiReviveProgress);
@@ -203,6 +204,7 @@ public partial class BattleManager
         AiCommandBus.Unbind(ai_commandEnum.terrain_points, OnAiPoints);
         AiCommandBus.Unbind(ai_commandEnum.terrain_path, OnAiPath);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_all, OnAiGetInfo);
+        AiCommandBus.Unbind(ai_commandEnum.battleInfo_common, OnAiCommon);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_timeLeft, OnAiTimeLeft);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_player, OnAiPlayer);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_reviveProgress, OnAiReviveProgress);
@@ -686,6 +688,43 @@ public partial class BattleManager
     private void OnAiTimeLeft(AiRequest request)
     {
         request.Reply("剩余=" + BattleRemainTime.ToString("0.##") + "秒");
+    }
+
+    // 常用信息：位置 + 可见实体摘要 + 卡牌数量 + 聊天未读，AI 常轮询这条
+    private void OnAiCommon(AiRequest request)
+    {
+        var loading = ClientLoadingManager.Current;
+        if (loading == null || !loading.HasSession)
+        {
+            request.Reject("没有战斗会话");
+            return;
+        }
+        if (!AiTryGetSelfPos(out Vector3 pos))
+        {
+            request.Reject("本地玩家实体未就绪");
+            return;
+        }
+        var commands = AiCommandLine.Current;
+        if (commands == null)
+        {
+            Debug.LogError("[AI] AiCommandLine 未就绪，battleInfo_common 取不到聊天未读");
+            request.Reject("AI 命令行未就绪");
+            return;
+        }
+
+        var builder = new StringBuilder();
+        builder.Append("坐标=(").Append(pos.x.ToString("0.##")).Append(',').Append(pos.z.ToString("0.##")).Append(')')
+            .Append(" 朝向=").Append(AiSelfYaw().ToString("0.#"));
+
+        builder.Append("\n可见实体 ");
+        AppendVisibleSummary(builder);
+
+        builder.Append("\n卡牌 ");
+        AppendCardCount(builder);
+
+        builder.Append("\n聊天未读 ").Append(commands.ReadChatUnread() ?? "（无）");
+
+        request.Reply(builder.ToString());
     }
 
     // 客户端可见实体 = 已经有视图的实体（玩家看得到模型的那批），血量/buff 取显示包缓存

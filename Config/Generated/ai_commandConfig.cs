@@ -92,6 +92,7 @@ namespace Ros.Config
         luaStateMachine_start,
         luaStateMachine_stop,
         battleInfo_all,
+        battleInfo_common,
         battleInfo_timeLeft,
         battleInfo_player,
         battleInfo_reviveProgress,
