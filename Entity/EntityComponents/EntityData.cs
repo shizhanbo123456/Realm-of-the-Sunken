@@ -574,13 +574,14 @@ public abstract class EntityData : MonoBehaviour
         return level < defaultEndure ? defaultEndure : level;
     }
 
-    public void ProcessHit(AttackData attack, int damage, CombatLabelType damageType, Vector3 hitOrigin, Vector3? floatPos = null)
+    // 返回值 = 本次命中是否成立（闪避与纯 0 伤害不成立），命中附带的 Buff 由调用方据此决定
+    public bool ProcessHit(AttackData attack, int damage, CombatLabelType damageType, Vector3 hitOrigin, Vector3? floatPos = null)
     {
         // 闪避：带闪避 Buff 时本次命中全部闪避（没有闪避率），不结算伤害、不进入受击
         if (effectController != null && effectController.HasEffect(EffectType.DodgeBoost))
         {
             OnDamaged(0f, damageType: CombatLabelType.Evade, hitPos: floatPos ?? hitOrigin);
-            return;
+            return false;
         }
         EntityData attacker = null;
         if (BattleManager.EntityContainer.Entities.TryGetObject(attack.shooter, out var shooter)) attacker = shooter;
@@ -596,9 +597,12 @@ public abstract class EntityData : MonoBehaviour
         }
         // 击退独立于受击判定：飞行与无刚体单位之外，只有护盾能挡住，霸体与冰冻都不挡
         ApplyKnockback(attacker != null ? attacker.transform.position : hitOrigin, attack.knockbackPower);
+        float shieldBefore = effectController != null ? effectController.GetShieldAbsorb() : 0f;
         float applied = OnDamaged(damage, attacker, damageType: damageType, hitPos: floatPos ?? hitOrigin);
         AddHitProtection(applied);
         Tool.BattleManager.OnHitPassive(attacker, this, damageType); // 攻击方被动（暴击麻痹），放在伤害结算之后
+        // 被盾吸收也算命中成立（飘护盾页）；失效 / GM 无敌 / 减伤到 0 不成立
+        return applied > 0f || (effectController != null && effectController.GetShieldAbsorb() < shieldBefore);
     }
 
     // 击退（命中与 GM 共用）：origin 为推力来源，force 为配表力度；只被护盾挡住，飞行与无刚体单位推不动

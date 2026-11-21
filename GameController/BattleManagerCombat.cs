@@ -125,8 +125,9 @@ public partial class BattleManager
                 if (e.TryBlockByHitProtection(floatPos)) continue; // 连击保护：只飘字，不结算伤害/buff/击退/受击
 
                 int damage = attack.GetDamage(e, out CombatLabelType type, spec.rates != null ? spec.rates[h] : 1f);
-                e.ProcessHit(attack, damage, type, prevCenter, floatPos);
-                if (attack.addEffectEvent != null && e.effectController != null)
+                // 闪避 / 失效：命中附带的 Buff 不施加，onHit 与击退等其余表现照旧
+                bool hitLanded = e.ProcessHit(attack, damage, type, prevCenter, floatPos);
+                if (hitLanded && attack.addEffectEvent != null && e.effectController != null)
                 {
                     attack.addEffectEvent.Invoke(e.effectController);
                 }
