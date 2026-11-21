@@ -62,7 +62,7 @@ namespace Ros.Transport
             }
             else
             {
-                if (invalidIndex - indexStart < 5) throw new Exception("反序列化 SCCombatLabel 失败：剩余数据不足");
+                if (invalidIndex <= indexStart) throw new Exception("反序列化 SCCombatLabel 失败：剩余数据不足");
 
                 BitField.SetBuffer(data, indexStart);
                 var r = new SCCombatLabel();

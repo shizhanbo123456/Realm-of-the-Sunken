@@ -155,7 +155,7 @@ namespace Ros.Transport
             }
             else
             {
-                if (invalidIndex - indexStart < 4) throw new Exception("反序列化 SCEntityDisplayInfo 失败：剩余数据不足");
+                if (invalidIndex <= indexStart) throw new Exception("反序列化 SCEntityDisplayInfo 失败：剩余数据不足");
 
                 BitField.SetBuffer(data, indexStart);
                 var r = new SCEntityDisplayInfo();

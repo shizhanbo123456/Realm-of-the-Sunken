@@ -73,6 +73,10 @@ namespace Ros.UI.Main
         // 每局进战斗：复位半径与点位、重算图标缩放、补建地形底图
         public void Reset(float defaultRadius)
         {
+            if (m_mapBase == null)
+                throw new System.InvalidOperationException("[小地图] Minimap 第 1 个子物体不是 mapBase(GGraph)，雷达换算无基准，请检查 FGUI 导出");
+            if (m_mask == null)
+                throw new System.InvalidOperationException("[小地图] Minimap 第 2 个子物体不是遮罩(GComponent)，点位与底图均无处挂载，请检查 FGUI 导出");
             viewRadius = defaultRadius;
             myCamp = EntityCamp.None;
             DisposeItems();
@@ -130,7 +134,6 @@ namespace Ros.UI.Main
             {
                 var point = pair.Value;
                 var item = EnsureItem(point);
-                if (item == null) continue;
                 item.m_type.selectedIndex = GetPage(point);
                 item.m_highlight.selectedIndex = point.marked ? 1 : 0; // 白眼标记随包同步
                 if (!PlaceItem(item, point, center)) culledIds.Add(point.id);
@@ -142,7 +145,6 @@ namespace Ros.UI.Main
         private UI_MinimapItem EnsureItem(in Point point)
         {
             if (items.TryGetValue(point.id, out var item) && item != null && !item.isDisposed) return item;
-            if (m_mask == null) return null;
             item = UI_MinimapItem.CreateInstance();
             item.scale = new Vector2(itemScale, itemScale); // 抵消上层缩放，恢复 FGUI 设计尺寸
             m_mask.AddChild(item); // 挂在遮罩里：越界由遮罩裁掉，层级也落在边框之下
@@ -155,7 +157,6 @@ namespace Ros.UI.Main
         private bool PlaceItem(UI_MinimapItem item, in Point point, Vector3 center)
         {
             var mapBase = m_mapBase;
-            if (mapBase == null) return true;
 
             float dx = 0f, dz = 0f;
             if (!point.self)
@@ -225,7 +226,6 @@ namespace Ros.UI.Main
                 return;
             }
             var mapBase = m_mapBase;
-            if (mapBase == null) return;
 
             staleQuickIds.Clear();
             foreach (int id in quickPointers.Keys) staleQuickIds.Add(id);
@@ -233,7 +233,6 @@ namespace Ros.UI.Main
             foreach (var mark in marks)
             {
                 var pointer = EnsureQuickPointer(mark.id);
-                if (pointer == null) continue;
                 pointer.Bind(mark.messageId);
                 PlaceQuickPointer(pointer, mark, center, ppm);
                 staleQuickIds.Remove(mark.id);
@@ -251,7 +250,6 @@ namespace Ros.UI.Main
         private UI_QuickMessagePointer EnsureQuickPointer(int id)
         {
             if (quickPointers.TryGetValue(id, out var pointer) && pointer != null && !pointer.isDisposed) return pointer;
-            if (m_mask == null) return null;
             float scale = itemScale * quickPointerScale;
             pointer = UI_QuickMessagePointer.CreateInstance();
             pointer.scale = new Vector2(scale, scale);
@@ -307,7 +305,6 @@ namespace Ros.UI.Main
         // 遮罩内创建地形底图 Loader：只建一次，被重建时补建
         private void EnsureMapLoader()
         {
-            if (m_mask == null) return;
             if (mapLoader != null && !mapLoader.isDisposed && mapLoader.parent == m_mask) return;
             mapLoader = new GLoader();
             mapLoader.fill = FillType.Scale; // 地形图与目标区域同为正方形，直接拉伸铺满
@@ -324,13 +321,13 @@ namespace Ros.UI.Main
         private void TickMapImage(Vector3 center)
         {
             var mapBase = m_mapBase;
-            if (mapLoader == null || mapLoader.isDisposed || mapBase == null) return;
+            if (mapLoader == null || mapLoader.isDisposed) return; // 底图尚未建好，本帧不对位
 
             float ppm = mapBase.width * 0.5f / viewRadius; // 像素/米
             float mapSize = GlobalVariable.RangeLength(global_variablesEnum.terrain_size);
             float size = mapSize * ppm;
-            float maskX = m_mask != null ? m_mask.x : 0f; // Loader 挂在遮罩里，需换算成遮罩局部
-            float maskY = m_mask != null ? m_mask.y : 0f;
+            float maskX = m_mask.x; // Loader 挂在遮罩里，需换算成遮罩局部
+            float maskY = m_mask.y;
             mapLoader.SetXY(
                 mapBase.x + mapBase.width * 0.5f - center.x * ppm - maskX,
                 mapBase.y + mapBase.height * 0.5f - (mapSize - center.z) * ppm - maskY);

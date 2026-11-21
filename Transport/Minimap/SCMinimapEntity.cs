@@ -16,6 +16,20 @@ namespace Ros.Transport
 
     public struct SCMinimapEntitySerializer
     {
+        private static int itemBytes;
+
+        // 单条实际字节数（含非位级）：位级长度随配表量化变，容量计算不能写死
+        public static int ItemBytes => itemBytes > 0 ? itemBytes : itemBytes = MeasureItemBytes();
+
+        private static int MeasureItemBytes()
+        {
+            byte[] scratch = new byte[64];
+            int index = 0;
+            if (!Serialize(default, scratch, ref index))
+                throw new System.Exception("测量 SCMinimapEntity 长度失败：缓冲区不足");
+            return index;
+        }
+
         public static bool Serialize(SCMinimapEntity value, byte[] result, ref int indexStart)
         {
             if (!EnsInstance.enableBitTransform)
@@ -30,9 +44,9 @@ namespace Ros.Transport
             }
             else
             {
-                if (result.Length - indexStart < 7) return false;
+                if (result.Length - indexStart < 1) return false;
 
-                // 位级：15+3+5+5+12+12+1=53 位
+                // 位级：字段位宽按配表量化现算（含坐标），总字节数不写死
                 BitField.SetBuffer(result, indexStart);
                 BitField.WriteInt(value.entityId, 0, SyncRanges.EntityIdMax);
                 BitField.WriteInt((int)value.type.category, 0, 7);
@@ -62,7 +76,7 @@ namespace Ros.Transport
             }
             else
             {
-                if (invalidIndex - indexStart < 7) throw new Exception("反序列化 SCMinimapEntity 失败：剩余数据不足");
+                if (invalidIndex <= indexStart) throw new Exception("反序列化 SCMinimapEntity 失败：剩余数据不足");
 
                 BitField.SetBuffer(data, indexStart);
                 var r = new SCMinimapEntity();
@@ -72,7 +86,7 @@ namespace Ros.Transport
                 r.posX = BitField.ReadFloat(0f, SyncRanges.PositionXZMax, SyncRanges.MinimapPositionStep);
                 r.posZ = BitField.ReadFloat(0f, SyncRanges.PositionXZMax, SyncRanges.MinimapPositionStep);
                 r.marked = BitField.ReadBool();
-                indexStart += 7;
+                indexStart += BitField.ReadByteLength;
                 return r;
             }
         }

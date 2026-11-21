@@ -30,9 +30,9 @@ namespace Ros.Transport
             }
             else
             {
-                if (result.Length - indexStart < 11) return false;
+                if (result.Length - indexStart < 1) return false;
 
-                // 位级：15+32+10+2+6+3+12+1+1=82 位
+                // 位级：字段位宽按各自范围现算，总字节数不写死
                 BitField.SetBuffer(result, indexStart);
                 BitField.WriteInt(value.entityId, 0, SyncRanges.EntityIdMax);
                 BitField.WriteInt(value.animId, int.MinValue, int.MaxValue);   // 动画状态 fullPathHash，可为负
@@ -67,7 +67,7 @@ namespace Ros.Transport
             }
             else
             {
-                if (invalidIndex - indexStart < 11) throw new Exception("反序列化 SCEntityAnimInfo 失败：剩余数据不足");
+                if (invalidIndex <= indexStart) throw new Exception("反序列化 SCEntityAnimInfo 失败：剩余数据不足");
 
                 BitField.SetBuffer(data, indexStart);
                 var r = new SCEntityAnimInfo();
@@ -77,7 +77,7 @@ namespace Ros.Transport
                 r.animParams = new AnimParamPack() { characterType = BitField.ReadInt(0, 3), attackId = BitField.ReadInt(0, 63), inAir = BitField.ReadBool(), moving = BitField.ReadBool(), slide = BitField.ReadBool(), hit = BitField.ReadInt(0, 1) };
                 r.moveSpeedScale = BitField.ReadFloat(0f, SyncRanges.MoveSpeedScaleMax, 0.01f);
                 r.paused = BitField.ReadBool();
-                indexStart += 11;
+                indexStart += BitField.ReadByteLength;
                 return r;
             }
         }
