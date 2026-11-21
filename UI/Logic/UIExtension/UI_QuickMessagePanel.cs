@@ -28,6 +28,8 @@ namespace Ros.UI.Main
                 button.m_graphic_over.m_type.selectedIndex = messageId;
                 button.m_graphic_selected.m_type.selectedIndex = messageId;
                 button.onClick.Set(() => Click(messageId));
+                button.onRollOver.Set(() => TipHost.ShowQuickMessage(messageId, button));
+                button.onRollOut.Set(TipHost.HideQuickTip);
             }
             Close();
         }
@@ -43,6 +45,7 @@ namespace Ros.UI.Main
 
         public void Close()
         {
+            TipHost.HideQuickTip(); // 收起时提示不能留在屏幕上
             m_t1.Stop();
             visible = false;
             touchable = false; // 收起时不吃点击

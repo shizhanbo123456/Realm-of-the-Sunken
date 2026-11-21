@@ -9,6 +9,7 @@ namespace Ros.UI.Main
 
         private static UI_SkillTip skillTip;
         private static UI_BuffTip buffTip;
+        private static UI_QuickMessageTip quickTip;
         private static GObject anchor;
         private static readonly TimerCallback check = CheckAnchor;
         private static readonly TimerCallback follow = FollowPointer;
@@ -16,6 +17,7 @@ namespace Ros.UI.Main
         public static void ShowSkill(int skillId, GObject from)
         {
             HideBuffTip();
+            HideQuickTip();
             if (skillTip == null || skillTip.isDisposed) skillTip = UI_SkillTip.CreateInstance();
             Attach(skillTip, from);
             skillTip.Fill(skillId);
@@ -26,6 +28,7 @@ namespace Ros.UI.Main
         public static void ShowBuff(int buffType, GObject from)
         {
             HideSkillTip();
+            HideQuickTip();
             if (buffTip == null || buffTip.isDisposed) buffTip = UI_BuffTip.CreateInstance();
             Attach(buffTip, from);
             buffTip.Fill(buffType);
@@ -33,13 +36,30 @@ namespace Ros.UI.Main
             Watch(from);
         }
 
+        public static void ShowQuickMessage(int messageId, GObject from)
+        {
+            HideSkillTip();
+            HideBuffTip();
+            if (quickTip == null || quickTip.isDisposed) quickTip = UI_QuickMessageTip.CreateInstance();
+            Attach(quickTip, from);
+            quickTip.Fill(messageId);
+            quickTip.ShowAtPointer();
+            Watch(from);
+        }
+
         public static void Hide()
         {
             HideSkillTip();
             HideBuffTip();
+            HideQuickTip();
             anchor = null;
             Timers.inst.Remove(check);
             Timers.inst.Remove(follow);
+        }
+
+        public static void HideQuickTip()
+        {
+            if (quickTip != null && !quickTip.isDisposed) quickTip.Hide();
         }
 
         private static void HideSkillTip()
@@ -82,6 +102,7 @@ namespace Ros.UI.Main
         {
             if (skillTip != null && !skillTip.isDisposed && skillTip.visible) TipLayout.PlaceAtPointer(skillTip);
             if (buffTip != null && !buffTip.isDisposed && buffTip.visible) TipLayout.PlaceAtPointer(buffTip);
+            if (quickTip != null && !quickTip.isDisposed && quickTip.visible) TipLayout.PlaceAtPointer(quickTip);
         }
 
         // 轮询锚点：列表回收、血条隐藏、面板关闭都会让锚点失效
