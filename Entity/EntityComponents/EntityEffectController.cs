@@ -118,7 +118,6 @@ public class EntityEffectController
     private readonly List<EffectType> iterateKeys = new();
     private readonly List<EffectLayer> layerSnapshot = new();
     private readonly List<int> shieldOrder = new();
-    private static readonly List<EntityData> s_tickTargets = new();
     private static readonly List<EntityData> s_curseTargets = new();
 
     private int nextSerial = 1;
@@ -372,7 +371,7 @@ public class EntityEffectController
                 owner.OnDamaged(SumDamageOf(layers, GlobalVariable.F(global_variablesEnum.buff_poison_damage_ratio)), FindEntity(layers), fixedDamage: true, damageType: CombatLabelType.Poison);
                 break;
             case EffectType.DeathStroll:
-                TickDeathStroll(layers);
+                ApplyAuraCurse();
                 break;
             case EffectType.DeathCurse:
                 owner.OnDamaged(GlobalVariable.F(global_variablesEnum.death_curse_tick_damage) * SumLevel(layers), FindEntity(layers), fixedDamage: true, damageType: CombatLabelType.DeathStroll);
@@ -386,17 +385,10 @@ public class EntityEffectController
         }
     }
 
-    // 光环伤害对每个目标只结算这一次；诅咒刷新每跳一次（叠加模式 2，等级随停留时间累加）
-    private void TickDeathStroll(List<EffectLayer> layers)
+    // 光环只负责给范围内敌人挂诅咒，每跳刷新一次（叠加模式 2，等级随停留时间累加）
+    private void ApplyAuraCurse()
     {
-        float damage = SumDamageOf(layers, GlobalVariable.F(global_variablesEnum.buff_death_stroll_dot_ratio));
         EntityCamp enemyCamp = EntityCampUtil.HostileOf(owner.type.category);
-        s_tickTargets.Clear();
-        BattleManager.EntityContainer.GetAllInCamp(owner.transform.position, GlobalVariable.F(global_variablesEnum.buff_death_stroll_radius), enemyCamp, s_tickTargets);
-        for (int i = 0; i < s_tickTargets.Count; i++)
-        {
-            if (s_tickTargets[i] != null) s_tickTargets[i].OnDamaged(damage, owner, fixedDamage: true, damageType: CombatLabelType.DeathStroll);
-        }
         s_curseTargets.Clear();
         BattleManager.EntityContainer.GetAllInCamp(owner.transform.position, GlobalVariable.F(global_variablesEnum.death_curse_radius), enemyCamp, s_curseTargets);
         for (int i = 0; i < s_curseTargets.Count; i++)
