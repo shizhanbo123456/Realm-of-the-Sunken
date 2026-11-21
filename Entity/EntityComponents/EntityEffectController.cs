@@ -373,7 +373,7 @@ public class EntityEffectController
                 owner.OnDamaged(GlobalVariable.F(global_variablesEnum.buff_burning_damage_per_tick) * SumLevel(layers), FindEntity(layers), fixedDamage: true, damageType: CombatLabelType.Burning);
                 break;
             case EffectType.PaleFire:
-                owner.OnDamaged(GlobalVariable.F(global_variablesEnum.buff_burning_damage_per_tick) * SumLevel(layers), FindEntity(layers), fixedDamage: true, damageType: CombatLabelType.PaleFire);
+                owner.OnDamaged(GlobalVariable.F(global_variablesEnum.buff_pale_fire_damage_per_tick) * SumLevel(layers), FindEntity(layers), fixedDamage: true, damageType: CombatLabelType.PaleFire);
                 break;
             case EffectType.Poison:
                 owner.OnDamaged(SumDamageOf(layers, GlobalVariable.F(global_variablesEnum.buff_poison_damage_ratio)), FindEntity(layers), fixedDamage: true, damageType: CombatLabelType.Poison);

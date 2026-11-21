@@ -183,8 +183,6 @@ namespace Ros.Config
         buff_demon_bless_heal_per_tick,
         buff_demon_bless_damage_up,
         buff_demon_bless_damage_taken_up,
-        buff_death_stroll_radius,
-        buff_death_stroll_dot_ratio,
         buff_plague_detonate_damage,
         buff_plague_mark_duration,
         buff_plague_pollute_radius,
@@ -194,5 +192,6 @@ namespace Ros.Config
         buff_speed_down,
         gm_speed_multiplier,
         buff_shield_health_ratio,
+        buff_pale_fire_damage_per_tick,
     }
 }
