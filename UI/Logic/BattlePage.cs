@@ -156,9 +156,34 @@ public class BattlePage : PageBase
         SendQuickMessage(index);
     }
 
+    // 位置口径：静止时带自身当时坐标（固定点）；按着移动键时不带位置，人机以发送者为动态锚点
     private void SendQuickMessage(int index)
     {
-        TrySendQuickMessage(index, Vector3.zero, false, out _); // 轮盘连点时静默丢，不打断玩家操作
+        if (MoveKeyHeld)
+        {
+            TrySendQuickMessage(index, Vector3.zero, false, out _); // 轮盘连点时静默丢，不打断玩家操作
+            return;
+        }
+
+        if (!TryGetOwnPosition(out Vector3 point))
+        {
+            Debug.LogError("[快捷指令] 静止发送但读不到本地玩家坐标，按不带位置发送");
+            TrySendQuickMessage(index, Vector3.zero, false, out _);
+            return;
+        }
+        TrySendQuickMessage(index, point, true, out _);
+    }
+
+    private static bool MoveKeyHeld =>
+        Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.D);
+
+    private bool TryGetOwnPosition(out Vector3 point)
+    {
+        point = Vector3.zero;
+        if (!HasSession || Tool.ClientLogicManager == null
+            || Tool.ClientLogicManager.EntityPlayers == null) return false;
+        return OwnEntityId != 0
+            && Tool.ClientLogicManager.EntityPlayers.TryGetEntityPosition(OwnEntityId, out point);
     }
 
     // 快捷指令唯一的发送入口：轮盘与 AI 命令共用，同玩家 1s 一条
