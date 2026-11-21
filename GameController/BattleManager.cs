@@ -306,7 +306,7 @@ public partial class BattleManager : EnsBehaviour
         Destroy(data.gameObject);
         if (wasKingStatue && BattleStarted)
         {
-            EndBattle(1); // 国王雕像被摧毁 → 进攻方必然获胜（策划案 17.2）
+            EndBattle(1); // 主守护点被摧毁 → 进攻方胜，不看副守护点是否存活（策划案 17.2）
         }
         return true;
     }
@@ -994,6 +994,39 @@ public partial class BattleManager : EnsBehaviour
         return StatueRemainingHealth() * (1f + GlobalConfig.kill_score_factor * DefenseKills);
     }
 
+    // 主守护点血量比例 ≥ 该值 → 防守方胜（1 = 进攻方胜，2 = 防守方胜）
+    private const float kMainStatueDefenseWinRatio = 0.5f;
+
+    // 胜负只认主守护点：不看副守护点是否存活（策划案 17.2）
+    public int WinnerByMainStatue()
+    {
+        EntityData king = FindMainStatue();
+        if (king == null)
+        {
+            Debug.LogError("[Battle] 找不到主守护点，无法判定胜负，按进攻方胜处理");
+            return 1;
+        }
+        if (king.attributes.Health / king.attributes.MaxHealth >= kMainStatueDefenseWinRatio) return 2;
+        return 1;
+    }
+
+    // 结算展示用：主守护点剩余血量（实体已销毁即 0）
+    public float MainStatueRemainingHealth()
+    {
+        EntityData king = FindMainStatue();
+        if (king == null) return 0f;
+        return king.attributes.Health;
+    }
+
+    private static EntityData FindMainStatue()
+    {
+        foreach (var guardStatue in EntityContainer.GuardStatues)
+        {
+            if (guardStatue != null && guardStatue.type == EntityType.KingStatue) return guardStatue;
+        }
+        return null;
+    }
+
     #endregion
 
     #region 输入与技能接收（服务器）
@@ -1208,7 +1241,7 @@ public partial class BattleManager : EnsBehaviour
                 killScore = DefenseKills,
                 remainTime = Mathf.Max(0f, BattleRemainTime),
                 expGain = Mathf.RoundToInt(harvest), // 经验 = 采集量 = 对雕像造成的伤害量（策划案 17.3）
-                guardStatueHealth = StatueRemainingHealth(),
+                guardStatueHealth = MainStatueRemainingHealth(),
             });
         }
 
@@ -1271,8 +1304,8 @@ public partial class BattleManager : EnsBehaviour
             BattleRemainTime -= UnityEngine.Time.deltaTime;
             if (BattleRemainTime <= 0f)
             {
-                // 时间耗尽按分数结算（分数制，不单独处理平局）
-                EndBattle(AttackScore >= DefenseScore() ? 1 : 2);
+                // 时间耗尽：按主守护点剩余血量判胜负（策划案 17.2）
+                EndBattle(WinnerByMainStatue());
                 Profiler.EndSample(); // kTimerTag
                 Profiler.EndSample(); // kManagedUpdateProfilerTag
                 return;
