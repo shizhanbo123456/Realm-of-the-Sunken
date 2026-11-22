@@ -50,6 +50,7 @@ public class EnvironmentManager : MonoBehaviour
 
         ApplyFogDistance();
         caustics.SetRenderEnabled(ClientSettings.Caustics); // 设置面板的焦散开关：关着时连全屏绘制都不提交
+        volumetricLight.enabled = ClientSettings.VolumetricLight; // 设置面板的体积光开关：停用组件即走插件 TurnOff
         if (!Mathf.Approximately(time, appliedTime)) Apply(time);
     }
 

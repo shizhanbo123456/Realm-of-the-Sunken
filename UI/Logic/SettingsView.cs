@@ -95,17 +95,17 @@ public class SettingsView : PageBase
     private void BindToggles()
     {
         View.m_toggle_caustic.selected = ClientSettings.Caustics;
+        View.m_toggle_volumetric_light.selected = ClientSettings.VolumetricLight;
         View.m_toggle_third_person_perspctivee.selected = ClientSettings.ThirdPersonCamera;
         View.m_toggle_auto_pitch.selected = ClientSettings.AutoPitch;
-        View.m_toggle_camea_shake.selected = ClientSettings.CameraShake;
         View.m_toggle_caustic.onChanged.Add(() =>
             ClientSettings.Caustics = View.m_toggle_caustic.selected);
+        View.m_toggle_volumetric_light.onChanged.Add(() =>
+            ClientSettings.VolumetricLight = View.m_toggle_volumetric_light.selected);
         View.m_toggle_third_person_perspctivee.onChanged.Add(() =>
             ClientSettings.ThirdPersonCamera = View.m_toggle_third_person_perspctivee.selected);
         View.m_toggle_auto_pitch.onChanged.Add(() =>
             ClientSettings.AutoPitch = View.m_toggle_auto_pitch.selected);
-        View.m_toggle_camea_shake.onChanged.Add(() =>
-            ClientSettings.CameraShake = View.m_toggle_camea_shake.selected);
     }
 
     private void SyncToggles()
@@ -113,12 +113,12 @@ public class SettingsView : PageBase
         if (View == null) return;
         if (View.m_toggle_caustic.selected != ClientSettings.Caustics)
             View.m_toggle_caustic.selected = ClientSettings.Caustics;
+        if (View.m_toggle_volumetric_light.selected != ClientSettings.VolumetricLight)
+            View.m_toggle_volumetric_light.selected = ClientSettings.VolumetricLight;
         if (View.m_toggle_third_person_perspctivee.selected != ClientSettings.ThirdPersonCamera)
             View.m_toggle_third_person_perspctivee.selected = ClientSettings.ThirdPersonCamera;
         if (View.m_toggle_auto_pitch.selected != ClientSettings.AutoPitch)
             View.m_toggle_auto_pitch.selected = ClientSettings.AutoPitch;
-        if (View.m_toggle_camea_shake.selected != ClientSettings.CameraShake)
-            View.m_toggle_camea_shake.selected = ClientSettings.CameraShake;
     }
     #endregion
 }

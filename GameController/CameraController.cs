@@ -108,7 +108,7 @@ public class CameraController : MonoBehaviour
     // 外部震源入口：强度档位由调用方按配表给（受击 / 命中），这里只负责累积与衰减
     public void AddTrauma(float amount)
     {
-        if (!ClientSettings.CameraShake || amount <= 0f) return;
+        if (amount <= 0f) return;
         trauma = Mathf.Clamp01(trauma + amount);
     }
 

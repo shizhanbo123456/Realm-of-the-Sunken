@@ -7,8 +7,8 @@ public static class ClientSettings
     // 勾选 = 俯仰角交给自动取景，鼠标不控俯仰；取消 = 鼠标纵向滑动控制俯仰
     public static bool AutoPitch { get; set; } = true;
 
-    // 勾选 = 受击/命中时镜头震动；取消 = 完全不震
-    public static bool CameraShake { get; set; } = true;
+    // 勾选 = 场景体积光；取消 = 体积光组件停用
+    public static bool VolumetricLight { get; set; } = true;
 
     // 勾选 = 全屏焦散；目前只有勾选态进存档，运行时还没有消费方（见 07-待办）
     public static bool Caustics { get; set; } = true;
@@ -22,7 +22,7 @@ public static class ClientSettings
         var sb = new System.Text.StringBuilder(BitCount);
         sb.Append(ThirdPersonCamera ? '1' : '0');
         sb.Append(AutoPitch ? '1' : '0');
-        sb.Append(CameraShake ? '1' : '0');
+        sb.Append(VolumetricLight ? '1' : '0');
         sb.Append(Caustics ? '1' : '0');
         return sb.ToString();
     }
@@ -38,7 +38,7 @@ public static class ClientSettings
 
         ThirdPersonCamera = bits[0] == '1';
         AutoPitch = bits[1] == '1';
-        CameraShake = bits[2] == '1';
+        VolumetricLight = bits[2] == '1';
         Caustics = bits[3] == '1';
     }
 
@@ -47,7 +47,7 @@ public static class ClientSettings
     {
         ThirdPersonCamera = false;
         AutoPitch = true;
-        CameraShake = true;
+        VolumetricLight = true;
         Caustics = true;
     }
     #endregion
