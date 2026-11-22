@@ -136,9 +136,20 @@ public class BattlePage : PageBase
         if (Tool.UIManager != null) Tool.UIManager.OpenSettings();
     }
 
+    // 只有真正在操作角色时才能发快捷指令：纯观战与死亡等待复活都不行
+    private bool CanUseQuickMessage => !spectatorMode && localPlayerAlive;
+
+    // 按钮可见性与轮盘开合跟着资格走：失去资格时立刻收起，避免残留的轮盘还能点
+    private void RefreshQuickMessageButton(bool allowed)
+    {
+        panel.m_BattleInfoPanel.m_btn_quick_message.visible = allowed;
+        if (!allowed && quickMessagePanel.IsOpen) quickMessagePanel.Close();
+    }
+
     // 快捷指令轮盘：点信息面板上的按钮开关；展开时按键 = 发送并收起
     private void ToggleQuickMessage()
     {
+        if (!CanUseQuickMessage) return;
         if (quickMessagePanel.IsOpen) quickMessagePanel.Close();
         else quickMessagePanel.Open();
     }
@@ -159,6 +170,7 @@ public class BattlePage : PageBase
     // 位置口径：静止时带自身当时坐标（固定点）；按着移动键时不带位置，人机以发送者为动态锚点
     private void SendQuickMessage(int index)
     {
+        if (!CanUseQuickMessage) return;
         if (MoveKeyHeld)
         {
             TrySendQuickMessage(index, Vector3.zero, false, out _); // 轮盘连点时静默丢，不打断玩家操作
@@ -547,11 +559,14 @@ public class BattlePage : PageBase
     public override void Update(float deltaTime)
     {
         if (OwnEntityId != 0) lastOwnEntityId = OwnEntityId;
+        // 快捷指令只服务于在场角色：纯观战 / 死亡等待复活时收起按钮，已展开的轮盘一并关掉
+        bool canQuickMessage = CanUseQuickMessage;
+        RefreshQuickMessageButton(canQuickMessage);
         // 输入被 UI 占用或 AI 接管时，技能选择、快捷消息与面板快捷键都不响应
         if (!InputManager.PlayerInputBlocked)
         {
             if (Input.GetKeyDown(GlobalConfig.skill_select_key)) Tool.UIManager.SkillSelect.Toggle();
-            if (AnyQuickMessageKeyDown(out int quickMessageIndex)) HandleQuickMessageKey(quickMessageIndex);
+            if (canQuickMessage && AnyQuickMessageKeyDown(out int quickMessageIndex)) HandleQuickMessageKey(quickMessageIndex);
             Tool.UIManager.GodView.TickOpenKey();
         }
         //剩余时间（以快照校准的本地推演为准，重连/中途进入的起点由服务器补发）
