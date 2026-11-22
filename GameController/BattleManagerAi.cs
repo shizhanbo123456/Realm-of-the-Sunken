@@ -159,13 +159,12 @@ public partial class BattleManager
         if (aiCommandsBound) return;
         aiCommandsBound = true;
 
-        AiCommandBus.Bind(ai_commandEnum.stateMachine_stop, OnAiStop);
-        AiCommandBus.Bind(ai_commandEnum.stateMachine_moveTo, OnAiMoveTo);
-        AiCommandBus.Bind(ai_commandEnum.stateMachine_attack, OnAiAttack);
-        AiCommandBus.Bind(ai_commandEnum.stateMachine_collectCoral, OnAiCollectCoral);
-        AiCommandBus.Bind(ai_commandEnum.stateMachine_castSkill, OnAiCastSkill);
-        AiCommandBus.Bind(ai_commandEnum.luaStateMachine_start, OnAiStartLua);
-        AiCommandBus.Bind(ai_commandEnum.luaStateMachine_stop, OnAiStopLua);
+        AiCommandBus.Bind(ai_commandEnum.control_stop, OnAiStop);
+        AiCommandBus.Bind(ai_commandEnum.control_moveTo, OnAiMoveTo);
+        AiCommandBus.Bind(ai_commandEnum.control_castSkill, OnAiCastSkill);
+        AiCommandBus.Bind(ai_commandEnum.luaSM_start, OnAiStartLua);
+        AiCommandBus.Bind(ai_commandEnum.luaSM_stop, OnAiStopLua);
+        AiCommandBus.Bind(ai_commandEnum.luaSM_list, OnAiListLua);
         AiCommandBus.Bind(ai_commandEnum.terrain_points, OnAiPoints);
         AiCommandBus.Bind(ai_commandEnum.terrain_path, OnAiPath);
         AiCommandBus.Bind(ai_commandEnum.battleInfo_all, OnAiGetInfo);
@@ -194,13 +193,12 @@ public partial class BattleManager
         if (!aiCommandsBound) return;
         aiCommandsBound = false;
 
-        AiCommandBus.Unbind(ai_commandEnum.stateMachine_stop, OnAiStop);
-        AiCommandBus.Unbind(ai_commandEnum.stateMachine_moveTo, OnAiMoveTo);
-        AiCommandBus.Unbind(ai_commandEnum.stateMachine_attack, OnAiAttack);
-        AiCommandBus.Unbind(ai_commandEnum.stateMachine_collectCoral, OnAiCollectCoral);
-        AiCommandBus.Unbind(ai_commandEnum.stateMachine_castSkill, OnAiCastSkill);
-        AiCommandBus.Unbind(ai_commandEnum.luaStateMachine_start, OnAiStartLua);
-        AiCommandBus.Unbind(ai_commandEnum.luaStateMachine_stop, OnAiStopLua);
+        AiCommandBus.Unbind(ai_commandEnum.control_stop, OnAiStop);
+        AiCommandBus.Unbind(ai_commandEnum.control_moveTo, OnAiMoveTo);
+        AiCommandBus.Unbind(ai_commandEnum.control_castSkill, OnAiCastSkill);
+        AiCommandBus.Unbind(ai_commandEnum.luaSM_start, OnAiStartLua);
+        AiCommandBus.Unbind(ai_commandEnum.luaSM_stop, OnAiStopLua);
+        AiCommandBus.Unbind(ai_commandEnum.luaSM_list, OnAiListLua);
         AiCommandBus.Unbind(ai_commandEnum.terrain_points, OnAiPoints);
         AiCommandBus.Unbind(ai_commandEnum.terrain_path, OnAiPath);
         AiCommandBus.Unbind(ai_commandEnum.battleInfo_all, OnAiGetInfo);
@@ -356,31 +354,29 @@ public partial class BattleManager
     }
     #endregion
 
-    #region 状态机动作
-    private void OnAiStop(AiRequest request) => SendAiIntent(AiIntent.Stop, Vector2.zero, 0, request);
-
-    private void OnAiMoveTo(AiRequest request) =>
-        SendAiIntent(AiIntent.MoveTo, new Vector2(request.Float(0), request.Float(1)), 0, request);
-
-    // 附近敌人 = 小地图上非中立、非我方的单位（珊瑚单独走 collectCoral）
-    private void OnAiAttack(AiRequest request)
+    #region 直接操控（执行即停用 lua 状态机）
+    // 直接操控优先：动手前先停掉 lua 决策机，否则下一拍就被状态机覆盖
+    private static void StopLuaDecision()
     {
-        if (!TryAiFindNearestEnemy(out ushort enemyId))
+        var lua = AiLuaInterface.Current;
+        if (lua == null)
         {
-            request.Reject("小地图上没有敌人");
+            Debug.LogError("[AI] AiLuaInterface 未就绪，control 命令无法停用 lua 状态机");
             return;
         }
-        SendAiIntent(AiIntent.AttackTarget, Vector2.zero, enemyId, request);
+        lua.StopDecision();
     }
 
-    private void OnAiCollectCoral(AiRequest request)
+    private void OnAiStop(AiRequest request)
     {
-        if (!TryAiFindNearestCoral(out ushort coralId))
-        {
-            request.Reject("小地图上没有珊瑚");
-            return;
-        }
-        SendAiIntent(AiIntent.AttackTarget, Vector2.zero, coralId, request);
+        StopLuaDecision();
+        SendAiIntent(AiIntent.Stop, Vector2.zero, 0, request);
+    }
+
+    private void OnAiMoveTo(AiRequest request)
+    {
+        StopLuaDecision();
+        SendAiIntent(AiIntent.MoveTo, new Vector2(request.Float(0), request.Float(1)), 0, request);
     }
 
     private void OnAiCastSkill(AiRequest request)
@@ -396,6 +392,7 @@ public partial class BattleManager
             request.Reject("未联网");
             return;
         }
+        StopLuaDecision();
         Tool.NetworkManager.SendAiSkillCast(skillId);
     }
 
@@ -407,7 +404,32 @@ public partial class BattleManager
             request.Reject("Lua 接口未就绪");
             return;
         }
-        request.Reply(lua.ActivateStateMachine());
+        request.Reply(lua.ActivateStateMachine(request.Str(0), request.Str(1)));
+    }
+
+    private void OnAiListLua(AiRequest request)
+    {
+        var lua = AiLuaInterface.Current;
+        if (lua == null)
+        {
+            request.Reject("Lua 接口未就绪");
+            return;
+        }
+
+        List<string> names = lua.ListStateMachines();
+        if (names.Count == 0)
+        {
+            request.Reply("（没有可用的状态机脚本）");
+            return;
+        }
+
+        var builder = new StringBuilder();
+        for (int i = 0; i < names.Count; i++)
+        {
+            if (i > 0) builder.Append('\n');
+            builder.Append(names[i]);
+        }
+        request.Reply(builder.ToString());
     }
 
     private void OnAiStopLua(AiRequest request)
@@ -419,59 +441,6 @@ public partial class BattleManager
             return;
         }
         request.Reply(lua.StopStateMachine());
-    }
-
-    private bool TryAiFindNearestCoral(out ushort coralId) => TryAiFindNearest(EntityCategory.Coral, out coralId);
-
-    private bool TryAiFindNearestEnemy(out ushort enemyId)
-    {
-        enemyId = 0;
-        var loading = ClientLoadingManager.Current;
-        if (loading == null || !loading.HasSession) return false;
-
-        EntityCamp mine = loading.Camp;
-        if (!AiTryGetSelfPos(out Vector3 self)) return false;
-
-        float best = float.MaxValue;
-        bool found = false;
-        foreach (var pair in aiMinimap)
-        {
-            var entity = pair.Value;
-            if (entity.camp == mine || entity.camp == EntityCamp.Neutral) continue;
-            if (entity.camp == EntityCamp.None) continue;
-            if (entity.type.category == EntityCategory.Coral) continue;
-
-            float dx = entity.posX - self.x;
-            float dz = entity.posZ - self.z;
-            float sqr = dx * dx + dz * dz;
-            if (sqr >= best) continue;
-            best = sqr;
-            enemyId = entity.entityId;
-            found = true;
-        }
-        return found;
-    }
-
-    private bool TryAiFindNearest(EntityCategory category, out ushort entityId)
-    {
-        entityId = 0;
-        if (!AiTryGetSelfPos(out Vector3 self)) return false;
-
-        float best = float.MaxValue;
-        bool found = false;
-        foreach (var pair in aiMinimap)
-        {
-            var entity = pair.Value;
-            if (entity.type.category != category) continue;
-            float dx = entity.posX - self.x;
-            float dz = entity.posZ - self.z;
-            float sqr = dx * dx + dz * dz;
-            if (sqr >= best) continue;
-            best = sqr;
-            entityId = entity.entityId;
-            found = true;
-        }
-        return found;
     }
     #endregion
 
@@ -492,7 +461,7 @@ public partial class BattleManager
             request.Reply("可达=否 原因=起点不在导航面上");
             return;
         }
-        if (!NavMesh.SamplePosition(to, out var endHit, 2f, NavMesh.AllAreas))
+        if (!NavMesh.SamplePosition(to, out var endHit, 4f, NavMesh.AllAreas))
         {
             request.Reply("可达=否 原因=终点不在导航面上");
             return;

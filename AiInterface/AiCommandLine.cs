@@ -324,8 +324,11 @@ public sealed class AiCommandLine : ClientSubManager
         AiCommandBus.Bind(ai_commandEnum.prompt_unread, OnPromptUnread);
         AiCommandBus.Bind(ai_commandEnum.importantEvent_buffer, OnImportantEventBuffer);
         AiCommandBus.Bind(ai_commandEnum.importantEvent_unread, OnImportantEventUnread);
-        AiCommandBus.Bind(ai_commandEnum.lua_reloadExtension, OnReloadLua);
-        AiCommandBus.Bind(ai_commandEnum.lua_execCommand, OnRunLuaExtension);
+        AiCommandBus.Bind(ai_commandEnum.luaExt_reload, OnReloadLua);
+        AiCommandBus.Bind(ai_commandEnum.luaMonitor_reload, OnReloadMonitor);
+        AiCommandBus.Bind(ai_commandEnum.luaMonitor_list, OnListMonitor);
+        AiCommandBus.Bind(ai_commandEnum.lua_current, OnListScripts);
+        AiCommandBus.Bind(ai_commandEnum.luaExt_exec, OnRunLuaExtension);
         AiCommandBus.Bind(ai_commandEnum.home_getPlayerName, OnGetPlayerName);
     }
 
@@ -342,8 +345,11 @@ public sealed class AiCommandLine : ClientSubManager
         AiCommandBus.Unbind(ai_commandEnum.prompt_unread, OnPromptUnread);
         AiCommandBus.Unbind(ai_commandEnum.importantEvent_buffer, OnImportantEventBuffer);
         AiCommandBus.Unbind(ai_commandEnum.importantEvent_unread, OnImportantEventUnread);
-        AiCommandBus.Unbind(ai_commandEnum.lua_reloadExtension, OnReloadLua);
-        AiCommandBus.Unbind(ai_commandEnum.lua_execCommand, OnRunLuaExtension);
+        AiCommandBus.Unbind(ai_commandEnum.luaExt_reload, OnReloadLua);
+        AiCommandBus.Unbind(ai_commandEnum.luaMonitor_reload, OnReloadMonitor);
+        AiCommandBus.Unbind(ai_commandEnum.luaMonitor_list, OnListMonitor);
+        AiCommandBus.Unbind(ai_commandEnum.lua_current, OnListScripts);
+        AiCommandBus.Unbind(ai_commandEnum.luaExt_exec, OnRunLuaExtension);
         AiCommandBus.Unbind(ai_commandEnum.home_getPlayerName, OnGetPlayerName);
     }
 
@@ -609,7 +615,7 @@ public sealed class AiCommandLine : ClientSubManager
         var lua = AiLuaInterface.Current;
         if (lua != null && lua.CommandNames.Count > 0)
         {
-            builder.Append("\n--- lua 拓展（用 lua_execCommand 调用）---");
+            builder.Append("\n--- lua 拓展（用 luaExt_exec 调用）---");
             for (int i = 0; i < lua.CommandNames.Count; i++)
             {
                 builder.Append('\n').Append(lua.CommandNames[i]);
@@ -637,7 +643,42 @@ public sealed class AiCommandLine : ClientSubManager
             request.Reject("Lua 接口未就绪");
             return;
         }
-        request.Reply(lua.ReloadExtensions());
+        request.Reply(lua.ReloadExtensions(request.Str(0)));
+    }
+
+    private void OnReloadMonitor(AiRequest request)
+    {
+        var lua = AiLuaInterface.Current;
+        if (lua == null)
+        {
+            request.Reject("Lua 接口未就绪");
+            return;
+        }
+        request.Reply(lua.ReloadMonitor(request.Str(0)));
+    }
+
+    private void OnListMonitor(AiRequest request)
+    {
+        var lua = AiLuaInterface.Current;
+        if (lua == null)
+        {
+            request.Reject("Lua 接口未就绪");
+            return;
+        }
+
+        List<string> names = lua.ListMonitors();
+        request.Reply(names.Count == 0 ? "（没有可用的监视器脚本）" : string.Join("\n", names));
+    }
+
+    private void OnListScripts(AiRequest request)
+    {
+        var lua = AiLuaInterface.Current;
+        if (lua == null)
+        {
+            request.Reject("Lua 接口未就绪");
+            return;
+        }
+        request.Reply(lua.DescribeLoadedScripts());
     }
 
     private static int Count(int count) => count <= 0 || count > MaxReadCount ? -1 : count;

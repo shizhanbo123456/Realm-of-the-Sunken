@@ -183,7 +183,7 @@ public abstract class EntityData : MonoBehaviour
     protected Vector3 NavDestination { get; private set; }
     protected bool HasNavDestination { get; private set; }
 
-    private const float nav_sample_radius = 1f;
+    private const float nav_sample_radius = 4f; // 终点吸附半径：与 terrain_path 同口径，AI 查得到的点才走得通
     private const float nav_corner_radius = 0.3f;
     private const float nav_repath_interval = 0.25f;
     private const float nav_arrive_radius = 0.3f; // 到达死区：执行层每帧判定，越过目标后不再掉头
