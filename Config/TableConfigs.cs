@@ -409,18 +409,14 @@ namespace Ros.Config
     public static class RobotNamesConfig
     {
         // 人机名字池，按表内行序存放
-        private static readonly List<robot_names> names = new();
+        private static readonly List<string> names = new();
+        public static IReadOnlyList<string> Names => names;
 
         internal static void Bake(ConfigManager m)
         {
             names.Clear();
-            foreach (robot_names row in m.robot_namesData.Values) names.Add(row);
-        }
-
-        public static string PickRandom()
-        {
-            if (names.Count == 0) throw new System.FormatException("[配表] robot_names 没有名字，无法取随机名称");
-            return names[UnityEngine.Random.Range(0, names.Count)].name;
+            foreach (robot_names row in m.robot_namesData.Values) names.Add(row.name);
+            if (names.Count == 0) throw new System.FormatException("[配表] robot_names 没有名字，人机无法取随机名称");
         }
     }
 }

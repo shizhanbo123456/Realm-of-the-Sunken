@@ -41,6 +41,8 @@ public partial class BattleManager : EnsBehaviour
     public const int ROBOT_TOKEN_BASE = 1_000_000_000;
     private int nextRobotToken = ROBOT_TOKEN_BASE;
     public readonly HashSet<int> RobotClients = new();
+    // 本局还没用掉的名字：建人机时随机取走一个，取完多出来的人机退回 RobotN
+    private readonly List<string> availableRobotNames = new();
 
     // 被外部 AI 接管的真人客户端：会话级，只在客户端退场时移除（实体重建不影响接管状态）
     public readonly HashSet<int> AiClients = new();
@@ -420,6 +422,8 @@ public partial class BattleManager : EnsBehaviour
             PlayerCamps.Remove(robotClientId);
         }
         RobotClients.Clear();
+        availableRobotNames.Clear();
+        availableRobotNames.AddRange(RobotNamesConfig.Names); // 重建即人机重新进场，名字池一并复位
 
         nextRobotToken = ROBOT_TOKEN_BASE;
         for (int i = 0; i < AttackRobotCount; i++) AddRobotPlayer(PlayerCampType.Attack);
@@ -431,7 +435,7 @@ public partial class BattleManager : EnsBehaviour
         int robotClientId = nextRobotToken++;
         var info = new CSLobbyPlayerInfo()
         {
-            // 名字：按 robot_random_name 的概率取名字池随机名，未命中仍用令牌推导的 RobotN
+            // 名字：按 robot_random_name 的概率取一个本局没用过的名字，未命中或名字用尽则用令牌推导的 RobotN
             name = RandomRobotName(robotClientId),
         };
         if (camp == PlayerCampType.Attack)
@@ -447,11 +451,17 @@ public partial class BattleManager : EnsBehaviour
         RobotClients.Add(robotClientId);
     }
 
-    // robot_random_name 的值即「使用随机名称的概率」：命中取名字池，未命中退回编号名（编号由令牌推导，不与真人冲突）
-    private static string RandomRobotName(int robotClientId)
+    // robot_random_name 的值即「使用随机名称的概率」：命中且名字池还有剩就取一个没被用过的，否则退回编号名
+    private string RandomRobotName(int robotClientId)
     {
-        if (UnityEngine.Random.value < GlobalVariable.F(global_variablesEnum.robot_random_name))
-            return RobotNamesConfig.PickRandom();
+        float chance = GlobalVariable.F(global_variablesEnum.robot_random_name);
+        if (availableRobotNames.Count > 0 && UnityEngine.Random.value < chance)
+        {
+            int index = UnityEngine.Random.Range(0, availableRobotNames.Count);
+            string name = availableRobotNames[index];
+            availableRobotNames.RemoveAt(index);
+            return name;
+        }
         return $"Robot{robotClientId - ROBOT_TOKEN_BASE + 1}";
     }
 
