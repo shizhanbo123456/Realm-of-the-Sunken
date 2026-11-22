@@ -431,8 +431,8 @@ public partial class BattleManager : EnsBehaviour
         int robotClientId = nextRobotToken++;
         var info = new CSLobbyPlayerInfo()
         {
-            // 名字由令牌推导：重建时令牌源归位，编号稳定且不与真人令牌冲突
-            name = $"Robot{robotClientId - ROBOT_TOKEN_BASE + 1}",
+            // 名字：按 robot_random_name 的概率取名字池随机名，未命中仍用令牌推导的 RobotN
+            name = RandomRobotName(robotClientId),
         };
         if (camp == PlayerCampType.Attack)
         {
@@ -445,6 +445,14 @@ public partial class BattleManager : EnsBehaviour
         PlayerInfoList[robotClientId] = info;
         PlayerCamps[robotClientId] = camp;
         RobotClients.Add(robotClientId);
+    }
+
+    // robot_random_name 的值即「使用随机名称的概率」：命中取名字池，未命中退回编号名（编号由令牌推导，不与真人冲突）
+    private static string RandomRobotName(int robotClientId)
+    {
+        if (UnityEngine.Random.value < GlobalVariable.F(global_variablesEnum.robot_random_name))
+            return RobotNamesConfig.PickRandom();
+        return $"Robot{robotClientId - ROBOT_TOKEN_BASE + 1}";
     }
 
     public void ReceiveLobbyUpdate(int clientId, CSLobbyUpdate update)

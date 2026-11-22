@@ -67,6 +67,7 @@ namespace Ros.Config
         move_turn_rate,
         fly_vertical_speed,
         revive_teammate_range,
+        robot_random_name,
         quick_message_pointer_scale,
         charge_max,
         melee_bullet_life,

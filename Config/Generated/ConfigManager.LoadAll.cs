@@ -23,6 +23,7 @@ namespace Ros.Config
             LoadpageConfig();
             Loadquick_messageConfig();
             Loadrevive_timeConfig();
+            Loadrobot_namesConfig();
             Loadsetting_tipsConfig();
             LoadskillConfig();
             Loadterrain_generationConfig();

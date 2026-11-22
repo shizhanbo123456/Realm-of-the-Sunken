@@ -70,6 +70,7 @@ namespace Ros.Config
             TerrainGeneration.Bake(this);
             GmCommandConfig.Bake(this);
             AiCommandConfig.Bake(this);
+            RobotNamesConfig.Bake(this);
         }
 
         private string Summary()

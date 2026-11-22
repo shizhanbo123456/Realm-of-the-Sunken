@@ -405,4 +405,22 @@ namespace Ros.Config
 
         public static ai_command Get(ai_commandEnum key) => ConfigBinary.Require(content, key, "ai_command");
     }
+
+    public static class RobotNamesConfig
+    {
+        // 人机名字池，按表内行序存放
+        private static readonly List<robot_names> names = new();
+
+        internal static void Bake(ConfigManager m)
+        {
+            names.Clear();
+            foreach (robot_names row in m.robot_namesData.Values) names.Add(row);
+        }
+
+        public static string PickRandom()
+        {
+            if (names.Count == 0) throw new System.FormatException("[配表] robot_names 没有名字，无法取随机名称");
+            return names[UnityEngine.Random.Range(0, names.Count)].name;
+        }
+    }
 }
