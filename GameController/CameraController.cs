@@ -303,7 +303,12 @@ public class CameraController : MonoBehaviour
             NotifyCameraUpdated();
             return;
         }
-        if (lookTarget == null) return;
+        // 跟随点缺失（本地死亡观战等）镜头不动，但要继续通知：世界层血条仍需按静止相机重投影
+        if (lookTarget == null)
+        {
+            NotifyCameraUpdated();
+            return;
+        }
 
         if (Mode == CameraViewMode.TopDown)
         {
