@@ -24,8 +24,8 @@ namespace Ros.UI.Main
 
             m_page = GetControllerAt(0);
             m_show_bar = GetControllerAt(1);
-            m_progressbar = (GProgressBar)GetChildAt(4);
-            m_label = (GTextField)GetChildAt(5);
+            m_progressbar = (GProgressBar)GetChildAt(3);
+            m_label = (GTextField)GetChildAt(4);
         }
     }
 }
