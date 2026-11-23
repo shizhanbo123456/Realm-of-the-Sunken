@@ -24,6 +24,8 @@ public class GodViewView : PageBase
         panel.Init();
         panel.Close();
         panel.m_panel.m_close.onClick.Set(Close);
+        // 控制器切页会改面板尺寸，切完重新按 page 表适配
+        panel.m_show_character_detail.onChanged.Add(OnDetailLayoutChanged);
         EventManager.AddEvent<SCGodViewEntities>(ClientEvent.OnGodViewEntities, OnEntities);
         EventManager.AddEvent<SCGodViewCorals>(ClientEvent.OnGodViewCorals, OnCorals);
         EventManager.AddEvent<SCGodViewEntityDetail>(ClientEvent.OnGodViewDetail, OnDetail);
@@ -31,6 +33,7 @@ public class GodViewView : PageBase
 
     public override void Shutdown()
     {
+        panel.m_show_character_detail.onChanged.Remove(OnDetailLayoutChanged);
         EventManager.RemoveEvent<SCGodViewEntities>(ClientEvent.OnGodViewEntities, OnEntities);
         EventManager.RemoveEvent<SCGodViewCorals>(ClientEvent.OnGodViewCorals, OnCorals);
         EventManager.RemoveEvent<SCGodViewEntityDetail>(ClientEvent.OnGodViewDetail, OnDetail);
@@ -80,6 +83,8 @@ public class GodViewView : PageBase
         panel.Close();
         base.Exit();
     }
+
+    private void OnDetailLayoutChanged() => ApplyLayout();
 
     private void ResetPress()
     {

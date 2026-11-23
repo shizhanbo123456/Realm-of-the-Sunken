@@ -95,7 +95,7 @@ public abstract class PageBase
     }
 
     // 适配：alignMode 0 = 全屏（高度不变、按窗口宽高比重设宽度后缩放到刚好铺满）；1~9 = 保持设计尺寸贴到屏幕九宫格
-    private void ApplyLayout()
+    protected void ApplyLayout()
     {
         Root.pivotAsAnchor = false;
         Root.pivot = Vector2.zero;
