@@ -23,8 +23,6 @@ namespace TerrainGen
         public static readonly List<Vector3> SubGuards = new List<Vector3>();
         public static readonly List<Vector3> Towers = new List<Vector3>();
         public static readonly List<Vector3> NeutralStatues = new List<Vector3>();
-        public static Vector3 DefenseSpawn { get; private set; }
-        public static Vector3 AttackSpawn { get; private set; }
 
         // 地板格白名单：由烘焙数据里的 Ground 物件还原，刷新点必须落在真实地板上
         private static bool[,] floorCells;
@@ -44,8 +42,6 @@ namespace TerrainGen
 
             float cell = data.cellSize;
             int mainGuardCount = 0;
-            int attackCount = 0;
-            int defenseCount = 0;
 
             for (int i = 0; i < data.points.Count; i++)
             {
@@ -66,23 +62,11 @@ namespace TerrainGen
                     case PointKind.NeutralStatue:
                         NeutralStatues.Add(world);
                         break;
-                    case PointKind.AttackSpawn:
-                        AttackSpawn = world;
-                        attackCount++;
-                        break;
-                    case PointKind.DefenseSpawn:
-                        DefenseSpawn = world;
-                        defenseCount++;
-                        break;
                 }
             }
 
             if (mainGuardCount != 1)
                 Debug.LogError($"[地形] 烘焙数据里有 {mainGuardCount} 个主守护点，应当恰好 1 个：国王雕像无法定位");
-            if (attackCount != 1)
-                Debug.LogError($"[地形] 烘焙数据里有 {attackCount} 个进攻出生点，应当恰好 1 个");
-            if (defenseCount != 1)
-                Debug.LogError($"[地形] 烘焙数据里有 {defenseCount} 个防守出生点，应当恰好 1 个");
             if (SubGuards.Count == 0)
                 Debug.LogError("[地形] 烘焙数据里没有副守护点：贤者雕像无法定位");
             if (NeutralStatues.Count == 0)
@@ -95,8 +79,6 @@ namespace TerrainGen
         {
             Built = false;
             MainGuard = Vector3.zero;
-            DefenseSpawn = Vector3.zero;
-            AttackSpawn = Vector3.zero;
             SubGuards.Clear();
             Towers.Clear();
             NeutralStatues.Clear();
@@ -235,6 +217,32 @@ namespace TerrainGen
                 return true;
             }
             return false;
+        }
+
+        // 进攻出生：地图中心 attack_spawn_min_ratio×边长 以外的任意合法地面，没有外半径
+        public static bool TrySampleAttackSpawn(out Vector3 pos)
+        {
+            pos = default;
+            float minRadius = GlobalConfig.attack_spawn_min_ratio * MapSize;
+            float minSq = minRadius * minRadius;
+
+            for (int i = 0; i < MaxSampleAttempts; i++)
+            {
+                float x = MapMin + Random.value * MapSize;
+                float z = MapMin + Random.value * MapSize;
+                float dx = x - MapCenter.x, dz = z - MapCenter.z;
+                if (dx * dx + dz * dz <= minSq) continue;
+                if (!TrySampleLegalPoint(x, z, out float y)) continue;
+                pos = new Vector3(x, y, z);
+                return true;
+            }
+            return false;
+        }
+
+        // 防守出生：主守护点附近的合法地面
+        public static bool TrySampleDefenseSpawn(out Vector3 pos)
+        {
+            return TrySampleSpawnPointInRing(MainGuard, 0f, GlobalConfig.defense_spawn_radius, out pos);
         }
 
         public static Vector3 RandomOf(List<Vector3> list)

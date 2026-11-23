@@ -30,15 +30,11 @@ namespace TerrainGen.EditorTools
         const string TowerColorKey = "TerrainGen.MapTowerColor";
         const string GuardColorKey = "TerrainGen.MapGuardColor";
         const string StatueColorKey = "TerrainGen.MapStatueColor";
-        const string AttackSpawnColorKey = "TerrainGen.MapAttackSpawnColor";
-        const string DefenseSpawnColorKey = "TerrainGen.MapDefenseSpawnColor";
         Color mapFloorColor = new Color(0.72f, 0.68f, 0.60f, 1f);
         Color mapVoidColor = new Color(0.09f, 0.10f, 0.14f, 1f);
         Color mapTowerColor = new Color(0.25f, 0.85f, 0.30f, 1f);
         Color mapGuardColor = new Color(1f, 0.55f, 0.10f, 1f);
         Color mapStatueColor = new Color(0.65f, 0.40f, 1f, 1f);
-        Color mapAttackSpawnColor = new Color(0.95f, 0.25f, 0.30f, 1f);
-        Color mapDefenseSpawnColor = new Color(0.25f, 0.60f, 1f, 1f);
 
         [MenuItem("Tools/模块化地形/建筑生成器")]
         public static void Open()
@@ -58,8 +54,6 @@ namespace TerrainGen.EditorTools
             mapTowerColor = LoadColor(TowerColorKey, mapTowerColor);
             mapGuardColor = LoadColor(GuardColorKey, mapGuardColor);
             mapStatueColor = LoadColor(StatueColorKey, mapStatueColor);
-            mapAttackSpawnColor = LoadColor(AttackSpawnColorKey, mapAttackSpawnColor);
-            mapDefenseSpawnColor = LoadColor(DefenseSpawnColorKey, mapDefenseSpawnColor);
         }
 
         void OnDisable() => DestroyImmediate(preview);
@@ -109,15 +103,7 @@ namespace TerrainGen.EditorTools
                 mapTowerColor = EditorGUILayout.ColorField("底图防御塔格", mapTowerColor);
                 mapGuardColor = EditorGUILayout.ColorField("底图守护点格", mapGuardColor);
             }
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                mapStatueColor = EditorGUILayout.ColorField("底图中立雕像格", mapStatueColor);
-                mapAttackSpawnColor = EditorGUILayout.ColorField("底图进攻出生格", mapAttackSpawnColor);
-            }
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                mapDefenseSpawnColor = EditorGUILayout.ColorField("底图防守出生格", mapDefenseSpawnColor);
-            }
+            mapStatueColor = EditorGUILayout.ColorField("底图中立雕像格", mapStatueColor);
             if (EditorGUI.EndChangeCheck()) SaveMapColors();
 
             EditorGUILayout.Space(4);
@@ -205,18 +191,16 @@ namespace TerrainGen.EditorTools
 
             int guards = 0;
             int statues = 0;
-            int spawns = 0;
             int towers = 0;
             foreach (MapPoint p in field.Points)
             {
                 if (p.Kind == PointKind.MainGuard || p.Kind == PointKind.SubGuard) guards++;
                 else if (p.Kind == PointKind.Tower) towers++;
-                else if (p.Kind == PointKind.NeutralStatue) statues++;
-                else spawns++;
+                else statues++;
             }
 
             summary = $"布局已生成：{field.Rooms.Count} 个房间（平均 {avgW:0}×{avgH:0} 单位），地板 {field.FloorCellCount()} 格，"
-                      + $"点位 {field.Points.Count} 个（守护 {guards} / 出生点 {spawns} / 中立雕像 {statues} / 防御塔 {towers}）。";
+                      + $"点位 {field.Points.Count} 个（守护 {guards} / 中立雕像 {statues} / 防御塔 {towers}）。";
             summaryIsError = field.FloorCellCount() == 0;
             Log(summary);
         }
@@ -293,7 +277,7 @@ namespace TerrainGen.EditorTools
             }
 
             bool mapOk = TerrainMapImage.Write(field, mapFloorColor, mapVoidColor, mapTowerColor, mapGuardColor,
-                mapStatueColor, mapAttackSpawnColor, mapDefenseSpawnColor, out string mapPath);
+                mapStatueColor, out string mapPath);
             // 落盘后要等编辑器导入完才拿得到 importer，放到延迟回调里做
             if (mapOk) EditorApplication.delayCall += () =>
             {
@@ -305,7 +289,7 @@ namespace TerrainGen.EditorTools
                       + TerrainPlanData.PathFor(settings.seed, settings.version)
                       + "；进播放模式后由 Culler 按区块动态生成";
             summary += mapOk
-                ? $"\n底图 → {mapPath}（{TerrainMapImage.Resolution}×{TerrainMapImage.Resolution}，地面/虚空 + 防御塔/守护点/中立雕像/攻守出生点格着色）"
+                ? $"\n底图 → {mapPath}（{TerrainMapImage.Resolution}×{TerrainMapImage.Resolution}，地面/虚空 + 防御塔/守护点/中立雕像格着色）"
                 : "\n底图生成失败，小地图将缺少底板";
             summaryIsError = !mapOk;
             Log(summary);
@@ -318,8 +302,6 @@ namespace TerrainGen.EditorTools
             EditorPrefs.SetString(TowerColorKey, "#" + ColorUtility.ToHtmlStringRGBA(mapTowerColor));
             EditorPrefs.SetString(GuardColorKey, "#" + ColorUtility.ToHtmlStringRGBA(mapGuardColor));
             EditorPrefs.SetString(StatueColorKey, "#" + ColorUtility.ToHtmlStringRGBA(mapStatueColor));
-            EditorPrefs.SetString(AttackSpawnColorKey, "#" + ColorUtility.ToHtmlStringRGBA(mapAttackSpawnColor));
-            EditorPrefs.SetString(DefenseSpawnColorKey, "#" + ColorUtility.ToHtmlStringRGBA(mapDefenseSpawnColor));
         }
 
         static Color LoadColor(string key, Color fallback)

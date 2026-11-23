@@ -32,7 +32,7 @@ namespace TerrainGen
     public class TerrainPlanData
     {
         const int Magic = 0x5447524E;
-        const int FormatVersion = 3;
+        const int FormatVersion = 4; // 4：点位不再包含攻守出生点，旧地形数据必须重新烘焙
 
         public int seed;
         public int configVersion;

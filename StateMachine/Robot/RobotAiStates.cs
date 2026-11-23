@@ -211,10 +211,6 @@ public partial class RobotAi
             if (escorted == null || !escorted.Alive) return robot.searchState;
             if (Time.time - enterTime > GlobalConfig.ai_escort_timeout) return robot.searchState;
 
-            // 赶去护送途中遇到玩家/人机：先打，打完继续去护送
-            var threat = robot.NearestHighThreat();
-            if (threat != null) return robot.chaseState.Bind(threat, this, GlobalConfig.ai_chase_limit);
-
             if (robot.FlatDistanceTo(escorted) <= GlobalConfig.ai_escort_arrive) return robot.escortState.Bind(escorted);
 
             robot.RequestMove(escorted.transform.position);
@@ -331,10 +327,6 @@ public partial class RobotAi
         {
             if (!robot.TryResolveAnchor(anchor, out var point)) return robot.searchState;
 
-            // 奔赴集结途中遇到玩家/人机：先打，打完回到集结
-            var threat = robot.NearestHighThreat();
-            if (threat != null) return robot.chaseState.Bind(threat, this, GlobalConfig.ai_chase_limit);
-
             if (robot.FlatDistance(point) <= GlobalConfig.ai_rally_arrive) return robot.rallyWaitState.Bind(anchor);
 
             robot.RequestMove(point);
@@ -382,22 +374,32 @@ public partial class RobotAi
         public override EntityReportState ReportState => EntityReportState.Assault;
         private readonly RobotAi robot;
         private TaskTarget anchor;
+        private bool abandoned;
 
         public AssaultState(RobotAi robot) { this.robot = robot; }
 
-        public AssaultState Bind(TaskTarget target) { anchor = target; return this; }
+        public AssaultState Bind(TaskTarget target) { anchor = target; abandoned = false; return this; }
+
+        // 锚点走不到（建筑底座挡路等）：放弃进攻点回搜索自己找仗打，否则会一直对着同一个点原地站着
+        public override void OnStuck() { abandoned = true; }
 
         public override DecisionState Decide()
         {
+            if (abandoned) { abandoned = false; return robot.searchState; }
             if (!robot.TryResolveAnchor(anchor, out var point)) return robot.searchState;
 
-            // 只对玩家/人机这类高威胁单位让路，僵尸与建筑不打断进攻
-            var enemy = robot.NearestHighThreat();
-            if (enemy != null) return robot.chaseState.Bind(enemy, this, GlobalConfig.ai_assault_combat_activity);
+            // 路上被「珊瑚/鲛人以外的敌人」贴进攻击范围：直接开打，打完回协同进攻继续赶路
+            var threat = robot.NearestAssaultThreat(robot.AttackRange);
+            if (threat != null) return robot.assaultCombatState.Bind(threat, this);
 
             if (!anchor.hasPosition) { robot.RequestMove(point); return null; } // 动态锚点：一路跟着发送者
 
-            if (robot.FlatDistance(point) > GlobalConfig.ai_assault_arrive) { robot.RequestMove(point); return null; }
+            // 执行层已停在导航终点也算到达：锚点吸附/算不出路时不会再一直重发移动请求而原地站着
+            if (robot.FlatDistance(point) > GlobalConfig.ai_assault_arrive && !robot.Owner.NavArrived)
+            {
+                robot.RequestMove(point);
+                return null;
+            }
             return robot.searchState; // 静态锚点到达且无敌：继续推
         }
     }

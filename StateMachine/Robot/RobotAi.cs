@@ -203,16 +203,10 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
         return best;
     }
 
-    // 高威胁 = 玩家/人机角色：移动类任务遇到时要先打，僵尸/塔/珊瑚这类低威胁继续听指令
+    // 高威胁 = 玩家/人机角色，僵尸/塔/珊瑚都不算
     private static bool IsHighThreat(EntityData e)
     {
         return e.type.category == EntityCategory.Character_Attack || e.type.category == EntityCategory.Character_Defense;
-    }
-
-    protected EntityData NearestHighThreat()
-    {
-        float radius = Mathf.Min(ViewDistance, GlobalConfig.ai_chase_limit - GlobalConfig.ai_acquire_margin);
-        return NearestHighThreatAround(Owner.transform.position, radius);
     }
 
     protected EntityData NearestHighThreatAround(Vector3 center, float radius)
@@ -231,6 +225,30 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
             if ((hostile & e.camp) == 0) continue;
             if (!IsHighThreat(e)) continue;
             float d = (e.transform.position - center).sqrMagnitude;
+            if (d < bestSqr) { bestSqr = d; best = e; }
+        }
+        s_ids.Clear();
+        return best;
+    }
+
+    // 进攻途中值得停手的敌人：珊瑚不还手、鲛人成群会一直被拖住，两者都不算；角色/雕像/塔/中立雕像都算
+    protected EntityData NearestAssaultThreat(float radius)
+    {
+        var hostile = EntityCampUtil.HostileOf(Owner.type.category);
+        s_ids.Clear();
+        BattleManager.EntityContainer.Entities.GetIdsInRange(Owner.transform.position, radius, s_ids);
+
+        EntityData best = null;
+        float bestSqr = float.MaxValue;
+        foreach (var id in s_ids)
+        {
+            if (!BattleManager.EntityContainer.Entities.TryGetObject(id, out var e)) continue;
+            if (e == null || !e.Alive || e.id == Owner.id) continue;
+            if (IsIgnored(e)) continue;
+            if ((hostile & e.camp) == 0) continue;
+            var category = e.type.category;
+            if (category == EntityCategory.Coral || category == EntityCategory.Zombie || category == EntityCategory.EliteZombie) continue;
+            float d = (e.transform.position - Owner.transform.position).sqrMagnitude;
             if (d < bestSqr) { bestSqr = d; best = e; }
         }
         s_ids.Clear();
@@ -342,7 +360,6 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
         if (type == QuickMessageType.RequestReport) { ReportStatus(); return; }
         if (type == QuickMessageType.ReleaseSignal) { CancelAll(); return; }
         if (type == QuickMessageType.Danger) { HandleDanger(message); return; }
-        if (type == QuickMessageType.Attack && !CanAcceptAttackMessage()) return;
 
         var target = new TaskTarget
         {
@@ -350,6 +367,14 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
             position = message.targetPosition,
             sender = ResolveSender(message.senderClientId),
         };
+
+        // 进攻是直接命令：任何状态收到都立即执行，不入槽
+        if (type == QuickMessageType.Attack)
+        {
+            hasPending = false;
+            SwitchTo(BuildTaskState(type, target, Current ?? searchState, false));
+            return;
+        }
 
         // 战斗态与危险躲避：只入槽，脱战后执行
         if (Current != null && Current.BlocksTaskMessages) { StorePending(type, target); return; }
@@ -383,20 +408,10 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
 
     private void StorePending(QuickMessageType type, TaskTarget target)
     {
-        if (type == QuickMessageType.Attack && !CanAcceptAttackMessage()) return;
         if (type == QuickMessageType.ContestNeutral && FindNeutralStatue() == null) return;
         hasPending = true;
         pendingType = type;
         pendingTarget = target;
-    }
-
-    // 进攻在搜索/打珊瑚/追击时都响应；护送与进攻途中忽略（有目标时会自己打）
-    private bool CanAcceptAttackMessage()
-    {
-        if (Current == escortState || Current == escortApproachState) return false;
-        if (Current == assaultState || Current == assaultCombatState) return false;
-        if (Current == dangerClearState) return false;
-        return true;
     }
 
     protected DecisionState ConsumePendingOr(DecisionState fallback)

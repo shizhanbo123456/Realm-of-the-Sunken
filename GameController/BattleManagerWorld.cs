@@ -30,8 +30,8 @@ public partial class BattleManager
             FacePoint(id, TerrainSpawns.MainGuard);
         }
 
-        // 主守护点：国王雕像，面向进攻方出生点
-        FacePoint(SpawnEntity(EntityType.KingStatue, 1, TerrainSpawns.MainGuard, EntityCamp.Defense), TerrainSpawns.AttackSpawn);
+        // 主守护点：国王雕像（进攻方从任意方向的外围进场，已无固定来向可朝）
+        SpawnEntity(EntityType.KingStatue, 1, TerrainSpawns.MainGuard, EntityCamp.Defense);
 
         // 珊瑚：开局不生成，按玩家邻近采样合法位置动态生成（见 TickCoralSpawn）
 

@@ -156,14 +156,6 @@ namespace TerrainGen
                         label = "Statue_" + (++statueIndex);
                         color = new Color(0.72f, 0.45f, 1f);
                         break;
-                    case PointKind.AttackSpawn:
-                        label = "Spawn_Attack";
-                        color = new Color(0.95f, 0.22f, 0.30f);
-                        break;
-                    case PointKind.DefenseSpawn:
-                        label = "Spawn_Defense";
-                        color = new Color(0.30f, 0.60f, 1f);
-                        break;
                     case PointKind.Tower:
                         label = "Tower_" + (++towerIndex);
                         color = new Color(0.35f, 0.95f, 0.45f);

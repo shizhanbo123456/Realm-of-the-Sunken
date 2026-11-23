@@ -121,6 +121,11 @@ public static class GlobalConfig
     public const float ai_unreachable_pause = 2f;
     public const float ai_stuck_min_move = 0.5f; // 采样周期内位移低于此值视为走不到目的地
     public const float ai_message_min_interval = 1f;
+    // 服务器给进攻方人机派点的周期，以及「打守护点 / 打防御塔」的分界随机值
+    public const float ai_assault_order_interval = 60f;
+    public const float ai_assault_order_ratio = 0.5f;
+    // 派点前置：周围该半径内有敌方角色（含人机）就不派
+    public const float ai_assault_order_quiet_radius = 30f;
     #endregion
 
     #region 昼夜
@@ -244,6 +249,11 @@ public static class GlobalConfig
     public const int defense_index_masked_pope = 2;    // 蒙面教皇
     public const int defense_index_deer_knight = 3;    // 鹿铠怪人
     public const int defense_index_death_stroller = 5; // 死灵漫步者（4 = 苍白舞者，被动按标记判定，不引用下标）
+    #endregion
+
+    #region 出生点（不烘点位：进攻方随机落在地图外围，防守方落主守护点附近）
+    public const float attack_spawn_min_ratio = 0.3f; // 距地图中心的下限，×地图边长；无外半径
+    public const float defense_spawn_radius = 6f;     // 防守出生点取主守护点该半径内的合法地面
     #endregion
 
 }

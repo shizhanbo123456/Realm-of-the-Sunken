@@ -963,14 +963,102 @@ public partial class BattleManager : EnsBehaviour
     }
     #endregion
 
-    private Vector3 GetAttackSpawnPos()
+    #region 进攻方人机自动派点（服务器定时让进攻方人机主动压上）
+    private Ticker robotAssaultTicker;
+
+    // 每满一个间隔：周围没人的进攻方人机随机取 0~1，过半打最近的守护点，其余打最近的防御塔
+    private void TickRobotAssaultOrders()
     {
-        return TerrainSpawns.AttackSpawn;
+        if (!robotAssaultTicker) return;
+
+        foreach (var entity in EntityContainer.Entities)
+        {
+            if (entity == null || !entity.Alive || !entity.robotControlled) continue;
+            if (entity.camp != EntityCamp.Attack) continue;
+            var robot = entity as PlayerEntityData;
+            if (robot == null) continue;
+
+            // 周围有敌方角色（真人或人机）说明它正在交战，不打断；队友不阻断
+            if (HasEnemyCharacterAround(entity, GlobalConfig.ai_assault_order_quiet_radius)) continue;
+
+            if (!EntityOwnerClient.TryGetValue(entity.id, out var clientId))
+            {
+                Debug.LogError($"[战斗] 进攻方人机 {entity.id} 没有归属客户端，无法派进攻命令");
+                continue;
+            }
+
+            Vector3 from = entity.transform.position;
+            bool toGuard = UnityEngine.Random.value > GlobalConfig.ai_assault_order_ratio;
+            var target = NearestAlive(toGuard ? EntityContainer.GuardStatues : EntityContainer.CrystalStatues, from);
+            if (target == null) target = NearestAlive(toGuard ? EntityContainer.CrystalStatues : EntityContainer.GuardStatues, from);
+            if (target == null)
+            {
+                Debug.LogWarning("[战斗] 进攻方人机派点跳过：场上没有存活的守护点与防御塔");
+                continue;
+            }
+
+            robot.OnQuickMessage(new SCQuickMessage
+            {
+                messageId = (int)QuickMessageType.Attack,
+                senderClientId = clientId,
+                hasTargetPosition = true,
+                targetPosition = target.transform.position,
+            });
+        }
     }
 
+    private static readonly HashSet<int> s_characterIds = new();
+
+    // 半径内是否有存活的敌方玩家角色（含人机；同阵营队友不算）
+    private static bool HasEnemyCharacterAround(EntityData self, float radius)
+    {
+        EntityCamp hostile = EntityCampUtil.HostileOf(self.type.category);
+        EntityContainer.Entities.GetIdsInRange(self.transform.position, radius, s_characterIds);
+        bool found = false;
+        foreach (int id in s_characterIds)
+        {
+            if (!EntityContainer.Entities.TryGetObject(id, out var other) || other == null) continue;
+            if (other.id == self.id || !other.Alive) continue;
+            if ((hostile & other.camp) == 0) continue;
+            if (other.type.category != EntityCategory.Character_Attack && other.type.category != EntityCategory.Character_Defense) continue;
+            found = true;
+            break;
+        }
+        s_characterIds.Clear();
+        return found;
+    }
+
+    // 最近存活实体：守护点与防御塔都只有个位数，直接遍历
+    private static EntityData NearestAlive(ChunkSearcher<EntityData> source, Vector3 from)
+    {
+        EntityData best = null;
+        float bestSqr = float.MaxValue;
+        foreach (var candidate in source)
+        {
+            if (candidate == null || !candidate.Alive) continue;
+            float sqr = (candidate.transform.position - from).sqrMagnitude;
+            if (sqr >= bestSqr) continue;
+            bestSqr = sqr;
+            best = candidate;
+        }
+        return best;
+    }
+    #endregion
+
+    // 进攻出生：每人各自在地图外围随机取点（距中心 > 0.3×边长）
+    private Vector3 GetAttackSpawnPos()
+    {
+        if (TerrainSpawns.TrySampleAttackSpawn(out var pos)) return pos;
+        Debug.LogError("[战斗] 进攻出生点采样失败：地图外围没有合法地面");
+        return TerrainSpawns.MainGuard;
+    }
+
+    // 防守出生：主守护点附近随机取点
     private Vector3 GetDefenseSpawnPos()
     {
-        return TerrainSpawns.DefenseSpawn;
+        if (TerrainSpawns.TrySampleDefenseSpawn(out var pos)) return pos;
+        Debug.LogError("[战斗] 防守出生点采样失败：主守护点附近没有合法地面");
+        return TerrainSpawns.MainGuard;
     }
 
     private void UpdateAI()
@@ -1183,6 +1271,8 @@ public partial class BattleManager : EnsBehaviour
         minimapTicker = new Ticker(GlobalConfig.minimap_sync_interval);
         zombieSpawnTicker = new Ticker(GlobalVariable.F(global_variablesEnum.zombie_spawn_attempt_interval));
         coralSpawnTicker = new Ticker(GlobalVariable.F(global_variablesEnum.coral_spawn_attempt_interval));
+        robotAssaultTicker = new Ticker(GlobalConfig.ai_assault_order_interval);
+        robotAssaultTicker.Reset(); // 开战不派点，第一次要等满一个周期
         playerBoundsTicker = new Ticker(GlobalConfig.entity_bounds_check_interval_player);
         boundsCheckTicker = new Ticker(GlobalConfig.entity_bounds_check_interval);
 
@@ -1305,6 +1395,7 @@ public partial class BattleManager : EnsBehaviour
     private const string kCampAliveCountTag = "BattleManager.CampAliveCount";
     private const string kDefensePointTag = "BattleManager.DefensePointProgress";
     private const string kUpdateAITag = "BattleManager.UpdateAI";
+    private const string kRobotAssaultOrderTag = "BattleManager.RobotAssaultOrder";
     private const string kZombieRefreshTag = "BattleManager.ZombieRefresh";
     private const string kCoralSpawnTag = "BattleManager.CoralSpawn";
     private const string kSyncEntitiesTag = "BattleManager.SyncEntitiesToClients";
@@ -1393,6 +1484,11 @@ public partial class BattleManager : EnsBehaviour
         // AI 行为（各实体在内部按 id 错峰，见 UpdateAI）
         Profiler.BeginSample(kUpdateAITag);
         UpdateAI();
+        Profiler.EndSample();
+
+        // 进攻方人机定时派点：避免人机一直在外围乱逛不进攻
+        Profiler.BeginSample(kRobotAssaultOrderTag);
+        TickRobotAssaultOrders();
         Profiler.EndSample();
 
         // 静默回收（鲛人卡死等）：AI 一拍内产出，本帧就移除并同步客户端，不算死亡、不结算掉落
