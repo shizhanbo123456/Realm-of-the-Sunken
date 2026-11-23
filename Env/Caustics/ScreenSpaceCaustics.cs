@@ -1,13 +1,11 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-using Ros.Config;
 // 挂在相机上：在画完不透明物体后全屏加色叠加焦散，不需要改动场景里任何材质
 [RequireComponent(typeof(Camera))]
 public class ScreenSpaceCaustics : MonoBehaviour
 {
     public const string ShaderName = "Hidden/Caustics/ScreenProjection";
-    public const string OcclusionResourcePath = "Effects/Caustics/CausticsOcclusion";
 
     [Header("贴图")]
     [Tooltip("焦散网纹：Assets/Files/Shaders/Caustics/T_Caustics")]
@@ -43,19 +41,8 @@ public class ScreenSpaceCaustics : MonoBehaviour
     [Tooltip("法线遮罩偏移：越大立面上也越亮，0.35 时立面约为正面的 12%")]
     public float normalBias = 0.35f;
 
-    [Header("遮挡（地形工具烘焙的高度图）")]
-    [Tooltip("关闭后不读高度图，屋顶下的地面也会有焦散")]
-    public bool useOcclusion = true;
-
-    [Tooltip("该列最高面比当前像素高出多少米判定为被遮挡")]
-    [Min(0f)] public float occlusionBias = 0.5f;
-
-    [Tooltip("遮挡过渡带宽度（米），太小会出硬边")]
-    [Min(0.01f)] public float occlusionFade = 1f;
-
     private static readonly int CausticsMapId = Shader.PropertyToID("_CausticsMap");
     private static readonly int FlowMapId = Shader.PropertyToID("_FlowMap");
-    private static readonly int OcclusionMapId = Shader.PropertyToID("_OcclusionMap");
     private static readonly int ColorId = Shader.PropertyToID("_CausticsColor");
     private static readonly int IntensityId = Shader.PropertyToID("_Intensity");
     private static readonly int TilingId = Shader.PropertyToID("_Tiling");
@@ -63,10 +50,6 @@ public class ScreenSpaceCaustics : MonoBehaviour
     private static readonly int FlowIntensityId = Shader.PropertyToID("_FlowIntensity");
     private static readonly int FlowScaleId = Shader.PropertyToID("_FlowScale");
     private static readonly int NormalBiasId = Shader.PropertyToID("_NormalBias");
-    private static readonly int MapMinId = Shader.PropertyToID("_MapMin");
-    private static readonly int MapSizeId = Shader.PropertyToID("_MapSize");
-    private static readonly int OcclusionBiasId = Shader.PropertyToID("_OcclusionBias");
-    private static readonly int OcclusionFadeId = Shader.PropertyToID("_OcclusionFade");
     private static readonly int CamPosId = Shader.PropertyToID("_CamPos");
     private static readonly int CornerBLId = Shader.PropertyToID("_CornerBL");
     private static readonly int CornerBRId = Shader.PropertyToID("_CornerBR");
@@ -77,13 +60,8 @@ public class ScreenSpaceCaustics : MonoBehaviour
     private Material material;
     private CommandBuffer buffer;
     private Mesh quad;
-    private Texture occlusionMap;
-    private bool occlusionActive;
-    private bool missingOcclusionWarned;
     private bool ready;
     private bool renderActive;
-    private float mapMin;
-    private float mapSize;
 
     private void Awake()
     {
@@ -113,17 +91,6 @@ public class ScreenSpaceCaustics : MonoBehaviour
             return;
         }
 
-        occlusionActive = useOcclusion;
-        if (occlusionActive)
-        {
-            occlusionMap = Resources.Load<Texture2D>(OcclusionResourcePath);
-            if (occlusionMap == null)
-            {
-                Debug.LogWarning($"[ScreenSpaceCaustics] 找不到 Resources/{OcclusionResourcePath}，本次不启用遮挡（用地形工具「烘焙焦散遮挡图」生成）", this);
-                occlusionActive = false;
-            }
-        }
-
         material = new Material(projectionShader);
         material.hideFlags = HideFlags.HideAndDontSave;
         ApplyMaterial();
@@ -145,18 +112,6 @@ public class ScreenSpaceCaustics : MonoBehaviour
         else cam.RemoveCommandBuffer(CameraEvent.AfterForwardOpaque, buffer);
     }
 
-    private void Start()
-    {
-        // 地图范围来自配表，晚于 Awake 读取以确保 ConfigManager 已加载
-        mapMin = GlobalVariable.RangeMin(global_variablesEnum.terrain_size);
-        mapSize = GlobalVariable.RangeLength(global_variablesEnum.terrain_size);
-        if (mapSize <= 0f)
-        {
-            Debug.LogWarning("[ScreenSpaceCaustics] 配表 terrain_size 无效（<=0），遮挡判定关闭", this);
-            occlusionActive = false;
-        }
-    }
-
     // Unity 在渲染前读该标志，别处覆盖时这里每帧补回来
     private void OnPreCull()
     {
@@ -166,40 +121,13 @@ public class ScreenSpaceCaustics : MonoBehaviour
     private void Update()
     {
         if (!ready) return;
-        SyncOcclusionToggle();
         ApplyMaterial();
-    }
-
-    // 允许运行时勾掉/勾上遮挡做 A/B 对比；勾上但资产缺失时只警告一次
-    private void SyncOcclusionToggle()
-    {
-        if (useOcclusion == occlusionActive) return;
-
-        if (!useOcclusion)
-        {
-            occlusionActive = false;
-            return;
-        }
-
-        if (occlusionMap == null) occlusionMap = Resources.Load<Texture2D>(OcclusionResourcePath);
-        if (occlusionMap == null)
-        {
-            if (!missingOcclusionWarned)
-            {
-                Debug.LogWarning($"[ScreenSpaceCaustics] 找不到 Resources/{OcclusionResourcePath}，遮挡仍关闭", this);
-                missingOcclusionWarned = true;
-            }
-            return;
-        }
-
-        occlusionActive = true;
     }
 
     private void ApplyMaterial()
     {
         material.SetTexture(CausticsMapId, causticsMap);
         material.SetTexture(FlowMapId, flowMap);
-        material.SetTexture(OcclusionMapId, occlusionActive ? occlusionMap : Texture2D.blackTexture);
         material.SetColor(ColorId, color);
         material.SetFloat(IntensityId, intensity);
         material.SetFloat(TilingId, tiling);
@@ -207,12 +135,6 @@ public class ScreenSpaceCaustics : MonoBehaviour
         material.SetFloat(FlowIntensityId, flowIntensity);
         material.SetFloat(FlowScaleId, flowScale);
         material.SetFloat(NormalBiasId, normalBias);
-        material.SetFloat(OcclusionBiasId, occlusionBias);
-        material.SetFloat(OcclusionFadeId, occlusionFade);
-
-        // MapSize 为 0 时 shader 里整段遮挡判定被跳过
-        material.SetVector(MapMinId, new Vector4(mapMin, 0f, mapMin, 0f));
-        material.SetFloat(MapSizeId, occlusionActive ? mapSize : 0f);
 
         UpdateFrustumCorners();
     }

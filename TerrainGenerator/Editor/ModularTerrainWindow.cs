@@ -129,14 +129,6 @@ namespace TerrainGen.EditorTools
             EditorGUILayout.LabelField("0 = 用项目 NavMeshAreas 里的 minRegionArea；大于 0 时按该面积换算成体素² 覆盖",
                 EditorStyles.wordWrappedMiniLabel);
 
-            EditorGUILayout.Space(4);
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                if (GUILayout.Button("烘焙焦散遮挡图（要求空场景，按真实网格生成）", GUILayout.Height(24))) BakeCausticsOcclusion();
-            }
-            EditorGUILayout.LabelField("产物 Assets/Resources/Effects/Caustics/CausticsOcclusion.asset，供相机上的 ScreenSpaceCaustics 判断屋顶下不铺焦散",
-                EditorStyles.wordWrappedMiniLabel);
-
             scroll = EditorGUILayout.BeginScrollView(scroll, GUILayout.ExpandHeight(true));
 
             showSettings = EditorGUILayout.Foldout(showSettings, "生成参数", true);
@@ -419,69 +411,6 @@ namespace TerrainGen.EditorTools
             summary = message;
             summaryIsError = !ok;
             Log(summary);
-        }
-
-        // 烘焦散遮挡图：流程同 NavMesh 烘焙，铺满整图后俯视正交渲染一遍真实几何
-        void BakeCausticsOcclusion()
-        {
-            report.Clear();
-
-            if (Application.isPlaying)
-            {
-                ReportCaustics("烘焙终止：请退出播放模式再烘焦散遮挡图。", true);
-                return;
-            }
-
-            if (!TryCheckSceneClean(out string blocked))
-            {
-                ReportCaustics("烘焙终止：场景里还有其它网格或碰撞体，先清空场景再烘。\n" + blocked, true);
-                return;
-            }
-
-            if (!EnsureConfig(out string configError))
-            {
-                ReportCaustics("烘焙失败：" + configError, true);
-                return;
-            }
-
-            if (kit == null)
-            {
-                ReportCaustics("烘焙失败：未指定素材表", true);
-                return;
-            }
-
-            TerrainPlanData data = TerrainGenerator.BuildData(settings, kit);
-            if (data == null)
-            {
-                ReportCaustics("烘焙失败：无法构建摆放数据，检查生成参数与素材表", true);
-                return;
-            }
-
-            var root = new GameObject("CausticsBakeRoot");
-            root.transform.position = Vector3.zero;
-
-            bool ok;
-            string message;
-            try
-            {
-                TerrainAssembler.SpawnColliderOnly(data, kit, root.transform, stripMeshes: false);
-                ok = CausticsOcclusionBaker.Bake(root.transform, data.groundHeight, out message);
-            }
-            finally
-            {
-                DestroyImmediate(root); // 烘完立刻清掉临时地形，场景回到干净状态
-            }
-
-            ReportCaustics(message, !ok);
-        }
-
-        // 焦散烘焙结果只走 Console：面板里的文字既复制不了也不好找
-        void ReportCaustics(string msg, bool error)
-        {
-            summary = msg;
-            summaryIsError = error;
-            if (error) Debug.LogError(msg);
-            else Debug.Log(msg);
         }
 
         bool TryBakeNavMesh(Transform root, TerrainPlanData data, out string message)
