@@ -203,6 +203,40 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
         return best;
     }
 
+    // 高威胁 = 玩家/人机角色：移动类任务遇到时要先打，僵尸/塔/珊瑚这类低威胁继续听指令
+    private static bool IsHighThreat(EntityData e)
+    {
+        return e.type.category == EntityCategory.Character_Attack || e.type.category == EntityCategory.Character_Defense;
+    }
+
+    protected EntityData NearestHighThreat()
+    {
+        float radius = Mathf.Min(ViewDistance, GlobalConfig.ai_chase_limit - GlobalConfig.ai_acquire_margin);
+        return NearestHighThreatAround(Owner.transform.position, radius);
+    }
+
+    protected EntityData NearestHighThreatAround(Vector3 center, float radius)
+    {
+        var hostile = EntityCampUtil.HostileOf(Owner.type.category);
+        s_ids.Clear();
+        BattleManager.EntityContainer.Entities.GetIdsInRange(center, radius, s_ids);
+
+        EntityData best = null;
+        float bestSqr = float.MaxValue;
+        foreach (var id in s_ids)
+        {
+            if (!BattleManager.EntityContainer.Entities.TryGetObject(id, out var e)) continue;
+            if (e == null || !e.Alive || e.id == Owner.id) continue;
+            if (IsIgnored(e)) continue;
+            if ((hostile & e.camp) == 0) continue;
+            if (!IsHighThreat(e)) continue;
+            float d = (e.transform.position - center).sqrMagnitude;
+            if (d < bestSqr) { bestSqr = d; best = e; }
+        }
+        s_ids.Clear();
+        return best;
+    }
+
     private static readonly HashSet<int> s_ids = new();
 
     // 防守方：定时扫描己方守护点，取离自己最近的"正在打守护点"的敌人
@@ -356,11 +390,9 @@ public partial class RobotAi : DecisionMachine, IBehaviorHost
         pendingTarget = target;
     }
 
-    // 进攻只在集结系与战斗态生效，其余状态忽略（有目标时会自己打）
+    // 进攻在搜索/打珊瑚/追击时都响应；护送与进攻途中忽略（有目标时会自己打）
     private bool CanAcceptAttackMessage()
     {
-        if (Current == searchState || Current == searchCombatState) return false;
-        if (Current == chaseState) return false;
         if (Current == escortState || Current == escortApproachState) return false;
         if (Current == assaultState || Current == assaultCombatState) return false;
         if (Current == dangerClearState) return false;

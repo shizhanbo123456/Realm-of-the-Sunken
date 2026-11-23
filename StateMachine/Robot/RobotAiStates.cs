@@ -210,6 +210,11 @@ public partial class RobotAi
         {
             if (escorted == null || !escorted.Alive) return robot.searchState;
             if (Time.time - enterTime > GlobalConfig.ai_escort_timeout) return robot.searchState;
+
+            // 赶去护送途中遇到玩家/人机：先打，打完继续去护送
+            var threat = robot.NearestHighThreat();
+            if (threat != null) return robot.chaseState.Bind(threat, this, GlobalConfig.ai_chase_limit);
+
             if (robot.FlatDistanceTo(escorted) <= GlobalConfig.ai_escort_arrive) return robot.escortState.Bind(escorted);
 
             robot.RequestMove(escorted.transform.position);
@@ -302,7 +307,8 @@ public partial class RobotAi
         {
             if (Time.time - enterTime > GlobalConfig.ai_danger_clear_timeout) return robot.searchState;
 
-            var enemy = robot.NearestEnemyAround(point, GlobalConfig.ai_danger_clear_radius, false);
+            // 只对玩家/人机让路
+            var enemy = robot.NearestHighThreatAround(point, GlobalConfig.ai_danger_clear_radius);
             if (enemy != null) return robot.chaseState.Bind(enemy, this, GlobalConfig.ai_chase_limit);
 
             if (robot.FlatDistance(point) > GlobalConfig.ai_danger_clear_arrive) robot.RequestMove(point);
@@ -324,6 +330,11 @@ public partial class RobotAi
         public override DecisionState Decide()
         {
             if (!robot.TryResolveAnchor(anchor, out var point)) return robot.searchState;
+
+            // 奔赴集结途中遇到玩家/人机：先打，打完回到集结
+            var threat = robot.NearestHighThreat();
+            if (threat != null) return robot.chaseState.Bind(threat, this, GlobalConfig.ai_chase_limit);
+
             if (robot.FlatDistance(point) <= GlobalConfig.ai_rally_arrive) return robot.rallyWaitState.Bind(anchor);
 
             robot.RequestMove(point);
@@ -380,7 +391,8 @@ public partial class RobotAi
         {
             if (!robot.TryResolveAnchor(anchor, out var point)) return robot.searchState;
 
-            var enemy = robot.NearestEnemy(false);
+            // 只对玩家/人机这类高威胁单位让路，僵尸与建筑不打断进攻
+            var enemy = robot.NearestHighThreat();
             if (enemy != null) return robot.chaseState.Bind(enemy, this, GlobalConfig.ai_assault_combat_activity);
 
             if (!anchor.hasPosition) { robot.RequestMove(point); return null; } // 动态锚点：一路跟着发送者

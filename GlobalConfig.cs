@@ -193,7 +193,7 @@ public static class GlobalConfig
 
     #region 寻路
     public const int nav_path_fail_limit = 3;        // 连续算路失败次数上限，达到即视为目标不可达
-    public const float ai_ignore_unreachable_time = 3f; // 目标不可达后忽略多久，避免放弃后立刻又锁回同一个
+    public const float ai_ignore_unreachable_time = 1f; // 目标不可达后忽略多久，避免放弃后立刻又锁回同一个
     #endregion
 
     #region 越界处理
