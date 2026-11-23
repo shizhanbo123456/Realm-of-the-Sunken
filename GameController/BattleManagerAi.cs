@@ -656,7 +656,7 @@ public partial class BattleManager
 
     private void OnAiTimeLeft(AiRequest request)
     {
-        request.Reply("剩余=" + BattleRemainTime.ToString("0.##") + "秒");
+        request.Reply("剩余=" + Tool.ClientLogicManager.BattleTime.RemainTime.ToString("0.##") + "秒");
     }
 
     // 常用信息：位置 + 可见实体摘要 + 卡牌数量 + 聊天未读，AI 常轮询这条
@@ -870,7 +870,7 @@ public partial class BattleManager
         builder.Append("\n卡牌 ");
         AppendCardCount(builder);
 
-        builder.Append("\n剩余时间 ").Append(BattleRemainTime.ToString("0.##")).Append('秒');
+        builder.Append("\n剩余时间 ").Append(Tool.ClientLogicManager.BattleTime.RemainTime.ToString("0.##")).Append('秒');
         builder.Append("\n可见实体 ");
         AppendVisibleSummary(builder);
         builder.Append("\n飘字未读 ").Append(commands.ReadPromptUnread() ?? "（无）");

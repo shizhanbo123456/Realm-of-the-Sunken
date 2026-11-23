@@ -146,7 +146,7 @@ public struct AiTextLine
 // 玩家看得到的文本上报点：时间一律取战斗剩余时间（非战斗阶段为 0）
 public static class AiObservation
 {
-    public static float Now => Tool.BattleManager != null ? Tool.BattleManager.BattleRemainTime : 0f;
+    public static float Now => Tool.ClientLogicManager.BattleTime.RemainTime;
 
     public static void ReportChat(int channel, string text, bool fromSelf)
     {
