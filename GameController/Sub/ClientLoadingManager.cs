@@ -11,13 +11,11 @@ public class ClientLoadingManager : ClientSubManager
     {
         Idle,           // 未开始或已结束
         Names,          // 全量名字表（分批拉，观战方也在里面）
-        AttackPlayers,
-        DefensePlayers,
-        AiUnits,
+        Units,          // 参战单位表（真人 + 人机、各阵营混排，分批拉）
         BattleAssets,   // 僵尸/精英/雕像/珊瑚预加载
     }
 
-    private readonly List<LoadingUnitEntry> units = new(); // 三步汇总：真人玩家 + AI 单位
+    private readonly List<LoadingUnitEntry> units = new(); // 参战单位：真人玩家 + 人机
     private readonly Dictionary<int, string> names = new(); // 玩家令牌 → 名字（加载期全量表，含观战方）
     private readonly Dictionary<ushort, int> entityOwners = new(); // 实体 id → 玩家令牌（名牌反查）
     private readonly Dictionary<int, int> playerEntities = new(); // 玩家令牌 → 实体 id（-1 = 无实体）
@@ -26,6 +24,7 @@ public class ClientLoadingManager : ClientSubManager
     private bool terrainReady;       // 地形已生成（素材表要异步加载，不能假定在 Prepared 之前完成）
     private bool preparedReceived;
     private int expectedNames;       // 元数据给的名字总条数：收满才进下一步
+    private int expectedUnits;       // 元数据给的参战单位总条数：收满才进下一步
 
     public static ClientLoadingManager Current =>
         Tool.ClientLogicManager != null ? Tool.ClientLogicManager.Loading : null;
@@ -78,6 +77,7 @@ public class ClientLoadingManager : ClientSubManager
         OwnEntityId = info.ownEntityId;
         CharacterType = info.characterType;
         expectedNames = info.nameCount;
+        expectedUnits = info.unitCount;
         NetworkManager.SyncServerTime(info.serverTime); // 服务器时间基准，顺带校准本地时钟
         preparedReceived = true;
         TryStartSteps();
@@ -105,42 +105,43 @@ public class ClientLoadingManager : ClientSubManager
         {
             // 快照条数与元数据由服务器同一处算出，为空说明两边口径已不一致，继续拉只会空转
             Debug.LogError($"[加载] 名字表提前结束：已收 {names.Count} / 元数据 {expectedNames}");
-            StartAttackStep();
+            StartUnitStep();
             return;
         }
         foreach (var entry in chunk.list) names[entry.clientId] = entry.name;
         if (names.Count < expectedNames) { RequestNextNames(); return; }
-        StartAttackStep();
+        StartUnitStep();
     }
 
-    private void StartAttackStep()
+    private void StartUnitStep()
     {
-        step = Step.AttackPlayers;
-        if (Tool.NetworkManager != null) Tool.NetworkManager.SendLoadingAttackPlayerRequest();
-    }
-
-    public void OnAttackPlayerResponse(SCLoadingAttackPlayerResponse info)
-    {
-        if (step != Step.AttackPlayers) return;
-        Merge(info.list);
-        step = Step.DefensePlayers;
+        step = Step.Units;
         if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(1f / 4f, MessageVariable.V(message_variablesEnum.loading_text_prepare));
-        if (Tool.NetworkManager != null) Tool.NetworkManager.SendLoadingDefensePlayerRequest();
+        RequestNextUnits();
     }
 
-    public void OnDefensePlayerResponse(SCLoadingDefensePlayerResponse info)
+    // 单位表同一套偏移拉法：收多少推进多少，漏批下次重新要同一偏移
+    private void RequestNextUnits()
     {
-        if (step != Step.DefensePlayers) return;
-        Merge(info.list);
-        step = Step.AiUnits;
-        if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(2f / 4f, MessageVariable.V(message_variablesEnum.loading_text_prepare));
-        if (Tool.NetworkManager != null) Tool.NetworkManager.SendLoadingAiUnitRequest();
+        if (Tool.NetworkManager != null) Tool.NetworkManager.SendLoadingUnitRequest(units.Count);
     }
 
-    public void OnAiUnitResponse(SCLoadingAiUnitResponse info)
+    public void OnUnitResponse(SCLoadingUnitResponse chunk)
     {
-        if (step != Step.AiUnits) return;
-        Merge(info.list);
+        if (step != Step.Units || chunk.list == null) return;
+        if (chunk.list.Count == 0)
+        {
+            Debug.LogError($"[加载] 单位表提前结束：已收 {units.Count} / 元数据 {expectedUnits}");
+            StartBattleAssets();
+            return;
+        }
+        Merge(chunk.list);
+        if (units.Count < expectedUnits) { RequestNextUnits(); return; }
+        StartBattleAssets();
+    }
+
+    private void StartBattleAssets()
+    {
         step = Step.BattleAssets;
         if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(3f / 4f, MessageVariable.V(message_variablesEnum.loading_text_battleAssets));
         if (Tool.ResourceManager == null)
@@ -271,6 +272,7 @@ public class ClientLoadingManager : ClientSubManager
         entityOwners.Clear();
         playerEntities.Clear();
         expectedNames = 0;
+        expectedUnits = 0;
         step = Step.Idle;
     }
     #endregion

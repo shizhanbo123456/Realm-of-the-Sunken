@@ -324,25 +324,18 @@ public partial class NetworkManager : EnsBehaviour
     }
 
     #region 加载期请求（客户端 → 服务器，逐步发送）
-    public void SendLoadingAttackPlayerRequest()
+    public void SendLoadingNamesRequest(int offset)
     {
         if (!CanSendWorldCommand) return;
-        CallFuncRpc(ServerReceiveLoadingAttackPlayerRequestLocal, SendTo.RoomOwner, Delivery.Reliable,
-            new CSLoadingAttackPlayerRequest(), LocalToken);
+        CallFuncRpc(ServerReceiveLoadingNamesRequestLocal, SendTo.RoomOwner, Delivery.Reliable,
+            new CSLoadingNamesRequest { offset = offset }, LocalToken);
     }
 
-    public void SendLoadingDefensePlayerRequest()
+    public void SendLoadingUnitRequest(int offset)
     {
         if (!CanSendWorldCommand) return;
-        CallFuncRpc(ServerReceiveLoadingDefensePlayerRequestLocal, SendTo.RoomOwner, Delivery.Reliable,
-            new CSLoadingDefensePlayerRequest(), LocalToken);
-    }
-
-    public void SendLoadingAiUnitRequest()
-    {
-        if (!CanSendWorldCommand) return;
-        CallFuncRpc(ServerReceiveLoadingAiUnitRequestLocal, SendTo.RoomOwner, Delivery.Reliable,
-            new CSLoadingAiUnitRequest(), LocalToken);
+        CallFuncRpc(ServerReceiveLoadingUnitRequestLocal, SendTo.RoomOwner, Delivery.Reliable,
+            new CSLoadingUnitRequest { offset = offset }, LocalToken);
     }
 
     public void SendLoadingComplete()
@@ -423,22 +416,10 @@ public partial class NetworkManager : EnsBehaviour
         CallFuncRpc(ClientReceiveLoadingPreparedLocal, to, Delivery.Reliable, info);
     }
 
-    public void SendLoadingAttackPlayerResponse(int clientId, SCLoadingAttackPlayerResponse info)
+    public void SendLoadingUnitResponse(int clientId, SCLoadingUnitResponse info)
     {
         if (!TryGetSendTo(clientId, out var to)) return;
-        CallFuncRpc(ClientReceiveLoadingAttackPlayerResponseLocal, to, Delivery.Reliable, info);
-    }
-
-    public void SendLoadingDefensePlayerResponse(int clientId, SCLoadingDefensePlayerResponse info)
-    {
-        if (!TryGetSendTo(clientId, out var to)) return;
-        CallFuncRpc(ClientReceiveLoadingDefensePlayerResponseLocal, to, Delivery.Reliable, info);
-    }
-
-    public void SendLoadingAiUnitResponse(int clientId, SCLoadingAiUnitResponse info)
-    {
-        if (!TryGetSendTo(clientId, out var to)) return;
-        CallFuncRpc(ClientReceiveLoadingAiUnitResponseLocal, to, Delivery.Reliable, info);
+        CallFuncRpc(ClientReceiveLoadingUnitResponseLocal, to, Delivery.Reliable, info);
     }
 
     public void SendBattleStart(int clientId)
@@ -736,21 +717,9 @@ public partial class NetworkManager : EnsBehaviour
     }
 
     [Rpc]
-    private void ServerReceiveLoadingAttackPlayerRequestLocal(CSLoadingAttackPlayerRequest request, int clientId)
+    private void ServerReceiveLoadingUnitRequestLocal(CSLoadingUnitRequest request, int clientId)
     {
-        if (Tool.BattleManager != null) Tool.BattleManager.OnLoadingRequestAttackPlayers(clientId);
-    }
-
-    [Rpc]
-    private void ServerReceiveLoadingDefensePlayerRequestLocal(CSLoadingDefensePlayerRequest request, int clientId)
-    {
-        if (Tool.BattleManager != null) Tool.BattleManager.OnLoadingRequestDefensePlayers(clientId);
-    }
-
-    [Rpc]
-    private void ServerReceiveLoadingAiUnitRequestLocal(CSLoadingAiUnitRequest request, int clientId)
-    {
-        if (Tool.BattleManager != null) Tool.BattleManager.OnLoadingRequestAiUnits(clientId);
+        if (Tool.BattleManager != null) Tool.BattleManager.OnLoadingRequestUnits(clientId, request);
     }
 
     [Rpc]
@@ -825,24 +794,10 @@ public partial class NetworkManager : EnsBehaviour
     }
 
     [Rpc]
-    private void ClientReceiveLoadingAttackPlayerResponseLocal(SCLoadingAttackPlayerResponse info)
+    private void ClientReceiveLoadingUnitResponseLocal(SCLoadingUnitResponse info)
     {
         if (Tool.ClientLogicManager == null) return;
-        Tool.ClientLogicManager.Loading.OnAttackPlayerResponse(info);
-    }
-
-    [Rpc]
-    private void ClientReceiveLoadingDefensePlayerResponseLocal(SCLoadingDefensePlayerResponse info)
-    {
-        if (Tool.ClientLogicManager == null) return;
-        Tool.ClientLogicManager.Loading.OnDefensePlayerResponse(info);
-    }
-
-    [Rpc]
-    private void ClientReceiveLoadingAiUnitResponseLocal(SCLoadingAiUnitResponse info)
-    {
-        if (Tool.ClientLogicManager == null) return;
-        Tool.ClientLogicManager.Loading.OnAiUnitResponse(info);
+        Tool.ClientLogicManager.Loading.OnUnitResponse(info);
     }
 
     [Rpc]

@@ -50,8 +50,9 @@ public partial class BattleManager : EnsBehaviour
     // 加载阶段：已完成的客户端（战斗表现包只发给它们；观战未完成时不阻塞开战）
     private bool LoadingStarted;
     private readonly HashSet<int> loadedClients = new();
-    // 加载期名字快照：客户端按偏移分批拉，偏移的稳定性靠它（现算的话中途有人退场会错位）
+    // 加载期数据快照：客户端按偏移分批拉，偏移的稳定性靠它们（现算的话中途有人退场会错位）
     private readonly List<LoadingNameEntry> loadingNames = new();
+    private readonly List<LoadingUnitEntry> loadingUnits = new();
     // 已预分配的实体 id（尚未 Spawn），分配器跳过它们，避免重复
     private readonly HashSet<ushort> reservedEntityIds = new();
 
@@ -604,8 +605,8 @@ public partial class BattleManager : EnsBehaviour
             EntityOwnerClient[id] = pair.Key;
         }
 
-        // ③ 预处理完成：发元数据，客户端据名字表条数自己来拉
-        RefreshLoadingNames();
+        // ③ 预处理完成：拍快照并下发条数，客户端按条数自己来拉
+        RefreshLoadingSnapshots();
         foreach (var pair in PlayerInfoList)
         {
             if (RobotClients.Contains(pair.Key)) continue;
@@ -618,6 +619,7 @@ public partial class BattleManager : EnsBehaviour
                 characterType = isDefense ? pair.Value.defenseCharacter : pair.Value.attackCharacter,
                 serverTime = Time.time,
                 nameCount = loadingNames.Count,
+                unitCount = loadingUnits.Count,
             });
         }
         Debug.Log($"[加载] 开始：真人 {PlayerInfoList.Count - RobotClients.Count}，预留实体 id {reservedEntityIds.Count} 个");
@@ -631,55 +633,23 @@ public partial class BattleManager : EnsBehaviour
         return EntityCamp.None;
     }
 
-    public void OnLoadingRequestAttackPlayers(int clientId) =>
-        Tool.NetworkManager.SendLoadingAttackPlayerResponse(clientId,
-            new SCLoadingAttackPlayerResponse { list = BuildLoadingUnits(PlayerCampType.Attack) });
-
-    public void OnLoadingRequestDefensePlayers(int clientId) =>
-        Tool.NetworkManager.SendLoadingDefensePlayerResponse(clientId,
-            new SCLoadingDefensePlayerResponse { list = BuildLoadingUnits(PlayerCampType.Defense) });
-
-    public void OnLoadingRequestAiUnits(int clientId) =>
-        Tool.NetworkManager.SendLoadingAiUnitResponse(clientId,
-            new SCLoadingAiUnitResponse { list = BuildLoadingUnits(null) });
-
-    // humanCamp = null 表示人机（服务器侧虚拟令牌，无真实连接）
-    private List<LoadingUnitEntry> BuildLoadingUnits(PlayerCampType? humanCamp)
-    {
-        var list = new List<LoadingUnitEntry>();
-        foreach (var pair in PlayerInfoList)
-        {
-            bool isRobot = RobotClients.Contains(pair.Key);
-            if (humanCamp.HasValue)
-            {
-                if (isRobot) continue;
-                if (!PlayerCamps.TryGetValue(pair.Key, out var camp) || camp != humanCamp.Value) continue;
-            }
-            else if (!isRobot) continue;
-
-            if (!PlayerEntityId.TryGetValue(pair.Key, out var entityId)) continue; // 观战方无实体
-            list.Add(new LoadingUnitEntry
-            {
-                clientId = pair.Key,
-                entityId = entityId,
-                camp = CampOf(pair.Key),
-            });
-        }
-        return list;
-    }
-
-    // 名字快照：真人 + 人机 + 观战方（观战方没有实体，只会出现在这张表里）
-    private void RefreshLoadingNames()
+    // 加载快照：名字覆盖真人 + 人机 + 观战方；单位只收有实体的（观战方无实体，只出现在名字表里）
+    private void RefreshLoadingSnapshots()
     {
         loadingNames.Clear();
+        loadingUnits.Clear();
         foreach (var pair in PlayerInfoList)
         {
             loadingNames.Add(new LoadingNameEntry { clientId = pair.Key, name = NameOf(pair.Key, pair.Value) });
+            if (!PlayerEntityId.TryGetValue(pair.Key, out var entityId)) continue;
+            loadingUnits.Add(new LoadingUnitEntry { clientId = pair.Key, entityId = entityId, camp = CampOf(pair.Key) });
         }
     }
 
-    // 单包上限 256B，故每包最多 6 条（6×(4 令牌+1 长度+18 名字)+4 偏移+4 计数 ≈ 146B）
+    // 单包上限 256B：名字每包 6 条（6×(4 令牌+1 长度+18 名字)+4 偏移+4 计数 ≈ 146B）
     private const int LoadingNamesPerPacket = 6;
+    // 单位每包 16 条（16×(4 令牌+2 实体+4 阵营)+8 ≈ 168B）
+    private const int LoadingUnitsPerPacket = 16;
 
     // 客户端按偏移来要名字；偏移由快照保证稳定，超出范围返回空列表（表示没有更多）
     public void OnLoadingRequestNames(int clientId, CSLoadingNamesRequest request)
@@ -690,6 +660,17 @@ public partial class BattleManager : EnsBehaviour
             chunk.list.Add(loadingNames[i]);
         }
         Tool.NetworkManager.SendLoadingPlayerNames(clientId, chunk);
+    }
+
+    // 同上：参战单位（真人 + 人机、各阵营混排）按偏移分批给
+    public void OnLoadingRequestUnits(int clientId, CSLoadingUnitRequest request)
+    {
+        var chunk = new SCLoadingUnitResponse { offset = request.offset, list = new List<LoadingUnitEntry>() };
+        for (int i = request.offset; i < loadingUnits.Count && chunk.list.Count < LoadingUnitsPerPacket; i++)
+        {
+            chunk.list.Add(loadingUnits[i]);
+        }
+        Tool.NetworkManager.SendLoadingUnitResponse(clientId, chunk);
     }
 
     // 人机令牌落在 [ROBOT_TOKEN_BASE, …) 段，与真人令牌段互不重叠

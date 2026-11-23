@@ -7,6 +7,7 @@ namespace Ros.Transport
         public EntityType characterType; // 本地玩家本局使用的角色（结算算角色经验要用）
         public float serverTime;         // 服务器时间基准，客户端据此校准本地时钟
         public int nameCount;            // 全量名字表条数（真人 + 人机 + 观战）：客户端按它分批拉完为止
+        public int unitCount;            // 参战单位条数（真人 + 人机，各阵营合计）：客户端按它分批拉完为止
     }
 
     public struct SCLoadingPreparedSerializer
@@ -16,7 +17,8 @@ namespace Ros.Transport
             if (!UshortSerializer.Serialize(value.ownEntityId, result, ref indexStart)) return false;
             if (!EntityTypeSerializer.Serialize(value.characterType, result, ref indexStart)) return false;
             if (!FloatSerializer.Serialize(value.serverTime, result, ref indexStart)) return false;
-            return IntSerializer.Serialize(value.nameCount, result, ref indexStart);
+            if (!IntSerializer.Serialize(value.nameCount, result, ref indexStart)) return false;
+            return IntSerializer.Serialize(value.unitCount, result, ref indexStart);
         }
 
         public static SCLoadingPrepared Deserialize(byte[] data, ref int indexStart, int invalidIndex)
@@ -27,6 +29,7 @@ namespace Ros.Transport
                 characterType = EntityTypeSerializer.Deserialize(data, ref indexStart, invalidIndex),
                 serverTime = FloatSerializer.Deserialize(data, ref indexStart, invalidIndex),
                 nameCount = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
+                unitCount = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
             };
         }
     }
