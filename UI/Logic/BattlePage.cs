@@ -317,6 +317,7 @@ public class BattlePage : PageBase
             return;
         }
         request.Reply("已提交技能栏，等服务器回推快照");
+        if (Tool.UIManager != null) Tool.UIManager.HidePage(pageEnum.skill_select);
     }
 
     // 打开技能选择界面，顺带把持有与当前栏报一遍
