@@ -854,7 +854,17 @@ public sealed class AiCommandLine : ClientSubManager
     private void OnBattleEnd(int gameState)
     {
         ClearBuffers();
-        hub.Push(AiInterruptKind.BattleEnd, "结算=" + gameState);
+        hub.Push(AiInterruptKind.BattleEnd, "结算=" + SettlementText(gameState));
+    }
+
+    private static string SettlementText(int gameState)
+    {
+        switch (gameState)
+        {
+            case 1: return "进攻方胜利";
+            case 2: return "防守方胜利";
+            default: return "未知结算码=" + gameState;
+        }
     }
 
     // 掉线/退出世界：战斗已经没了，缓冲一并清掉（不再补中断，控制台那边没人等）
