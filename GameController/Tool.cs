@@ -373,8 +373,26 @@ public class Tool : MonoBehaviour
         e += CheckReferences("ResourceManager.ProjectionVFX", m, ResourceType.ProjectionVFX, vfx_projection_count);
         e += CheckReferences("ResourceManager.WeaponPrefabs", m, ResourceType.WeaponPrefabs, weapon_count);
 
-        e += CheckList("ResourceManager.AttackCharacterIcons", m.AttackCharacterIcons, GlobalConfig.attack_character_count);
-        e += CheckList("ResourceManager.DefenseCharacterIcons", m.DefenseCharacterIcons, GlobalConfig.defense_character_count);
+        e += CheckIconReferences("ResourceManager.AttackCharacterIcons", m, IconType.AttackCharacterIcons, GlobalConfig.attack_character_count);
+        e += CheckIconReferences("ResourceManager.DefenseCharacterIcons", m, IconType.DefenseCharacterIcons, GlobalConfig.defense_character_count);
+        return e;
+    }
+
+    private static int CheckIconReferences(string label, ResourceManager m, IconType type, int expected)
+    {
+        int count = m.IconCount(type);
+        int e = 0;
+        if (expected > 0 && count != expected)
+        {
+            if (count < expected) { Debug.LogError($"[启动自检] {label} 数量不足：{count} / 期望 {expected}"); e++; }
+            else Debug.LogWarning($"[启动自检] {label} 数量偏多：{count} / 期望 {expected}");
+        }
+        for (int i = 0; i < count; i++)
+        {
+            if (m.IsIconConfigured(type, i)) continue;
+            Debug.LogError($"[启动自检] {label}[{i}] 的 AssetReference 为空或未指向 addressable 资产");
+            e++;
+        }
         return e;
     }
 

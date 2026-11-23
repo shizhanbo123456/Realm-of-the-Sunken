@@ -276,7 +276,7 @@ public class UIManager : MonoBehaviour
 
     public void SetLoadingProgress(float progress01, string text) => loading.SetProgress(progress01, text);
 
-    // 进入游戏：先挂加载界面把常驻资源拉齐（攻守角色/武器/两张布置图/地形素材表），完成后再进首页
+    // 进入游戏：先挂加载界面把常驻资源拉齐（攻守角色/武器/两张布置图/地形素材表/图标），完成后再进首页
     private void BeginStartupLoad()
     {
         ShowLoading();

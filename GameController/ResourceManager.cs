@@ -5,8 +5,8 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
-// 客户端资源管理器：大体积预制体走 Addressables（AssetReference）按需加载与延迟卸载。
-// 角色/武器/怪物/场景物件在进游戏与进战斗时预加载后常驻，只有特效按实例回收：最后一个实例销毁后 3s 再卸载。
+// 客户端资源管理器：预制体与图标全部走 Addressables（AssetReference）按需加载与延迟卸载。
+// 角色/武器/怪物/场景物件与图标在进游戏与进战斗时预加载后常驻，只有特效按实例回收：最后一个实例销毁后 3s 再卸载。
 public class ResourceManager : MonoBehaviour
 {
     private const float unloadDelay = 3f;
@@ -44,8 +44,6 @@ public class ResourceManager : MonoBehaviour
     private void Awake()
     {
         InitReferenceMap();
-        SkillIconMap = BuildIconMap(skillIconTextures);
-        BuffIconMap = BuildIconMap(buffIconTextures);
         Tool.ResourceManager = this;
     }
 
@@ -81,10 +79,14 @@ public class ResourceManager : MonoBehaviour
     [SerializeField] private AssetReferenceT<GameObject> LobbyDisplayArranger;  // 大厅场景布置
     [SerializeField] private AssetReferenceT<BuildingKitSet> BuildingKit;       // 地形素材表（加载它即连带加载全部地形预制体）
 
-    [SerializeField] private List<Texture> skillIconTextures = new();   // 贴图名前 3 位 = 技能 id
-    [SerializeField] private List<Texture> buffIconTextures = new();    // 贴图名前 3 位 = Buff(EffectType) id
-    public List<Texture2D> AttackCharacterIcons = new();
-    public List<Texture2D> DefenseCharacterIcons = new();
+    [SerializeField] private List<AssetReferenceT<Texture2D>> SkillIconRefs = new();      // 贴图名前 3 位 = 技能 id
+    [SerializeField] private List<AssetReferenceT<Texture2D>> BuffIconRefs = new();       // 贴图名前 3 位 = Buff(EffectType) id
+    [SerializeField] private List<AssetReferenceT<Texture2D>> AttackCharacterIconRefs = new();
+    [SerializeField] private List<AssetReferenceT<Texture2D>> DefenseCharacterIconRefs = new();
+
+    // 图标随常驻资源一起加载，加载完才进首页
+    public List<Texture2D> AttackCharacterIcons { get; private set; } = new();
+    public List<Texture2D> DefenseCharacterIcons { get; private set; } = new();
 
     public Dictionary<int, Texture> SkillIconMap { get; private set; } = new();
     public Dictionary<int, Texture> BuffIconMap { get; private set; } = new();
@@ -128,10 +130,11 @@ public class ResourceManager : MonoBehaviour
     private void BeginNecessary()
     {
         necessaryStarted = true;
-        // 布置图与地形素材表按 1 项计（未配置时也会走一次失败回调，保证计数收得回来）
+        // 布置图、地形素材表、四组图标各按 1 项计（未配置时也会走一次失败回调，保证计数收得回来）
+        const int iconGroups = 4;
         necessaryTotal = CountOf(ResourceType.AttackCharacterGraphics)
                        + CountOf(ResourceType.DefenseCharacterGraphics)
-                       + CountOf(ResourceType.WeaponPrefabs) + 3;
+                       + CountOf(ResourceType.WeaponPrefabs) + 3 + iconGroups;
         if (necessaryTotal <= 0)
         {
             necessaryLoaded = true;
@@ -144,6 +147,28 @@ public class ResourceManager : MonoBehaviour
         PreloadNecessary(ResourceType.HomeDisplayArranger, 0);
         PreloadNecessary(ResourceType.LobbyDisplayArranger, 0);
         LoadBuildingKit(_ => NecessaryOneDone());
+
+        // 先归还进度再建表：贴图名不合规时 BuildIconMap 会抛异常，不能让加载界面卡住
+        LoadIconGroup("SkillIconRefs", SkillIconRefs, textures =>
+        {
+            NecessaryOneDone();
+            SkillIconMap = BuildIconMap(textures);
+        });
+        LoadIconGroup("BuffIconRefs", BuffIconRefs, textures =>
+        {
+            NecessaryOneDone();
+            BuffIconMap = BuildIconMap(textures);
+        });
+        LoadIconGroup("AttackCharacterIconRefs", AttackCharacterIconRefs, textures =>
+        {
+            AttackCharacterIcons = textures;
+            NecessaryOneDone();
+        });
+        LoadIconGroup("DefenseCharacterIconRefs", DefenseCharacterIconRefs, textures =>
+        {
+            DefenseCharacterIcons = textures;
+            NecessaryOneDone();
+        });
     }
 
     private void PreloadNecessary(ResourceType type)
@@ -222,6 +247,48 @@ public class ResourceManager : MonoBehaviour
                 entry.notify.Add(step);
                 EnsureLoaded(key, entry);
             }
+        }
+    }
+
+    // 图标按组加载：整组结束后回调一次；失败项留 null 并报错（角色图标的下标就是角色编号，不能剔除）
+    private void LoadIconGroup(string label, List<AssetReferenceT<Texture2D>> references, Action<List<Texture2D>> onLoaded)
+    {
+        int count = references == null ? 0 : references.Count;
+        var textures = new List<Texture2D>(count);
+        for (int i = 0; i < count; i++) textures.Add(null);
+        if (count == 0)
+        {
+            onLoaded(textures);
+            return;
+        }
+
+        int remaining = count;
+        for (int index = 0; index < count; index++)
+        {
+            int slot = index;
+            AssetReferenceT<Texture2D> reference = references[index];
+            if (reference == null || !reference.RuntimeKeyIsValid())
+            {
+                Debug.LogError($"[资源] {label}[{slot}] 的 AssetReference 为空或未指向 addressable 资产");
+                OneDone();
+                continue;
+            }
+
+            reference.LoadAssetAsync().Completed += operation =>
+            {
+                if (operation.Status != AsyncOperationStatus.Succeeded || operation.Result == null)
+                    Debug.LogError($"[资源] {label}[{slot}] 加载失败：{operation.OperationException?.Message}");
+                else
+                    textures[slot] = operation.Result;
+                OneDone();
+            };
+        }
+
+        void OneDone()
+        {
+            remaining--;
+            if (remaining > 0) return;
+            onLoaded(textures);
         }
     }
     #endregion
@@ -306,6 +373,29 @@ public class ResourceManager : MonoBehaviour
         if (index < 0 || index >= CountOf(type)) return false;
         return entries.TryGetValue(RefToInt(type, index), out Entry entry)
             && entry.reference != null && entry.reference.RuntimeKeyIsValid();
+    }
+
+    // 图标同样供启动自检用：只读 Inspector 里配的引用，不触发加载
+    public int IconCount(IconType type) => IconRefsOf(type).Count;
+
+    public bool IsIconConfigured(IconType type, int index)
+    {
+        List<AssetReferenceT<Texture2D>> references = IconRefsOf(type);
+        if (index < 0 || index >= references.Count) return false;
+        AssetReferenceT<Texture2D> reference = references[index];
+        return reference != null && reference.RuntimeKeyIsValid();
+    }
+
+    private List<AssetReferenceT<Texture2D>> IconRefsOf(IconType type)
+    {
+        switch (type)
+        {
+            case IconType.SkillIcons: return SkillIconRefs;
+            case IconType.BuffIcons: return BuffIconRefs;
+            case IconType.AttackCharacterIcons: return AttackCharacterIconRefs;
+            case IconType.DefenseCharacterIcons: return DefenseCharacterIconRefs;
+        }
+        throw new ArgumentOutOfRangeException(nameof(type), type, "[资源] 未定义的图标类别");
     }
 
     public bool TryGetPrefab(ResourceType type, int index, out GameObject prefab)
@@ -556,7 +646,7 @@ public class ResourceManager : MonoBehaviour
     }
 
     // 图标 id 取贴图名前 3 位（如 "015_霜棱散" → 15）；名字不合规或 id 重复属资源配置错配，直接抛
-    private static Dictionary<int, Texture> BuildIconMap(List<Texture> textures)
+    private static Dictionary<int, Texture> BuildIconMap(List<Texture2D> textures)
     {
         var map = new Dictionary<int, Texture>();
         if (textures == null)
@@ -564,8 +654,7 @@ public class ResourceManager : MonoBehaviour
 
         foreach (var texture in textures)
         {
-            if (texture == null)
-                throw new FormatException("[图标] ResourceManager 的图标列表含空引用，请检查 Inspector 列表");
+            if (texture == null) continue;   // 加载失败的槽位已由 LoadIconGroup 报错
             string textureName = texture.name;
             if (textureName.Length < 3 || !int.TryParse(textureName.Substring(0, 3), out int id))
                 throw new FormatException($"[图标] ResourceManager 的贴图「{textureName}」前 3 位不是图标 id");
@@ -601,4 +690,13 @@ public enum ResourceType
     WeaponPrefabs,
     HomeDisplayArranger,
     LobbyDisplayArranger,
+}
+
+// 图标不参与 ResourceType 的预制体卸载体系，单独一组枚举给加载与启动自检用
+public enum IconType
+{
+    SkillIcons,
+    BuffIcons,
+    AttackCharacterIcons,
+    DefenseCharacterIcons,
 }
