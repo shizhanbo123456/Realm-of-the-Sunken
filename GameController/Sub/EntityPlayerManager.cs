@@ -35,9 +35,12 @@ public class EntityPlayerManager : ClientSubManager
 
         public readonly Dictionary<int, GameObject> buffVfx = new();
         public readonly HashSet<int> activeBuffs = new();   // 本次同步里仍生效的 buff：异步加载完成后据此判断还要不要
+        public bool destroyed; // 实体销毁后置位：异步加载回调据此丢弃已经没有归属的特效
 
         private void OnDestroy()
         {
+            destroyed = true;
+            activeBuffs.Clear();
             foreach (var pair in buffVfx)
             {
                 if (pair.Value != null) Destroy(pair.Value);
@@ -431,8 +434,8 @@ public class EntityPlayerManager : ClientSubManager
         Tool.VfxManager.LoadVfx(resourceType, index, anchor.Lerp(0f), Quaternion.identity, obj =>
         {
             if (obj == null) return;
-            // 加载期间 buff 已过期或实体已销毁：直接丢掉，避免留下无主特效
-            if (!view.activeBuffs.Contains(buffType) || view.buffVfx.ContainsKey(buffType))
+            // 加载期间实体已销毁或 buff 已过期：直接丢掉，避免留下无主特效
+            if (view.destroyed || !view.activeBuffs.Contains(buffType) || view.buffVfx.ContainsKey(buffType))
             {
                 UnityEngine.Object.Destroy(obj);
                 return;
