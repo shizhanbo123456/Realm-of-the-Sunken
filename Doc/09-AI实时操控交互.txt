@@ -31,3 +31,4 @@ Tick状态机（监控飘字提示内容和聊天频道内容中@自己的内容
 包含ai_command表的条目，允许命令行和lua调用
 listCommands 只列 frequently_used 打勾的常用命令（且当前阶段可用）
 listAllCommands 列全表所有命令，不看阶段
+图鉴命令常驻可用：guide_range 列实体各类型有效下标与技能/Buff 有效 id；guide_entity category index、guide_skill id、guide_buff id 按配表全字段逐行输出

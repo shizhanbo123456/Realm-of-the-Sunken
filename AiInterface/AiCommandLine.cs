@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Reflection;
 using System.Text;
 using Ros.Config;
 using Ros.Transport;
@@ -318,6 +319,10 @@ public sealed class AiCommandLine : ClientSubManager
         AiCommandBus.Bind(ai_commandEnum.checkInterrupt, OnCheckInterrupt);
         AiCommandBus.Bind(ai_commandEnum.interrupt, OnInterrupt);
         AiCommandBus.Bind(ai_commandEnum.waitForIntrrupt, OnWait);
+        AiCommandBus.Bind(ai_commandEnum.guide_range, OnGuideRange);
+        AiCommandBus.Bind(ai_commandEnum.guide_entity, OnGuideEntity);
+        AiCommandBus.Bind(ai_commandEnum.guide_skill, OnGuideSkill);
+        AiCommandBus.Bind(ai_commandEnum.guide_buff, OnGuideBuff);
         AiCommandBus.Bind(ai_commandEnum.chat_recent, OnChatRecent);
         AiCommandBus.Bind(ai_commandEnum.chat_unread, OnChatUnread);
         AiCommandBus.Bind(ai_commandEnum.prompt_buffer, OnPromptBuffer);
@@ -339,6 +344,10 @@ public sealed class AiCommandLine : ClientSubManager
         AiCommandBus.Unbind(ai_commandEnum.checkInterrupt, OnCheckInterrupt);
         AiCommandBus.Unbind(ai_commandEnum.interrupt, OnInterrupt);
         AiCommandBus.Unbind(ai_commandEnum.waitForIntrrupt, OnWait);
+        AiCommandBus.Unbind(ai_commandEnum.guide_range, OnGuideRange);
+        AiCommandBus.Unbind(ai_commandEnum.guide_entity, OnGuideEntity);
+        AiCommandBus.Unbind(ai_commandEnum.guide_skill, OnGuideSkill);
+        AiCommandBus.Unbind(ai_commandEnum.guide_buff, OnGuideBuff);
         AiCommandBus.Unbind(ai_commandEnum.chat_recent, OnChatRecent);
         AiCommandBus.Unbind(ai_commandEnum.chat_unread, OnChatUnread);
         AiCommandBus.Unbind(ai_commandEnum.prompt_buffer, OnPromptBuffer);
@@ -516,6 +525,115 @@ public sealed class AiCommandLine : ClientSubManager
     private void OnGetPlayerName(AiRequest request)
     {
         request.Reply(string.IsNullOrEmpty(ClientSelection.playerName) ? "名称=（空）" : "名称=" + ClientSelection.playerName);
+    }
+
+    private void OnGuideRange(AiRequest request)
+    {
+        var byCategory = new SortedDictionary<int, List<int>>();
+        foreach (var pair in EntityConfig.content)
+        {
+            var row = pair.Value;
+            if (!byCategory.TryGetValue(row.category, out var values))
+            {
+                values = new List<int>();
+                byCategory.Add(row.category, values);
+            }
+            values.Add(row.value);
+        }
+
+        var builder = new StringBuilder();
+        builder.Append("实体：");
+        foreach (var pair in byCategory)
+        {
+            pair.Value.Sort();
+            builder.Append('\n').Append(pair.Key).Append("：").Append(JoinIds(pair.Value));
+        }
+        builder.Append("\n技能：").Append(JoinIds(SortedIds(SkillConfig.content)));
+        builder.Append("\nBuff：").Append(JoinIds(SortedIds(EffectConfig.content)));
+        request.Reply(builder.ToString());
+    }
+
+    private void OnGuideEntity(AiRequest request)
+    {
+        int category = request.Int(0);
+        int index = request.Int(1);
+        foreach (var pair in EntityConfig.content)
+        {
+            var row = pair.Value;
+            if (row.category != category || row.value != index) continue;
+            request.Reply(Describe(row));
+            return;
+        }
+        request.Reject($"没有类型={category} 下标={index} 的实体");
+    }
+
+    private void OnGuideSkill(AiRequest request)
+    {
+        int id = request.Int(0);
+        if (!SkillConfig.content.TryGetValue(id, out var row))
+        {
+            request.Reject($"没有技能 id={id}");
+            return;
+        }
+        request.Reply(Describe(row));
+    }
+
+    private void OnGuideBuff(AiRequest request)
+    {
+        int id = request.Int(0);
+        if (!EffectConfig.content.TryGetValue(id, out var row))
+        {
+            request.Reject($"没有 Buff id={id}");
+            return;
+        }
+        request.Reply(Describe(row));
+    }
+
+    private static string JoinIds(List<int> ids)
+    {
+        var builder = new StringBuilder();
+        for (int i = 0; i < ids.Count; i++)
+        {
+            if (i > 0) builder.Append(',');
+            builder.Append(ids[i]);
+        }
+        return builder.ToString();
+    }
+
+    private static List<int> SortedIds<T>(Dictionary<int, T> source)
+    {
+        var ids = new List<int>(source.Keys);
+        ids.Sort();
+        return ids;
+    }
+
+    private static string Describe(object row)
+    {
+        var fields = row.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public);
+        var builder = new StringBuilder();
+        for (int i = 0; i < fields.Length; i++)
+        {
+            if (i > 0) builder.Append('\n');
+            builder.Append(fields[i].Name).Append('=').Append(FormatField(fields[i].GetValue(row)));
+        }
+        return builder.ToString();
+    }
+
+    private static string FormatField(object value)
+    {
+        if (value == null) return "空";
+        if (value is string text) return text.Length == 0 ? "空" : text;
+        if (value is System.Collections.IEnumerable items)
+        {
+            var builder = new StringBuilder();
+            foreach (object item in items)
+            {
+                if (builder.Length > 0) builder.Append(';');
+                builder.Append(FormatField(item));
+            }
+            return builder.ToString();
+        }
+        return Convert.ToString(value, CultureInfo.InvariantCulture);
     }
 
     private void OnChatRecent(AiRequest request)
