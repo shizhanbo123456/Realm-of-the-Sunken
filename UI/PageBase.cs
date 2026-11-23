@@ -95,6 +95,7 @@ public abstract class PageBase
     }
 
     // 适配：alignMode 0 = 全屏（高度不变、按窗口宽高比重设宽度后缩放到刚好铺满）；1~9 = 保持设计尺寸贴到屏幕九宫格
+    // 摆位用实时 Screen：GRoot 尺寸由 FGUI 自己的 Update 更新，全屏切换时会滞后一帧
     protected void ApplyLayout()
     {
         Root.pivotAsAnchor = false;
@@ -118,16 +119,16 @@ public abstract class PageBase
         int col = (Config.alignMode - 1) % 3;
         float width = Root.width * UiScale;
         if (col == 0) return Config.marginX;
-        if (col == 1) return (GRoot.inst.width - width) * 0.5f;
-        return GRoot.inst.width - width - Config.marginX;
+        if (col == 1) return (Screen.width - width) * 0.5f;
+        return Screen.width - width - Config.marginX;
     }
 
     private float AnchorY()
     {
         int row = (Config.alignMode - 1) / 3; // 0 底 / 1 中 / 2 顶
         float height = Root.height * UiScale;
-        if (row == 0) return GRoot.inst.height - height - Config.marginY;
-        if (row == 1) return (GRoot.inst.height - height) * 0.5f;
+        if (row == 0) return Screen.height - height - Config.marginY;
+        if (row == 1) return (Screen.height - height) * 0.5f;
         return Config.marginY;
     }
 
