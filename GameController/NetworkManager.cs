@@ -1139,11 +1139,24 @@ public partial class NetworkManager : EnsBehaviour
     }
     #endregion
 
-    #region 加载期名字表（分批下发）
+    #region 加载期名字表（客户端按偏移分批拉取）
+    public void SendLoadingNamesRequest(int offset)
+    {
+        if (!CanSendWorldCommand) return;
+        CallFuncRpc(ServerReceiveLoadingNamesRequestLocal, SendTo.RoomOwner, Delivery.Reliable,
+            new CSLoadingNamesRequest { offset = offset }, LocalToken);
+    }
+
     public void SendLoadingPlayerNames(int clientId, SCLoadingPlayerNames chunk)
     {
         if (!TryGetSendTo(clientId, out var to)) return;
         CallFuncRpc(ClientReceiveLoadingPlayerNamesLocal, to, Delivery.Reliable, chunk);
+    }
+
+    [Rpc]
+    private void ServerReceiveLoadingNamesRequestLocal(CSLoadingNamesRequest request, int clientId)
+    {
+        if (Tool.BattleManager != null) Tool.BattleManager.OnLoadingRequestNames(clientId, request);
     }
 
     [Rpc]

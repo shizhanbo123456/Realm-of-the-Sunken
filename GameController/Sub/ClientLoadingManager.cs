@@ -10,6 +10,7 @@ public class ClientLoadingManager : ClientSubManager
     private enum Step
     {
         Idle,           // 未开始或已结束
+        Names,          // 全量名字表（分批拉，观战方也在里面）
         AttackPlayers,
         DefensePlayers,
         AiUnits,
@@ -24,6 +25,7 @@ public class ClientLoadingManager : ClientSubManager
     private Step step = Step.Idle;
     private bool terrainReady;       // 地形已生成（素材表要异步加载，不能假定在 Prepared 之前完成）
     private bool preparedReceived;
+    private int expectedNames;       // 元数据给的名字总条数：收满才进下一步
 
     public static ClientLoadingManager Current =>
         Tool.ClientLogicManager != null ? Tool.ClientLogicManager.Loading : null;
@@ -70,11 +72,12 @@ public class ClientLoadingManager : ClientSubManager
         GenerateTerrain();
     }
 
-    // 服务器预处理完成（实体 id 已预分配）：地形就绪后才开始逐步请求数据
+    // 服务器预处理完成（实体 id 已预分配 + 拉取清单）：地形就绪后按清单逐个来拉
     public void OnLoadingPrepared(SCLoadingPrepared info)
     {
         OwnEntityId = info.ownEntityId;
         CharacterType = info.characterType;
+        expectedNames = info.nameCount;
         NetworkManager.SyncServerTime(info.serverTime); // 服务器时间基准，顺带校准本地时钟
         preparedReceived = true;
         TryStartSteps();
@@ -82,9 +85,37 @@ public class ClientLoadingManager : ClientSubManager
 
     private void TryStartSteps()
     {
-        if (!terrainReady || !preparedReceived) return;
-        step = Step.AttackPlayers;
+        if (step != Step.Idle || !terrainReady || !preparedReceived) return;
+        step = Step.Names;
         if (Tool.UIManager != null) Tool.UIManager.SetLoadingProgress(0f, MessageVariable.V(message_variablesEnum.loading_text_prepare));
+        RequestNextNames();
+    }
+
+    // 名字表按偏移分批拉：只按已收到的条数推进，漏了哪批下次自然重拉同一偏移
+    private void RequestNextNames()
+    {
+        if (Tool.NetworkManager != null) Tool.NetworkManager.SendLoadingNamesRequest(names.Count);
+    }
+
+    // 收到一批名字：没拉满就按新偏移继续要，收满才进单位表
+    public void OnPlayerNames(SCLoadingPlayerNames chunk)
+    {
+        if (step != Step.Names || chunk.list == null) return;
+        if (chunk.list.Count == 0)
+        {
+            // 快照条数与元数据由服务器同一处算出，为空说明两边口径已不一致，继续拉只会空转
+            Debug.LogError($"[加载] 名字表提前结束：已收 {names.Count} / 元数据 {expectedNames}");
+            StartAttackStep();
+            return;
+        }
+        foreach (var entry in chunk.list) names[entry.clientId] = entry.name;
+        if (names.Count < expectedNames) { RequestNextNames(); return; }
+        StartAttackStep();
+    }
+
+    private void StartAttackStep()
+    {
+        step = Step.AttackPlayers;
         if (Tool.NetworkManager != null) Tool.NetworkManager.SendLoadingAttackPlayerRequest();
     }
 
@@ -137,13 +168,6 @@ public class ClientLoadingManager : ClientSubManager
     #endregion
 
     #region//数据查询
-    // 战斗期玩家名字（真人 / 人机 / 观战方，分多包下发，逐包合并）
-    public void OnPlayerNames(SCLoadingPlayerNames chunk)
-    {
-        if (!HasSession || chunk.list == null) return;
-        foreach (var entry in chunk.list) names[entry.clientId] = entry.name;
-    }
-
     // 战斗期名字的唯一读取口：名字表查不到才回退缺省名
     public string GetName(int clientId)
     {
@@ -246,6 +270,7 @@ public class ClientLoadingManager : ClientSubManager
         names.Clear();
         entityOwners.Clear();
         playerEntities.Clear();
+        expectedNames = 0;
         step = Step.Idle;
     }
     #endregion

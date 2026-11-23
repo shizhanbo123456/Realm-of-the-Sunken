@@ -51,8 +51,8 @@ public partial class BattleManager
 
         Tool.NetworkManager.SendLoadingStart(token, new SCLoadingStart { camp = CampOf(token), resync = true });
 
-        // 名字表与首次加载同一口径：观战方也在表里，重连后名字才不会丢
-        SendLoadingNames(token, BuildLoadingNames());
+        // 名字快照与首次加载同一口径：观战方也在表里，重连后名字才不会丢
+        RefreshLoadingNames();
 
         PlayerEntityId.TryGetValue(token, out var ownId);
         var info = PlayerInfoList[token];
@@ -63,6 +63,7 @@ public partial class BattleManager
             // 观战方没有战斗角色，与首次加载保持同一口径（沿用其进攻方选择，结算取角色下标用）
             characterType = isDefense ? info.defenseCharacter : info.attackCharacter,
             serverTime = Time.time,
+            nameCount = loadingNames.Count,
         });
 
         // 玩家 → 实体关系全量：客户端据此认自己、名牌反查、观战列表

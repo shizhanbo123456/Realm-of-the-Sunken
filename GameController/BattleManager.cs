@@ -50,6 +50,8 @@ public partial class BattleManager : EnsBehaviour
     // 加载阶段：已完成的客户端（战斗表现包只发给它们；观战未完成时不阻塞开战）
     private bool LoadingStarted;
     private readonly HashSet<int> loadedClients = new();
+    // 加载期名字快照：客户端按偏移分批拉，偏移的稳定性靠它（现算的话中途有人退场会错位）
+    private readonly List<LoadingNameEntry> loadingNames = new();
     // 已预分配的实体 id（尚未 Spawn），分配器跳过它们，避免重复
     private readonly HashSet<ushort> reservedEntityIds = new();
 
@@ -602,12 +604,11 @@ public partial class BattleManager : EnsBehaviour
             EntityOwnerClient[id] = pair.Key;
         }
 
-        // ③ 预处理完成：客户端此时才开始逐步请求数据；名字表先于单位表下发
-        var loadingNames = BuildLoadingNames();
+        // ③ 预处理完成：发元数据，客户端据名字表条数自己来拉
+        RefreshLoadingNames();
         foreach (var pair in PlayerInfoList)
         {
             if (RobotClients.Contains(pair.Key)) continue;
-            SendLoadingNames(pair.Key, loadingNames);
             PlayerEntityId.TryGetValue(pair.Key, out var ownId);
             bool isDefense = PlayerCamps.TryGetValue(pair.Key, out var camp) && camp == PlayerCampType.Defense;
             Tool.NetworkManager.SendLoadingPrepared(pair.Key, new SCLoadingPrepared
@@ -616,6 +617,7 @@ public partial class BattleManager : EnsBehaviour
                 // 观战方没有战斗角色，与旧行为一致地沿用其进攻方选择（结算取角色下标用）
                 characterType = isDefense ? pair.Value.defenseCharacter : pair.Value.attackCharacter,
                 serverTime = Time.time,
+                nameCount = loadingNames.Count,
             });
         }
         Debug.Log($"[加载] 开始：真人 {PlayerInfoList.Count - RobotClients.Count}，预留实体 id {reservedEntityIds.Count} 个");
@@ -666,30 +668,28 @@ public partial class BattleManager : EnsBehaviour
         return list;
     }
 
-    // 全量名字：真人 + 人机 + 观战方（观战方没有实体，只会出现在这张表里）
-    private List<LoadingNameEntry> BuildLoadingNames()
+    // 名字快照：真人 + 人机 + 观战方（观战方没有实体，只会出现在这张表里）
+    private void RefreshLoadingNames()
     {
-        var list = new List<LoadingNameEntry>();
+        loadingNames.Clear();
         foreach (var pair in PlayerInfoList)
         {
-            list.Add(new LoadingNameEntry { clientId = pair.Key, name = NameOf(pair.Key, pair.Value) });
+            loadingNames.Add(new LoadingNameEntry { clientId = pair.Key, name = NameOf(pair.Key, pair.Value) });
         }
-        return list;
     }
 
-    // 名字表与单位表分开下发，观战方也在表里：客户端只认这一处名字来源
-    // 单包上限 256B，故每包最多 6 条（6×(4 令牌+1 长度+18 名字)+4 计数 ≈ 142B），人多分多包
+    // 单包上限 256B，故每包最多 6 条（6×(4 令牌+1 长度+18 名字)+4 偏移+4 计数 ≈ 146B）
     private const int LoadingNamesPerPacket = 6;
 
-    private void SendLoadingNames(int clientId, List<LoadingNameEntry> names)
+    // 客户端按偏移来要名字；偏移由快照保证稳定，超出范围返回空列表（表示没有更多）
+    public void OnLoadingRequestNames(int clientId, CSLoadingNamesRequest request)
     {
-        for (int start = 0; start < names.Count; start += LoadingNamesPerPacket)
+        var chunk = new SCLoadingPlayerNames { offset = request.offset, list = new List<LoadingNameEntry>() };
+        for (int i = request.offset; i < loadingNames.Count && chunk.list.Count < LoadingNamesPerPacket; i++)
         {
-            var chunk = new SCLoadingPlayerNames { list = new List<LoadingNameEntry>() };
-            int end = Mathf.Min(start + LoadingNamesPerPacket, names.Count);
-            for (int i = start; i < end; i++) chunk.list.Add(names[i]);
-            Tool.NetworkManager.SendLoadingPlayerNames(clientId, chunk);
+            chunk.list.Add(loadingNames[i]);
         }
+        Tool.NetworkManager.SendLoadingPlayerNames(clientId, chunk);
     }
 
     // 人机令牌落在 [ROBOT_TOKEN_BASE, …) 段，与真人令牌段互不重叠
