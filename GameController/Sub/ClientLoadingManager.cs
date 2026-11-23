@@ -17,7 +17,7 @@ public class ClientLoadingManager : ClientSubManager
     }
 
     private readonly List<LoadingUnitEntry> units = new(); // 三步汇总：真人玩家 + AI 单位
-    private readonly Dictionary<int, string> names = new(); // 玩家令牌 → 名字
+    private readonly Dictionary<int, string> names = new(); // 玩家令牌 → 名字（加载期全量表，含观战方）
     private readonly Dictionary<ushort, int> entityOwners = new(); // 实体 id → 玩家令牌（名牌反查）
     private readonly Dictionary<int, int> playerEntities = new(); // 玩家令牌 → 实体 id（-1 = 无实体）
 
@@ -137,7 +137,14 @@ public class ClientLoadingManager : ClientSubManager
     #endregion
 
     #region//数据查询
-    // 战斗期玩家名字（AI 也在这套表里，直接带名字下发）
+    // 战斗期玩家名字（真人 / 人机 / 观战方，分多包下发，逐包合并）
+    public void OnPlayerNames(SCLoadingPlayerNames chunk)
+    {
+        if (!HasSession || chunk.list == null) return;
+        foreach (var entry in chunk.list) names[entry.clientId] = entry.name;
+    }
+
+    // 战斗期名字的唯一读取口：名字表查不到才回退缺省名
     public string GetName(int clientId)
     {
         if (names.TryGetValue(clientId, out var name) && !string.IsNullOrEmpty(name)) return name;
@@ -182,13 +189,13 @@ public class ClientLoadingManager : ClientSubManager
         TryStartSteps();
     }
 
+    // 单位表只填实体关系，名字由 SCLoadingPlayerNames 单独下发
     private void Merge(List<LoadingUnitEntry> list)
     {
         if (list == null) return;
         foreach (var entry in list)
         {
             units.Add(entry);
-            names[entry.clientId] = entry.name;
             entityOwners[entry.entityId] = entry.clientId;
             playerEntities[entry.clientId] = entry.entityId;
         }

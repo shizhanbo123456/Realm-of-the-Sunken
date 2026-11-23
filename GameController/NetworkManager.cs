@@ -1138,4 +1138,19 @@ public partial class NetworkManager : EnsBehaviour
         EventManager.TrigEvent(ClientEvent.OnGodViewDetail, info);
     }
     #endregion
+
+    #region 加载期名字表（分批下发）
+    public void SendLoadingPlayerNames(int clientId, SCLoadingPlayerNames chunk)
+    {
+        if (!TryGetSendTo(clientId, out var to)) return;
+        CallFuncRpc(ClientReceiveLoadingPlayerNamesLocal, to, Delivery.Reliable, chunk);
+    }
+
+    [Rpc]
+    private void ClientReceiveLoadingPlayerNamesLocal(SCLoadingPlayerNames chunk)
+    {
+        if (Tool.ClientLogicManager == null) return;
+        Tool.ClientLogicManager.Loading.OnPlayerNames(chunk);
+    }
+    #endregion
 }

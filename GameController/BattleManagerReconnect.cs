@@ -51,6 +51,9 @@ public partial class BattleManager
 
         Tool.NetworkManager.SendLoadingStart(token, new SCLoadingStart { camp = CampOf(token), resync = true });
 
+        // 名字表与首次加载同一口径：观战方也在表里，重连后名字才不会丢
+        SendLoadingNames(token, BuildLoadingNames());
+
         PlayerEntityId.TryGetValue(token, out var ownId);
         var info = PlayerInfoList[token];
         bool isDefense = PlayerCamps.TryGetValue(token, out var camp) && camp == PlayerCampType.Defense;

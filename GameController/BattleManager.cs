@@ -602,10 +602,12 @@ public partial class BattleManager : EnsBehaviour
             EntityOwnerClient[id] = pair.Key;
         }
 
-        // ③ 预处理完成：客户端此时才开始逐步请求数据
+        // ③ 预处理完成：客户端此时才开始逐步请求数据；名字表先于单位表下发
+        var loadingNames = BuildLoadingNames();
         foreach (var pair in PlayerInfoList)
         {
             if (RobotClients.Contains(pair.Key)) continue;
+            SendLoadingNames(pair.Key, loadingNames);
             PlayerEntityId.TryGetValue(pair.Key, out var ownId);
             bool isDefense = PlayerCamps.TryGetValue(pair.Key, out var camp) && camp == PlayerCampType.Defense;
             Tool.NetworkManager.SendLoadingPrepared(pair.Key, new SCLoadingPrepared
@@ -658,11 +660,36 @@ public partial class BattleManager : EnsBehaviour
             {
                 clientId = pair.Key,
                 entityId = entityId,
-                name = NameOf(pair.Key, pair.Value),
                 camp = CampOf(pair.Key),
             });
         }
         return list;
+    }
+
+    // 全量名字：真人 + 人机 + 观战方（观战方没有实体，只会出现在这张表里）
+    private List<LoadingNameEntry> BuildLoadingNames()
+    {
+        var list = new List<LoadingNameEntry>();
+        foreach (var pair in PlayerInfoList)
+        {
+            list.Add(new LoadingNameEntry { clientId = pair.Key, name = NameOf(pair.Key, pair.Value) });
+        }
+        return list;
+    }
+
+    // 名字表与单位表分开下发，观战方也在表里：客户端只认这一处名字来源
+    // 单包上限 256B，故每包最多 6 条（6×(4 令牌+1 长度+18 名字)+4 计数 ≈ 142B），人多分多包
+    private const int LoadingNamesPerPacket = 6;
+
+    private void SendLoadingNames(int clientId, List<LoadingNameEntry> names)
+    {
+        for (int start = 0; start < names.Count; start += LoadingNamesPerPacket)
+        {
+            var chunk = new SCLoadingPlayerNames { list = new List<LoadingNameEntry>() };
+            int end = Mathf.Min(start + LoadingNamesPerPacket, names.Count);
+            for (int i = start; i < end; i++) chunk.list.Add(names[i]);
+            Tool.NetworkManager.SendLoadingPlayerNames(clientId, chunk);
+        }
     }
 
     // 人机令牌落在 [ROBOT_TOKEN_BASE, …) 段，与真人令牌段互不重叠
