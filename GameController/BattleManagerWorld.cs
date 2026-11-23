@@ -103,7 +103,7 @@ public partial class BattleManager
         SpawnEntity(EntityType.Zombie(variant), GetZombieSpawnLevel(), pos, EntityCamp.Defense);
     }
 
-    // 每满一个间隔做一批尝试：夜间用快速档次数、白天用慢速档次数；场上达上限整批跳过
+    // 每满一个间隔刷一批：单次数量 = 昼夜速率 × 进攻方队伍总人数（含 AI、阵亡也算，来源 TickCampAliveCount）
     private void TickZombieSpawn()
     {
         if (!zombieSpawnTicker) return;
@@ -111,9 +111,10 @@ public partial class BattleManager
         int max = GlobalVariable.I(global_variablesEnum.zombie_max);
         if (zombieCount >= max) return;
 
-        int times = IsDay
+        int rate = IsDay
             ? GlobalVariable.I(global_variablesEnum.zombie_refresh_rate_slow)
             : GlobalVariable.I(global_variablesEnum.zombie_refresh_rate_fast);
+        int times = rate * lastAttackerTotal;
         for (int i = 0; i < times && zombieCount < max; i++) SpawnZombie();
     }
 

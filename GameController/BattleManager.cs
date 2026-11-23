@@ -1405,7 +1405,7 @@ public partial class BattleManager : EnsBehaviour
             EntityData.ClearDiscarded();
         }
 
-        // 僵尸刷新（策划案第九章）：每满一个间隔做一批尝试，夜间次数多、白天次数少
+        // 僵尸刷新（策划案第九章）：每满一个间隔做一批尝试，数量 = 昼夜速率 × 进攻方人数
         Profiler.BeginSample(kZombieRefreshTag);
         TickZombieSpawn();
         Profiler.EndSample(); // kZombieRefreshTag
