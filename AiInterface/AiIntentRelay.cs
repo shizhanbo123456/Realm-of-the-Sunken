@@ -150,6 +150,11 @@ public sealed class AiIntentRelay : DecisionMachine, IBehaviorHost
     // 连招窗口内续接普攻下一段；窗口没开就按技能优先、全不可用退普攻的常规顺序出手
     bool IBehaviorHost.TryAttack(EntityData target)
     {
+        if (target == null || !target.Alive) // 目标已死：旧引用不能续段
+        {
+            punchChain = false;
+            return false;
+        }
         if (punchChain && Owner.anim != null && Owner.anim.AllowCombo)
         {
             if (Time.time < comboRetryTime) return false;
