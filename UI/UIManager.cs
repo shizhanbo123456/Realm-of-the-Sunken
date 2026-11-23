@@ -198,6 +198,20 @@ public class UIManager : MonoBehaviour
     #endregion
 
     #region 显示与层级
+    // 页面退出统一入口：根界面退出时，按 page 表把标记 autoClose 的界面一起收起
+    private void ExitPage(PageBase page)
+    {
+        bool isRoot = page.Config.rootPage == true;
+        page.Exit();
+        if (!isRoot) return;
+        for (int i = 0; i < pageList.Count; i++)
+        {
+            PageBase follower = pageList[i];
+            if (follower.Config.autoClose == true && follower.IsVisible)
+                follower.Exit();
+        }
+    }
+
     // 唯一的显示入口：同 Order 的页面互斥，先顶掉旧的再显示新的
     public void ShowPage(pageEnum id, ShowParam param = null)
     {
@@ -206,7 +220,7 @@ public class UIManager : MonoBehaviour
         {
             PageBase other = pageList[i];
             if (other == page || other.Order != page.Order || !other.IsVisible) continue;
-            other.Exit();
+            ExitPage(other);
         }
         if (!page.IsVisible) page.Enter(param);
         ApplyPageOrder();
@@ -216,7 +230,7 @@ public class UIManager : MonoBehaviour
     public void HidePage(pageEnum id)
     {
         PageBase page = Require(id);
-        if (page.IsVisible) page.Exit();
+        if (page.IsVisible) ExitPage(page);
         ApplyPageOrder();
     }
 
@@ -253,19 +267,6 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    // 切页时收起所有浮层，避免旧遮罩挡住新页面
-    private void HideOverlays()
-    {
-        HidePage(pageEnum.confirm);
-        HidePage(pageEnum.settings);
-        HidePage(pageEnum.rule);
-        HidePage(pageEnum.guide);
-        // 战斗内的独立界面：切场景时一并收起，避免留在新界面上
-        HidePage(pageEnum.skill_select);
-        HidePage(pageEnum.large_minimap);
-        HidePage(pageEnum.god_view);
-        HidePage(pageEnum.select_card);
-    }
     #endregion
 
     #region 加载界面
@@ -403,14 +404,12 @@ public class UIManager : MonoBehaviour
     #region 事件
     private void OnConnect()
     {
-        HideOverlays();
         ShowPage(pageEnum.lobby);
         ShowPage(pageEnum.chat); // 联网后聊天面板常驻，大厅与战斗共用
     }
 
     private void OnBattleStart(int camp)
     {
-        HideOverlays();
         ShowPage(pageEnum.battle);
     }
 
@@ -424,7 +423,6 @@ public class UIManager : MonoBehaviour
     private void ReturnToHome()
     {
         if (Tool.ClientLogicManager != null) Tool.ClientLogicManager.EntityPlayers.ClearAll();
-        HideOverlays();
         HidePage(pageEnum.chat);
         ShowPage(pageEnum.home);
     }

@@ -30,6 +30,10 @@ namespace Ros.Config
                     row.alignMode = r.ReadInt32();
                     row.marginX = r.ReadInt32();
                     row.marginY = r.ReadInt32();
+                    byte has6 = r.ReadByte();
+                    row.rootPage = has6 == 1 ? (bool?)(r.ReadByte() != 0) : null;
+                    byte has7 = r.ReadByte();
+                    row.autoClose = has7 == 1 ? (bool?)(r.ReadByte() != 0) : null;
                     pageData.Add(row.key, row);
                 }
             }
@@ -44,6 +48,8 @@ namespace Ros.Config
         public int alignMode;  // 适配模式：0=全屏铺满；1=左下 2=正下 3=右下 4=左中 5=正中 6=右中 7=左上 8=正上 9=右上
         public int marginX;  // 水平边距：贴左右边时留出的距离
         public int marginY;  // 垂直边距：贴上下边时留出的距离
+        public bool? rootPage;  // 根界面
+        public bool? autoClose;  // 随界面切换自动关闭：切换根界面时一起关闭
     }
     public enum pageEnum
     {
