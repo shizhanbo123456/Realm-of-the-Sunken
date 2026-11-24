@@ -53,7 +53,6 @@ namespace Ros.UI.Main
         private readonly Dictionary<ushort, float> lastReceived = new();
         private readonly Dictionary<ushort, UI_MinimapItem> items = new();
         private readonly Dictionary<int, UI_QuickMessagePointer> quickPointers = new();
-        private readonly List<ushort> culledIds = new(); // 剔除临时列表：遍历中不能改字典
         private readonly List<ushort> expiredIds = new();
         private readonly List<int> staleQuickIds = new();
         private ushort selfId;
@@ -137,7 +136,6 @@ namespace Ros.UI.Main
 
         private void RenderPoints(Vector3 center)
         {
-            culledIds.Clear();
             foreach (var pair in points)
             {
                 var point = pair.Value;
@@ -145,9 +143,9 @@ namespace Ros.UI.Main
                 item.m_type.selectedIndex = GetPage(point);
                 if (point.marked) item.m_highlight.selectedIndex = 1; // 白眼标记随包同步
                 else item.m_highlight.selectedIndex = 0;
-                if (!PlaceItem(item, point, center)) culledIds.Add(point.id);
+                if (point.self && hasSelfYaw) item.rotation = selfYaw; // 地图不转、图标转
+                PlaceItem(item, point, center);
             }
-            foreach (var id in culledIds) Remove(id);
             RaiseSelfToTop();
         }
 
@@ -162,8 +160,8 @@ namespace Ros.UI.Main
             return item;
         }
 
-        // 返回 false = 超出雷达显示半径（由调用方剔除）
-        private bool PlaceItem(UI_MinimapItem item, in Point point, Vector3 center)
+        // 服务器已做半径过滤，客户端不再剔除，越界视觉由遮罩裁掉
+        private void PlaceItem(UI_MinimapItem item, in Point point, Vector3 center)
         {
             var mapBase = m_mapBase;
 
@@ -172,7 +170,6 @@ namespace Ros.UI.Main
             {
                 dx = point.world.x - center.x;
                 dz = point.world.y - center.z;
-                if (dx * dx + dz * dz > viewRadius * viewRadius) return false;
             }
 
             // 雷达坐标：上方=世界Z+、右侧=世界X+，显示半径铺满 mapBase；再减去居中偏移换到遮罩局部
@@ -180,7 +177,6 @@ namespace Ros.UI.Main
             Vector2 half = CenterOffset(item);
             item.SetXY(mapBase.x + mapBase.width * 0.5f + dx * scale - half.x - m_mask.x,
                 mapBase.y + mapBase.height * 0.5f - dz * scale - half.y - m_mask.y);
-            return true;
         }
 
         // xy 到图标中点的偏移：非锚点模式下 xy 是左上角，缩放朝右下长；锚点模式下 xy 本身就是中点。
