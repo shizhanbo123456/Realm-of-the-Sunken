@@ -143,7 +143,6 @@ namespace Ros.UI.Main
                 item.m_type.selectedIndex = GetPage(point);
                 if (point.marked) item.m_highlight.selectedIndex = 1; // 白眼标记随包同步
                 else item.m_highlight.selectedIndex = 0;
-                if (point.self && hasSelfYaw) item.rotation = selfYaw; // 地图不转、图标转
                 PlaceItem(item, point, center);
             }
             RaiseSelfToTop();
