@@ -158,6 +158,9 @@ public class EntityPlayerManager : ClientSubManager
     private float catchupSnapDistanceY;
     private bool catchupConfigLoaded;
 
+    // 追帧的最小偏差（0.2m 的平方）：量化误差级别的偏差不追，否则每包来回拉成晃动
+    private const float catchupMinOffsetSqr = 0.04f;
+
     private void EnsureCatchupConfig()
     {
         if (catchupConfigLoaded) return;
@@ -500,13 +503,16 @@ public class EntityPlayerManager : ClientSubManager
         if (info.hasTransform)
         {
             EnsureCatchupConfig();
+            bool firstPose = !view.predictedInit;
             view.predictedInit = true;
             view.predictedYaw = info.yaw;   // 朝向直接采用包内值，不追帧
 
             // 水平与纵向分别判定：高度突变（落地、升降切换）不允许靠追帧慢慢抹平
             Vector3 offset = info.position - view.predictedPos;
             float offsetXZ = offset.x * offset.x + offset.z * offset.z;
-            if (offsetXZ >= catchupSnapDistance * catchupSnapDistance || Mathf.Abs(offset.y) >= catchupSnapDistanceY)
+            // 包内位置滞后一个同步 tick，补上这一 tick 的移动量后再与推演位置比
+            Vector3 delta = offset + info.velocity * GlobalConfig.entity_sync_interval_fast;
+            if (firstPose || offsetXZ >= catchupSnapDistance * catchupSnapDistance || Mathf.Abs(offset.y) >= catchupSnapDistanceY)
             {
                 // 首见或偏差超过上限：直接落位
                 view.predictedPos = info.position;
@@ -524,13 +530,14 @@ public class EntityPlayerManager : ClientSubManager
                     view.transform.rotation = Quaternion.Euler(0f, info.yaw, 0f);
                 }
             }
-            else
+            else if (delta.sqrMagnitude > catchupMinOffsetSqr)
             {
                 // 追帧目标 = 包内位置按包内速度（含纵向）推演追帧时长后的位置；位置由 Update 逐帧推进，不瞬移
                 Vector3 target = info.position + info.velocity * catchupTime;
                 view.catchupVel = (target - view.predictedPos) / catchupTime;
                 view.catchupEndTime = Time.time + catchupTime;
             }
+            // 偏差只是量化噪声：不追，等下一次偏差较大的包再追
         }
 
         // 动画不在本高频包：状态/参数/速度全由动画事件驱动；客户端一旦偏离服务器状态，只能等下次状态变化才被纠正
