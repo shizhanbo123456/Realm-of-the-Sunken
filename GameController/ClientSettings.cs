@@ -1,4 +1,4 @@
-// 局内客户端的本地开关：设置面板勾选写入，相机与输入直接读，四项全量由 SaveManager 落盘
+// 局内客户端的本地开关：设置面板勾选写入，相机与输入直接读，五项全量由 SaveManager 落盘
 public static class ClientSettings
 {
     // 勾选 = 第三人称，取消 = 俯视
@@ -13,8 +13,11 @@ public static class ClientSettings
     // 勾选 = 全屏焦散；目前只有勾选态进存档，运行时还没有消费方（见 07-待办）
     public static bool Caustics { get; set; } = true;
 
+    // 勾选 = 窗口获得焦点时才开启相机，失去焦点自动停用相机组件
+    public static bool CameraActiveWithFocus { get; set; }
+
     // 位串长度：面板每加一个开关就加一位，存档字段结构不用动
-    public const int BitCount = 4;
+    public const int BitCount = 5;
 
     #region//Local
     public static string ToBits()
@@ -24,6 +27,7 @@ public static class ClientSettings
         sb.Append(AutoPitch ? '1' : '0');
         sb.Append(VolumetricLight ? '1' : '0');
         sb.Append(Caustics ? '1' : '0');
+        sb.Append(CameraActiveWithFocus ? '1' : '0');
         return sb.ToString();
     }
 
@@ -40,15 +44,17 @@ public static class ClientSettings
         AutoPitch = bits[1] == '1';
         VolumetricLight = bits[2] == '1';
         Caustics = bits[3] == '1';
+        CameraActiveWithFocus = bits[4] == '1';
     }
 
-    // 新建存档的默认值：与上面四个属性的初始值保持一致
+    // 新建存档的默认值：与上面五个属性的初始值保持一致
     public static void ResetToDefault()
     {
         ThirdPersonCamera = false;
         AutoPitch = true;
         VolumetricLight = true;
         Caustics = true;
+        CameraActiveWithFocus = false;
     }
     #endregion
 }

@@ -16,6 +16,9 @@ public class CameraController : MonoBehaviour
     // 渲染用的相机组件（CameraController 挂在主相机 GameObject 上）
     public Camera WorldCamera { get; private set; }
 
+    // 焦点启停控制的相机：自身 + 直接子物体上的全部 Camera
+    private Camera[] focusCameras;
+
     // 相机插值收尾后回调：UI 在此用最终相机变换投影，避免与渲染差一帧导致震颤
     public event System.Action OnCameraUpdated;
 
@@ -87,6 +90,9 @@ public class CameraController : MonoBehaviour
     // 会话跟踪：新一局按设置面板的口径重建镜头模式
     private bool sessionActive;
 
+    // 焦点启停开关的上次值：设置面板改动后即时应用，不必等下次启动
+    private bool lastCameraActiveWithFocus;
+
     // 震动状态：trauma 累积到 1，位移取 trauma² 保证小伤害几乎不动
     private float trauma;
     private readonly float[] shakeSeed = new float[3];
@@ -100,9 +106,33 @@ public class CameraController : MonoBehaviour
     {
         Tool.CameraController = this;
         WorldCamera = GetComponent<Camera>();
+        CollectFocusCameras();
+        lastCameraActiveWithFocus = ClientSettings.CameraActiveWithFocus;
+        ApplyFocusState(Application.isFocused);
         camYaw = transform.eulerAngles.y;
         lastAutoPitch = ClientSettings.AutoPitch;
         for (int i = 0; i < shakeSeed.Length; i++) shakeSeed[i] = Random.value * 100f;
+    }
+
+    // 自身与直接子物体的全部相机一起受焦点开关控制
+    private void CollectFocusCameras()
+    {
+        var list = new System.Collections.Generic.List<Camera>();
+        list.AddRange(GetComponents<Camera>());
+        foreach (Transform child in transform) list.AddRange(child.GetComponents<Camera>());
+        focusCameras = list.ToArray();
+    }
+
+    // 开关关闭时相机保持常开；开启时按焦点启停
+    public void ApplyFocusState(bool focused)
+    {
+        bool enable = !ClientSettings.CameraActiveWithFocus || focused;
+        for (int i = 0; i < focusCameras.Length; i++) focusCameras[i].enabled = enable;
+    }
+
+    private void OnApplicationFocus(bool focus)
+    {
+        ApplyFocusState(focus);
     }
 
     // 外部震源入口：强度档位由调用方按配表给（受击 / 命中），这里只负责累积与衰减
@@ -197,6 +227,12 @@ public class CameraController : MonoBehaviour
 
     private void Update()
     {
+        if (ClientSettings.CameraActiveWithFocus != lastCameraActiveWithFocus)
+        {
+            lastCameraActiveWithFocus = ClientSettings.CameraActiveWithFocus;
+            ApplyFocusState(Application.isFocused);
+        }
+
         var loading = ClientLoadingManager.Current;
         TickSession(loading);
         if (!sessionActive) return;

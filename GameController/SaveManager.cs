@@ -3,7 +3,7 @@
 public class SaveManager : MonoBehaviour
 {
     // 局外只存身份、选角、本地设置与上次服务器地址：等级/经验随局外养成一并删除，旧格式不再兼容
-    public const string SaveKey = "GameSaveDataV8";
+    public const string SaveKey = "GameSaveDataV9";
 
     public const string DefaultServerIp = "127.0.0.1";
 
