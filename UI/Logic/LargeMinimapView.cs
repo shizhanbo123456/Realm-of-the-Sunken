@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Ros.Config;
+using Ros.Transport;
 using Ros.UI.Main;
 
 // 大地图：点小地图上的按钮打开，每帧按雷达收到的点位重铺整张地形图
@@ -48,6 +49,8 @@ public class LargeMinimapView : PageBase
 
     public override void Exit()
     {
+        // 任意路径离开本页（关闭按钮 / 切页 / 退战斗）都视为关闭大地图，恢复雷达半径过滤
+        if (Tool.NetworkManager != null) Tool.NetworkManager.SendMinimapBigMap(new CSMinimapBigMap { open = false });
         panel.Close();
         base.Exit();
     }

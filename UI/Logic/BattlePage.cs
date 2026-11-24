@@ -476,7 +476,8 @@ public class BattlePage : PageBase
         base.Enter(param);
         EventManager.AddEvent<SCEntityDisplayInfo>(ClientEvent.OnEntityDisplayUpdate, OnEntityDisplayUpdate);
         EventManager.AddEvent<int>(ClientEvent.OnEntityDisplayRemove, OnEntityDisplayRemove);
-        EventManager.AddEvent<SCMinimapEntity>(ClientEvent.OnMinimapUpdate, OnMinimapUpdate);
+        EventManager.AddEvent<SCMinimapEntities>(ClientEvent.OnMinimapEntitiesUpdate, OnMinimapEntitiesUpdate);
+        EventManager.AddEvent<SCMinimapSwarm>(ClientEvent.OnMinimapSwarmUpdate, OnMinimapSwarmUpdate);
         EventManager.AddEvent<float>(ClientEvent.OnMinimapRadiusUpdate, OnMinimapRadiusUpdate);
         EventManager.AddEvent<SCScoreInfo>(ClientEvent.OnScoreUpdate, OnScoreUpdate);
         EventManager.AddEvent<SCBattleEvent>(ClientEvent.OnBattleEvent, OnBattleEvent);
@@ -530,7 +531,8 @@ public class BattlePage : PageBase
         Tool.UIManager.ShowFlyText(promptEnum.battle_end); // 离场飘字（结算/退出本局共用这一处）
         EventManager.RemoveEvent<SCEntityDisplayInfo>(ClientEvent.OnEntityDisplayUpdate, OnEntityDisplayUpdate);
         EventManager.RemoveEvent<int>(ClientEvent.OnEntityDisplayRemove, OnEntityDisplayRemove);
-        EventManager.RemoveEvent<SCMinimapEntity>(ClientEvent.OnMinimapUpdate, OnMinimapUpdate);
+        EventManager.RemoveEvent<SCMinimapEntities>(ClientEvent.OnMinimapEntitiesUpdate, OnMinimapEntitiesUpdate);
+        EventManager.RemoveEvent<SCMinimapSwarm>(ClientEvent.OnMinimapSwarmUpdate, OnMinimapSwarmUpdate);
         EventManager.RemoveEvent<float>(ClientEvent.OnMinimapRadiusUpdate, OnMinimapRadiusUpdate);
         EventManager.RemoveEvent<SCScoreInfo>(ClientEvent.OnScoreUpdate, OnScoreUpdate);
         EventManager.RemoveEvent<SCBattleEvent>(ClientEvent.OnBattleEvent, OnBattleEvent);
@@ -945,12 +947,26 @@ public class BattlePage : PageBase
         }
     }
 
-    private void OnMinimapUpdate(SCMinimapEntity e)
+    private void OnMinimapEntitiesUpdate(SCMinimapEntities chunk)
     {
-        // 每个实体一个独立包：只登记坐标与类别，换算和显隐交给小地图自身
+        // 批量实体流：只登记坐标与类别，换算和显隐交给小地图自身
         if (panel.m_Minimap == null) return;
-        panel.m_Minimap.Push(new UI_Minimap.Point(e.entityId, e.type.category, e.type, e.camp,
-            e.marked, IsOwnEntity(e.entityId), new Vector2(e.posX, e.posZ)), (EntityCamp)localPlayerCamp);
+        foreach (var e in chunk.entries)
+            panel.m_Minimap.Push(new UI_Minimap.Point(e.entityId, e.type.category, e.type, e.camp,
+                e.marked, IsOwnEntity(e.entityId), new Vector2(e.posX, e.posZ)), (EntityCamp)localPlayerCamp);
+    }
+
+    // 珊瑚/鲛人精简流：只带 id 与坐标，类别由协议 bit 还原（鲛人不含精英）
+    private void OnMinimapSwarmUpdate(SCMinimapSwarm chunk)
+    {
+        if (panel.m_Minimap == null) return;
+        foreach (var p in chunk.points)
+        {
+            var category = p.zombie ? EntityCategory.Zombie : EntityCategory.Coral;
+            panel.m_Minimap.Push(new UI_Minimap.Point(p.entityId, category,
+                new EntityType(category, p.zombieVariant), EntityCamp.None,
+                false, false, new Vector2(p.posX, p.posZ)), (EntityCamp)localPlayerCamp);
+        }
     }
 
     //F 键切换雷达显示半径：服务器权威回应，客户端换用新半径做裁剪与缩放（点位下一帧即按新半径重排）
@@ -973,6 +989,7 @@ public class BattlePage : PageBase
     // 小地图：点小地图上的按钮打开大地图，关闭走大地图自己的底框按钮
     private static void OpenLargeMinimap()
     {
+        if (Tool.NetworkManager != null) Tool.NetworkManager.SendMinimapBigMap(new CSMinimapBigMap { open = true });
         if (Tool.UIManager != null) Tool.UIManager.LargeMinimap.Open();
     }
 

@@ -26,16 +26,16 @@ public class GodViewView : PageBase
         panel.m_panel.m_close.onClick.Set(Close);
         // 控制器切页会改面板尺寸，切完重新按 page 表适配
         panel.m_show_character_detail.onChanged.Add(OnDetailLayoutChanged);
-        EventManager.AddEvent<SCGodViewEntities>(ClientEvent.OnGodViewEntities, OnEntities);
-        EventManager.AddEvent<SCGodViewCorals>(ClientEvent.OnGodViewCorals, OnCorals);
+        EventManager.AddEvent<SCMinimapEntities>(ClientEvent.OnMinimapEntitiesUpdate, OnEntities);
+        EventManager.AddEvent<SCMinimapSwarm>(ClientEvent.OnMinimapSwarmUpdate, OnSwarm);
         EventManager.AddEvent<SCGodViewEntityDetail>(ClientEvent.OnGodViewDetail, OnDetail);
     }
 
     public override void Shutdown()
     {
         panel.m_show_character_detail.onChanged.Remove(OnDetailLayoutChanged);
-        EventManager.RemoveEvent<SCGodViewEntities>(ClientEvent.OnGodViewEntities, OnEntities);
-        EventManager.RemoveEvent<SCGodViewCorals>(ClientEvent.OnGodViewCorals, OnCorals);
+        EventManager.RemoveEvent<SCMinimapEntities>(ClientEvent.OnMinimapEntitiesUpdate, OnEntities);
+        EventManager.RemoveEvent<SCMinimapSwarm>(ClientEvent.OnMinimapSwarmUpdate, OnSwarm);
         EventManager.RemoveEvent<SCGodViewEntityDetail>(ClientEvent.OnGodViewDetail, OnDetail);
     }
 
@@ -101,9 +101,9 @@ public class GodViewView : PageBase
         return new Vector2(half, half);
     }
 
-    private void OnEntities(SCGodViewEntities chunk) => panel.OnEntities(chunk);
+    private void OnEntities(SCMinimapEntities chunk) => panel.OnEntities(chunk);
 
-    private void OnCorals(SCGodViewCorals chunk) => panel.OnCorals(chunk);
+    private void OnSwarm(SCMinimapSwarm chunk) => panel.OnSwarm(chunk);
 
     private void OnDetail(SCGodViewEntityDetail info) => panel.OnDetail(info);
 

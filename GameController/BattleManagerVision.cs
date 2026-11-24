@@ -23,6 +23,7 @@ public partial class BattleManager
 
     private readonly Dictionary<int, HashSet<ushort>> visibleByClient = new();
     private readonly Dictionary<int, float> minimapRadiusByClient = new(); // 各客户端雷达显示半径（F 键切换，缺省 = minimap_view_radius）
+    private readonly Dictionary<int, bool> bigMapOpenByClient = new();     // 各客户端大地图展开状态（打开 = 不按雷达半径过滤，全量下发）
 
     #region 视野锚点与观战
     // 每个玩家的视野锚点：位置/半径随操控实体逐帧刷新；实体销毁（死亡）后冻结在死亡位置；
@@ -172,6 +173,11 @@ public partial class BattleManager
 
     private static readonly EntityCamp[] s_camps = { EntityCamp.Attack, EntityCamp.Defense };
     private static readonly List<SCMinimapEntity> s_minimapEntries = new();
+    private static readonly List<SCMinimapSwarm.Point> s_minimapSwarm = new();
+    private static readonly List<SCMinimapEntity> s_sendEntries = new();       // 单客户端发送暂存：常规实体
+    private static readonly List<SCMinimapSwarm.Point> s_sendSwarm = new();    // 单客户端发送暂存：珊瑚/鲛人
+    private static readonly List<SCMinimapEntity> s_entityChunk = new();       // 切包暂存（CallFuncRpc 同步序列化，可复用）
+    private static readonly List<SCMinimapSwarm.Point> s_swarmChunk = new();
     private static readonly HashSet<ushort> s_visibleScratch = new();
     private static readonly HashSet<ushort> s_dirtySweep = new(); // 本轮至少被一个客户端可见的实体（用于清 health/buff 脏标记）
     private static readonly HashSet<ushort> s_removedScratch = new();
@@ -301,20 +307,32 @@ public partial class BattleManager
                 }
                 else if (!IsMemberOfCamp(memberCamp, camp)) continue;
                 if (!loadedClients.Contains(pair.Key)) continue; // 未完成加载的客户端先不给小地图数据
+                bool bigMapOpen = IsBigMapOpen(pair.Key);
                 float radiusSq = GetMinimapRadius(pair.Key);
                 radiusSq *= radiusSq;
                 var viewPos = state.position; // 视野锚点：存活/观战/死亡冻结统一由 TickVisionStates 维护
-                // 每个实体独立成包（无片段号、不拼回）；客户端分帧累积，并对超时未更新的点位做隐藏。
-                // 非本阵营单位按该客户端的雷达显示半径在服务器侧过滤，圈外不下发
+                // 非本阵营单位按该客户端的雷达显示半径在服务器侧过滤，圈外不下发；
+                // 大地图打开时跳过该过滤，阵营视野并集内全量下发
                 foreach (var entry in s_minimapEntries)
                 {
-                    if (entry.camp != camp)
+                    if (!bigMapOpen && entry.camp != camp)
                     {
                         float dx = entry.posX - viewPos.x, dz = entry.posZ - viewPos.z;
                         if (dx * dx + dz * dz > radiusSq) continue;
                     }
-                    Tool.NetworkManager.SendMinimapEntity(pair.Key, entry);
+                    s_sendEntries.Add(entry);
                 }
+                foreach (var point in s_minimapSwarm)
+                {
+                    if (!bigMapOpen)
+                    {
+                        float dx = point.posX - viewPos.x, dz = point.posZ - viewPos.z;
+                        if (dx * dx + dz * dz > radiusSq) continue;
+                    }
+                    s_sendSwarm.Add(point);
+                }
+                SendMinimapEntities(pair.Key);
+                SendMinimapSwarm(pair.Key);
             }
             Profiler.EndSample();
         }
@@ -327,6 +345,7 @@ public partial class BattleManager
     private void BuildCampMinimapEntries(EntityCamp camp, bool includeEnemies)
     {
         s_minimapEntries.Clear();
+        s_minimapSwarm.Clear();
 
         // 先收集本阵营成员的视野源（只扫一遍，O(n)）；之后每个实体只需与"成员数 k"比较，
         // 而不是与"实体总数 n"比较 —— 消除原本 IsInCampVision 对每个敌方实体再全量扫 n 的 O(n²)。
@@ -346,7 +365,12 @@ public partial class BattleManager
             }
             if (!includeEnemies) continue;
             if (IsHiddenFromEnemyMinimap(entity)) continue; // 黑夜标记：敌方小地图不显示
-            if (IsMarkedOnMinimap(entity) || IsInCachedCampVision(entity.transform.position)) AppendMinimapEntry(entity);
+            if (!IsMarkedOnMinimap(entity) && !IsInCachedCampVision(entity.transform.position)) continue;
+            // 珊瑚/鲛人（不含精英鲛人）数量最多，走精简流；其余走常规点位流
+            if (entity.type.category == EntityCategory.Coral || entity.type.category == EntityCategory.Zombie)
+                AppendSwarmPoint(entity);
+            else
+                AppendMinimapEntry(entity);
         }
         Profiler.EndSample();
     }
@@ -354,16 +378,17 @@ public partial class BattleManager
     private void CollectCampVisionSources(EntityCamp camp)
     {
         s_campVisionSources.Clear();
-        // 视野源 = 该阵营所有成员的视野锚点（含死亡冻结的：阵亡玩家仍为阵营提供死前位置的视野）
-        foreach (var pair in PlayerCamps)
+        // 视野源 = 该阵营所有存活实体（玩家单位与非玩家设施一致，如防御塔；死亡不提供视野）
+        foreach (var entity in EntityContainer.Entities)
         {
-            if (!IsMemberOfCamp(pair.Value, camp)) continue; // 观战方玩家不贡献阵营视野源
-            if (!visionStates.TryGetValue(pair.Key, out var state)) continue;
+            if (entity == null || !entity.Alive || entity.camp != camp) continue;
+            var pos = entity.transform.position;
+            float radius = VisionRadius(entity);
             s_campVisionSources.Add(new CampVisionSource
             {
-                x = state.position.x,
-                z = state.position.z,
-                radiusSq = state.viewRadius * state.viewRadius,
+                x = pos.x,
+                z = pos.z,
+                radiusSq = radius * radius,
             });
         }
     }
@@ -396,6 +421,47 @@ public partial class BattleManager
         Profiler.EndSample();
     }
 
+    private static void AppendSwarmPoint(EntityData entity)
+    {
+        var pos = entity.transform.position;
+        s_minimapSwarm.Add(new SCMinimapSwarm.Point
+        {
+            entityId = entity.id,
+            posX = pos.x,
+            posZ = pos.z,
+            zombie = entity.type.category == EntityCategory.Zombie,
+            zombieVariant = entity.type.value,
+        });
+    }
+
+    // 常规实体批量下发：按共用容量切包；CallFuncRpc 同步序列化，暂存列表可复用
+    private void SendMinimapEntities(int clientId)
+    {
+        int capacity = MinimapCommonChunk.EntityCapacity;
+        for (int start = 0; start < s_sendEntries.Count; start += capacity)
+        {
+            s_entityChunk.Clear();
+            int end = Mathf.Min(start + capacity, s_sendEntries.Count);
+            for (int i = start; i < end; i++) s_entityChunk.Add(s_sendEntries[i]);
+            Tool.NetworkManager.SendMinimapEntities(clientId, new SCMinimapEntities { entries = s_entityChunk });
+        }
+        s_sendEntries.Clear();
+    }
+
+    // 珊瑚/鲛人批量下发：同上切包
+    private void SendMinimapSwarm(int clientId)
+    {
+        int capacity = MinimapCommonChunk.SwarmCapacity;
+        for (int start = 0; start < s_sendSwarm.Count; start += capacity)
+        {
+            s_swarmChunk.Clear();
+            int end = Mathf.Min(start + capacity, s_sendSwarm.Count);
+            for (int i = start; i < end; i++) s_swarmChunk.Add(s_sendSwarm[i]);
+            Tool.NetworkManager.SendMinimapSwarm(clientId, new SCMinimapSwarm { points = s_swarmChunk });
+        }
+        s_sendSwarm.Clear();
+    }
+
     private void PruneVisibilityCache()
     {
         s_clientScratch.Clear();
@@ -407,6 +473,7 @@ public partial class BattleManager
         {
             visibleByClient.Remove(clientId);
             minimapRadiusByClient.Remove(clientId);
+            bigMapOpenByClient.Remove(clientId);
             ExitSpectate(clientId); // 兜底：从目标的观战列表摘除
             visionStates.Remove(clientId);
         }
@@ -444,6 +511,16 @@ public partial class BattleManager
         }
         return radii[0];
     }
+
+    // 大地图展开状态上报：打开期间对该客户端跳过雷达半径过滤，阵营视野并集内全量下发
+    public void ReceiveMinimapBigMap(int clientId, bool open)
+    {
+        if (!AtServer || !BattleStarted) return;
+        bigMapOpenByClient[clientId] = open;
+    }
+
+    private bool IsBigMapOpen(int clientId)
+        => bigMapOpenByClient.TryGetValue(clientId, out var open) && open;
     #endregion
 
     #region 小地图失联（昼夜事件驱动）

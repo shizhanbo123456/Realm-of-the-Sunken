@@ -368,6 +368,7 @@ public partial class BattleManager
         HarvestByClient.Clear();
         KillCountByClient.Clear();
         minimapRadiusByClient.Clear(); // 每局雷达显示半径回到默认档
+        bigMapOpenByClient.Clear(); // 每局大地图展开状态重置
         visionStates.Clear(); // 每局视野锚点与观战状态重置
         skillFailPromptTime.Clear();
         lastAttackerTotal = lastDefenseTotal = lastAttackerAlive = lastDefenseAlive = -1; // 每局重置，保证开局首帧必发

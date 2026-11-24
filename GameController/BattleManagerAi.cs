@@ -114,7 +114,8 @@ public partial class BattleManager
         EventManager.AddEvent<int>(ClientEvent.OnBattleEnd, OnAiStageEnd);
         EventManager.AddEvent(ClientEvent.OnExitWorld, OnAiExitWorld);
         EventManager.AddEvent(ClientEvent.OnRestartGame, OnAiExitWorld); // 掉线也走这条，战斗命令一并摘掉
-        EventManager.AddEvent<SCMinimapEntity>(ClientEvent.OnMinimapUpdate, OnAiMinimapUpdate);
+        EventManager.AddEvent<SCMinimapEntities>(ClientEvent.OnMinimapEntitiesUpdate, OnAiMinimapUpdate);
+        EventManager.AddEvent<SCMinimapSwarm>(ClientEvent.OnMinimapSwarmUpdate, OnAiSwarmUpdate);
         EventManager.AddEvent<SCEntityDisplayInfo>(ClientEvent.OnEntityDisplayUpdate, OnAiEntityDisplay);
         EventManager.AddEvent<SCDefensePointProgress>(ClientEvent.OnDefensePointProgress, OnAiGuardUpdate);
     }
@@ -125,7 +126,8 @@ public partial class BattleManager
         EventManager.RemoveEvent<int>(ClientEvent.OnBattleEnd, OnAiStageEnd);
         EventManager.RemoveEvent(ClientEvent.OnExitWorld, OnAiExitWorld);
         EventManager.RemoveEvent(ClientEvent.OnRestartGame, OnAiExitWorld);
-        EventManager.RemoveEvent<SCMinimapEntity>(ClientEvent.OnMinimapUpdate, OnAiMinimapUpdate);
+        EventManager.RemoveEvent<SCMinimapEntities>(ClientEvent.OnMinimapEntitiesUpdate, OnAiMinimapUpdate);
+        EventManager.RemoveEvent<SCMinimapSwarm>(ClientEvent.OnMinimapSwarmUpdate, OnAiSwarmUpdate);
         EventManager.RemoveEvent<SCEntityDisplayInfo>(ClientEvent.OnEntityDisplayUpdate, OnAiEntityDisplay);
         EventManager.RemoveEvent<SCDefensePointProgress>(ClientEvent.OnDefensePointProgress, OnAiGuardUpdate);
     }
@@ -222,10 +224,34 @@ public partial class BattleManager
         AiCommandBus.UnbindIntent(AiIntent.Stop, OnAiIntentStop);
     }
 
-    private void OnAiMinimapUpdate(SCMinimapEntity entity)
+    private void OnAiMinimapUpdate(SCMinimapEntities chunk)
     {
-        aiMinimap[entity.entityId] = entity;
-        aiMinimapSeen[entity.entityId] = Time.time;
+        for (int i = 0; i < chunk.entries.Count; i++)
+        {
+            var entity = chunk.entries[i];
+            aiMinimap[entity.entityId] = entity;
+            aiMinimapSeen[entity.entityId] = Time.time;
+        }
+    }
+
+    // 珊瑚/鲛人精简流：只有鲛人进 AI 小地图（珊瑚是纯物件，AI 原本也收不到）；鲛人一律 Neutral 阵营
+    private void OnAiSwarmUpdate(SCMinimapSwarm chunk)
+    {
+        for (int i = 0; i < chunk.points.Count; i++)
+        {
+            var point = chunk.points[i];
+            if (!point.zombie) continue;
+            aiMinimap[point.entityId] = new SCMinimapEntity
+            {
+                entityId = point.entityId,
+                type = EntityType.Zombie(point.zombieVariant),
+                camp = EntityCamp.Neutral,
+                posX = point.posX,
+                posZ = point.posZ,
+                marked = false,
+            };
+            aiMinimapSeen[point.entityId] = Time.time;
+        }
     }
 
     // 显示包对每个客户端可见实体都会来：自身留一份，其余进「周围可见」的缓存

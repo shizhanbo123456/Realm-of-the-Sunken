@@ -25,11 +25,10 @@ public static class ClientEvent
     #region 实体表现（10230 段）
     public const int OnEntityDisplayUpdate = 10230;
     public const int OnEntityDisplayRemove = 10231;
-    public const int OnMinimapUpdate = 10233;
+    public const int OnMinimapEntitiesUpdate = 10233; // param=SCMinimapEntities 常规实体批量流（小地图定时同步与上帝视角共用）
     public const int OnMinimapRadiusUpdate = 10234; // param=float 切换后的雷达显示半径
     public const int OnCombatLabelDisplay = 10235;  // param=SCCombatLabel 战斗飘字（伤害/治疗）
-    public const int OnGodViewEntities = 10236;     // param=SCGodViewEntities 上帝视角实体块（不含珊瑚）
-    public const int OnGodViewCorals = 10237;       // param=SCGodViewCorals 上帝视角珊瑚块（仅 id 与位置）
+    public const int OnMinimapSwarmUpdate = 10236;  // param=SCMinimapSwarm 珊瑚/鲛人精简流（小地图定时同步与上帝视角共用）
     public const int OnGodViewDetail = 10238;       // param=SCGodViewEntityDetail 上帝视角点选实体的详情快照
     public const int OnHitFeel = 10239;             // param=SCHitFeel 打击震颤（只发给攻击方/受击方当事人）
     #endregion

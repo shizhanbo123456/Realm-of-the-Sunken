@@ -1,11 +1,7 @@
-// 上帝视角分块容量：单包 ≤240B，按固定开销 16B（分隔符 / 长度 / 消息头 / RPC 头）算条数
-// 单条字节数由序列化器按当前配表实测（位级长度随坐标量化变，不能写死）
+// 上帝视角分块容量：常规实体流与珊瑚/鲛人流已下沉为小地图共用协议，容量统一在 MinimapCommonChunk
 public static class GodViewChunk
 {
-    private const int PacketBytes = 240;
-    private const int FrameBytes = 16;
-
-    public static int EntityCapacity => (PacketBytes - FrameBytes) / Ros.Transport.SCMinimapEntitySerializer.ItemBytes;
-    public static int CoralCapacity => (PacketBytes - FrameBytes) / Ros.Transport.SCGodViewCoralsSerializer.ItemBytes;
+    public static int EntityCapacity => Ros.Transport.MinimapCommonChunk.EntityCapacity;
+    public static int SwarmCapacity => Ros.Transport.MinimapCommonChunk.SwarmCapacity;
     public const int MaxHeldSkills = 24; // 详情里未装备技能的条数上限（技能栏槽位另算）
 }

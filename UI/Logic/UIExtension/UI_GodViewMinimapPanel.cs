@@ -24,7 +24,7 @@ namespace Ros.UI.Main
         }
 
         private readonly Dictionary<ushort, Marker> entityMarkers = new(); // 可点实体
-        private readonly Dictionary<ushort, Marker> coralMarkers = new();   // 珊瑚：只画点、不可点
+        private readonly Dictionary<ushort, Marker> swarmMarkers = new();  // 珊瑚/鲛人：只画点、不可点
         private readonly List<ushort> expiredScratch = new();
         private readonly List<UI_SkillList.Slot> detailSkills = new();
         private readonly List<UI_SkillList.Slot> detailHeldSkills = new();
@@ -63,7 +63,7 @@ namespace Ros.UI.Main
             dragging = false;
             markersDirty = false;
             DisposeMarkers(entityMarkers);
-            DisposeMarkers(coralMarkers);
+            DisposeMarkers(swarmMarkers);
             ClearDetail();
             BuildScaleButtons();
             ComputeItemScale();
@@ -78,7 +78,7 @@ namespace Ros.UI.Main
             dragging = false;
             markersDirty = false;
             DisposeMarkers(entityMarkers);
-            DisposeMarkers(coralMarkers);
+            DisposeMarkers(swarmMarkers);
             ClearDetail();
         }
 
@@ -126,7 +126,7 @@ namespace Ros.UI.Main
 
         #region 数据回包
         // 逐条落点位：已有该 id 就只更新坐标与收到时间，没有才新建；不做整轮拼装，单包丢失只影响包内几条
-        public void OnEntities(SCGodViewEntities chunk)
+        public void OnEntities(SCMinimapEntities chunk)
         {
             if (!visible) return;
             float now = Time.unscaledTime;
@@ -146,16 +146,19 @@ namespace Ros.UI.Main
             markersDirty = true;
         }
 
-        public void OnCorals(SCGodViewCorals chunk)
+        // 珊瑚/鲛人精简流：按 1bit 类别选图标页，逐条按 id 落点位、超时清除
+        public void OnSwarm(SCMinimapSwarm chunk)
         {
             if (!visible) return;
             float now = Time.unscaledTime;
             for (int i = 0; i < chunk.points.Count; i++)
             {
                 var point = chunk.points[i];
-                var view = EnsureCoralView(point.entityId);
+                var view = EnsureSwarmView(point.entityId);
                 if (view == null) continue;
-                coralMarkers[point.entityId] = new Marker
+                var category = point.zombie ? EntityCategory.Zombie : EntityCategory.Coral;
+                view.m_type.selectedIndex = UI_Minimap.PageOf(category, new EntityType(category, point.zombieVariant), EntityCamp.None, false, myCamp);
+                swarmMarkers[point.entityId] = new Marker
                 {
                     view = view,
                     world = new Vector2(point.posX, point.posZ),
@@ -205,14 +208,13 @@ namespace Ros.UI.Main
             return view;
         }
 
-        private UI_MinimapItem EnsureCoralView(ushort entityId)
+        private UI_MinimapItem EnsureSwarmView(ushort entityId)
         {
-            if (coralMarkers.TryGetValue(entityId, out var marker) && marker.view != null && !marker.view.isDisposed)
+            if (swarmMarkers.TryGetValue(entityId, out var marker) && marker.view != null && !marker.view.isDisposed)
                 return marker.view as UI_MinimapItem;
             var view = UI_MinimapItem.CreateInstance();
             view.scale = new Vector2(itemScale, itemScale);
             view.touchable = false;
-            view.m_type.selectedIndex = UI_Minimap.PageOf(EntityCategory.Coral, default, EntityCamp.None, false, myCamp);
             m_largeMinimapContainer.AddChild(view);
             return view;
         }
@@ -228,7 +230,7 @@ namespace Ros.UI.Main
         {
             float now = Time.unscaledTime;
             if (ExpireMarkers(entityMarkers, now)) markersDirty = true;
-            if (ExpireMarkers(coralMarkers, now)) markersDirty = true;
+            if (ExpireMarkers(swarmMarkers, now)) markersDirty = true;
         }
 
         private bool ExpireMarkers(Dictionary<ushort, Marker> markers, float now)
@@ -248,7 +250,7 @@ namespace Ros.UI.Main
             float minX = center.x - Edge * 0.5f;
             float maxZ = center.y + Edge * 0.5f;
             foreach (var marker in entityMarkers.Values) PlaceMarker(marker.view, marker.world, ppm, minX, maxZ);
-            foreach (var marker in coralMarkers.Values) PlaceMarker(marker.view, marker.world, ppm, minX, maxZ);
+            foreach (var marker in swarmMarkers.Values) PlaceMarker(marker.view, marker.world, ppm, minX, maxZ);
         }
 
         // 点位组件的轴心在中心（pivotAsAnchor），xy 就是图标中点，不能再扣半宽高

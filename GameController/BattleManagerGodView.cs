@@ -8,7 +8,7 @@ public partial class BattleManager
     // 上帝视角：客户端按 0.2s 反复请求显示区域，服务器只在收到请求时扫描并回块，不保存状态、不做定时下发
     // 区域内的实体没有任何显示条件（阵营 / 视野 / 昼夜 / 显示距离一律不过滤）
     private static readonly List<SCMinimapEntity> s_godViewEntities = new();
-    private static readonly List<SCGodViewCorals.Point> s_godViewCorals = new();
+    private static readonly List<SCMinimapSwarm.Point> s_godViewSwarm = new();
 
     public void ReceiveGodViewArea(int clientId, CSGodViewArea request)
     {
@@ -25,9 +25,9 @@ public partial class BattleManager
 
         CollectGodViewEntities(minX, minZ, maxX, maxZ);
         SendGodViewEntities(clientId);
-        SendGodViewCorals(clientId);
+        SendGodViewSwarm(clientId);
         s_godViewEntities.Clear();
-        s_godViewCorals.Clear();
+        s_godViewSwarm.Clear();
     }
 
     public void ReceiveGodViewEntityDetail(int clientId, CSGodViewEntityDetail request)
@@ -39,20 +39,22 @@ public partial class BattleManager
     private void CollectGodViewEntities(float minX, float minZ, float maxX, float maxZ)
     {
         s_godViewEntities.Clear();
-        s_godViewCorals.Clear();
+        s_godViewSwarm.Clear();
         foreach (var entity in EntityContainer.Entities)
         {
             if (entity == null) continue;
             var pos = entity.transform.position;
             if (pos.x < minX || pos.x > maxX || pos.z < minZ || pos.z > maxZ) continue;
-            // 珊瑚数量最多，只进珊瑚流（id + 坐标，客户端按 id 落点），实体流不带
-            if (entity.type.category == EntityCategory.Coral)
+            // 珊瑚/鲛人（不含精英鲛人）数量最多，只进精简流（id + 坐标 + 类别 bit），实体流不带
+            if (entity.type.category == EntityCategory.Coral || entity.type.category == EntityCategory.Zombie)
             {
-                s_godViewCorals.Add(new SCGodViewCorals.Point
+                s_godViewSwarm.Add(new SCMinimapSwarm.Point
                 {
                     entityId = entity.id,
                     posX = pos.x,
                     posZ = pos.z,
+                    zombie = entity.type.category == EntityCategory.Zombie,
+                    zombieVariant = entity.type.value,
                 });
                 continue;
             }
@@ -75,23 +77,23 @@ public partial class BattleManager
         int total = s_godViewEntities.Count;
         for (int start = 0; start < total; start += capacity)
         {
-            var chunk = new SCGodViewEntities { entries = new List<SCMinimapEntity>() };
+            var chunk = new SCMinimapEntities { entries = new List<SCMinimapEntity>() };
             int end = Mathf.Min(start + capacity, total);
             for (int i = start; i < end; i++) chunk.entries.Add(s_godViewEntities[i]);
-            Tool.NetworkManager.SendGodViewEntities(clientId, chunk);
+            Tool.NetworkManager.SendMinimapEntities(clientId, chunk);
         }
     }
 
-    private void SendGodViewCorals(int clientId)
+    private void SendGodViewSwarm(int clientId)
     {
-        int capacity = GodViewChunk.CoralCapacity;
-        int total = s_godViewCorals.Count;
+        int capacity = GodViewChunk.SwarmCapacity;
+        int total = s_godViewSwarm.Count;
         for (int start = 0; start < total; start += capacity)
         {
-            var chunk = new SCGodViewCorals { points = new List<SCGodViewCorals.Point>() };
+            var chunk = new SCMinimapSwarm { points = new List<SCMinimapSwarm.Point>() };
             int end = Mathf.Min(start + capacity, total);
-            for (int i = start; i < end; i++) chunk.points.Add(s_godViewCorals[i]);
-            Tool.NetworkManager.SendGodViewCorals(clientId, chunk);
+            for (int i = start; i < end; i++) chunk.points.Add(s_godViewSwarm[i]);
+            Tool.NetworkManager.SendMinimapSwarm(clientId, chunk);
         }
     }
 

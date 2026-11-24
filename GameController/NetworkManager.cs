@@ -352,6 +352,13 @@ public partial class NetworkManager : EnsBehaviour
         CallFuncRpc(ServerReceiveMinimapRadiusSwitchLocal, SendTo.RoomOwner, Delivery.Reliable, new CSMinimapRadiusSwitch(), LocalToken);
     }
 
+    // 大地图展开状态上报：打开期间服务器对该客户端不做雷达半径过滤
+    public void SendMinimapBigMap(CSMinimapBigMap request)
+    {
+        if (!CanSendWorldCommand) return;
+        CallFuncRpc(ServerReceiveMinimapBigMapLocal, SendTo.RoomOwner, Delivery.Reliable, request, LocalToken);
+    }
+
     // 观战自由视角：位置上报（仅纯观战方），由 CameraController 按 1s / 1m 阈值节流
     public void SendFreeCamera(CSFreeCamera info)
     {
@@ -449,10 +456,16 @@ public partial class NetworkManager : EnsBehaviour
         CallFuncRpc(ClientRemoveEntityLocal, to, Delivery.Reliable, entityId);
     }
 
-    public void SendMinimapEntity(int clientId, SCMinimapEntity e)
+    public void SendMinimapEntities(int clientId, SCMinimapEntities chunk)
     {
         if (!TryGetSendTo(clientId, out var to)) return;
-        CallFuncRpc(ClientReceiveMinimapEntityLocal, to, Delivery.Unreliable, e);
+        CallFuncRpc(ClientReceiveMinimapEntitiesLocal, to, Delivery.Unreliable, chunk);
+    }
+
+    public void SendMinimapSwarm(int clientId, SCMinimapSwarm chunk)
+    {
+        if (!TryGetSendTo(clientId, out var to)) return;
+        CallFuncRpc(ClientReceiveMinimapSwarmLocal, to, Delivery.Unreliable, chunk);
     }
 
     public void SendMinimapRadius(int clientId, float radius)
@@ -741,6 +754,12 @@ public partial class NetworkManager : EnsBehaviour
     }
 
     [Rpc]
+    private void ServerReceiveMinimapBigMapLocal(CSMinimapBigMap request, int clientId)
+    {
+        if (Tool.BattleManager != null) Tool.BattleManager.ReceiveMinimapBigMap(clientId, request.open);
+    }
+
+    [Rpc]
     private void ServerReceiveFreeCameraLocal(CSFreeCamera request, int clientId)
     {
         if (Tool.BattleManager != null) Tool.BattleManager.ReceiveFreeCamera(clientId, request);
@@ -831,9 +850,15 @@ public partial class NetworkManager : EnsBehaviour
     }
 
     [Rpc]
-    private void ClientReceiveMinimapEntityLocal(SCMinimapEntity e)
+    private void ClientReceiveMinimapEntitiesLocal(SCMinimapEntities chunk)
     {
-        EventManager.TrigEvent(ClientEvent.OnMinimapUpdate, e);
+        EventManager.TrigEvent(ClientEvent.OnMinimapEntitiesUpdate, chunk);
+    }
+
+    [Rpc]
+    private void ClientReceiveMinimapSwarmLocal(SCMinimapSwarm chunk)
+    {
+        EventManager.TrigEvent(ClientEvent.OnMinimapSwarmUpdate, chunk);
     }
 
     [Rpc]
@@ -1044,18 +1069,6 @@ public partial class NetworkManager : EnsBehaviour
         CallFuncRpc(ServerReceiveGodViewEntityDetailLocal, SendTo.RoomOwner, Delivery.Reliable, request, LocalToken);
     }
 
-    public void SendGodViewEntities(int clientId, SCGodViewEntities chunk)
-    {
-        if (!TryGetSendTo(clientId, out var to)) return;
-        CallFuncRpc(ClientReceiveGodViewEntitiesLocal, to, Delivery.Unreliable, chunk);
-    }
-
-    public void SendGodViewCorals(int clientId, SCGodViewCorals chunk)
-    {
-        if (!TryGetSendTo(clientId, out var to)) return;
-        CallFuncRpc(ClientReceiveGodViewCoralsLocal, to, Delivery.Unreliable, chunk);
-    }
-
     public void SendGodViewEntityDetail(int clientId, SCGodViewEntityDetail info)
     {
         if (!TryGetSendTo(clientId, out var to)) return;
@@ -1073,18 +1086,6 @@ public partial class NetworkManager : EnsBehaviour
     private void ServerReceiveGodViewEntityDetailLocal(CSGodViewEntityDetail request, int clientId)
     {
         if (Tool.BattleManager != null) Tool.BattleManager.ReceiveGodViewEntityDetail(clientId, request);
-    }
-
-    [Rpc]
-    private void ClientReceiveGodViewEntitiesLocal(SCGodViewEntities chunk)
-    {
-        EventManager.TrigEvent(ClientEvent.OnGodViewEntities, chunk);
-    }
-
-    [Rpc]
-    private void ClientReceiveGodViewCoralsLocal(SCGodViewCorals chunk)
-    {
-        EventManager.TrigEvent(ClientEvent.OnGodViewCorals, chunk);
     }
 
     [Rpc]
