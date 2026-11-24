@@ -66,7 +66,6 @@ namespace Ros.Config
         godView_marker_scale,
         move_turn_rate,
         fly_vertical_speed,
-        revive_teammate_range,
         robot_random_name,
         quick_message_pointer_scale,
         charge_max,
@@ -195,5 +194,13 @@ namespace Ros.Config
         buff_speed_down,
         gm_speed_multiplier,
         buff_shield_health_ratio,
+        settlement_attack_sub_guard_damage_factor,
+        settlement_attack_main_guard_damage_factor,
+        settlement_attack_player_kill_score,
+        settlement_attack_neutral_kill_factor,
+        settlement_defense_sub_guard_health_factor,
+        settlement_defense_main_guard_health_factor,
+        settlement_defense_player_kill_score,
+        settlement_defense_neutral_kill_factor,
     }
 }

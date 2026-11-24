@@ -45,6 +45,7 @@ public class NeutralStatueEntityData : EntityData
             };
             captor.effectController.AddEffect(bless, 1, GlobalVariable.F(global_variablesEnum.buff_statue_bless_duration));
         }
+        if (captor != null) battle.AddNeutralKill(captor.camp); // 与祝福同一归属：被 DoT 击破时无归属，不计中立击杀
         battle.NotifyNeutralStatueCaptured(this.id);
         battle.ScheduleNeutralStatueRespawn();
     }

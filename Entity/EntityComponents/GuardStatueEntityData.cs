@@ -5,7 +5,7 @@ public class GuardStatueEntityData : EntityData
         var battle = Tool.BattleManager;
         if (battle == null) return;
 
-        battle.AddStatueDamage(finalDamage);
+        battle.AddStatueDamage(this, finalDamage);
         if (attacker == null || finalDamage <= 0f) return;
         if (battle.EntityOwnerClient.TryGetValue(attacker.id, out var harvester))
         {

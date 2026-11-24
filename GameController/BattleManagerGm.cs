@@ -36,7 +36,7 @@ public partial class BattleManager
             case GmCommandId.TimeSet: GmSetRemainTime(gm.i); break;
             case GmCommandId.End:
                 if (!BattleStarted) break;
-                EndBattle(WinnerByMainStatue()); // 立即结算：按主守护点剩余血量判胜负
+                EndBattle(WinnerByScore()); // 立即结算：按双方结算分判胜负
                 break;
             case GmCommandId.SetDayTime:
                 // 0~1 全天进度 → 周期值 [0,2)

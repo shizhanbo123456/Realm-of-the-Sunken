@@ -21,8 +21,12 @@ public partial class BattleManager : EnsBehaviour
 
     public float BattleRemainTime { get; private set; }
 
-    public float AttackScore { get; private set; }
     public int DefenseKills { get; private set; }
+    public int AttackKills { get; private set; }
+    public int AttackNeutralKills { get; private set; }
+    public int DefenseNeutralKills { get; private set; }
+    private float attackMainStatueDamage;
+    private float attackSubStatueDamage;
 
     private Ticker syncTicker;
     private Ticker detailsTicker;
@@ -1069,9 +1073,24 @@ public partial class BattleManager : EnsBehaviour
         }
     }
 
-    public void AddStatueDamage(float damage)
+    public void AddStatueDamage(EntityData statue, float damage)
     {
-        AttackScore += damage;
+        if (statue.type == EntityType.KingStatue) attackMainStatueDamage += damage;
+        else attackSubStatueDamage += damage;
+    }
+
+    // 击杀数只认玩家角色：鲛人、水晶雕像、守护点等设施死亡不计分
+    private void CountCampKill(EntityData entity)
+    {
+        if (entity.type.category == EntityCategory.Character_Attack) DefenseKills++;
+        else if (entity.type.category == EntityCategory.Character_Defense) AttackKills++;
+    }
+
+    // 中立实体（中立雕像）被击杀：按最后一击所属阵营计入该阵营的中立击杀数
+    public void AddNeutralKill(EntityCamp camp)
+    {
+        if (camp == EntityCamp.Attack) AttackNeutralKills++;
+        else if (camp == EntityCamp.Defense) DefenseNeutralKills++;
     }
 
     public void UpdateKingStatueReduce()
@@ -1103,25 +1122,38 @@ public partial class BattleManager : EnsBehaviour
         return remaining;
     }
 
-    public float DefenseScore()
+    public float SubStatueRemainingHealth()
     {
-        return StatueRemainingHealth() * (1f + GlobalConfig.kill_score_factor * DefenseKills);
+        float remaining = 0f;
+        foreach (var guardStatue in EntityContainer.GuardStatues)
+        {
+            if (guardStatue != null && guardStatue.type != EntityType.KingStatue) remaining += guardStatue.attributes.Health;
+        }
+        return remaining;
     }
 
-    // 主守护点血量比例 ≥ 该值 → 防守方胜（1 = 进攻方胜，2 = 防守方胜）
-    private const float kMainStatueDefenseWinRatio = 0.5f;
-
-    // 胜负只认主守护点：不看副守护点是否存活（策划案 17.2）
-    public int WinnerByMainStatue()
+    // 进攻分 =（副点伤害×系数 + 主点伤害×系数 + 击杀玩家数×分值）×(1 + 中立击杀系数×中立击杀数)
+    public float AttackScore()
     {
-        EntityData king = FindMainStatue();
-        if (king == null)
-        {
-            Debug.LogError("[Battle] 找不到主守护点，无法判定胜负，按进攻方胜处理");
-            return 1;
-        }
-        if (king.attributes.Health / king.attributes.MaxHealth >= kMainStatueDefenseWinRatio) return 2;
-        return 1;
+        float damage = attackSubStatueDamage * GlobalVariable.F(global_variablesEnum.settlement_attack_sub_guard_damage_factor)
+            + attackMainStatueDamage * GlobalVariable.F(global_variablesEnum.settlement_attack_main_guard_damage_factor);
+        float kill = AttackKills * GlobalVariable.F(global_variablesEnum.settlement_attack_player_kill_score);
+        return (damage + kill) * (1f + GlobalVariable.F(global_variablesEnum.settlement_attack_neutral_kill_factor) * AttackNeutralKills);
+    }
+
+    // 防守分 =（副点剩余×系数 + 主点剩余×系数 + 击杀玩家数×分值）×(1 + 中立击杀系数×中立击杀数)
+    public float DefenseScore()
+    {
+        float health = SubStatueRemainingHealth() * GlobalVariable.F(global_variablesEnum.settlement_defense_sub_guard_health_factor)
+            + MainStatueRemainingHealth() * GlobalVariable.F(global_variablesEnum.settlement_defense_main_guard_health_factor);
+        float kill = DefenseKills * GlobalVariable.F(global_variablesEnum.settlement_defense_player_kill_score);
+        return (health + kill) * (1f + GlobalVariable.F(global_variablesEnum.settlement_defense_neutral_kill_factor) * DefenseNeutralKills);
+    }
+
+    // 主守护点被摧毁由 DestroyEntity 直接判进攻方胜；其余触发时比较双方分数（2 = 防守方胜，1 = 进攻方胜）
+    public int WinnerByScore()
+    {
+        return DefenseScore() >= AttackScore() ? 2 : 1;
     }
 
     // 结算展示用：主守护点剩余血量（实体已销毁即 0）
@@ -1259,7 +1291,11 @@ public partial class BattleManager : EnsBehaviour
 
         // 开战重置：计分清零、子弹/移动/复活/重生状态清空（id 源已在加载阶段重置并预留，这里不再重置）
         if (reservedEntityIds.Count == 0) ResetEntityIdSource(); // 未经加载阶段直接开战（GM/调试）时兜底
-        AttackScore = 0f;
+        attackMainStatueDamage = 0f;
+        attackSubStatueDamage = 0f;
+        AttackKills = 0;
+        AttackNeutralKills = 0;
+        DefenseNeutralKills = 0;
         DefenseKills = 0;
         zombieCount = 0; // 上局僵尸已在上面的清场里逐个减过，这里再显式归零（与计分同一口径）
         ClearBattleState();
@@ -1352,7 +1388,7 @@ public partial class BattleManager : EnsBehaviour
             Tool.NetworkManager.SendScoreInfo(clientId, new SCScoreInfo()
             {
                 gameState = gameState,
-                attackScore = AttackScore,
+                attackScore = AttackScore(),
                 defenseScore = DefenseScore(),
                 killScore = DefenseKills,
                 remainTime = Mathf.Max(0f, BattleRemainTime),
@@ -1421,8 +1457,8 @@ public partial class BattleManager : EnsBehaviour
             BattleRemainTime -= UnityEngine.Time.deltaTime;
             if (BattleRemainTime <= 0f)
             {
-                // 时间耗尽：按主守护点剩余血量判胜负（策划案 17.2）
-                EndBattle(WinnerByMainStatue());
+                // 时间耗尽：按双方结算分判胜负（策划案 17.2）
+                EndBattle(WinnerByScore());
                 Profiler.EndSample(); // kTimerTag
                 Profiler.EndSample(); // kManagedUpdateProfilerTag
                 return;
@@ -1466,7 +1502,7 @@ public partial class BattleManager : EnsBehaviour
             foreach (var entity in killed)
             {
                 entity.OnKilled();
-                if (entity.camp == EntityCamp.Attack) DefenseKills++; // 防守方击杀数（得分公式用）
+                CountCampKill(entity);
                 HandleDeath(entity);
             }
             EntityData.ClearKilled();

@@ -185,10 +185,6 @@ public static class GlobalConfig
     public const float attack_retry_interval = 0.1f;
     #endregion
 
-    #region 结算与得分
-    public const float kill_score_factor = 0.1f;
-    #endregion
-
     #region 同步
     public const float entity_sync_interval_fast = 0.02f;
     public const float entity_sync_interval_details = 1f;   // 全量心跳：兼作静止实体的保活，须小于客户端的 3s 视图超时

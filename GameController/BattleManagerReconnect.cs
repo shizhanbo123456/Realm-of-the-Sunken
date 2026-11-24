@@ -74,7 +74,7 @@ public partial class BattleManager
         Tool.NetworkManager.SendScoreInfo(token, new SCScoreInfo
         {
             resync = true,
-            attackScore = AttackScore,
+            attackScore = AttackScore(),
             defenseScore = DefenseScore(),
             killScore = DefenseKills,
             remainTime = Mathf.Max(0f, BattleRemainTime),

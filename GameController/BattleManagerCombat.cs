@@ -226,7 +226,7 @@ public partial class BattleManager
         // 雕像的分层减伤重算在其子类 OnKilled 里处理（该方法先于本方法调用）
         if (wasAttack)
         {
-            CheckAttackWiped(); // 进攻方全灭 → 立即按主守护点血量结算（策划案 17.2，不直接判负）
+            CheckAttackWiped(); // 进攻方全灭 → 立即按双方结算分结算（策划案 17.2，不直接判负）
         }
     }
 
@@ -236,7 +236,7 @@ public partial class BattleManager
         {
             if (e != null && e.Alive && e.type.category == EntityCategory.Character_Attack) return;
         }
-        EndBattle(WinnerByMainStatue());
+        EndBattle(WinnerByScore());
     }
 
     // 珊瑚被摧毁：按尺寸给击杀者回血
