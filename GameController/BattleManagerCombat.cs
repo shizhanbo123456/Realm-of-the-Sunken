@@ -303,8 +303,8 @@ public partial class BattleManager
         EntityType characterType = isAttack ? info.attackCharacter : info.defenseCharacter;
         int level = GetPlayerLevel(clientId); // 复活沿用局内等级，压制关系不因死亡丢失
 
-        // 复活点：进攻方落在存活队友旁边（没有存活进攻方才回外围随机点），防守方落在主守护点附近
-        Vector3 pos = isAttack ? GetAttackRespawnPos() : GetDefenseSpawnPos();
+        // 复活点与出生一致：进攻方回地图外围随机点，防守方落在主守护点附近
+        Vector3 pos = isAttack ? GetAttackSpawnPos() : GetDefenseSpawnPos();
 
         EntityCamp entityCamp = isAttack ? EntityCamp.Attack : EntityCamp.Defense;
         ushort entityId = SpawnEntity(characterType, level, pos, entityCamp);
@@ -344,32 +344,6 @@ public partial class BattleManager
         rs.progress = 0f; // deathCount 保留，供下次倍率与叠层
         // 复活换了新实体 id：客户端由 SCPlayerEntity 更新自己的实体 id 与名牌归属，不再单独下发会话信息
         SendReviveState(clientId, rs, entityId, ready: true);
-    }
-
-    private static readonly List<Vector3> s_attackAliveScratch = new();
-
-    // 进攻方复活点：随机挑一名存活队友作圆心，在配表环带内取合法点；场上没有存活进攻方（全灭）才回出生点
-    private Vector3 GetAttackRespawnPos()
-    {
-        s_attackAliveScratch.Clear();
-        foreach (var e in EntityContainer.Entities)
-        {
-            if (e != null && e.Alive && e.type.category == EntityCategory.Character_Attack)
-                s_attackAliveScratch.Add(e.transform.position);
-        }
-        if (s_attackAliveScratch.Count == 0) return GetAttackSpawnPos();
-
-        float minDist = GlobalVariable.RangeMin(global_variablesEnum.revive_teammate_range);
-        float maxDist = GlobalVariable.RangeMax(global_variablesEnum.revive_teammate_range);
-        // 逐个队友试：贴墙或窄道时他身边可能没有合法点，换下一个
-        while (s_attackAliveScratch.Count > 0)
-        {
-            int pick = Random.Range(0, s_attackAliveScratch.Count);
-            Vector3 center = s_attackAliveScratch[pick];
-            s_attackAliveScratch.RemoveAt(pick); // 挑过的队友移出，避免重复试同一个
-            if (TerrainSpawns.TrySampleSpawnPointInRing(center, minDist, maxDist, out var near)) return near;
-        }
-        return GetAttackSpawnPos(); // 队友身边全采不到合法点：回外围随机点
     }
 
     // 只在死亡、复活、重连补发这三个时机下发；进度本身由客户端读配表本地推演
