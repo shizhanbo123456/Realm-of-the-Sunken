@@ -570,6 +570,7 @@ public class BattlePage : PageBase
         {
             if (Input.GetKeyDown(GlobalConfig.skill_select_key)) Tool.UIManager.SkillSelect.Toggle();
             if (canQuickMessage && AnyQuickMessageKeyDown(out int quickMessageIndex)) HandleQuickMessageKey(quickMessageIndex);
+            if (Input.GetKeyDown(GlobalConfig.minimap_radius_key)) Tool.NetworkManager.SendMinimapRadiusSwitch();
             Tool.UIManager.GodView.TickOpenKey();
         }
         //剩余时间（以快照校准的本地推演为准，重连/中途进入的起点由服务器补发）
