@@ -112,6 +112,7 @@ public class CameraController : MonoBehaviour
         camYaw = transform.eulerAngles.y;
         lastAutoPitch = ClientSettings.AutoPitch;
         for (int i = 0; i < shakeSeed.Length; i++) shakeSeed[i] = Random.value * 100f;
+        ApplyCursorState();
     }
 
     // 自身与直接子物体的全部相机一起受焦点开关控制
@@ -133,6 +134,20 @@ public class CameraController : MonoBehaviour
     private void OnApplicationFocus(bool focus)
     {
         ApplyFocusState(focus);
+    }
+
+    // 第三人称锁定隐藏指针；其它模式与会话外把鼠标交还界面
+    private void ApplyCursorState()
+    {
+        bool locked = sessionActive && Mode == CameraViewMode.ThirdPerson;
+        Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
+        Cursor.visible = !locked;
+    }
+
+    private void OnDestroy()
+    {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
     }
 
     // 外部震源入口：强度档位由调用方按配表给（受击 / 命中），这里只负责累积与衰减
@@ -196,6 +211,7 @@ public class CameraController : MonoBehaviour
         bool fromFree = Mode == CameraViewMode.Free;
         Mode = mode;
         mousePosValid = false;
+        ApplyCursorState();
 
         if (mode == CameraViewMode.Free)
         {
@@ -283,28 +299,17 @@ public class CameraController : MonoBehaviour
         Mode = ClientSettings.ThirdPersonCamera ? CameraViewMode.ThirdPerson : CameraViewMode.TopDown;
         mousePosValid = false;
         pitchHoldTime = 0f;
+        ApplyCursorState();
     }
 
     // 第三人称：鼠标水平滑动转镜头，纵向滑动改俯仰（勾选自动俯仰角时不接管）；俯视不响应鼠标
     private void TickMouseLook()
     {
-        if (Mode != CameraViewMode.ThirdPerson || InputManager.PlayerInputBlocked)
-        {
-            mousePosValid = false;
-            return;
-        }
+        if (Mode != CameraViewMode.ThirdPerson || InputManager.PlayerInputBlocked) return;
 
-        Vector3 pos = Input.mousePosition;
-        if (!mousePosValid)
-        {
-            lastMousePos = pos;
-            mousePosValid = true;
-            return;
-        }
-
-        float dx = pos.x - lastMousePos.x;
-        float dy = pos.y - lastMousePos.y;
-        lastMousePos = pos;
+        // Mouse X/Y 轴的 sensitivity=0.1，乘 10 还原成像素口径，与原 mousePosition 差值同灵敏度
+        float dx = Input.GetAxis("Mouse X") * 10f;
+        float dy = Input.GetAxis("Mouse Y") * 10f;
 
         if (dx != 0f) camYaw = Mathf.Repeat(camYaw + dx * GlobalConfig.mouse_yaw_sensitivity, 360f);
         if (!ClientSettings.AutoPitch && dy != 0f)
