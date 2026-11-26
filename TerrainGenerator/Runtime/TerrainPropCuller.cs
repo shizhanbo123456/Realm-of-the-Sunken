@@ -32,10 +32,12 @@ namespace TerrainGen
         readonly Dictionary<GameObject, Stack<GameObject>> free = new Dictionary<GameObject, Stack<GameObject>>();
         readonly Dictionary<GameObject, GameObject> instancePrefabs = new Dictionary<GameObject, GameObject>();
 
-        BuildingKitSet kit;
-        Transform contentRoot;
-        Transform poolRoot;
-        float timer;
+    BuildingKitSet kit;
+    Transform contentRoot;
+    Transform poolRoot;
+    // 缓存主相机引用：焦点开关会禁用 Camera 组件，但 transform 仍可读
+    Camera worldCamera;
+    float timer;
         Vector3 lastCheckPos;
         float lastRadius = float.NaN;
 
@@ -61,6 +63,12 @@ namespace TerrainGen
                 Debug.LogError("[地形] Culler 初始化失败：未指定内容根节点", this);
                 return;
             }
+            if (Tool.CameraController == null || Tool.CameraController.WorldCamera == null)
+            {
+                Debug.LogError("[地形] Culler 初始化失败：场景缺少 CameraController 或主相机引用", this);
+                return;
+            }
+            worldCamera = Tool.CameraController.WorldCamera;
 
             this.kit = kit;
             contentRoot = content;
@@ -106,7 +114,7 @@ namespace TerrainGen
                 return;
             }
 
-            Vector3 cameraPos = Camera.main.transform.position;
+            Vector3 cameraPos = worldCamera.transform.position;
             if (!AnyChunkOutside(cameraPos))
             {
                 Debug.LogWarning($"[地形] 判定半径 {visibleDistance + GlobalVariable.F(global_variablesEnum.terrain_chunk_size):0}m 以主相机位置为心覆盖了全部 {chunkDefs.Count} 个区块，"
@@ -127,7 +135,7 @@ namespace TerrainGen
             if (timer < checkInterval) return;
             timer = 0f;
 
-            Vector3 pos = Camera.main.transform.position;
+            Vector3 pos = worldCamera.transform.position;
             if ((pos - lastCheckPos).sqrMagnitude < quietDistance * quietDistance
                 && Mathf.Approximately(visibleDistance, lastRadius)) return;
 
