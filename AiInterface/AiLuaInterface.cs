@@ -746,8 +746,6 @@ public sealed class AiLuaApi
         return SendIntent(AiIntent.AttackTarget, Vector2.zero, (ushort)entityId);
     }
 
-    public bool cast_skill(int skillId) => CallCommand(ai_commandEnum.control_castSkill, skillId);
-
     public bool signal(int messageId) => CallCommand(ai_commandEnum.quickMessage_send, messageId);
 
     public bool signal_at(int messageId, float x, float z) =>

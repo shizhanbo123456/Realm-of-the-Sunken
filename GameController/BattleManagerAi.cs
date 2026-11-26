@@ -161,9 +161,6 @@ public partial class BattleManager
         if (aiCommandsBound) return;
         aiCommandsBound = true;
 
-        AiCommandBus.Bind(ai_commandEnum.control_stop, OnAiStop);
-        AiCommandBus.Bind(ai_commandEnum.control_moveTo, OnAiMoveTo);
-        AiCommandBus.Bind(ai_commandEnum.control_castSkill, OnAiCastSkill);
         AiCommandBus.Bind(ai_commandEnum.luaSM_start, OnAiStartLua);
         AiCommandBus.Bind(ai_commandEnum.luaSM_stop, OnAiStopLua);
         AiCommandBus.Bind(ai_commandEnum.luaSM_list, OnAiListLua);
@@ -195,9 +192,6 @@ public partial class BattleManager
         if (!aiCommandsBound) return;
         aiCommandsBound = false;
 
-        AiCommandBus.Unbind(ai_commandEnum.control_stop, OnAiStop);
-        AiCommandBus.Unbind(ai_commandEnum.control_moveTo, OnAiMoveTo);
-        AiCommandBus.Unbind(ai_commandEnum.control_castSkill, OnAiCastSkill);
         AiCommandBus.Unbind(ai_commandEnum.luaSM_start, OnAiStartLua);
         AiCommandBus.Unbind(ai_commandEnum.luaSM_stop, OnAiStopLua);
         AiCommandBus.Unbind(ai_commandEnum.luaSM_list, OnAiListLua);
@@ -380,48 +374,6 @@ public partial class BattleManager
     }
     #endregion
 
-    #region 直接操控（执行即停用 lua 状态机）
-    // 直接操控优先：动手前先停掉 lua 决策机，否则下一拍就被状态机覆盖
-    private static void StopLuaDecision()
-    {
-        var lua = AiLuaInterface.Current;
-        if (lua == null)
-        {
-            Debug.LogError("[AI] AiLuaInterface 未就绪，control 命令无法停用 lua 状态机");
-            return;
-        }
-        lua.StopDecision();
-    }
-
-    private void OnAiStop(AiRequest request)
-    {
-        StopLuaDecision();
-        SendAiIntent(AiIntent.Stop, Vector2.zero, 0, request);
-    }
-
-    private void OnAiMoveTo(AiRequest request)
-    {
-        StopLuaDecision();
-        SendAiIntent(AiIntent.MoveTo, new Vector2(request.Float(0), request.Float(1)), 0, request);
-    }
-
-    private void OnAiCastSkill(AiRequest request)
-    {
-        int skillId = request.Int(0);
-        if (!SkillManager.TryGet(skillId, out _))
-        {
-            request.Reject($"技能 {skillId} 未注册");
-            return;
-        }
-        if (!NetworkManager.CanSendWorldCommand)
-        {
-            request.Reject("未联网");
-            return;
-        }
-        StopLuaDecision();
-        Tool.NetworkManager.SendAiSkillCast(skillId);
-    }
-
     private void OnAiStartLua(AiRequest request)
     {
         var lua = AiLuaInterface.Current;
@@ -468,7 +420,6 @@ public partial class BattleManager
         }
         request.Reply(lua.StopStateMachine());
     }
-    #endregion
 
     #region 地形
     private void OnAiPath(AiRequest request)
