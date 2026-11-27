@@ -19,6 +19,7 @@ public class BattlePage : PageBase
     // 血条池：实体进出场与血条开关都复用这里的对象，不再每次 CreateInstance/Dispose
     private readonly Stack<UI_EntityBar> barPool = new();
     private bool barsVisible = true; // 上次生效的 ClientSettings.ShowHealthBar
+    private bool labelsVisible = true; // 上次生效的 ClientSettings.ShowDamageLabel
     private readonly List<UI_EntityBar.Buff> barBuffs = new(); // 血条 buff 快照缓冲（每个摘要包重填）
     private readonly List<SCEntityDisplayInfo.BuffRuntime> localBuffs = new();                      // 本地玩家左上角血条的 buff 数据源
     private readonly float barDefaultSizeDistance = GlobalVariable.I(global_variablesEnum.distance_of_bar_default_size); // 血条 scale=(1,1) 时的相机距离
@@ -505,6 +506,7 @@ public class BattlePage : PageBase
 
         localPlayerCamp = -1;
         barsVisible = ClientSettings.ShowHealthBar; // 进战先对齐存档里的血条开关
+        labelsVisible = ClientSettings.ShowDamageLabel; // 飘字开关同理，开局无飘字无需清场
         localAvatarSet = false;
         spectatorMode = Session != null && Session.IsSpectator;
         if (Session != null) lastOwnEntityId = Session.OwnEntityId;
@@ -576,6 +578,7 @@ public class BattlePage : PageBase
     public override void Update(float deltaTime)
     {
         SyncBarVisibility(); // 设置里的血条开关：变化时立即入池或按缓存重建
+        SyncLabelVisibility(); // 设置里的飘字开关：关掉时立即清场
         if (OwnEntityId != 0) lastOwnEntityId = OwnEntityId;
         // 快捷指令只服务于在场角色：纯观战 / 死亡等待复活时收起按钮，已展开的轮盘一并关掉
         bool canQuickMessage = CanUseQuickMessage;
@@ -1255,6 +1258,14 @@ public class BattlePage : PageBase
         }
     }
 
+    // 设置里的飘字开关：关闭瞬间清掉场上正在播的飘字，重新打开后照常生成
+    private void SyncLabelVisibility()
+    {
+        if (labelsVisible == ClientSettings.ShowDamageLabel) return;
+        labelsVisible = ClientSettings.ShowDamageLabel;
+        if (!labelsVisible) UI_DamageLabel.ClearAll(panel.m_world_element_container);
+    }
+
     // 协议 buff 列表 → 血条条目数据（复用缓冲，避免每个摘要包都分配）
     private IReadOnlyList<UI_EntityBar.Buff> ToBarBuffs(List<SCEntityDisplayInfo.BuffRuntime> source)
     {
@@ -1306,6 +1317,7 @@ public class BattlePage : PageBase
 
     private void ShowCombatLabel(int value, CombatLabelType type, ushort targetId, bool hasHitPos, Vector3 hitPos)
     {
+        if (!ClientSettings.ShowDamageLabel) return; // 关闭飘字：包照收，命中特效与受击表现不受影响
         // 锚点：有命中点用命中点，否则退到实体头顶（飘字与命中特效共用这套兜底）
         Vector3 anchor = hitPos;
         if (!hasHitPos)

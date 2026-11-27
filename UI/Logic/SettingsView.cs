@@ -91,7 +91,7 @@ public class SettingsView : PageBase
     }
 
     #region//Local
-    // 七个勾选全量写 ClientSettings 并随存档落盘；勾选态与运行时是否已接无关
+    // 八个勾选全量写 ClientSettings 并随存档落盘；勾选态与运行时是否已接无关
     private void BindToggles()
     {
         View.m_toggle_caustic.selected = ClientSettings.Caustics;
@@ -101,6 +101,7 @@ public class SettingsView : PageBase
         View.m_toggle_camera_active_with_focus.selected = ClientSettings.CameraActiveWithFocus;
         View.m_toggle_hide_bar.selected = ClientSettings.ShowHealthBar;
         View.m_toggle_show_event.selected = ClientSettings.ShowEventBroadcast;
+        View.m_toggle_show_damage_label.selected = ClientSettings.ShowDamageLabel;
         View.m_toggle_caustic.onChanged.Add(() =>
             ClientSettings.Caustics = View.m_toggle_caustic.selected);
         View.m_toggle_volumetric_light.onChanged.Add(() =>
@@ -115,6 +116,8 @@ public class SettingsView : PageBase
             ClientSettings.ShowHealthBar = View.m_toggle_hide_bar.selected);
         View.m_toggle_show_event.onChanged.Add(() =>
             ClientSettings.ShowEventBroadcast = View.m_toggle_show_event.selected);
+        View.m_toggle_show_damage_label.onChanged.Add(() =>
+            ClientSettings.ShowDamageLabel = View.m_toggle_show_damage_label.selected);
     }
 
     private void SyncToggles()
@@ -134,6 +137,8 @@ public class SettingsView : PageBase
             View.m_toggle_hide_bar.selected = ClientSettings.ShowHealthBar;
         if (View.m_toggle_show_event.selected != ClientSettings.ShowEventBroadcast)
             View.m_toggle_show_event.selected = ClientSettings.ShowEventBroadcast;
+        if (View.m_toggle_show_damage_label.selected != ClientSettings.ShowDamageLabel)
+            View.m_toggle_show_damage_label.selected = ClientSettings.ShowDamageLabel;
     }
     #endregion
 }

@@ -48,6 +48,17 @@ namespace Ros.UI.Main
             if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated += label.OnCameraUpdated;
         }
 
+        // 设置里关掉「显示伤害飘字」时整层清场：只认飘字实例，不碰同层的实体血条
+        public static void ClearAll(UI_empty_container layer)
+        {
+            if (layer == null) return;
+            for (int i = layer.numChildren - 1; i >= 0; i--)
+            {
+                var label = layer.GetChildAt(i) as UI_DamageLabel;
+                if (label != null) label.Kill();
+            }
+        }
+
         // 出生点与相机同步：相机插值收尾时用最终变换重投影，消除与渲染差一帧的震颤
         private void OnCameraUpdated() => ApplyPosition();
 
@@ -86,6 +97,16 @@ namespace Ros.UI.Main
         {
             if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated -= OnCameraUpdated;
             transition = null; // 自身已结束，避免在回调里取消自己
+            Dispose();
+        }
+
+        // 中途销毁：先摘相机回调、取消生命周期计时，再销毁，否则计时回调会打到已销毁的实例
+        private void Kill()
+        {
+            if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated -= OnCameraUpdated;
+            var handle = transition;
+            transition = null;
+            if (handle != null) handle.Cancel();
             Dispose();
         }
     }
