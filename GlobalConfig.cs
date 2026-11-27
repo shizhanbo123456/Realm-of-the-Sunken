@@ -246,9 +246,9 @@ public static class GlobalConfig
     public const int defense_index_death_stroller = 5; // 死灵漫步者（4 = 苍白舞者，被动按标记判定，不引用下标）
     #endregion
 
-    #region 出生点（不烘点位：进攻方随机落在地图外围，防守方落主守护点附近）
+    #region 出生点（不烘点位：进攻方随机落在地图外围，防守方落存活守护点附近）
     public const float attack_spawn_min_ratio = 0.3f; // 距地图中心的下限，×地图边长；无外半径
-    public const float defense_spawn_radius = 6f;     // 防守出生点取主守护点该半径内的合法地面
+    public const float defense_spawn_radius = 6f;     // 防守出生点取所选守护点该半径内的合法地面
     #endregion
 
 }

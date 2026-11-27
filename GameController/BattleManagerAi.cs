@@ -478,7 +478,7 @@ public partial class BattleManager
         for (int i = 0; i < TerrainSpawns.NeutralStatues.Count; i++)
             AppendPoint(builder, "中立雕像" + (i + 1), TerrainSpawns.NeutralStatues[i]);
         builder.Append('\n').Append("进攻出生=随机（距地图中心 > ").Append((GlobalConfig.attack_spawn_min_ratio * TerrainSpawns.MapSize).ToString("0.#")).Append(" 米）");
-        builder.Append('\n').Append("防守出生=主守护点 ").Append(GlobalConfig.defense_spawn_radius.ToString("0.#")).Append(" 米内随机");
+        builder.Append('\n').Append("防守出生=存活守护点（主+副）中随机一个的 ").Append(GlobalConfig.defense_spawn_radius.ToString("0.#")).Append(" 米内随机");
         request.Reply(builder.ToString());
     }
 

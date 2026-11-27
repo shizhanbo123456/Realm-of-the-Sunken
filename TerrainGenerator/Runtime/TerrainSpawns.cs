@@ -239,10 +239,10 @@ namespace TerrainGen
             return false;
         }
 
-        // 防守出生：主守护点附近的合法地面
-        public static bool TrySampleDefenseSpawn(out Vector3 pos)
+        // 防守出生：指定守护点附近的合法地面（选哪个守护点由调用方决定）
+        public static bool TrySampleDefenseSpawn(Vector3 center, out Vector3 pos)
         {
-            return TrySampleSpawnPointInRing(MainGuard, 0f, GlobalConfig.defense_spawn_radius, out pos);
+            return TrySampleSpawnPointInRing(center, 0f, GlobalConfig.defense_spawn_radius, out pos);
         }
 
         public static Vector3 RandomOf(List<Vector3> list)

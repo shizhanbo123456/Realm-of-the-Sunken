@@ -303,7 +303,7 @@ public partial class BattleManager
         EntityType characterType = isAttack ? info.attackCharacter : info.defenseCharacter;
         int level = GetPlayerLevel(clientId); // 复活沿用局内等级，压制关系不因死亡丢失
 
-        // 复活点与出生一致：进攻方回地图外围随机点，防守方落在主守护点附近
+        // 复活点与出生一致：进攻方回地图外围随机点，防守方落在随机一个存活守护点附近
         Vector3 pos = isAttack ? GetAttackSpawnPos() : GetDefenseSpawnPos();
 
         EntityCamp entityCamp = isAttack ? EntityCamp.Attack : EntityCamp.Defense;

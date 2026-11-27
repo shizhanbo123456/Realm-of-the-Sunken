@@ -1084,12 +1084,28 @@ public partial class BattleManager : EnsBehaviour
         return TerrainSpawns.MainGuard;
     }
 
-    // 防守出生：主守护点附近随机取点
+    // 防守出生：在存活守护点（主 + 副）中随机挑一个，在其附近随机取点
     private Vector3 GetDefenseSpawnPos()
     {
-        if (TerrainSpawns.TrySampleDefenseSpawn(out var pos)) return pos;
-        Debug.LogError("[战斗] 防守出生点采样失败：主守护点附近没有合法地面");
-        return TerrainSpawns.MainGuard;
+        Vector3 center = PickDefenseSpawnCenter();
+        if (TerrainSpawns.TrySampleDefenseSpawn(center, out var pos)) return pos;
+        Debug.LogError($"[战斗] 防守出生点采样失败：守护点 {center} 附近没有合法地面");
+        return center;
+    }
+
+    // 存活守护点里随机取圆心；全部被摧毁时退回主守护点
+    private static readonly List<Vector3> s_guardCenterScratch = new();
+    private static Vector3 PickDefenseSpawnCenter()
+    {
+        s_guardCenterScratch.Clear();
+        foreach (var statue in EntityContainer.GuardStatues)
+        {
+            if (statue != null) s_guardCenterScratch.Add(statue.transform.position);
+        }
+        if (s_guardCenterScratch.Count == 0) return TerrainSpawns.MainGuard;
+        Vector3 center = s_guardCenterScratch[UnityEngine.Random.Range(0, s_guardCenterScratch.Count)];
+        s_guardCenterScratch.Clear();
+        return center;
     }
 
     private void UpdateAI()
