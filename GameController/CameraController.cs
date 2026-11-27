@@ -69,10 +69,6 @@ public class CameraController : MonoBehaviour
     // 第三人称镜头偏航（度）：只由鼠标水平滑动驱动，与角色朝向无关
     private float camYaw;
 
-    // 鼠标位移采样：切模式 / 被 UI 占用后先丢一帧，避免跨帧差值把镜头甩出去
-    private Vector3 lastMousePos;
-    private bool mousePosValid;
-
     // 俯仰偏转
     private float pitchTarget;
     private float pitchHoldTime;
@@ -136,10 +132,10 @@ public class CameraController : MonoBehaviour
         ApplyFocusState(focus);
     }
 
-    // 第三人称锁定隐藏指针；其它模式与会话外把鼠标交还界面
+    // 第三人称与自由视角都靠指针位移转向：锁定隐藏指针；俯视与会话外把鼠标交还界面
     private void ApplyCursorState()
     {
-        bool locked = sessionActive && Mode == CameraViewMode.ThirdPerson;
+        bool locked = sessionActive && (Mode == CameraViewMode.ThirdPerson || Mode == CameraViewMode.Free);
         Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
         Cursor.visible = !locked;
     }
@@ -210,7 +206,6 @@ public class CameraController : MonoBehaviour
         if (Mode == mode) return;
         bool fromFree = Mode == CameraViewMode.Free;
         Mode = mode;
-        mousePosValid = false;
         ApplyCursorState();
 
         if (mode == CameraViewMode.Free)
@@ -297,7 +292,6 @@ public class CameraController : MonoBehaviour
         if (active == sessionActive) return;
         sessionActive = active;
         Mode = ClientSettings.ThirdPersonCamera ? CameraViewMode.ThirdPerson : CameraViewMode.TopDown;
-        mousePosValid = false;
         pitchHoldTime = 0f;
         ApplyCursorState();
     }
@@ -416,26 +410,13 @@ public class CameraController : MonoBehaviour
     }
 
     #region 自由视角（仅纯观战）
-    // 鼠标滑动转向：水平滑动改 yaw、纵向滑动改俯仰（灵敏度与第三人称同一组口径）
+    // 鼠标滑动转向：水平滑动改 yaw、纵向滑动改俯仰（灵敏度与第三人称同一组口径，指针锁定故不受屏幕边缘限制）
     private void TickFreeLook()
     {
-        if (InputManager.PlayerInputBlocked)
-        {
-            mousePosValid = false;
-            return;
-        }
+        if (InputManager.PlayerInputBlocked) return;
 
-        Vector3 pos = Input.mousePosition;
-        if (!mousePosValid)
-        {
-            lastMousePos = pos;
-            mousePosValid = true;
-            return;
-        }
-
-        float dx = pos.x - lastMousePos.x;
-        float dy = pos.y - lastMousePos.y;
-        lastMousePos = pos;
+        float dx = Input.GetAxis("Mouse X") * 10f;
+        float dy = Input.GetAxis("Mouse Y") * 10f;
 
         if (dx != 0f) freeYaw = Mathf.Repeat(freeYaw + dx * GlobalConfig.mouse_yaw_sensitivity, 360f);
         if (dy != 0f)
