@@ -55,5 +55,10 @@ namespace Ros.Gm
 
         // 存档
         public const int TempCredential = 39;
+
+        // 演示
+        public const int DemoCardsToSelf = 41;
+        public const int DemoCardsToEnemy = 42;
+        public const int DemoDamageNearby = 43;
     }
 }

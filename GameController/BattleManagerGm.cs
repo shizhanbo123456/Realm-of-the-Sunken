@@ -91,6 +91,11 @@ public partial class BattleManager
                     break;
                 }
 
+            // ===== 演示 =====
+            case GmCommandId.DemoCardsToSelf: GmGrantCampCards(clientId, gm.v0, gm.v1, toSelf: true); break;
+            case GmCommandId.DemoCardsToEnemy: GmGrantCampCards(clientId, gm.v0, gm.v1, toSelf: false); break;
+            case GmCommandId.DemoDamageNearby: GmDamageNearby(clientId, gm.v0, gm.v1); break;
+
             // ===== 服务器查询 =====
             case GmCommandId.ServerFps:
                 SendGmResult(clientId, gm.type, i: EnsInstance.frameRate);
@@ -297,6 +302,63 @@ public partial class BattleManager
         }
 
         foreach (var e in gmTargetScratch) e.ApplyKnockback(origin, force);
+    }
+
+    // 演示-下发卡牌：按阵营逐人加待抽次数，与击杀掉卡同路径（进度下发后客户端自己弹抽卡界面，人机直接自抽）
+    private readonly List<int> gmCardClients = new();
+
+    private void GmGrantCampCards(int clientId, float tierValue, float countValue, bool toSelf)
+    {
+        if (!BattleStarted) return;
+        if (!PlayerCamps.TryGetValue(clientId, out var myCamp)) return;
+        if (myCamp == PlayerCampType.Spectator)
+        {
+            Debug.LogWarning("[GM] 观战方没有阵营，卡牌指令取消");
+            return;
+        }
+
+        int tier = Mathf.RoundToInt(tierValue);
+        int count = Mathf.RoundToInt(countValue);
+        if (tier < 0 || tier >= CardCatalog.TierCount)
+        {
+            Debug.LogWarning($"[GM] 卡牌品质 {tier} 越界（0~{CardCatalog.TierCount - 1}），指令取消");
+            return;
+        }
+        if (count <= 0) return;
+
+        gmCardClients.Clear();
+        foreach (var pair in PlayerCamps)
+        {
+            if ((pair.Value == myCamp) == toSelf) gmCardClients.Add(pair.Key);
+        }
+        foreach (int target in gmCardClients)
+        {
+            for (int k = 0; k < count; k++) AddPendingCard(target, tier);
+            SendProgress(target);
+        }
+    }
+
+    // 演示-范围伤害：以 GM 自身为原点，按正常敌对关系选目标（同阵营与友方建筑都不在内）
+    private readonly List<EntityData> gmDamageTargets = new();
+
+    private void GmDamageNearby(int clientId, float radius, float damage)
+    {
+        if (!BattleStarted || radius <= 0f || damage <= 0f) return;
+        var source = GetGmPlayerEntity(clientId);
+        if (source == null) return;
+
+        gmDamageTargets.Clear();
+        Vector3 origin = source.transform.position;
+        foreach (var e in EntityContainer.Entities)
+        {
+            if (e == null || !e.Alive || e.id == source.id) continue;
+            if (!EntityCampUtil.IsHostile(source.type.category, e.camp)) continue;
+            if ((e.transform.position - origin).sqrMagnitude > radius * radius) continue;
+            gmDamageTargets.Add(e);
+        }
+
+        // 先收集再结算：结算可能触发死亡与容器清理
+        foreach (var e in gmDamageTargets) e.OnDamaged(damage, source, fixedDamage: true);
     }
 
     private static int GmCountAliveEntities()
