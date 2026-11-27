@@ -1,4 +1,4 @@
-// 局内客户端的本地开关：设置面板勾选写入，相机与输入直接读，六项全量由 SaveManager 落盘
+// 局内客户端的本地开关：设置面板勾选写入，相机与输入直接读，七项全量由 SaveManager 落盘
 public static class ClientSettings
 {
     // 勾选 = 第三人称，取消 = 俯视
@@ -19,8 +19,11 @@ public static class ClientSettings
     // 勾选 = 显示实体头顶血条；取消 = 血条全部回收，只留数据缓存
     public static bool ShowHealthBar { get; set; } = true;
 
+    // 勾选 = 显示重要事件 banner 与天亮/天黑横幅；取消 = 不再起新的播报，正在播的播完
+    public static bool ShowEventBroadcast { get; set; } = true;
+
     // 位串长度：面板每加一个开关就加一位，存档字段结构不用动
-    public const int BitCount = 6;
+    public const int BitCount = 7;
 
     #region//Local
     public static string ToBits()
@@ -32,6 +35,7 @@ public static class ClientSettings
         sb.Append(Caustics ? '1' : '0');
         sb.Append(CameraActiveWithFocus ? '1' : '0');
         sb.Append(ShowHealthBar ? '1' : '0');
+        sb.Append(ShowEventBroadcast ? '1' : '0');
         return sb.ToString();
     }
 
@@ -50,9 +54,10 @@ public static class ClientSettings
         Caustics = bits[3] == '1';
         CameraActiveWithFocus = bits[4] == '1';
         ShowHealthBar = bits[5] == '1';
+        ShowEventBroadcast = bits[6] == '1';
     }
 
-    // 新建存档的默认值：与上面六个属性的初始值保持一致
+    // 新建存档的默认值：与上面七个属性的初始值保持一致
     public static void ResetToDefault()
     {
         ThirdPersonCamera = false;
@@ -61,6 +66,7 @@ public static class ClientSettings
         Caustics = true;
         CameraActiveWithFocus = false;
         ShowHealthBar = true;
+        ShowEventBroadcast = true;
     }
     #endregion
 }

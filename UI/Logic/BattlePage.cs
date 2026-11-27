@@ -1040,6 +1040,7 @@ public class BattlePage : PageBase
     // 切 EventBanner 档位并播 BattlePanel 的显隐转场
     private void ShowEventBanner(int page)
     {
+        if (!ClientSettings.ShowEventBroadcast) return; // 关闭播报：不再起新横幅，正在播的由动画自己播完
         var banner = panel.m_eventBanner;
         if (banner == null || banner.m_type == null) return;
         banner.m_type.selectedIndex = page;
@@ -1049,6 +1050,7 @@ public class BattlePage : PageBase
     // 重要事件 banner：技能名取 skill.csv，播报文案格式固定
     private void EnqueueImportantBanner(int skillId)
     {
+        if (!ClientSettings.ShowEventBroadcast) return; // 关闭播报：不入队，正在播的那条继续播完
         importantBannerQueue.Enqueue(ImportantBannerPrefix + SkillConfig.Get(skillId).name);
         PlayNextImportantBanner();
     }
@@ -1058,6 +1060,12 @@ public class BattlePage : PageBase
     {
         var banner = panel.m_important_event_banner;
         if (banner == null || importantBannerPlaying) return;
+        if (!ClientSettings.ShowEventBroadcast)
+        {
+            importantBannerQueue.Clear(); // 播放中关掉开关时，积压的不再补播（当前这条已经播完才走到这里）
+            banner.visible = false;
+            return;
+        }
         if (importantBannerQueue.Count == 0)
         {
             banner.visible = false;
