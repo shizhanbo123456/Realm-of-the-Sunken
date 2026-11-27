@@ -162,7 +162,9 @@ public class GmPanel : PageBase
             item.m_type.selectedPage = "副栏";
             item.m_content.selectedPage = ContentPage(row.paramType.Value);
             item.m_label_sub_column.text = row.paramDec;
-            item.m_input.text = string.Empty;
+            // GList 复用 item，上一条的状态要清掉：bool 清勾选，其余清文本
+            if (row.paramType.Value == GmCommandRunner.ParamBool) item.m_checkbox.selected = false;
+            else item.m_input.text = string.Empty;
             return;
         }
 
@@ -190,17 +192,33 @@ public class GmPanel : PageBase
     {
         if (curId < 0 || !GmCommandConfig.content.TryGetValue(curId, out var row)) return;
 
-        string raw = string.Empty;
-        if (row.paramType.HasValue && ItemAt(1) is UI_GmItem input) raw = input.m_input.text;
-        if (!GmCommandRunner.TryParseParam(row, raw, out var arg, out string error))
+        if (!TryBuildArg(row, out var arg, out string error))
         {
-            string msg = $"{row.subMenuName} 参数解析失败：{error}（输入：{raw}）";
+            string msg = $"{row.subMenuName} 参数解析失败：{error}";
             Output(msg);
             Debug.LogWarning("[GM] " + msg);
             return;
         }
 
         GmCommandRunner.Run(row, arg, Output); // 输出框与聊天系统栏同时收到结果
+    }
+
+    // bool 读复选框勾选态（勾=1、未勾=0），其余类型仍按文本解析
+    private bool TryBuildArg(gm_command row, out GmCommandRunner.Arg arg, out string error)
+    {
+        arg = default;
+        error = null;
+        if (!row.paramType.HasValue) return true;
+        if (ItemAt(1) is not UI_GmItem item) { error = "副栏未渲染"; return false; }
+
+        if (row.paramType.Value == GmCommandRunner.ParamBool)
+        {
+            int value = 0;
+            if (item.m_checkbox.selected) value = 1;
+            arg.i = value;
+            return true;
+        }
+        return GmCommandRunner.TryParseParam(row, item.m_input.text, out arg, out error);
     }
     #endregion
 

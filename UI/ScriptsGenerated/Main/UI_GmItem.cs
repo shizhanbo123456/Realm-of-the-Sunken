@@ -12,6 +12,7 @@ namespace Ros.UI.Main
         public GTextField m_label_main_column;
         public GTextField m_label_sub_column;
         public GTextInput m_input;
+        public GButton m_checkbox;
         public GButton m_btn;
         public const string URL = "ui://q68vr2bftjktiq";
 
@@ -29,7 +30,8 @@ namespace Ros.UI.Main
             m_label_main_column = (GTextField)GetChildAt(1);
             m_label_sub_column = (GTextField)GetChildAt(3);
             m_input = (GTextInput)GetChildAt(4);
-            m_btn = (GButton)GetChildAt(8);
+            m_checkbox = (GButton)GetChildAt(7);
+            m_btn = (GButton)GetChildAt(9);
         }
     }
 }
