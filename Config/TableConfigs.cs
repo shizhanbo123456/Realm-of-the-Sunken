@@ -250,9 +250,12 @@ namespace Ros.Config
     public static class EntityConfig
     {
         public static readonly Dictionary<EntityType, entity> content = new();
-        // 上线角色的阵营内下标（升序）：选角列表与人机随机都只从这里取
+        // 上线角色的阵营内下标（升序）：真人选角列表用
         public static readonly List<int> onlineAttackCharacters = new();
         public static readonly List<int> onlineDefenseCharacters = new();
+        // 人机选角候选：本阵营且配表标记可选，不看上线、不去重
+        public static readonly List<int> robotAttackCharacters = new();
+        public static readonly List<int> robotDefenseCharacters = new();
 
         // 角色数量不写死：取配表里该阵营的最大下标 + 1，加行即生效（缺行由启动自检报出来）
         public static int AttackCharacterCount { get; private set; }
@@ -263,10 +266,22 @@ namespace Ros.Config
             content.Clear();
             onlineAttackCharacters.Clear();
             onlineDefenseCharacters.Clear();
+            robotAttackCharacters.Clear();
+            robotDefenseCharacters.Clear();
             foreach (entity row in m.entityData.Values)
                 content.Add(new EntityType((EntityCategory)row.category, row.value), row);
             AttackCharacterCount = BakeCharacters(onlineAttackCharacters, EntityCategory.Character_Attack);
             DefenseCharacterCount = BakeCharacters(onlineDefenseCharacters, EntityCategory.Character_Defense);
+            foreach (var pair in content)
+            {
+                if (pair.Key.value < 0) continue;
+                if (pair.Key.category == EntityCategory.Character_Attack && pair.Value.robot_attack_available == true)
+                    robotAttackCharacters.Add(pair.Key.value);
+                else if (pair.Key.category == EntityCategory.Character_Defense && pair.Value.robot_defense_available == true)
+                    robotDefenseCharacters.Add(pair.Key.value);
+            }
+            robotAttackCharacters.Sort();
+            robotDefenseCharacters.Sort();
         }
 
         // 只认显式「上线=1」，留空按不上线处理；返回值 = 该阵营角色数量
@@ -290,6 +305,17 @@ namespace Ros.Config
             {
                 case EntityCategory.Character_Attack: return onlineAttackCharacters;
                 case EntityCategory.Character_Defense: return onlineDefenseCharacters;
+                default:
+                    throw new System.ArgumentOutOfRangeException(nameof(category), category, "只有进攻/防守两个阵营有可玩角色");
+            }
+        }
+
+        public static List<int> RobotAvailableCharacters(EntityCategory category)
+        {
+            switch (category)
+            {
+                case EntityCategory.Character_Attack: return robotAttackCharacters;
+                case EntityCategory.Character_Defense: return robotDefenseCharacters;
                 default:
                     throw new System.ArgumentOutOfRangeException(nameof(category), category, "只有进攻/防守两个阵营有可玩角色");
             }
