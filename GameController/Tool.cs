@@ -209,6 +209,23 @@ public class Tool : MonoBehaviour
         foreach (var key in EntityConfig.content.Keys)
             if (key.category == category) rows++;
         if (rows > count) Debug.LogWarning($"[启动自检] entity.csv 的{label}角色有 {rows} 行，多于角色数量 {count}：多出的行不会被选中，建议删除");
+
+        // 「上线」列留空按不上线处理，容易漏填；整阵营零上线则选角列表为空
+        int online = 0;
+        var blankOnline = new List<int>();
+        for (int i = 0; i < count; i++)
+        {
+            if (!EntityConfig.content.TryGetValue(new EntityType(category, i), out entity row)) continue;
+            if (row.online == true) online++;
+            else if (row.online == null) blankOnline.Add(i);
+        }
+        if (blankOnline.Count > 0)
+            Debug.LogWarning($"[启动自检] entity.csv 的{label}角色 {string.Join(",", blankOnline)} 未填「上线」列：按不上线处理，玩家与人机都不会选到");
+        if (online == 0)
+        {
+            Debug.LogError($"[启动自检] entity.csv 的{label}角色没有一个填「上线=1」：选角列表为空，人机也无法生成");
+            e++;
+        }
         return e;
     }
 

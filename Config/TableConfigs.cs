@@ -250,12 +250,39 @@ namespace Ros.Config
     public static class EntityConfig
     {
         public static readonly Dictionary<EntityType, entity> content = new();
+        // 上线角色的阵营内下标（升序）：选角列表与人机随机都只从这里取
+        public static readonly List<int> onlineAttackCharacters = new();
+        public static readonly List<int> onlineDefenseCharacters = new();
 
         internal static void Bake(ConfigManager m)
         {
             content.Clear();
+            onlineAttackCharacters.Clear();
+            onlineDefenseCharacters.Clear();
             foreach (entity row in m.entityData.Values)
                 content.Add(new EntityType((EntityCategory)row.category, row.value), row);
+            BakeOnlineCharacters(onlineAttackCharacters, EntityCategory.Character_Attack, GlobalConfig.attack_character_count);
+            BakeOnlineCharacters(onlineDefenseCharacters, EntityCategory.Character_Defense, GlobalConfig.defense_character_count);
+        }
+
+        // 只认显式「上线=1」，留空按不上线处理
+        private static void BakeOnlineCharacters(List<int> target, EntityCategory category, int count)
+        {
+            foreach (var pair in content)
+                if (pair.Key.category == category && pair.Key.value >= 0 && pair.Key.value < count && pair.Value.online == true)
+                    target.Add(pair.Key.value);
+            target.Sort();
+        }
+
+        public static List<int> OnlineCharacters(EntityCategory category)
+        {
+            switch (category)
+            {
+                case EntityCategory.Character_Attack: return onlineAttackCharacters;
+                case EntityCategory.Character_Defense: return onlineDefenseCharacters;
+                default:
+                    throw new System.ArgumentOutOfRangeException(nameof(category), category, "只有进攻/防守两个阵营有可玩角色");
+            }
         }
 
         public static entity Get(EntityType type) => ConfigBinary.Require(content, type, "entity");

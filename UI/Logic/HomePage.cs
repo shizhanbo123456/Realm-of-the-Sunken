@@ -64,6 +64,7 @@ public class HomePage : PageBase
     {
         base.Enter(param);
         Tool.EnvironmentManager.SetTime(GlobalConfig.home_env_time); // 固定首页昼夜，不沿用对局结束时的时刻
+        NormalizeSelections();
         // 每次进首页固定从进攻方已选角色开始展示，不沿用上次浏览到的角色
         defenseTab = false;
         selectedSaveIndex = ClientSelection.selectedAttackIndex;
@@ -147,13 +148,18 @@ public class HomePage : PageBase
         }
 
         bool defense = camp == 1;
+        string campName = "进攻";
+        if (defense) campName = "防守";
         int count = GlobalConfig.attack_character_count;
         if (defense) count = GlobalConfig.defense_character_count;
         if (index < 0 || index >= count)
         {
-            string campName = "进攻";
-            if (defense) campName = "防守";
             request.Reject($"{campName}方下标范围 0~{count - 1}");
+            return;
+        }
+        if (!OnlineCharacters(defense).Contains(index))
+        {
+            request.Reject($"{campName}方角色 {index} 未上线，不可选择");
             return;
         }
 
@@ -271,6 +277,7 @@ public class HomePage : PageBase
     // GM 换临时凭证后就地刷新：新名字与回零的选角都不必退回首页重进
     public void RefreshCredential()
     {
+        NormalizeSelections();
         defenseTab = false;
         selectedSaveIndex = ClientSelection.selectedAttackIndex;
         RefreshPlayerName();
@@ -296,6 +303,34 @@ public class HomePage : PageBase
 
     // 存档下标：0~5 进攻、6~11 防守；页签只列其中一侧
     private static bool IsDefense(int saveIndex) => saveIndex >= GlobalConfig.attack_character_count;
+
+    // 该阵营已上线的角色下标（列表按它排序，下标即显示位置）
+    private static List<int> OnlineCharacters(bool defense)
+    {
+        if (defense) return EntityConfig.OnlineCharacters(EntityCategory.Character_Defense);
+        return EntityConfig.OnlineCharacters(EntityCategory.Character_Attack);
+    }
+
+    // 存档里的选择可能指向已下线角色：两侧都纠正为该阵营第一个上线角色
+    private static void NormalizeSelections()
+    {
+        NormalizeSelection(false);
+        NormalizeSelection(true);
+    }
+
+    private static void NormalizeSelection(bool defense)
+    {
+        var online = OnlineCharacters(defense);
+        if (online.Count == 0) return; // 整阵营无上线角色属配表错误，启动自检已报错
+        int selected = ClientSelection.selectedAttackIndex;
+        if (defense) selected = ClientSelection.selectedDefenseIndex;
+        if (online.Contains(selected)) return;
+
+        int first = online[0];
+        if (defense) ClientSelection.selectedDefenseIndex = first;
+        else ClientSelection.selectedAttackIndex = first;
+        Debug.LogWarning($"[首页] 存档角色下标 {selected} 未上线，自动改选{(defense ? "防守" : "进攻")}方首个上线角色 {first}");
+    }
 
     private bool defenseTab;
 
@@ -325,15 +360,14 @@ public class HomePage : PageBase
     private void Refresh()
     {
         var selection = panel.m_character_selection_panel;
-        int count = GlobalConfig.attack_character_count;
-        if (defenseTab) count = GlobalConfig.defense_character_count;
+        var characters = OnlineCharacters(defenseTab);
         if (defenseTab) selection.m_current_selected_camp.selectedIndex = 1;
         else selection.m_current_selected_camp.selectedIndex = 0;
         selection.m_tab_attacker.selected = !defenseTab;
         selection.m_tab_defenser.selected = defenseTab;
-        selection.m_characterList.numItems = count;
+        selection.m_characterList.numItems = characters.Count;
         // numItems 不变时 FGUI 不重绘已有条目，切页签与选中变化都要手动重画
-        for (int i = 0; i < count; i++) RenderCharacter(i, selection.m_characterList.GetChildAt(i));
+        for (int i = 0; i < characters.Count; i++) RenderCharacter(i, selection.m_characterList.GetChildAt(i));
 
         int selectedMode = 0;
         if (selectedSaveIndex == ChosenSaveIndex) selectedMode = 1;
@@ -368,10 +402,12 @@ public class HomePage : PageBase
         list.numItems = entries.Count;
     }
 
+    // 列表只列上线角色；列表下标是显示位置，角色下标仍是 entity 的 value
     private void RenderCharacter(int index, GObject obj)
     {
         var head = (UI_RoleHead)obj;
-        int saveIndex = CampOffset + index;
+        int character = OnlineCharacters(defenseTab)[index];
+        int saveIndex = CampOffset + character;
         entity info = GetCharacterInfo(saveIndex);
 
         head.m_roleName.text = DisplayName(info, saveIndex);
@@ -383,8 +419,8 @@ public class HomePage : PageBase
             if (defenseTab) icons = Tool.ResourceManager.DefenseCharacterIcons;
             else icons = Tool.ResourceManager.AttackCharacterIcons;
         }
-        bool hasIcon = icons != null && index < icons.Count && icons[index] != null;
-        if (hasIcon) head.m_headIcon.texture = new NTexture(icons[index]);
+        bool hasIcon = icons != null && character < icons.Count && icons[character] != null;
+        if (hasIcon) head.m_headIcon.texture = new NTexture(icons[character]);
         else head.m_headIcon.texture = null;
         head.m_lock.selectedIndex = 0; // 全角色默认解锁
         int confirmMode = 0;

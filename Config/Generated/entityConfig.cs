@@ -26,6 +26,8 @@ namespace Ros.Config
                     row.key = r.ReadInt32();
                     row.category = r.ReadInt32();
                     row.value = r.ReadInt32();
+                    byte has2 = r.ReadByte();
+                    row.online = has2 == 1 ? (bool?)(r.ReadByte() != 0) : null;
                     row.name = ConfigBinary.ReadString(r);
                     row.health = r.ReadInt32();
                     row.attack = r.ReadInt32();
@@ -33,26 +35,26 @@ namespace Ros.Config
                     row.critDamage = r.ReadInt32();
                     row.viewDistance = r.ReadSingle();
                     row.weaponSlotCount = r.ReadInt32();
-                    int n9 = r.ReadInt32();
-                    row.initialSkills = new List<int>(n9);
-                    for (int j9 = 0; j9 < n9; j9++) row.initialSkills.Add(r.ReadInt32());
-                    byte has10 = r.ReadByte();
-                    row.showHealthBar = has10 == 1 ? (bool?)(r.ReadByte() != 0) : null;
+                    int n10 = r.ReadInt32();
+                    row.initialSkills = new List<int>(n10);
+                    for (int j10 = 0; j10 < n10; j10++) row.initialSkills.Add(r.ReadInt32());
                     byte has11 = r.ReadByte();
-                    row.endureLevel = has11 == 1 ? (bool?)(r.ReadByte() != 0) : null;
+                    row.showHealthBar = has11 == 1 ? (bool?)(r.ReadByte() != 0) : null;
                     byte has12 = r.ReadByte();
-                    row.weaponId = has12 == 1 ? (int?)(r.ReadInt32()) : null;
-                    int n13 = r.ReadInt32();
-                    row.cardDropWeights = new List<int>(n13);
-                    for (int j13 = 0; j13 < n13; j13++) row.cardDropWeights.Add(r.ReadInt32());
+                    row.endureLevel = has12 == 1 ? (bool?)(r.ReadByte() != 0) : null;
+                    byte has13 = r.ReadByte();
+                    row.weaponId = has13 == 1 ? (int?)(r.ReadInt32()) : null;
+                    int n14 = r.ReadInt32();
+                    row.cardDropWeights = new List<int>(n14);
+                    for (int j14 = 0; j14 < n14; j14++) row.cardDropWeights.Add(r.ReadInt32());
                     row.expDrop = r.ReadInt32();
                     row.dropToCamp = r.ReadByte() != 0;
                     row.passiveSkillDes = ConfigBinary.ReadString(r);
                     row.hitProtection = r.ReadInt32();
-                    byte has18 = r.ReadByte();
-                    row.animMovementSpeed = has18 == 1 ? (float?)(r.ReadSingle()) : null;
                     byte has19 = r.ReadByte();
-                    row.animAttackSpeed = has19 == 1 ? (float?)(r.ReadSingle()) : null;
+                    row.animMovementSpeed = has19 == 1 ? (float?)(r.ReadSingle()) : null;
+                    byte has20 = r.ReadByte();
+                    row.animAttackSpeed = has20 == 1 ? (float?)(r.ReadSingle()) : null;
                     entityData.Add(row.key, row);
                 }
             }
@@ -63,6 +65,7 @@ namespace Ros.Config
         public int key;  // 主键
         public int category;  // 实体类型
         public int value;  // 实体下标
+        public bool? online;  // 上线
         public string name;  // 姓名
         public int health;  // 生命
         public int attack;  // 攻击

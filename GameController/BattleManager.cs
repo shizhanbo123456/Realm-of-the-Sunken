@@ -447,15 +447,24 @@ public partial class BattleManager : EnsBehaviour
         };
         if (camp == PlayerCampType.Attack)
         {
-            info.attackCharacter = EntityType.Attack(UnityEngine.Random.Range(0, GlobalConfig.attack_character_count));
+            info.attackCharacter = EntityType.Attack(RandomOnlineCharacter(EntityCategory.Character_Attack));
         }
         else
         {
-            info.defenseCharacter = EntityType.Defense(UnityEngine.Random.Range(0, GlobalConfig.defense_character_count));
+            info.defenseCharacter = EntityType.Defense(RandomOnlineCharacter(EntityCategory.Character_Defense));
         }
         PlayerInfoList[robotClientId] = info;
         PlayerCamps[robotClientId] = camp;
         RobotClients.Add(robotClientId);
+    }
+
+    // 人机只在「上线」的角色里随机；整阵营没有上线角色属于配表错误
+    private static int RandomOnlineCharacter(EntityCategory category)
+    {
+        List<int> online = EntityConfig.OnlineCharacters(category);
+        if (online.Count == 0)
+            throw new System.InvalidOperationException($"[配表] entity 的 {category} 没有任何上线角色，人机无法选角");
+        return online[UnityEngine.Random.Range(0, online.Count)];
     }
 
     // robot_random_name 的值即「使用随机名称的概率」：命中且名字池还有剩就取一个没被用过的，否则退回编号名
