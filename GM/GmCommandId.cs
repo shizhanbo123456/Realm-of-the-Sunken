@@ -35,7 +35,6 @@ namespace Ros.Gm
         public const int Fly = 21;
         public const int Invincible = 22;
         public const int ExtremeSpeed = 23;
-        public const int ShowEnemyCampConversation = 24;
 
         public const int SettlementView = 25;
 
@@ -53,8 +52,6 @@ namespace Ros.Gm
         public const int DebugEntityCount = 34;
         public const int ClientTime = 35;
         public const int MeshSurfaceCount = 36;
-
-        public const int Fog = 37;
 
         // 存档
         public const int TempCredential = 39;

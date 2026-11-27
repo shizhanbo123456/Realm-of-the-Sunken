@@ -130,11 +130,6 @@ namespace Ros.Gm
         {
             switch (row.key)
             {
-                case GmCommandId.ShowEnemyCampConversation:
-                    ChatPlugin.ShowEnemyDialog = arg.i != 0;
-                    output($"敌方阵营聊天：{(ChatPlugin.ShowEnemyDialog ? "开" : "关")}");
-                    return true;
-
                 case GmCommandId.SettlementView:
                     if (Tool.UIManager != null) Tool.UIManager.Settlement.PlayDemo();
                     output("已播放结算界面演示");
@@ -160,13 +155,6 @@ namespace Ros.Gm
 
                 case GmCommandId.MeshSurfaceCount:
                     output($"模型网格面数：{CountSceneMeshFaces()}");
-                    return true;
-
-                case GmCommandId.Fog:
-                    var env = Tool.EnvironmentManager;
-                    if (env == null) { output("雾气：当前场景没有 EnvironmentManager"); return true; }
-                    env.SetFogEnabled(arg.i != 0);
-                    output($"雾气：{(env.fogEnabled ? "开" : "关")}");
                     return true;
 
                 case GmCommandId.TempCredential:

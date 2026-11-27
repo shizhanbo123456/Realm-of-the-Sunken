@@ -21,9 +21,6 @@ public class ChatPlugin : PageBase
 
     public const int TabSystem = 3; // 页签 = 频道值 0/1/2，3 是本地系统消息页签（不上协议）
 
-    // GM 开关「敌方对话」：开启后阵营频道额外显示敌方阵营的消息
-    public static bool ShowEnemyDialog;
-
     private const int MaxEntries = 50;      // 聊天只保留最近 50 条
     private const float SendInterval = 1f;  // 最快 1s 一条
 
@@ -326,8 +323,6 @@ public class ChatPlugin : PageBase
     private void OnChatMessage(SCChat chat)
     {
         if (chat.senderClientId == NetworkManager.LocalToken) return; // 自己的已本地回显
-        // 阵营频道客户端过滤；GM「敌方对话」开启时放行敌方阵营消息（附近频道已由服务器按距离筛过）
-        if (chat.channel == (int)ChatChannel.Camp && chat.camp != GetMyCamp() && !ShowEnemyDialog) return;
         AppendEntry(new ChatEntry()
         {
             channel = chat.channel,
@@ -342,8 +337,6 @@ public class ChatPlugin : PageBase
     // 状态上报：协议只带状态、血量、位置与周边敌人数，文本本地拼，统一进阵营频道
     private void OnStateReport(SCStateReport report)
     {
-        if (report.camp != GetMyCamp() && !ShowEnemyDialog) return; // 与聊天同规则：阵营频道只显示同阵营
-
         bool isSelf = report.senderClientId == NetworkManager.LocalToken; // 自己没有本地回显，靠这条显示
         string head;
         if (report.state == (int)EntityReportState.None)

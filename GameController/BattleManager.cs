@@ -828,7 +828,25 @@ public partial class BattleManager : EnsBehaviour
             SendNearbyChat(clientId, message);
             return;
         }
+        if (chat.channel == (int)ChatChannel.Camp)
+        {
+            SendCampChat(clientId, message);
+            return;
+        }
         Tool.NetworkManager.SendChat(message);
+    }
+
+    // 阵营频道：只发给同阵营真人；发送方本地已回显，观战方不显示阵营消息
+    private void SendCampChat(int senderClientId, SCChat message)
+    {
+        int camp = CampValueOf(senderClientId);
+        foreach (int targetClientId in PlayerInfoList.Keys)
+        {
+            if (targetClientId == senderClientId) continue;
+            if (RobotClients.Contains(targetClientId)) continue;
+            if (CampValueOf(targetClientId) != camp) continue;
+            Tool.NetworkManager.SendChat(targetClientId, message);
+        }
     }
 
     // 附近频道：只发给「操控的实体」在发送者 chat_nearby_radius 米内的玩家；观战方没有实体，发不出也收不到

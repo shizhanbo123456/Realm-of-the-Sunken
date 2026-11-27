@@ -6,7 +6,7 @@ using TerrainGen;
 using UnityEngine;
 
 // GM 指令的服务器执行体：NetworkManager.ServerReceiveGmLocal → ExecuteGm
-// 指令 id 与参数含义见配表 gm_command；纯客户端项（敌方聊天/雾气/结算演示/客户端调试）在 GmPanel 本地执行
+// 指令 id 与参数含义见配表 gm_command；纯客户端项（结算演示/客户端调试/临时凭证）在 GmPanel 本地执行
 public partial class BattleManager
 {
     // 击退指令的固定作用半径
