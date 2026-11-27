@@ -216,7 +216,7 @@ public class LobbyPage : PageBase
         int quitMode = 0;
         if (myCamp == camp) quitMode = 1;
         block.m_quit_mode.selectedIndex = quitMode;
-        block.m_label_AI_count.text = $"x{aiCount}";
+        block.m_label_AI_count.text = aiCount.ToString();
     }
 
     private static int SpectateCount(SCLobbyInfo info)
