@@ -13,6 +13,7 @@ namespace Ros.UI.Main
         public GButton m_toggle_third_person_perspctivee;
         public GButton m_toggle_auto_pitch;
         public GButton m_toggle_camera_active_with_focus;
+        public GButton m_toggle_hide_bar;
         public GButton m_open_rule;
         public GButton m_open_guide;
         public GButton m_open_bridge;
@@ -36,12 +37,13 @@ namespace Ros.UI.Main
             m_toggle_third_person_perspctivee = (GButton)GetChildAt(7);
             m_toggle_auto_pitch = (GButton)GetChildAt(9);
             m_toggle_camera_active_with_focus = (GButton)GetChildAt(11);
-            m_open_rule = (GButton)GetChildAt(15);
-            m_open_guide = (GButton)GetChildAt(17);
-            m_open_bridge = (GButton)GetChildAt(19);
-            m_back_to_fight = (GButton)GetChildAt(22);
-            m_exit = (GButton)GetChildAt(23);
-            m_back = (GButton)GetChildAt(24);
+            m_toggle_hide_bar = (GButton)GetChildAt(13);
+            m_open_rule = (GButton)GetChildAt(17);
+            m_open_guide = (GButton)GetChildAt(19);
+            m_open_bridge = (GButton)GetChildAt(21);
+            m_back_to_fight = (GButton)GetChildAt(24);
+            m_exit = (GButton)GetChildAt(25);
+            m_back = (GButton)GetChildAt(26);
         }
     }
 }

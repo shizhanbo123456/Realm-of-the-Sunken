@@ -54,6 +54,14 @@ namespace Ros.UI.Main
             visible = true;
         }
 
+        // 入池/复用前清掉上一条记录：buff 段缺失的包不会重填列表，不复用会留着前一个实体的图标
+        public void ResetForPool()
+        {
+            buffs.Clear();
+            if (m_buff_list != null && m_buff_list.m_list != null) m_buff_list.m_list.numItems = 0;
+            visible = false;
+        }
+
         // 头顶投影 + 距离缩放：拿不到锚点或锚点在相机背后就隐藏
         public void Place(bool hasAnchor, Vector3 headPos, float defaultSizeDistance)
         {

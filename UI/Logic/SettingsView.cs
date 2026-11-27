@@ -91,7 +91,7 @@ public class SettingsView : PageBase
     }
 
     #region//Local
-    // 五个勾选全量写 ClientSettings 并随存档落盘；勾选态与运行时是否已接无关
+    // 六个勾选全量写 ClientSettings 并随存档落盘；勾选态与运行时是否已接无关
     private void BindToggles()
     {
         View.m_toggle_caustic.selected = ClientSettings.Caustics;
@@ -99,6 +99,7 @@ public class SettingsView : PageBase
         View.m_toggle_third_person_perspctivee.selected = ClientSettings.ThirdPersonCamera;
         View.m_toggle_auto_pitch.selected = ClientSettings.AutoPitch;
         View.m_toggle_camera_active_with_focus.selected = ClientSettings.CameraActiveWithFocus;
+        View.m_toggle_hide_bar.selected = ClientSettings.ShowHealthBar;
         View.m_toggle_caustic.onChanged.Add(() =>
             ClientSettings.Caustics = View.m_toggle_caustic.selected);
         View.m_toggle_volumetric_light.onChanged.Add(() =>
@@ -109,6 +110,8 @@ public class SettingsView : PageBase
             ClientSettings.AutoPitch = View.m_toggle_auto_pitch.selected);
         View.m_toggle_camera_active_with_focus.onChanged.Add(() =>
             ClientSettings.CameraActiveWithFocus = View.m_toggle_camera_active_with_focus.selected);
+        View.m_toggle_hide_bar.onChanged.Add(() =>
+            ClientSettings.ShowHealthBar = View.m_toggle_hide_bar.selected);
     }
 
     private void SyncToggles()
@@ -124,6 +127,8 @@ public class SettingsView : PageBase
             View.m_toggle_auto_pitch.selected = ClientSettings.AutoPitch;
         if (View.m_toggle_camera_active_with_focus.selected != ClientSettings.CameraActiveWithFocus)
             View.m_toggle_camera_active_with_focus.selected = ClientSettings.CameraActiveWithFocus;
+        if (View.m_toggle_hide_bar.selected != ClientSettings.ShowHealthBar)
+            View.m_toggle_hide_bar.selected = ClientSettings.ShowHealthBar;
     }
     #endregion
 }

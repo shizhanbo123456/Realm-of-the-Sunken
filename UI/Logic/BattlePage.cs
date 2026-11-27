@@ -14,8 +14,11 @@ public class BattlePage : PageBase
     private float nextQuickMessageTime;  // 快捷消息发送节流（防刷）
     private readonly List<UI_SkillList.Slot> skillSlots = new(); // 技能栏快照缓冲（每 0.1s 重填一次，避免分配）
     private readonly Dictionary<ushort, UI_EntityBar> entityBars = new();
-    // 血量缓存：摘要包只在 healthDirty/全量时携带血量段，未携带的包（如仅 buff 变化）不能把血条刷成 0/0
-    private readonly Dictionary<ushort, (int health, int maxHealth)> entityVitals = new();
+    // 血条数据缓存：摘要包分段下发，血条隐藏期间也要攒着，重开时按它立即重建
+    private readonly Dictionary<ushort, BarData> entityBarData = new();
+    // 血条池：实体进出场与血条开关都复用这里的对象，不再每次 CreateInstance/Dispose
+    private readonly Stack<UI_EntityBar> barPool = new();
+    private bool barsVisible = true; // 上次生效的 ClientSettings.ShowHealthBar
     private readonly List<UI_EntityBar.Buff> barBuffs = new(); // 血条 buff 快照缓冲（每个摘要包重填）
     private readonly List<SCEntityDisplayInfo.BuffRuntime> localBuffs = new();                      // 本地玩家左上角血条的 buff 数据源
     private readonly float barDefaultSizeDistance = GlobalVariable.I(global_variablesEnum.distance_of_bar_default_size); // 血条 scale=(1,1) 时的相机距离
@@ -47,6 +50,16 @@ public class BattlePage : PageBase
     private bool importantBannerPlaying;                          // 当前 banner 动画是否在播
     private static string ImportantBannerPrefix => MessageVariable.V(message_variablesEnum.battle_bannerPrefix);
     private bool aiBound; // 本页的 AI 命令是否已注册
+
+    // 血条显示所需的最小数据：摘要包缺哪段就沿用上次值
+    private struct BarData
+    {
+        public EntityType type;
+        public EntityCamp camp;
+        public int health;
+        public int maxHealth;
+        public List<SCEntityDisplayInfo.BuffRuntime> buffs; // null = 该实体一直没带过 buff 段
+    }
 
     // 本局会话数据全部来自加载期（不再读组队缓存）
     private static ClientLoadingManager Session => ClientLoadingManager.Current;
@@ -491,6 +504,7 @@ public class BattlePage : PageBase
         if (Tool.CameraController != null) Tool.CameraController.OnCameraUpdated += OnCameraUpdated;
 
         localPlayerCamp = -1;
+        barsVisible = ClientSettings.ShowHealthBar; // 进战先对齐存档里的血条开关
         localAvatarSet = false;
         spectatorMode = Session != null && Session.IsSpectator;
         if (Session != null) lastOwnEntityId = Session.OwnEntityId;
@@ -561,6 +575,7 @@ public class BattlePage : PageBase
 
     public override void Update(float deltaTime)
     {
+        SyncBarVisibility(); // 设置里的血条开关：变化时立即入池或按缓存重建
         if (OwnEntityId != 0) lastOwnEntityId = OwnEntityId;
         // 快捷指令只服务于在场角色：纯观战 / 死亡等待复活时收起按钮，已展开的轮盘一并关掉
         bool canQuickMessage = CanUseQuickMessage;
@@ -606,11 +621,7 @@ public class BattlePage : PageBase
     {
         // 血条是否创建由 entity.csv 的「显示血条」列决定；名牌只给双方角色
         if (EntityConfig.GetByCategory(info.type).showHealthBar == true)
-        {
-            bool withName = info.type.category == EntityCategory.Character_Attack ||
-                            info.type.category == EntityCategory.Character_Defense;
-            UpdateEntityBar(info, withName);
-        }
+            UpdateEntityBar(info);
 
         if (IsOwnEntity(info.entityId))
         {
@@ -630,7 +641,7 @@ public class BattlePage : PageBase
     private void OnEntityDisplayRemove(int entityId)
     {
         RemoveEntityBar((ushort)entityId);
-        entityVitals.Remove((ushort)entityId);
+        entityBarData.Remove((ushort)entityId);
         if (panel.m_Minimap != null) panel.m_Minimap.Remove((ushort)entityId);
 
         if (lastOwnEntityId != 0 && entityId == lastOwnEntityId)
@@ -1153,28 +1164,87 @@ public class BattlePage : PageBase
     #endregion
 
     #region//Local
-    private void UpdateEntityBar(SCEntityDisplayInfo info, bool withName)
+    private void UpdateEntityBar(SCEntityDisplayInfo info)
     {
+        BarData data = CacheBarData(info);
+        if (!barsVisible) return; // 血条开关关闭：只攒数据，不建对象
         if (!entityBars.TryGetValue(info.entityId, out var bar))
         {
-            bar = UI_EntityBar.CreateInstance();
-            panel.m_world_element_container.AddChild(bar); // 挂在世界层：压在战斗界面各元素之下
+            bar = AcquireBar();
             entityBars[info.entityId] = bar;
         }
+        BindBar(bar, info.entityId, data);
+    }
+
+    private void BindBar(UI_EntityBar bar, ushort entityId, BarData data)
+    {
+        bool withName = data.type.category == EntityCategory.Character_Attack ||
+                        data.type.category == EntityCategory.Character_Defense;
         string name = "";
-        if (withName && HasSession) name = Session.GetNameByEntity(info.entityId);
-        var vitals = ResolveVitals(info);
+        if (withName && HasSession) name = Session.GetNameByEntity(entityId);
         IReadOnlyList<UI_EntityBar.Buff> buffs = null;
-        if (info.hasBuffs) buffs = ToBarBuffs(info.buffs);
-        bar.Bind(vitals.health, vitals.maxHealth, info.camp, (EntityCamp)localPlayerCamp, name, buffs);
+        if (data.buffs != null) buffs = ToBarBuffs(data.buffs);
+        bar.Bind(data.health, data.maxHealth, data.camp, (EntityCamp)localPlayerCamp, name, buffs);
+    }
+
+    // 血量/阵营/类型/buff 分段携带：带则刷新缓存，不带则沿用上次值（首见包必为全量）
+    private BarData CacheBarData(SCEntityDisplayInfo info)
+    {
+        entityBarData.TryGetValue(info.entityId, out var data);
+        if (info.hasHealth)
+        {
+            data.health = info.health;
+            data.maxHealth = info.maxHealth;
+        }
+        if (info.hasBuffs) data.buffs = info.buffs;
+        data.type = info.type;
+        data.camp = info.camp;
+        entityBarData[info.entityId] = data;
+        return data;
     }
 
     // 血量段只在置脏/全量包携带：带则刷新缓存，不带则沿用上次值（首见包必为全量）
     private (int health, int maxHealth) ResolveVitals(SCEntityDisplayInfo info)
     {
-        if (info.hasHealth) entityVitals[info.entityId] = (info.health, info.maxHealth);
-        if (entityVitals.TryGetValue(info.entityId, out var vitals)) return vitals;
-        return default;
+        BarData data = CacheBarData(info);
+        return (data.health, data.maxHealth);
+    }
+
+    // 取一个血条：池里有就复用，复用前清掉上一条的记录
+    private UI_EntityBar AcquireBar()
+    {
+        UI_EntityBar bar = null;
+        if (barPool.Count > 0) bar = barPool.Pop();
+        if (bar == null) bar = UI_EntityBar.CreateInstance();
+        else bar.ResetForPool();
+        panel.m_world_element_container.AddChild(bar); // 挂在世界层：压在战斗界面各元素之下
+        return bar;
+    }
+
+    private void ReleaseBar(UI_EntityBar bar)
+    {
+        if (bar == null) return;
+        bar.ResetForPool();
+        if (bar.parent != null) bar.parent.RemoveChild(bar, false);
+        barPool.Push(bar);
+    }
+
+    // 设置里的血条开关：关闭时全部入池只留数据缓存，打开时按缓存立即重建
+    private void SyncBarVisibility()
+    {
+        if (barsVisible == ClientSettings.ShowHealthBar) return;
+        barsVisible = ClientSettings.ShowHealthBar;
+        foreach (var bar in entityBars.Values) ReleaseBar(bar);
+        entityBars.Clear();
+        if (!barsVisible) return;
+        foreach (var pair in entityBarData)
+        {
+            // 缓存里也有只给 HUD 用的自身实体：重建仍按 entity.csv 的「显示血条」列判定
+            if (EntityConfig.GetByCategory(pair.Value.type).showHealthBar != true) continue;
+            var bar = AcquireBar();
+            entityBars[pair.Key] = bar;
+            BindBar(bar, pair.Key, pair.Value);
+        }
     }
 
     // 协议 buff 列表 → 血条条目数据（复用缓冲，避免每个摘要包都分配）
@@ -1214,19 +1284,16 @@ public class BattlePage : PageBase
     {
         if (entityBars.TryGetValue(entityId, out var bar))
         {
-            if (bar != null) bar.Dispose();
             entityBars.Remove(entityId);
+            ReleaseBar(bar);
         }
     }
 
     private void ClearEntityBars()
     {
-        foreach (var bar in entityBars.Values)
-        {
-            if (bar != null) bar.Dispose();
-        }
+        foreach (var bar in entityBars.Values) ReleaseBar(bar);
         entityBars.Clear();
-        entityVitals.Clear(); // 实体 id 每局重排，旧血量缓存不能跨局沿用
+        entityBarData.Clear(); // 实体 id 每局重排，旧缓存不能跨局沿用
     }
 
     private void ShowCombatLabel(int value, CombatLabelType type, ushort targetId, bool hasHitPos, Vector3 hitPos)
