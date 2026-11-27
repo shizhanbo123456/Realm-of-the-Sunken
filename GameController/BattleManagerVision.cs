@@ -307,15 +307,15 @@ public partial class BattleManager
                 }
                 else if (!IsMemberOfCamp(memberCamp, camp)) continue;
                 if (!loadedClients.Contains(pair.Key)) continue; // 未完成加载的客户端先不给小地图数据
-                bool bigMapOpen = IsBigMapOpen(pair.Key);
+                // 大地图打开或被 AI 接管的客户端跳过距离过滤：阵营视野并集内全距离下发
+                bool skipRadius = IsBigMapOpen(pair.Key) || AiClients.Contains(pair.Key);
                 float radiusSq = GetMinimapRadius(pair.Key);
                 radiusSq *= radiusSq;
                 var viewPos = state.position; // 视野锚点：存活/观战/死亡冻结统一由 TickVisionStates 维护
-                // 非本阵营单位按该客户端的雷达显示半径在服务器侧过滤，圈外不下发；
-                // 大地图打开时跳过该过滤，阵营视野并集内全量下发
+                // 非本阵营单位按该客户端的雷达显示半径在服务器侧过滤，圈外不下发
                 foreach (var entry in s_minimapEntries)
                 {
-                    if (!bigMapOpen && entry.camp != camp)
+                    if (!skipRadius && entry.camp != camp)
                     {
                         float dx = entry.posX - viewPos.x, dz = entry.posZ - viewPos.z;
                         if (dx * dx + dz * dz > radiusSq) continue;
@@ -324,7 +324,7 @@ public partial class BattleManager
                 }
                 foreach (var point in s_minimapSwarm)
                 {
-                    if (!bigMapOpen)
+                    if (!skipRadius)
                     {
                         float dx = point.posX - viewPos.x, dz = point.posZ - viewPos.z;
                         if (dx * dx + dz * dz > radiusSq) continue;
