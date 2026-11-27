@@ -74,7 +74,9 @@ public class EnvironmentManager : MonoBehaviour
     public void CollectComponents()
     {
         sun = FindSun();
-        Camera cam = Camera.main;
+        // 焦点启停会把主相机整个停掉，Camera.main 这时取不到；主相机统一从 CameraController 所在物体拿
+        CameraController cameraController = Tool.CameraController;
+        Camera cam = cameraController != null ? cameraController.GetComponent<Camera>() : null;
         fog = cam != null ? cam.GetComponent<ScreenSpaceFog>() : null;
         caustics = cam != null ? cam.GetComponent<ScreenSpaceCaustics>() : null;
         volumetricLight = FindVolumetricLight();
