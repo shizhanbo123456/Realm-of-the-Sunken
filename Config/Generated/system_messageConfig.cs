@@ -44,8 +44,10 @@ namespace Ros.Config
         sage_statue_2_destroyed,
         sage_statue_3_destroyed,
         neutral_statue_respawn,
-        neutral_statue_captured,
+        neutral_statue_captured_attack,
         nightfall,
         daybreak,
+        neutral_statue_captured_defense,
+        neutral_statue_defeated,
     }
 }

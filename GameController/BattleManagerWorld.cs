@@ -185,12 +185,16 @@ public partial class BattleManager
         neutralStatueRespawnTime = Time.time + GlobalConfig.neutral_statue_respawn_delay;
     }
 
-    public void NotifyNeutralStatueCaptured(ushort treeId)
+    public void NotifyNeutralStatueCaptured(EntityData captor)
     {
+        // 全场播报，文案按归属区分：攻守双方击杀都照实宣称获得祝福，无归属（DoT 击破）或其它阵营只报被击败
+        system_messageEnum text = system_messageEnum.neutral_statue_defeated;
+        if (captor != null && captor.camp == EntityCamp.Attack) text = system_messageEnum.neutral_statue_captured_attack;
+        else if (captor != null && captor.camp == EntityCamp.Defense) text = system_messageEnum.neutral_statue_captured_defense;
         Tool.NetworkManager.SendBattleEvent(new SCBattleEvent()
         {
             type = SCBattleEvent.Type.NeutralStatueCaptured,
-            textId = (int)system_messageEnum.neutral_statue_captured,
+            textId = (int)text,
         });
     }
 
