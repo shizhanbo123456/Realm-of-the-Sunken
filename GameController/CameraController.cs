@@ -102,6 +102,7 @@ public class CameraController : MonoBehaviour
     {
         Tool.CameraController = this;
         WorldCamera = GetComponent<Camera>();
+        EventManager.AddEvent<int>(ClientEvent.OnBattleEnd, OnBattleEnd);
         CollectFocusCameras();
         lastCameraActiveWithFocus = ClientSettings.CameraActiveWithFocus;
         ApplyFocusState(Application.isFocused);
@@ -142,8 +143,16 @@ public class CameraController : MonoBehaviour
 
     private void OnDestroy()
     {
+        EventManager.RemoveEvent<int>(ClientEvent.OnBattleEnd, OnBattleEnd);
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
+    }
+
+    // 自由视角只服务于对局：结算一出现就退出，否则大厅机位每帧被鼠标旋转覆盖
+    private void OnBattleEnd(int gameState)
+    {
+        if (Mode != CameraViewMode.Free) return;
+        SetMode(ClientSettings.ThirdPersonCamera ? CameraViewMode.ThirdPerson : CameraViewMode.TopDown);
     }
 
     // 外部震源入口：强度档位由调用方按配表给（受击 / 命中），这里只负责累积与衰减
