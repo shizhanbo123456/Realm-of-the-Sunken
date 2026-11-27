@@ -1419,6 +1419,7 @@ public partial class BattleManager : EnsBehaviour
                 defenseScore = DefenseScore(),
                 killScore = DefenseKills,
                 remainTime = Mathf.Max(0f, BattleRemainTime),
+                attackKills = AttackKills,
                 expGain = Mathf.RoundToInt(harvest), // 经验 = 采集量 = 对雕像造成的伤害量（策划案 17.3）
                 guardStatueHealth = MainStatueRemainingHealth(),
             });

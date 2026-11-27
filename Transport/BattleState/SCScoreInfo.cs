@@ -10,6 +10,7 @@ namespace Ros.Transport
         public int expGain;
         public float guardStatueHealth;
         public bool resync; // true = 重连补发的中途快照（gameState 仍为 0，客户端不结算）
+        public int attackKills;
     }
 
     public struct SCScoreInfoSerializer
@@ -23,7 +24,8 @@ namespace Ros.Transport
             if (!FloatSerializer.Serialize(value.remainTime, result, ref indexStart)) return false;
             if (!IntSerializer.Serialize(value.expGain, result, ref indexStart)) return false;
             if (!FloatSerializer.Serialize(value.guardStatueHealth, result, ref indexStart)) return false;
-            return BoolSerializer.Serialize(value.resync, result, ref indexStart);
+            if (!BoolSerializer.Serialize(value.resync, result, ref indexStart)) return false;
+            return IntSerializer.Serialize(value.attackKills, result, ref indexStart);
         }
 
         public static SCScoreInfo Deserialize(byte[] data, ref int indexStart, int invalidIndex)
@@ -38,6 +40,7 @@ namespace Ros.Transport
                 expGain = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
                 guardStatueHealth = FloatSerializer.Deserialize(data, ref indexStart, invalidIndex),
                 resync = BoolSerializer.Deserialize(data, ref indexStart, invalidIndex),
+                attackKills = IntSerializer.Deserialize(data, ref indexStart, invalidIndex),
             };
         }
     }

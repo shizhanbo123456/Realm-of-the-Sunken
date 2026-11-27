@@ -44,7 +44,8 @@ public class SettlementView
             gameState = 1, // 进攻方胜
             attackScore = 1280f,
             defenseScore = 960f,
-            killScore = 8,
+            attackKills = 5,
+            defenseKills = 8,
             remainTime = 120f,
             expGain = 800,
             guardStatueHealth = 40f,
@@ -163,7 +164,13 @@ public class SettlementView
             rows.Add(MessageVariable.F(message_variablesEnum.settlement_attackScore, (int)r.attackScore));
             rows.Add(MessageVariable.F(message_variablesEnum.settlement_defenseScore, (int)r.defenseScore));
         }
-        rows.Add(MessageVariable.F(message_variablesEnum.settlement_kill, r.killScore));
+        if (camp == EntityCamp.Attack) rows.Add(MessageVariable.F(message_variablesEnum.settlement_attackKill, r.attackKills));
+        else if (camp == EntityCamp.Defense) rows.Add(MessageVariable.F(message_variablesEnum.settlement_defenseKill, r.defenseKills));
+        else
+        {
+            rows.Add(MessageVariable.F(message_variablesEnum.settlement_attackKill, r.attackKills));
+            rows.Add(MessageVariable.F(message_variablesEnum.settlement_defenseKill, r.defenseKills));
+        }
         if (camp == EntityCamp.Attack)
             rows.Add(MessageVariable.F(message_variablesEnum.settlement_guardDamage, (int)r.expGain));
         else

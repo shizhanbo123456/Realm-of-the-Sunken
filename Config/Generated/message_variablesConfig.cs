@@ -126,5 +126,7 @@ namespace Ros.Config
         card_discardExp,
         card_luck,
         battle_bannerPrefix,
+        settlement_attackKill,
+        settlement_defenseKill,
     }
 }

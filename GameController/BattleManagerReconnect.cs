@@ -78,6 +78,7 @@ public partial class BattleManager
             defenseScore = DefenseScore(),
             killScore = DefenseKills,
             remainTime = Mathf.Max(0f, BattleRemainTime),
+            attackKills = AttackKills,
         });
 
         // 昼夜快照（心跳 10s 也会补，但重连应当立即正确）

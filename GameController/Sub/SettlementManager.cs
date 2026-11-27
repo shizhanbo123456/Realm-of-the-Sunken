@@ -5,7 +5,8 @@ public struct SettlementResult
     public int gameState;
     public float attackScore;
     public float defenseScore;
-    public int killScore;
+    public int attackKills;
+    public int defenseKills;
     public float remainTime;
     public int expGain;
     public float guardStatueHealth;
@@ -46,7 +47,8 @@ public class SettlementManager : ClientSubManager
             gameState = info.gameState,
             attackScore = info.attackScore,
             defenseScore = info.defenseScore,
-            killScore = info.killScore,
+            attackKills = info.attackKills,
+            defenseKills = info.killScore,
             remainTime = info.remainTime,
             expGain = info.expGain,
             guardStatueHealth = info.guardStatueHealth,
