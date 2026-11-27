@@ -649,15 +649,16 @@ public abstract class EntityData : MonoBehaviour
     }
 
     // 受伤计算，返回结算后的实际掉血（hitPos = 命中位置，飘字优先显示在命中处；DoT/反伤等无范围伤害传 null 回退实体头顶）
-    public virtual float OnDamaged(float damage, EntityData attacker = null, bool fixedDamage = false, bool canReflect = true, CombatLabelType damageType = CombatLabelType.Normal, Vector3? hitPos = null)
+    // pierceModifiers = 穿透护盾、减伤率、增伤系数、单次上限与守护点减伤（GM 直伤），GM 无敌仍生效
+    public virtual float OnDamaged(float damage, EntityData attacker = null, bool fixedDamage = false, bool canReflect = true, CombatLabelType damageType = CombatLabelType.Normal, Vector3? hitPos = null, bool pierceModifiers = false)
     {
         if (!Alive) return 0f;
         if (BattleManager.IsGmInvincible(id)) return 0f; // GM 无敌：伤害按 0 处理（见 BattleManagerGm）
         if (attacker != null) lastAttacker = attacker; // 记录伤害来源（掉落归属判定）
         float finalDamage = damage;
-        if (Tool.BattleManager != null) finalDamage = Tool.BattleManager.AdjustIncomingDamage(this, finalDamage); // 白眼伯爵：单次受伤上限
+        if (!pierceModifiers && Tool.BattleManager != null) finalDamage = Tool.BattleManager.AdjustIncomingDamage(this, finalDamage); // 白眼伯爵：单次受伤上限
         float shieldDamage = 0f; // 命中类伤害面对的名义伤害（护盾飘字用）
-        if (effectController != null)
+        if (!pierceModifiers && effectController != null)
         {
             // 只有命中类（正常/暴击）吃护盾；DoT、反伤、瘟疫引爆等特殊伤害无视护盾直接扣血
             if (damageType == CombatLabelType.Normal || damageType == CombatLabelType.Crit)
@@ -675,7 +676,7 @@ public abstract class EntityData : MonoBehaviour
             if (!fixedDamage) finalDamage *= effectController.GetInDamageMultiplier();
         }
         // 守护点减伤：读己方（防守方）玩家的「壁垒」词条总和
-        if (type.category == EntityCategory.GuardStatue && Tool.BattleManager != null)
+        if (!pierceModifiers && type.category == EntityCategory.GuardStatue && Tool.BattleManager != null)
             finalDamage *= 1f - Mathf.Clamp01(Tool.BattleManager.GetCampCardBonus(camp).guardReduction);
         finalDamage = Mathf.Max(0f, finalDamage);
         attributes.ApplyDamage(finalDamage);

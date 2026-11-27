@@ -20,10 +20,10 @@ public class NeutralStatueEntityData : EntityData
         stateMachine.Tick();
     }
 
-    public override float OnDamaged(float damage, EntityData attacker = null, bool fixedDamage = false, bool canReflect = true, CombatLabelType damageType = CombatLabelType.Normal, Vector3? hitPos = null)
+    public override float OnDamaged(float damage, EntityData attacker = null, bool fixedDamage = false, bool canReflect = true, CombatLabelType damageType = CombatLabelType.Normal, Vector3? hitPos = null, bool pierceModifiers = false)
     {
         bool wasAlive = Alive;
-        float applied = base.OnDamaged(damage, attacker, fixedDamage, canReflect, damageType, hitPos);
+        float applied = base.OnDamaged(damage, attacker, fixedDamage, canReflect, damageType, hitPos, pierceModifiers);
         // 只认直接攻击：固定数值伤害来自 Buff/DoT，不给归属（也不能沿用更早那次的归属）
         if (wasAlive) captor = fixedDamage ? null : attacker;
         return applied;

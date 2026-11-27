@@ -357,8 +357,8 @@ public partial class BattleManager
             gmDamageTargets.Add(e);
         }
 
-        // 先收集再结算：结算可能触发死亡与容器清理
-        foreach (var e in gmDamageTargets) e.OnDamaged(damage, source, fixedDamage: true);
+        // 先收集再结算：结算可能触发死亡与容器清理；穿透护盾/减伤/单次上限，GM 无敌仍生效
+        foreach (var e in gmDamageTargets) e.OnDamaged(damage, source, pierceModifiers: true);
     }
 
     private static int GmCountAliveEntities()
