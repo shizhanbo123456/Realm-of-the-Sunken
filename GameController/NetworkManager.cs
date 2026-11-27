@@ -251,8 +251,8 @@ public partial class NetworkManager : EnsBehaviour
         // 双方角色各自选择并随 CSLobbyPlayerInfo 上报；阵营完全在房间内确定，服务器按最终阵营取对应一侧
         var info = new CSLobbyPlayerInfo()
         {
-            attackCharacter = EntityType.Attack(Mathf.Clamp(ClientSelection.selectedAttackIndex, 0, GlobalConfig.attack_character_count - 1)),
-            defenseCharacter = EntityType.Defense(Mathf.Clamp(ClientSelection.selectedDefenseIndex, 0, GlobalConfig.defense_character_count - 1)),
+            attackCharacter = EntityType.Attack(Mathf.Clamp(ClientSelection.selectedAttackIndex, 0, EntityConfig.AttackCharacterCount - 1)),
+            defenseCharacter = EntityType.Defense(Mathf.Clamp(ClientSelection.selectedDefenseIndex, 0, EntityConfig.DefenseCharacterCount - 1)),
             name = ClientSelection.playerName,
             aiTakeover = InputManager.IsAiControl, // Home 阶段定下的控制模式，服务器据此决定是否给实体挂 AI 行为状态机
         };

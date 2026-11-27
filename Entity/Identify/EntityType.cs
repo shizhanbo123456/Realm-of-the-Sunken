@@ -1,4 +1,5 @@
 ﻿using System;
+using Ros.Config;
 
 [Serializable]
 public struct EntityType : IEquatable<EntityType>
@@ -32,7 +33,7 @@ public struct EntityType : IEquatable<EntityType>
     public static EntityType Attack4 => Attack(4);
     public static EntityType Attack5 => Attack(5);
     public static EntityType AttackFirst => Attack0;
-    public static EntityType AttackLast => Attack(GlobalConfig.attack_character_count - 1);
+    public static EntityType AttackLast => Attack(EntityConfig.AttackCharacterCount - 1);
 
     // 防守方角色（6 人，基于实际模型资源）
     public static EntityType Defense0 => Defense(0);
@@ -42,7 +43,7 @@ public struct EntityType : IEquatable<EntityType>
     public static EntityType Defense4 => Defense(4);
     public static EntityType Defense5 => Defense(5);
     public static EntityType DefenseFirst => Defense0;
-    public static EntityType DefenseLast => Defense(GlobalConfig.defense_character_count - 1);
+    public static EntityType DefenseLast => Defense(EntityConfig.DefenseCharacterCount - 1);
 
     // 守护雕像：0/1/2 贤者雕像（外围），3 国王雕像（中心）
     public static EntityType SageStatue0 => GuardStatue(0);

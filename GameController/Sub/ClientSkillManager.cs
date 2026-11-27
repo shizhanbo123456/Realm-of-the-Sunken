@@ -199,7 +199,7 @@ public class ClientSkillManager : ClientSubManager
         int saveIndex = loading.Camp switch
         {
             EntityCamp.Attack => ClientSelection.selectedAttackIndex,
-            EntityCamp.Defense => GlobalConfig.attack_character_count + ClientSelection.selectedDefenseIndex,
+            EntityCamp.Defense => EntityConfig.AttackCharacterCount + ClientSelection.selectedDefenseIndex,
             _ => -1,
         };
         if (saveIndex < 0 || Tool.InfoManager == null || Tool.SaveManager == null) return 0;

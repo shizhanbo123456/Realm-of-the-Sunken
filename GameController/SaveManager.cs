@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using Ros.Config;
 
 public class SaveManager : MonoBehaviour
 {
@@ -82,8 +83,8 @@ public class SaveManager : MonoBehaviour
             return;
         }
 
-        ClientSelection.selectedAttackIndex = InRange(attackIndex, GlobalConfig.attack_character_count);
-        ClientSelection.selectedDefenseIndex = InRange(defenseIndex, GlobalConfig.defense_character_count);
+        ClientSelection.selectedAttackIndex = InRange(attackIndex, EntityConfig.AttackCharacterCount);
+        ClientSelection.selectedDefenseIndex = InRange(defenseIndex, EntityConfig.DefenseCharacterCount);
         lastServerIp = string.IsNullOrEmpty(serverIp) ? DefaultServerIp : serverIp;
     }
 

@@ -58,13 +58,13 @@ public class InfoManager : MonoBehaviour
         return EntityConfig.GetByCategory(type);
     }
 
-    // 全局角色下标：0~5 进攻方，6~11 防守方
+    // 全局角色下标：0~进攻方末尾 是进攻方，之后是防守方
     public entity GetPlayerCharacterInfo(int globalIndex)
     {
-        if (globalIndex < GlobalConfig.attack_character_count)
+        if (globalIndex < EntityConfig.AttackCharacterCount)
             return EntityConfig.Get(EntityType.Attack(globalIndex));
 
-        return EntityConfig.Get(EntityType.Defense(globalIndex - GlobalConfig.attack_character_count));
+        return EntityConfig.Get(EntityType.Defense(globalIndex - EntityConfig.AttackCharacterCount));
     }
     #endregion
 }

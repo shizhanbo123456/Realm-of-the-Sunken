@@ -254,6 +254,10 @@ namespace Ros.Config
         public static readonly List<int> onlineAttackCharacters = new();
         public static readonly List<int> onlineDefenseCharacters = new();
 
+        // 角色数量不写死：取配表里该阵营的最大下标 + 1，加行即生效（缺行由启动自检报出来）
+        public static int AttackCharacterCount { get; private set; }
+        public static int DefenseCharacterCount { get; private set; }
+
         internal static void Bake(ConfigManager m)
         {
             content.Clear();
@@ -261,17 +265,23 @@ namespace Ros.Config
             onlineDefenseCharacters.Clear();
             foreach (entity row in m.entityData.Values)
                 content.Add(new EntityType((EntityCategory)row.category, row.value), row);
-            BakeOnlineCharacters(onlineAttackCharacters, EntityCategory.Character_Attack, GlobalConfig.attack_character_count);
-            BakeOnlineCharacters(onlineDefenseCharacters, EntityCategory.Character_Defense, GlobalConfig.defense_character_count);
+            AttackCharacterCount = BakeCharacters(onlineAttackCharacters, EntityCategory.Character_Attack);
+            DefenseCharacterCount = BakeCharacters(onlineDefenseCharacters, EntityCategory.Character_Defense);
         }
 
-        // 只认显式「上线=1」，留空按不上线处理
-        private static void BakeOnlineCharacters(List<int> target, EntityCategory category, int count)
+        // 只认显式「上线=1」，留空按不上线处理；返回值 = 该阵营角色数量
+        private static int BakeCharacters(List<int> target, EntityCategory category)
         {
+            int max = -1;
             foreach (var pair in content)
-                if (pair.Key.category == category && pair.Key.value >= 0 && pair.Key.value < count && pair.Value.online == true)
-                    target.Add(pair.Key.value);
+            {
+                if (pair.Key.category != category) continue;
+                if (pair.Key.value < 0) continue;
+                if (pair.Key.value > max) max = pair.Key.value;
+                if (pair.Value.online == true) target.Add(pair.Key.value);
+            }
             target.Sort();
+            return max + 1;
         }
 
         public static List<int> OnlineCharacters(EntityCategory category)

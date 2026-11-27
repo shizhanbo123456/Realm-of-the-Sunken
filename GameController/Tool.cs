@@ -129,8 +129,8 @@ public class Tool : MonoBehaviour
         }
 
         errors += CheckInfoManager();
-        errors += CheckCharacterRows(EntityCategory.Character_Attack, GlobalConfig.attack_character_count, "进攻方");
-        errors += CheckCharacterRows(EntityCategory.Character_Defense, GlobalConfig.defense_character_count, "防守方");
+        errors += CheckCharacterRows(EntityCategory.Character_Attack, EntityConfig.AttackCharacterCount, "进攻方");
+        errors += CheckCharacterRows(EntityCategory.Character_Defense, EntityConfig.DefenseCharacterCount, "防守方");
         errors += CheckGuardStatueSpawns();
 
         // 资源来源按端分：服务器同步读 AssetsManager 的直接引用，客户端读 ResourceManager 的 AssetReference
@@ -235,8 +235,8 @@ public class Tool : MonoBehaviour
         if (m == null) return 0;
 
         int e = 0;
-        e += CheckList("AssetsManager.AttackCharacterGraphics", m.AttackCharacterGraphics, GlobalConfig.attack_character_count);
-        e += CheckList("AssetsManager.DefenseCharacterGraphics", m.DefenseCharacterGraphics, GlobalConfig.defense_character_count);
+        e += CheckList("AssetsManager.AttackCharacterGraphics", m.AttackCharacterGraphics, EntityConfig.AttackCharacterCount);
+        e += CheckList("AssetsManager.DefenseCharacterGraphics", m.DefenseCharacterGraphics, EntityConfig.DefenseCharacterCount);
         e += CheckList("AssetsManager.ZombieGraphics", m.ZombieGraphics, GlobalConfig.zombie_variant_count);
         e += CheckList("AssetsManager.EliteZombieGraphics", m.EliteZombieGraphics, GlobalConfig.elite_zombie_variant_count);
         e += CheckList("AssetsManager.SageStatueGraphics", m.SageStatueGraphics, GlobalConfig.sage_statue_count);
@@ -368,8 +368,8 @@ public class Tool : MonoBehaviour
         if (m == null) return 0;
 
         int e = 0;
-        e += CheckReferences("ResourceManager.AttackCharacterGraphics", m, ResourceType.AttackCharacterGraphics, GlobalConfig.attack_character_count);
-        e += CheckReferences("ResourceManager.DefenseCharacterGraphics", m, ResourceType.DefenseCharacterGraphics, GlobalConfig.defense_character_count);
+        e += CheckReferences("ResourceManager.AttackCharacterGraphics", m, ResourceType.AttackCharacterGraphics, EntityConfig.AttackCharacterCount);
+        e += CheckReferences("ResourceManager.DefenseCharacterGraphics", m, ResourceType.DefenseCharacterGraphics, EntityConfig.DefenseCharacterCount);
         e += CheckReferences("ResourceManager.ZombieGraphics", m, ResourceType.ZombieGraphics, GlobalConfig.zombie_variant_count);
         e += CheckReferences("ResourceManager.EliteZombieGraphics", m, ResourceType.EliteZombieGraphics, GlobalConfig.elite_zombie_variant_count);
         e += CheckReferences("ResourceManager.SageStatueGraphics", m, ResourceType.SageStatueGraphics, GlobalConfig.sage_statue_count);
@@ -390,8 +390,8 @@ public class Tool : MonoBehaviour
         e += CheckReferences("ResourceManager.ProjectionVFX", m, ResourceType.ProjectionVFX, vfx_projection_count);
         e += CheckReferences("ResourceManager.WeaponPrefabs", m, ResourceType.WeaponPrefabs, weapon_count);
 
-        e += CheckIconReferences("ResourceManager.AttackCharacterIcons", m, IconType.AttackCharacterIcons, GlobalConfig.attack_character_count);
-        e += CheckIconReferences("ResourceManager.DefenseCharacterIcons", m, IconType.DefenseCharacterIcons, GlobalConfig.defense_character_count);
+        e += CheckIconReferences("ResourceManager.AttackCharacterIcons", m, IconType.AttackCharacterIcons, EntityConfig.AttackCharacterCount);
+        e += CheckIconReferences("ResourceManager.DefenseCharacterIcons", m, IconType.DefenseCharacterIcons, EntityConfig.DefenseCharacterCount);
         return e;
     }
 

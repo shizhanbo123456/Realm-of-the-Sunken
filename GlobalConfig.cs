@@ -6,8 +6,7 @@ using Ros.Config;
 public static class GlobalConfig
 {
     #region 角色
-    public const int attack_character_count = 6;
-    public const int defense_character_count = 6;
+    // 角色数量不写死：取 entity 表里该阵营的角色行数（EntityConfig.AttackCharacterCount / DefenseCharacterCount）
 
     // 实体胶囊碰撞体半径：所有实体统一写死，不随模型体型变化（只有高度按包围盒 + 骨骼动态收紧）
     public const float entity_capsule_radius = 0.22f;

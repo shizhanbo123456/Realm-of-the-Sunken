@@ -150,8 +150,8 @@ public class HomePage : PageBase
         bool defense = camp == 1;
         string campName = "进攻";
         if (defense) campName = "防守";
-        int count = GlobalConfig.attack_character_count;
-        if (defense) count = GlobalConfig.defense_character_count;
+        int count = EntityConfig.AttackCharacterCount;
+        if (defense) count = EntityConfig.DefenseCharacterCount;
         if (index < 0 || index >= count)
         {
             request.Reject($"{campName}方下标范围 0~{count - 1}");
@@ -301,8 +301,8 @@ public class HomePage : PageBase
         if (Tool.UIManager != null) Tool.UIManager.OpenSettings();
     }
 
-    // 存档下标：0~5 进攻、6~11 防守；页签只列其中一侧
-    private static bool IsDefense(int saveIndex) => saveIndex >= GlobalConfig.attack_character_count;
+    // 存档下标：进攻方排在前，防守方紧随其后；页签只列其中一侧
+    private static bool IsDefense(int saveIndex) => saveIndex >= EntityConfig.AttackCharacterCount;
 
     // 该阵营已上线的角色下标（列表按它排序，下标即显示位置）
     private static List<int> OnlineCharacters(bool defense)
@@ -341,7 +341,7 @@ public class HomePage : PageBase
     {
         get
         {
-            if (defenseTab) return GlobalConfig.attack_character_count;
+            if (defenseTab) return EntityConfig.AttackCharacterCount;
             return 0;
         }
     }
@@ -521,7 +521,7 @@ public class HomePage : PageBase
     {
         if (!string.IsNullOrEmpty(info.name)) return info.name;
         if (IsDefense(saveIndex))
-            return MessageVariable.F(message_variablesEnum.home_roleName_defense, saveIndex - GlobalConfig.attack_character_count);
+            return MessageVariable.F(message_variablesEnum.home_roleName_defense, saveIndex - EntityConfig.AttackCharacterCount);
         return MessageVariable.F(message_variablesEnum.home_roleName_attack, saveIndex);
     }
 
@@ -541,7 +541,7 @@ public class HomePage : PageBase
         if (Tool.ClientLogicManager == null || Tool.ClientLogicManager.HomePreview == null) return;
         int saveIndex = selectedSaveIndex;
         EntityType type;
-        if (IsDefense(saveIndex)) type = EntityType.Defense(saveIndex - GlobalConfig.attack_character_count);
+        if (IsDefense(saveIndex)) type = EntityType.Defense(saveIndex - EntityConfig.AttackCharacterCount);
         else type = EntityType.Attack(saveIndex);
         Tool.ClientLogicManager.HomePreview.RefreshHome(type);
     }
